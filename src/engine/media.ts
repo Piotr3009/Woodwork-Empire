@@ -24,6 +24,7 @@ import {
 } from './constants';
 import {
   BENCH,
+  bestMachineOf,
   floorMachines,
   hasCentralExtraction,
   hasGate,
@@ -32,7 +33,7 @@ import {
   machineIsOut,
   machinesAtWork,
 } from './machines';
-import { cncOptions, currentStage } from './stages';
+import { currentStage } from './stages';
 import type { Equipment, GameState } from './types';
 
 /** A whole number with the thousands marked, the way the hall writes a figure of m3/h or l/min. */
@@ -381,6 +382,16 @@ export function sprayingOnWetAir(state: GameState, item: Equipment): boolean {
   return compressor === null || !compressorHasDryer(state, compressor);
 }
 
+/** True while a minute of a job's Finishing is done in a booth on wet air: the booth the hall
+ *  sprays in, the best of them, is on a compressor with no dryer. From v53 the finish is the job's
+ *  and not whoever stands at the booth that minute, so it is read off the stage the minute is
+ *  written on (PIOTR, CLAUDE.md T10 3.3; v53). */
+export function finishOnWetAir(state: GameState, stage: { id: string; family: string | null }): boolean {
+  if (stage.id !== 'finishing' || stage.family !== 'sprayBooth') return false;
+  const booth = bestMachineOf(state, 'sprayBooth');
+  return booth !== null && sprayingOnWetAir(state, booth);
+}
+
 /** The hall's air as one line for the hall note and the company board, or empty while every
  *  compressor in it is holding up. */
 export function airLine(check: AirCheck): string {
@@ -481,7 +492,7 @@ export function airHands(state: GameState): AirHands {
   for (const job of state.jobs) {
     const lead = job.assignees[0] ?? null;
     if (job.stage !== 'inProduction' || lead === null) continue;
-    const stage = currentStage(state, job, cncOptions(state, lead, job));
+    const stage = currentStage(state, job);
     if (stage === null) continue;
     const draw = benchDrawsAir(stage);
     if (draw === 'bench') hands.bench += 1;

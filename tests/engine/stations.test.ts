@@ -54,11 +54,12 @@ describe('the station of a stage', () => {
     // The job opens on its cutting, which is the saw the day 1 kit bought: a place at it.
     const state = tick(atTheBench(), 1);
     expect(state.owner.station).toBe(machineStation('tableSaw'));
-    // Without the saw the cutting is done by hand, at his bench, and wants no place
-    // (CLAUDE.md T7 3.6, T25 2.3).
+    // Without the saw the cutting is done by hand (CLAUDE.md T7 3.6). Until v53 that wanted no
+    // place and stood him at his bench with none; now the bench is one of the families every job
+    // is made on, so he takes a place at it and works the job there (PIOTR, 24.09; v53).
     const bare = atTheBench();
     bare.equipment = bare.equipment.filter((item) => item.specId !== 'tableSaw');
-    expect(tick(bare, 1).owner.station).toBe(STATION_BENCH);
+    expect(tick(bare, 1).owner.station).toBe(machineStation('workbench'));
   });
 });
 
@@ -138,9 +139,13 @@ describe('where the owner stands', () => {
     // At a place at the bench, a family with places like any other (CLAUDE.md T25 2.2).
     expect(assembling.owner.station).toBe(machineStation('workbench'));
     // The edgebander comes out of a tool cabinet, so the machining is done at the bench too
-    // (CLAUDE.md T6 3.5).
+    // (CLAUDE.md T6 3.5): from v53 at a place at it, with the tool out of the cabinet in his hands,
+    // where until v53 he stood at his bench with no place.
     job.labourRemaining = job.labourValue * 0.7;
-    expect(tick(state, 1).owner.station).toBe(STATION_BENCH);
+    const machining = tick(state, 1);
+    expect(machining.owner.station).toBe(machineStation('workbench'));
+    // His one minute is the bander's one minute of hours.
+    expect(machining.equipment.find((item) => item.specId === 'edgebander')?.hoursUsed).toBeCloseTo(1 / 60, 6);
   });
 
   it('stands at the office door on a desk task, and at the gate unloading', () => {

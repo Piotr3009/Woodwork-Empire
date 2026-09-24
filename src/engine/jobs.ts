@@ -6,7 +6,6 @@ import {
   BUILDING_ROLES,
   COURIER_COST,
   MEETING_PRICE_THRESHOLD,
-  SAW_FALLBACK_DEFAULT,
   DEADLINE_DAYS_BASE,
   DEADLINE_DAYS_FACTOR,
   DEADLINE_DAYS_MAX,
@@ -47,12 +46,9 @@ import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
   OWNER,
-  familyStopped,
-  findSpec,
   hallHasABench,
   has,
   hasExtraction,
-  machineShortWord,
 } from './machines';
 import {
   materialCostFor,
@@ -64,8 +60,6 @@ import {
   sheetsForCost,
   shortfallOf,
 } from './materials';
-import { familyAirBlock } from './media';
-import { firstOnOrder } from './orders';
 import { ownerIsAvailable } from './owner';
 import {
   stagePlanFor,
@@ -73,7 +67,6 @@ import {
   type StageOptions,
   type StagePlan,
   type StagedJob,
-  cncOptions,
   currentStage,
   jobMinutesFor,
   minutesLeftFor,
@@ -301,14 +294,6 @@ export function jobStage(
   return currentStage(state, job, options);
 }
 
-/** The player's say over whether this job waits for the CNC or goes on the saw when the CNC is
- *  taken (CLAUDE.md T7 3.4). */
-export function setSawFallback(state: GameState, jobId: string, on: boolean): boolean {
-  const job = findJob(state, jobId);
-  if (!job) return false;
-  job.sawFallback = on;
-  return true;
-}
 
 /** Minutes this job still needs from a worker of the given rate (1 is the owner). Every stage
  *  still ahead of him at its own machine's speed (CLAUDE.md T7 3.1). */
@@ -424,7 +409,6 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     bespokeMaterial: enquiry.bespokeMaterial,
     express: enquiry.express,
     byHand: madeByHand,
-    sawFallback: SAW_FALLBACK_DEFAULT,
     needsMeasure: enquiry.needsMeasure,
     labourValue,
     labourRemaining: labourValue,
@@ -745,58 +729,27 @@ export function dropJob(state: GameState, jobId: string): boolean {
  *  hand or not (CLAUDE.md T4 3.4). */
 export const BENCHLESS_HALL = 'the hall has no workbench';
 
-/** A machine that is bought and still on the road is a drawing on the floor: the stage that wants
- *  it stands and waits for the lorry rather than falling back to a pair of hands, and says which
- *  day the lorry is (CLAUDE.md T10 1, 3.10). The board's lock is the one question on-order kit
- *  may answer, and it asked it days ago, when the job was taken. */
-function onOrderBlock(state: GameState, family: string): string {
-  if (has(state, family)) return '';
-  const coming = firstOnOrder(state, family);
-  if (coming === null) return '';
-  return `${machineShortWord(family)} on order, due ${formatCalendarDay(coming.dueDay)}`;
-}
-
-/** Everything in the hall that stops a job at this stage for everybody on it, in the order the
- *  player would notice it: no extraction, no bench in the hall, kit still on the lorry, a machine
- *  that will not run on the air it has, the bags full. Empty while the stage can be worked. A
- *  broken machine, or one away for its service, is not here: it has no places, and the men it
- *  would have held are the day plan's men with no place (CLAUDE.md T25 2.1, 2.3). The day plan
- *  asks this with the stage it has chosen for a man; `hallBlock` asks it for the job as a whole. */
-export function hallStops(state: GameState, job: Job, stage: StagePlan | null): string {
+/** Everything in the hall that stops a job for everybody on it: no extraction in the hall at all,
+ *  or no bench in it. Nothing about one stage's machine stops a job any more: a machine broken, away
+ *  for its service, still on the lorry, short of air or making dust with the bags full has no
+ *  places this minute, and the job's share of it goes at the by hand pace while the men work
+ *  wherever the hall has a place [PIOTR, 24.09: "they never wait for the saw"] (v53). */
+export function hallStops(state: GameState, job: Job): string {
   if (!job.byHand && !hasExtraction(state)) return 'no extraction';
   if (!hallHasABench(state)) return BENCHLESS_HALL;
-  if (job.byHand) return '';
-  const family = stage?.family ?? null;
-  if (family === null) return '';
-  const coming = onOrderBlock(state, family);
-  if (coming !== '') return coming;
-  // A machine that wants more bar than its compressor gives, or dry air where there is none, does
-  // not run at all (PIOTR, CLAUDE.md T10 3.2 rule 1, 3.3).
-  const air = familyAirBlock(state, family);
-  if (air !== '') return `${(findSpec(family)?.name ?? family).toLowerCase()} ${air}`;
-  // The hall's bags are full: one block for every machine that makes dust (CLAUDE.md T12 2.3).
-  if (familyStopped(state, family)?.why === 'bags') return 'bags full';
+  // A lacquer is sprayed in a booth and nowhere else: the board takes the job with the booth on
+  // the lorry (CLAUDE.md T10 3.7), and now that nobody waits for a stage the job can reach its
+  // Finishing before the booth is in the hall. It stops there, for the booth (v53).
+  if (job.finish === 'lacquer' && currentStage(state, job)?.id === 'finishing' && !has(state, 'sprayBooth')) {
+    return 'no spray booth';
+  }
   return '';
 }
 
 /** Everything in the hall that can stop a job, in the order the player would notice it: what
- *  `hallStops` says, and the machine of its stage broken or away for its service when every one of
- *  the family is. Empty while the job is free to be worked on (CLAUDE.md T2 3.9). */
+ *  `hallStops` says. Empty while the job is free to be worked on (CLAUDE.md T2 3.9; v53). */
 export function hallBlock(state: GameState, job: Job): string {
-  // Only the machine of the stage it is at can stop it: a broken edgebander does not stop a job
-  // that is still being cut (CLAUDE.md T7 3.1).
-  const stage = job.byHand ? null : jobStage(state, job, cncOptions(state, leadAssignee(job) ?? OWNER, job));
-  const stops = hallStops(state, job, stage);
-  if (stops !== '') return stops;
-  const family = stage?.family ?? null;
-  if (family === null) return '';
-  const stopped = familyStopped(state, family);
-  if (stopped === null || stopped.why === 'bags') return '';
-  const machine = (findSpec(stopped.item.specId)?.name ?? 'a machine').toLowerCase();
-  // A machine away being serviced stops the stage the way a broken one does, and the card says
-  // which of the two it is (CLAUDE.md T20 2.9.3).
-  if (stopped.why === 'service') return `${machine} is in for a service`;
-  return `${machine} is broken`;
+  return hallStops(state, job);
 }
 
 /** The stages a job can still be sent to the bench from. Once somebody is on it there is nothing
@@ -1163,7 +1116,7 @@ export function addLabour(state: GameState, job: Job, labour: number, stage: Sta
   job.labourRemaining -= labour;
   // The stage's own bag, so the next man on the job can be at another stage (v37).
   job.stageLabour[stage] = (job.stageLabour[stage] ?? 0) + put;
-  const plan = stagePlanFor(state, job, cncOptions(state, leadAssignee(job) ?? OWNER, job));
+  const plan = stagePlanFor(state, job);
   const worked = plan.find((entry) => entry.id === stage);
   if (worked !== undefined && stageLeft(job, plan, worked) <= WORK_EPSILON) {
     closeStageRun(state, job, stage);

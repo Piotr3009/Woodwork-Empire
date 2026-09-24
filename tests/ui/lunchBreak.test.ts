@@ -80,6 +80,9 @@ describe('the dinner hour empties the floor (CLAUDE.md T21 2.12)', () => {
     playing(working);
     expect(onTheFloor().length).toBeGreaterThanOrEqual(7);
     expect(onTheFloor()).toContain('owner');
+    // Seven men and a saw of two places: the saw wears the mark for too few saws for the crew
+    // while they work (PIOTR, 24.09; v53).
+    expect(root().innerHTML).toContain('data-machine-mark=');
     // Noon: the station of every man of them is the canteen, and once his legs have got him there he
     // is behind the door and off the hall.
     const dinner = runClock(working, BREAK_START_MINUTE - working.clock.minute + 5);
@@ -92,7 +95,10 @@ describe('the dinner hour empties the floor (CLAUDE.md T21 2.12)', () => {
     // And nothing is left at the door: a man at his dinner has nothing wrong with him, so he carries
     // no mark, and the bubble of Turn 21 that stood at the door is gone with the away class. Where
     // his crew went is the top bar's to say, which says the hour is a break (CLAUDE.md T22 2.5).
+    // The saw's mark goes with them: nothing is marked at dinner, a machine no more than a man
+    // (PIOTR, 24.09; v53).
     expect(root().innerHTML).not.toContain('data-away-door');
+    expect(root().innerHTML).not.toContain('data-machine-mark');
     expect(root().innerHTML).not.toContain('class="mark"');
     expect(root().innerHTML).toContain('Break');
     // One o'clock: out of the canteen and back at their stations.
@@ -102,6 +108,8 @@ describe('the dinner hour empties the floor (CLAUDE.md T21 2.12)', () => {
     expect(onTheFloor().length).toBeGreaterThanOrEqual(7);
     expect(onTheFloor()).toContain('owner');
     expect(root().innerHTML).not.toContain('data-away-door="canteen"');
+    // And the saw's mark is back with the crew.
+    expect(root().innerHTML).toContain('data-machine-mark=');
   });
 
   it('leaves the man who works through it on the floor by himself', () => {

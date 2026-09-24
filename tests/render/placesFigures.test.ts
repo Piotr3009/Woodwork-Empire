@@ -3,7 +3,9 @@
 // bought, each up to its places, so the second man of a two place saw stands at its second place
 // and the third stands at the second saw, not in a heap at the first. `machineForPlace` is what the
 // figure loop and the machine's card both read, and `placeCellsAt` lays out every family's places,
-// the bench's included. A man with no place stands at his own home cell.
+// the bench's included. A man the saw has no place for works at another machine of his job or at
+// a bench, and a man stands at his own home cell only when every place he could take is taken
+// (PIOTR, 24.09; v53).
 
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '../../src/engine/index';
@@ -98,8 +100,23 @@ describe('the men at their places (CLAUDE.md T25 2.6)', () => {
     expect(new Set(cells).size).toBe(3);
   });
 
-  it('stands a man with no place at his own home cell', () => {
+  it('spreads four men over a one place saw and the benches, and stands a man at home only when every place is taken', () => {
     const state = menAtTheSaws(4, 1, 'used');
+    // Until v53 the three men the used saw had no place for stood at their home cells. Now they
+    // work at the benches, each at a place and a cell of his own.
+    expect(state.workers.slice(0, 4).map((worker) => worker.station)).toEqual([
+      'machine:tableSaw',
+      'machine:workbench',
+      'machine:workbench',
+      'machine:workbench',
+    ]);
+    const cells = ['staff-1', 'staff-2', 'staff-3', 'staff-4'].map((who) => key(cellOf(state, who)));
+    expect(new Set(cells).size).toBe(4);
+    // One bench of one place left: the saw's place and the bench's are the first two men's, and
+    // the third and the fourth have every place they could take taken.
+    const keep = state.equipment.find((item) => item.specId === 'workbench');
+    state.equipment = state.equipment.filter((item) => item.specId !== 'workbench' || item === keep);
+    planPlaces(state);
     const man = state.workers.find((worker) => worker.id === 'staff-3');
     if (man === undefined) throw new Error('the third man is wanted');
     expect(man.station).toBe(STATION_HOME);

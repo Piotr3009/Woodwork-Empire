@@ -36,6 +36,7 @@ import {
 } from '../../src/engine/index';
 import { bankruptcyFloor } from '../../src/engine/economy';
 import { bubbleFor } from '../../src/engine/bubbles';
+import { shortageLine } from '../../src/engine/machines';
 import { canHire } from '../../src/engine/staff';
 import {
   depositCanBePaid,
@@ -234,28 +235,25 @@ describe('(gg) four men, one saw and two jobs, on Very easy', () => {
     expect(GG_QUEUE.opening.cash).toBe(GG.opening.cash);
   });
 
-  it('works three of the four all day and stands the man who cannot have the saw', () => {
+  it('works all four all day, and nobody waits for the one saw', () => {
     // The day's own meters, which are the ones the top bar showed him: five seats (the owner and
-    // his four men) over the 480 minutes of the working day is 2,400 possible, and 1,440 of them
-    // were worked, which is three men times every minute of the day. The fourth man is the second
-    // man of the cutting job, and his whole day, 480 minutes of it, is lost to the one saw. Turn 21
-    // moved him to the other job's bench and worked all 1,920; Piotr reversed that on 19.09, and
-    // this is the figure of the hall that does not move men (CLAUDE.md T22 2.6).
+    // his four men) over the 480 minutes of the working day is 2,400 possible, and 1,920 of them
+    // were worked, which is four men times every minute of the day. From v53 nobody waits for the
+    // saw: the second man of the cutting job works wherever the hall has a free place, and the one
+    // saw costs the hall its pace instead (PIOTR, 24.09). On v52 his whole day, 480 minutes, was
+    // lost to no place and the day worked 1,440.
     expect(GG.record.efficiency.possible).toBe(2400);
-    expect(GG.record.efficiency.worked).toBe(1440);
-    expect(GG.record.efficiency.lost.noPlace).toBe(480);
+    expect(GG.record.efficiency.worked).toBe(1920);
+    expect(GG.record.efficiency.lost.noPlace).toBe(0);
     expect(GG.record.efficiency.lost.noMaterial).toBe(0);
     // The 480 left over is the owner's own seat. He worked the whole of his day, all 480 minutes of
     // it, but on the jobs of work on his own list and never at a bench, so the seat at the benches
     // is nobody at a station and not a man standing about.
     expect(GG.record.efficiency.lost.noPeople).toBe(480);
     expect(GG.record.minutesWorked).toBe(MINUTES_PER_WORKING_DAY);
-    // The man on the saw and the two at the other job's bench put in every minute of the day; the
-    // man behind him at the saw put in none.
-    for (const man of [GG.men[0], GG.men[2], GG.men[3]]) {
-      expect(minutesOf(GG.evening, man?.name ?? ''), man?.name).toBe(MINUTES_PER_WORKING_DAY);
+    for (const man of GG.men) {
+      expect(minutesOf(GG.evening, man.name), man.name).toBe(MINUTES_PER_WORKING_DAY);
     }
-    expect(minutesOf(GG.evening, GG.men[1]?.name ?? '')).toBe(0);
   });
 
   it('leaves every man on the job he was assigned to, all day', () => {
@@ -265,122 +263,86 @@ describe('(gg) four men, one saw and two jobs, on Very easy', () => {
     // and the two at the bench are still its own [PIOTR, 19.09] (CLAUDE.md T22 2.6).
     expect(cutting.assignees).toEqual([GG.men[0]?.id, GG.men[1]?.id]);
     expect(bench.assignees).toEqual([GG.men[2]?.id, GG.men[3]?.id]);
-    const waiting = GG.evening.workers.find((worker) => worker.id === GG.men[1]?.id);
-    expect(waiting?.jobId).toBe(GG.cuttingId);
-    // 480 minutes into the cutting job, one man's day; 960 into the assembly job, two men's.
-    expect(cutting.productionMinutes).toBe(480);
+    expect(GG.evening.workers.find((worker) => worker.id === GG.men[1]?.id)?.jobId).toBe(GG.cuttingId);
+    // Two men's day into each job, 960 minutes apiece (v53; on v52 the cutting job had 480, one
+    // man's, because its second man stood).
+    expect(cutting.productionMinutes).toBe(960);
     expect(bench.productionMinutes).toBe(960);
   });
 
-  it('has the man the saw has no place for at his home cell every minute of the day', () => {
-    // Every minute of the day was watched and the men were read where they stood: 480 readings of
-    // a man at his home cell with no place, and every one of them is the second man of the cutting
-    // job, from 08:00 to the end of the day, the dinner hour apart. The man at the saw is never
-    // among them: the day plan gives the one place out once and it does not flicker between two
-    // minutes, where the queue had him stood at the saw's waiting cell at 08:00 and at 13:00
-    // (CLAUDE.md T25 2.3).
-    const first = GG.men[0];
-    const second = GG.men[1];
-    if (first === undefined || second === undefined) throw new Error('the two men are wanted here');
-    expect(GG.stood).toHaveLength(480);
-    expect(GG.stood.filter((reading) => reading.who === first.name)).toEqual([]);
-    expect(GG.stood.filter((reading) => reading.who === second.name)).toHaveLength(480);
-    for (const reading of GG.stood) expect(reading.waitingFor).toBe('tableSaw');
-    // The job's own row says nothing: no place is the man's, and it is said over him and on his
-    // card (CLAUDE.md T25 2.3, 2.8).
+  it('has nobody at his home cell for want of a place, any minute of the day', () => {
+    // Every minute of the day was watched and the men were read where they stood: not one reading
+    // of a man with no place (v53; 480 on v52, all of them the second man of the cutting job).
+    expect(GG.stood).toEqual([]);
     expect(jobOn(GG.evening, GG.cuttingId).blockedBy).toBe('');
     expect(jobOn(GG.evening, GG.benchId).blockedBy).toBe('');
+    // The bar still says where each job has got to (PIOTR, 24.09: "the bar shows the stages").
     expect(stageText(GG.evening, jobOn(GG.evening, GG.cuttingId))).toBe('Cutting');
     expect(stageText(GG.evening, jobOn(GG.evening, GG.benchId))).toBe('Assembly');
   });
 
-  it('marks a man only while something is wrong with him, and never a man at work', () => {
-    // The marks of CLAUDE.md T22 2.5, as they stood on the played day. The two men at the assembly
-    // of the second job and the man at the saw worked every minute of it and carry nothing at all.
-    // The second man of the cutting job carried a mark all day, and it said the one thing that was
-    // true of him: the hall has no place for him at the saw (CLAUDE.md T25 2.3). The dinner hour
-    // is no mark either, because a man at his lunch has nothing wrong with him.
-    const waiting = GG.men[1]?.name ?? '';
-    expect(GG.said.get(GG.men[0]?.name ?? '')).toBeUndefined();
-    expect(GG.said.get(waiting)).toEqual(['no place at the saw']);
-    for (const man of GG.men.slice(2)) {
-      expect(GG.said.get(man.name), man.name).toBeUndefined();
-    }
+  it('marks nobody, and says on the saw what one saw costs the crew', () => {
+    // Nothing was wrong with any of the four, so nobody carried a mark all day (v53; on v52 the
+    // second man of the cutting job carried `no place at the saw` all day). What the one saw
+    // costs is written on the saw and on the Output sheet: five men, the owner among them, and one
+    // place (PIOTR, 24.09: "me and two men is three").
+    for (const man of GG.men) expect(GG.said.get(man.name), man.name).toBeUndefined();
+    expect(shortageLine(GG.opening, 'tableSaw')).toBe('Too few saws for the crew: 5 men, 1 place, 4 work at 67%');
     console.log(
       '(gg) FOUR MEN, ONE SAW, TWO JOBS\n' +
         `the hall on day ${GG.opening.clock.day}: ${GG.men.length} joiners, ` +
         `${GG.opening.equipment.filter((item) => item.specId === 'tableSaw').length} saw, ` +
         `${GG.opening.stock.sheets} sheets on the rack\n` +
-        `Small kitchen at its cutting stage with ${GG.men[0]?.name} and ${waiting} on it; ` +
-        `Garage shelves at its assembly with ${GG.men[2]?.name} and ${GG.men[3]?.name}\n` +
         `the day's meters: ${GG.record.efficiency.worked} minutes worked of ` +
         `${GG.record.efficiency.possible} possible, ` +
         `${GG.record.efficiency.lost.noPlace} lost to no place\n` +
         `Small kitchen took ${jobOn(GG.evening, GG.cuttingId).productionMinutes} minutes, ` +
-        `Garage shelves ${jobOn(GG.evening, GG.benchId).productionMinutes}; ` +
-        `${waiting} spent his day at his home cell with no place at the saw, on the job he was put on\n` +
-        `readings of a man with no place, all day: ${GG.stood.length}`,
+        `Garage shelves ${jobOn(GG.evening, GG.benchId).productionMinutes}\n` +
+        `on the saw: ${shortageLine(GG.opening, 'tableSaw')}`,
     );
   });
 });
 
 describe('(gg) the same hall with nothing in it but the saw s own work', () => {
-  it('stands three of the four men at the saw, and moves nobody', () => {
-    // The control: both jobs at their cutting stage, so there is no bench work in the hall to be
-    // had. One saw, one man cutting, and the other three stand: 480 minutes worked of the same
-    // 2,400, and 1,440 lost to a machine, which is three men times every minute of the day. These
-    // are the figures the hall had in Turn 21 as well: with nothing else in the hall to do there was
-    // nowhere to move a man to, so the run beside this one is the whole of the difference 2.6 makes
-    // (CLAUDE.md T22 2.6).
+  it('works all four men all day, and moves nobody', () => {
+    // The control: both jobs at their cutting stage. On v52 one man cut and three stood, 480
+    // minutes worked and 1,440 lost to no place. From v53 the job's stages are its bar and nobody
+    // waits for one: the three the saw has no place for work the jobs at the edgebander and the
+    // benches, 1,920 minutes worked and nothing lost (PIOTR, 24.09).
     expect(GG_QUEUE.record.efficiency.possible).toBe(2400);
-    expect(GG_QUEUE.record.efficiency.worked).toBe(480);
-    expect(GG_QUEUE.record.efficiency.lost.noPlace).toBe(1440);
+    expect(GG_QUEUE.record.efficiency.worked).toBe(1920);
+    expect(GG_QUEUE.record.efficiency.lost.noPlace).toBe(0);
     const cutting = jobOn(GG_QUEUE.evening, GG_QUEUE.cuttingId);
     const bench = jobOn(GG_QUEUE.evening, GG_QUEUE.benchId);
     expect(cutting.assignees).toEqual([GG_QUEUE.men[0]?.id, GG_QUEUE.men[1]?.id]);
     expect(bench.assignees).toEqual([GG_QUEUE.men[2]?.id, GG_QUEUE.men[3]?.id]);
-    expect(cutting.productionMinutes).toBe(480);
-    expect(bench.productionMinutes).toBe(0);
-    expect(minutesOf(GG_QUEUE.evening, GG_QUEUE.men[0]?.name ?? '')).toBe(480);
-    for (const man of GG_QUEUE.men.slice(1)) {
-      expect(minutesOf(GG_QUEUE.evening, man.name), man.name).toBe(0);
+    expect(cutting.productionMinutes).toBe(960);
+    expect(bench.productionMinutes).toBe(960);
+    for (const man of GG_QUEUE.men) {
+      expect(minutesOf(GG_QUEUE.evening, man.name), man.name).toBe(MINUTES_PER_WORKING_DAY);
     }
   });
 
-  it('says why they stand, over their heads', () => {
+  it('says nothing over their heads, and nobody stands', () => {
     const cutting = jobOn(GG_QUEUE.evening, GG_QUEUE.cuttingId);
     const bench = jobOn(GG_QUEUE.evening, GG_QUEUE.benchId);
-    // No job is stopped: the saw works all day. The three men it has no place for say so over their
-    // heads, in the trade's own short word for the machine (CLAUDE.md T21 2.7, T25 2.3).
     expect(cutting.blockedBy).toBe('');
     expect(bench.blockedBy).toBe('');
-    expect(stageText(GG_QUEUE.evening, cutting)).toBe('Cutting');
-    expect(stageText(GG_QUEUE.evening, bench)).toBe('Cutting');
-    const words = [...GG_QUEUE.said.values()].flat();
-    // And nothing else was said all day: every mark is one of the things that are wrong.
-    expect([...new Set(words)]).toEqual(['no place at the saw']);
-    // 1,440 readings of a man with no place: the three men the saw has no place for, every one of
-    // the 480 minutes of the day. The queue had 962 and a third man "short of cut parts" out of
-    // them; nobody is sent anywhere now, so all three are the same reading.
-    expect(GG_QUEUE.stood).toHaveLength(1440);
-    expect(new Set(GG_QUEUE.stood.map((reading) => reading.who)).size).toBe(3);
-    for (const reading of GG_QUEUE.stood) expect(reading.waitingFor).toBe('tableSaw');
+    // Not one mark and not one reading of a man with no place, all day (v53; on v52 the three men
+    // the saw had no place for said `no place at the saw` over their heads, 1,440 readings).
+    expect([...GG_QUEUE.said.values()].flat()).toEqual([]);
+    expect(GG_QUEUE.stood).toEqual([]);
     console.log(
       '(gg) THE SAME HALL WITH NOTHING BUT THE SAW S OWN WORK\n' +
         `the day's meters: ${GG_QUEUE.record.efficiency.worked} minutes worked of ` +
         `${GG_QUEUE.record.efficiency.possible} possible, ` +
-        `${GG_QUEUE.record.efficiency.lost.noPlace} lost to no place at the saw\n` +
+        `${GG_QUEUE.record.efficiency.lost.noPlace} lost to no place\n` +
         `Small kitchen took ${cutting.productionMinutes} minutes, ` +
-        `Garage shelves ${bench.productionMinutes}\n` +
-        `readings of a man with no place, all day: ${GG_QUEUE.stood.length}\n` +
-        `what they said: ${[...new Set(words)].sort().join(' | ')}`,
+        `Garage shelves ${bench.productionMinutes}`,
     );
   });
 });
 
-// ---------------------------------------------------------------------------
-// (hh) A fifty thousand pound job dropped with seven thousand in the bank
-//      (PIOTR, 18.09; CLAUDE.md T21 0, 2.2, 2.3, 2.4, 3, 7)
 // ---------------------------------------------------------------------------
 
 /** Piotr's own evening of 18.09: he dropped a fifty thousand pound job with seven thousand in the

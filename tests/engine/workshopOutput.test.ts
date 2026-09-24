@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // One Output number, the workshop's average (PIOTR, 21.09; v40): what a minute of production has
-// been worth on average today, the hall, every man, his manager, the owner's absence and the class
-// of machine at his stage in it, weighted by the minutes worked. The top bar shows it and the
+// been worth on average today, the hall, every man, his manager, the owner's absence and his job's
+// one pace (v53) in it, weighted by the minutes worked. The top bar shows it and the
 // company board says it beside the hall's own number. The boss's own overtime factor is his own
 // minutes' and lives in the day meter's tip, not on the bar as a second Output.
 
@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest';
 import { WORKER_RATES } from '../../src/engine/constants';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
-import { classPaceOf, hallProductivityFactor, workshopOutputToday } from '../../src/engine/machines';
+import { hallProductivityFactor, workshopOutputToday } from '../../src/engine/machines';
+import { jobPace } from '../../src/engine/stages';
 import { renderTopbar } from '../../src/ui/topbar';
 import { renderCompany } from '../../src/ui/company';
 import {
@@ -50,15 +51,23 @@ describe('the workshop\'s average output today (v40)', () => {
     expect(workshopOutputToday(state)).toBe(hallProductivityFactor(state));
   });
 
-  it('is the owner\'s minutes at the saw\'s class over a clean hall when he works alone', () => {
+  it('is the owner\'s minutes at the job\'s one pace over a clean hall when he works alone', () => {
     const worked = tick(ownerAtTheBench('standard'), 60);
     expect(worked.dayStats.workMinutes).toBe(60);
-    const saw = worked.equipment.find((item) => item.specId === 'tableSaw');
-    const sawClass = saw === undefined ? 1 : classPaceOf(saw);
-    // Sixty minutes of cutting at the standard saw's class, the owner at 1.0, the hall clean:
-    // the average is the class itself, and the sum behind it is sixty of it.
-    expect(worked.dayStats.outputWorth).toBeCloseTo(60 * sawClass * hallProductivityFactor(worked), 3);
-    expect(workshopOutputToday(worked)).toBe(Math.round(sawClass * hallProductivityFactor(worked) * 100) / 100);
+    const job = firstJob(worked);
+    // Sixty minutes of the job at its one pace, the owner at 1.0, the hall clean: the average is
+    // the pace itself, and the sum behind it is sixty of it. Until v53 it was sixty minutes at the
+    // standard saw's 1.05, 63.00, because the owner was at the cutting; from v53 the saw's 1.05 is
+    // on the cutting's quarter of the job only, 1 / (0.25 / 1.05 + 0.75) = 1.0120, and the sum is
+    // 60.72 (PIOTR, 24.09; v53).
+    expect(jobPace(worked, job)).toBeCloseTo(1 / (0.25 / 1.05 + 0.75), 10);
+    expect(hallProductivityFactor(worked)).toBe(1);
+    // The sum is booked to four places a minute (`bookOutputMinute`), so each minute adds 1.0120
+    // of the pace's 1.012048: sixty of them are 60.72.
+    const booked = Math.round(jobPace(worked, job) * hallProductivityFactor(worked) * 10000) / 10000;
+    expect(worked.dayStats.outputWorth).toBeCloseTo(60 * booked, 6);
+    expect(worked.dayStats.outputWorth).toBeCloseTo(60.72, 6);
+    expect(workshopOutputToday(worked)).toBe(Math.round(jobPace(worked, job) * hallProductivityFactor(worked) * 100) / 100);
   });
 
   it('weights the two of them by their minutes, the joiner at his rate', () => {
@@ -67,8 +76,8 @@ describe('the workshop\'s average output today (v40)', () => {
     const hall = hallProductivityFactor(worked);
     const owner = worked.days.length; // no day has closed: the two are on today's stats
     expect(owner).toBe(0);
-    // One of them at 1.0 and one at the novice's 0.6, each for sixty minutes at his own stage's
-    // class: the average is between the two and nearer neither than the minutes say.
+    // One of them at 1.0 and one at the novice's 0.6, each for sixty minutes at his job's one pace
+    // (v53): the average is between the two and nearer neither than the minutes say.
     const average = workshopOutputToday(worked);
     expect(average).toBeLessThan(1 * 1.3 * hall + 0.001);
     expect(average).toBeGreaterThan(WORKER_RATES.novice * hall - 0.001);

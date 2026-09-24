@@ -1,7 +1,8 @@
 // A machine on order is a drawing on the floor and nothing more (CLAUDE.md T10 1, 3.10). It cuts
 // nothing, it has no places and it answers no question about what is in the hall. The one
 // question it may answer is the board's lock, and the board asked it days before anybody cut
-// anything.
+// anything. Until v53 the stage that wanted it stood and waited for the lorry; from v53 nothing
+// stops a job but the whole hall, so its share goes by hand until the lorry comes (PIOTR, 24.09).
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -16,8 +17,19 @@ import {
 import { createOnOrder } from '../../src/engine/orders';
 import { lockReasonFor } from '../../src/engine/catalog';
 import { template } from '../../src/engine/catalog';
-import { acceptNow, act, fillRack, firstJob, newGame, placeEnquiry, placeEquipment, runClock } from '../helpers';
-import { formatCalendarDay } from '../../src/engine/index';
+import { OWNER_LABOUR_PER_MINUTE } from '../../src/engine/constants';
+import { jobPace, stageSpeed } from '../../src/engine/stages';
+import {
+  acceptNow,
+  act,
+  fillRack,
+  firstJob,
+  newGame,
+  placeEnquiry,
+  placeEquipment,
+  runClock,
+  withAir,
+} from '../helpers';
 import type { GameState } from '../../src/engine/index';
 
 /** A hall with a bench and an extractor, a sheet job ready for the bench, and a table saw that is
@@ -69,33 +81,40 @@ describe('kit that is bought and still on the road', () => {
     expect(hasExtraction(state)).toBe(false);
   });
 
-  it('makes the Cutting stage wait, with the lorry named, instead of falling back to hands', () => {
+  it('stops no job for the saw on the lorry: the cutting goes by hand until it comes', () => {
     const state = sawOnTheRoad();
-    const order = state.onOrder[0];
-    if (!order) throw new Error('the saw should be on order');
-    // The trade's own word for the machine and the day the lorry comes (CLAUDE.md T21 2.7,
-    // T25 2.2: nothing says it waits for a machine).
-    const wanted = `saw on order, due ${formatCalendarDay(order.dueDay)}`;
-    expect(hallBlock(state, firstJob(state))).toBe(wanted);
-    expect(startProductionCheck(state, firstJob(state))).toEqual({ ok: false, reason: wanted });
+    // Until v53 the job stood with `saw on order, due ...` on it and Start production refused it.
+    // Now the lorry stops nothing: the cutting, and the machining with no edgebander in the hall,
+    // go at the by hand 1 / 1.5, and the rest at 1.00 (PIOTR, 24.09; v53).
+    expect(hallBlock(state, firstJob(state))).toBe('');
+    expect(startProductionCheck(state, firstJob(state))).toEqual({ ok: true, reason: '' });
+    expect(stageSpeed(state, firstJob(state), 'cutting')).toEqual({ speed: 1 / 1.5, byHand: true });
+    expect(jobPace(state, firstJob(state))).toBeCloseTo(1 / (0.4 * 1.5 + 0.6), 10);
   });
 
-  it('writes that line on the job the minute the owner stands at it', () => {
-    const state = sawOnTheRoad();
-    const order = state.onOrder[0];
-    if (!order) throw new Error('the saw should be on order');
+  it('writes nothing on the job the minute the owner stands at it, and he cuts by hand at a bench', () => {
+    // A compressor behind the bench, so the minute is the by hand cutting's and nothing of the air.
+    const state = withAir(sawOnTheRoad());
     const next = runClock(act(state, { type: 'WORK_HERE', jobId: firstJob(state).id }), 10);
     const job = firstJob(next);
-    expect(job.blockedBy).toBe(`saw on order, due ${formatCalendarDay(order.dueDay)}`);
-    // And nothing was cut while it waited.
-    expect(job.labourRemaining).toBe(job.labourValue);
+    expect(job.blockedBy).toBe('');
+    expect(next.owner.station).toBe('machine:workbench');
+    // Until v53 nothing was cut while it waited; now ten minutes of it at the job's one pace,
+    // 5.56 of labour, all of it on the cutting where the bar stands.
+    expect(job.labourValue - job.labourRemaining).toBeCloseTo((10 * OWNER_LABOUR_PER_MINUTE) / 1.2, 6);
+    expect(job.stageLabour.cutting ?? 0).toBeCloseTo((10 * OWNER_LABOUR_PER_MINUTE) / 1.2, 6);
   });
 
-  it('lets the work start the moment the same saw is standing in the hall', () => {
+  it('puts the cutting on the saw the moment the same saw is standing in the hall', () => {
     const state = sawOnTheRoad();
     placeEquipment(state, 'tableSaw', { variantId: 'budget', x: 2, y: 1 });
     state.onOrder = [];
     expect(hallBlock(state, firstJob(state))).toBe('');
+    // The saw's one place, and the cutting at its pace: the job's one pace rises from 0.8333 by
+    // hand to 0.9302, the machining still by hand with no edgebander in the hall (v53).
+    expect(hallPlaces(state, 'tableSaw')).toBe(1);
+    expect(stageSpeed(state, firstJob(state), 'cutting')).toEqual({ speed: 1, byHand: false });
+    expect(jobPace(state, firstJob(state))).toBeCloseTo(1 / (0.25 + 0.15 * 1.5 + 0.6), 10);
   });
 
   it('falls back to a pair of hands when nothing of the family is owned or ordered', () => {

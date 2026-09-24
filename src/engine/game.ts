@@ -177,7 +177,6 @@ import {
   resolveClientOffer,
   runBookedTransport,
   dropJob,
-  setSawFallback,
   BUILDING_ROLES,
   takeOffJob,
   takeOverJob,
@@ -213,7 +212,7 @@ import {
 } from './owner';
 import { paidHoursToday } from './rate';
 import { chance, int, makeId } from './rng';
-import { type StagePlan, labourPerMinute, tradeFactor } from './stages';
+import { labourPerMinute } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -223,7 +222,7 @@ import {
   extractionKit,
   extractionRunning,
   hallAirCheck,
-  sprayingOnWetAir,
+  finishOnWetAir,
   underExtracted,
 } from './media';
 import { cubicMetres, metresBy, plural } from './text';
@@ -236,6 +235,7 @@ import {
   storageSaleBlock,
 } from './stations';
 import {
+  type AtWork,
   type Hand,
   jobOf,
   placeHand,
@@ -1600,14 +1600,6 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
 }
 
 
-/** One man putting one minute into one job, with the machine he got for it. Gathered before the
- *  hall is measured, because the extraction and the air sums are the sums of the machines running
- *  this very minute and not of last minute's (CLAUDE.md T10 3.1, 3.2). */
-interface AtWork {
-  hand: Hand;
-  stage: StagePlan;
-  machine: Equipment | null;
-}
 
 /** The seats the workshop could have worked this minute: every hired man on the floor and in
  *  today, and the owner while he is in the workshop (CLAUDE.md T13 3.5). Nobody at dinner. */
@@ -1669,7 +1661,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     if (place.noMaterial) raiseNoMaterial(state);
     if (place.lost !== null) lose(place.lost);
     if (place.work === null) continue;
-    atWork.push({ hand, stage: place.work.stage, machine: place.work.machine });
+    atWork.push({ hand, ...place.work });
   }
   // The men on a standing contract put their minute in beside the jobs (CLAUDE.md T13 3.16).
   const contract = runContractMinute(state, plan);
@@ -1706,7 +1698,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
   // it out and what fills the hall's bags (CLAUDE.md T7 2, T12 2.3).
   const used = new Map<string, number>();
-  for (const { hand, stage, machine } of running) {
+  for (const { hand, stage, book, pace, machine } of running) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
     if (worker) {
       worker.productionMinutes += 1;
@@ -1722,30 +1714,28 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     // A machine books an hour for every hour a man works at one of its places (PIOTR, 21.09:
     // "keep the hours"; CLAUDE.md T25 section 6).
     if (machine !== null) used.set(machine.id, (used.get(machine.id) ?? 0) + 1);
-    // The pace is the hall's and not the machine's he is at: the stage's own speed, the best of
-    // its family in the hall, whichever of them his place is at (CLAUDE.md T25 2.4).
-    let speed = stage.speed;
+    // The pace is the job's, one figure for the whole of it: every stage at the hall's pace for its
+    // family and his trade's worth at it, whichever machine his place is at (T25 2.4; v53).
+    let speed = pace;
     // A compressor that is short of litres runs every pneumatic consumer on it at 0.7 for the
     // minute, and a booth on wet air takes half as long again over the finish and marks the
     // piece (PIOTR, CLAUDE.md T10 3.2, 3.3).
     const atTheBench = benchDrawsAir(stage) !== null;
     speed *= airFactorFor(state, air, machine, atTheBench);
-    if (machine !== null && sprayingOnWetAir(state, machine)) {
+    if (finishOnWetAir(state, book)) {
       speed /= WET_AIR_FINISH_FACTOR;
       hand.job.wetFinish = true;
     }
     // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3).
     const compressor = drawingOn(state, machine, atTheBench);
     if (compressor !== null) used.set(compressor.id, (used.get(compressor.id) ?? 0) + 1);
-    // What the man's own trade is worth at this stage: a sprayer's full minute at the booth, a
-    // joiner's slower one there, and neither anywhere else (CLAUDE.md T19 2.6).
-    const trade = tradeFactor(worker?.role ?? null, stage.family);
-    const minute = labourPerMinute(hand.rate * trade, speed) * hall;
-    // The minute's own multiplier, for the workshop's average output (v40): the same four things
-    // the labour is made of, and nothing else, booked against the man who worked it so the Output
+    const minute = labourPerMinute(hand.rate, speed) * hall;
+    // The minute's own multiplier, for the workshop's average output (v40): the same things the
+    // labour is made of, and nothing else, booked against the man who worked it so the Output
     // sheet can say who made the number (v50). The night's minutes book theirs in `workMinute`.
-    bookOutputMinute(state, hand.who, hand.rate * trade * speed * hall);
-    if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
+    bookOutputMinute(state, hand.who, hand.rate * speed * hall);
+    // Written on the stage the bar stands at, so the bar fills in order (v53).
+    if (addLabour(state, hand.job, minute, book.id)) raiseJobAtGate(state, hand.job);
   }
   // The extraction books its hours the whole time it is running, whoever is at what: a fan is
   // pulling for the hall and not for one man, and it is serviced on those hours exactly as a
@@ -2177,9 +2167,6 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'DROP_JOB':
       // The client has his deposit back and the company takes the hit (CLAUDE.md T9 3.9).
       dropJob(next, action.jobId);
-      break;
-    case 'SET_SAW_FALLBACK':
-      setSawFallback(next, action.jobId, action.on);
       break;
     case 'WORK_HERE': {
       const job = action.jobId ? findJob(next, action.jobId) : oldestReadyJob(next);

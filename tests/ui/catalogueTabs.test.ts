@@ -199,7 +199,9 @@ describe('the tabs', () => {
       'toolCabinet',
       'locker',
     ]);
-    expect(folders('timberMachines')).toEqual(['thicknesser', 'solidWoodTools', 'spindleMoulder']);
+    // The timber tool set's folder is gone with the family: the thicknesser and the spindle
+    // moulder are all a furniture shop needs (PIOTR, 24.09; v53).
+    expect(folders('timberMachines')).toEqual(['thicknesser', 'spindleMoulder']);
     // Every line of the catalogue is in exactly one folder of exactly one tab, except the shared
     // spindle moulder, which is in both machine tabs (CLAUDE.md T13 3.13).
     const all = EQUIPMENT_TABS.flatMap((tab) => folders(tab.id));

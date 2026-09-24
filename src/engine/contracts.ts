@@ -52,7 +52,7 @@ import {
   classPaceOf,
   bookOutputMinute,
   findSpec,
-  hallPlaces,
+  placeShortages,
   hallProductivityFactor,
   has,
   machineIsShared,
@@ -66,7 +66,7 @@ import { chance, float, int, pick } from './rng';
 import type { RngCarrier } from './rng';
 import { crewHasGoneHome, isWorkingToday, joiners } from './staff';
 import { STATION_DOOR, STATION_HOME } from './stations';
-import { cncOptions, familyForStage, jobOnCnc, stageSpeed } from './stages';
+import { familyForStage, jobOnCnc, stageSpeed } from './stages';
 import type { Contract, ContractWeek, Equipment, GameState, StageId, Worker } from './types';
 
 /** What a man on a contract carries in `jobId`, so the jobs leave him alone: not available for
@@ -372,12 +372,12 @@ export function contractMinuteCost(state: GameState, worker: Worker | null): num
   return ownerDrawPerDay(state) / MINUTES_PER_WORKING_DAY;
 }
 
-/** What the hall does to this piece for this man: the machine of the piece's own stage, the CNC
- *  when he can have one, or the by hand reading when the hall has neither. It is the same reading
- *  the minute loop works at, so the card's minutes are the minutes he really takes
- *  (CLAUDE.md T20 2.1.1). */
-export function contractPieceSpeed(state: GameState, who: string, piece: ContractPieceSpec): number {
-  const { stage } = pieceStage(state, who, piece);
+/** What the hall does to this piece: the machine of the piece's own stage, the CNC when the hall
+ *  has one that runs, or the by hand reading when it has neither. It is the same reading the minute
+ *  loop works at, so the card's minutes are the minutes a man really takes (CLAUDE.md T20 2.1.1;
+ *  v53). */
+export function contractPieceSpeed(state: GameState, piece: ContractPieceSpec): number {
+  const { stage } = pieceStage(state, piece);
   return stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
 }
 
@@ -416,12 +416,12 @@ function resultAtSpeed(
   // His minutes over a piece, which is what the day is counted in: never less than one.
   const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
   const labourCost = pence(minutes * contractMinuteCost(state, worker));
-  const machine = candidate === null ? pieceMachine(state, worker === null ? OWNER : worker.id, piece) : null;
+  const machine = candidate === null ? pieceMachine(state, piece) : null;
   const wearPerMinute =
     candidate !== null ? candidate.wearPerMinute : machine === null ? 0 : machineWearPerMinute(machine);
   // The wear is charged on the minutes the man actually stands at the machine and on no other:
   // none on a minute at the bench and none on a minute by hand [PIOTR, 22.09] (CLAUDE.md T24 2.4).
-  const machineMinutes = minutes * pieceMachineShare(state, worker === null ? OWNER : worker.id, piece);
+  const machineMinutes = minutes * pieceMachineShare(state, piece);
   const wear = pence(machineMinutes * wearPerMinute);
   const margin = pence(contract.pricePerPiece - piece.material - labourCost - wear);
   const piecesPerDay = Math.floor(MINUTES_PER_WORKING_DAY / minutes);
@@ -466,9 +466,7 @@ export function contractResultFor(
   contract: Contract,
   worker: Worker | null,
 ): ContractResult {
-  const piece = contractPiece(contract);
-  const who = worker === null ? OWNER : worker.id;
-  return resultAtSpeed(state, contract, worker, contractPieceSpeed(state, who, piece));
+  return resultAtSpeed(state, contract, worker, contractPieceSpeed(state, contractPiece(contract)));
 }
 
 /** How many men like this one the contract wants at the least: the client's day against what one
@@ -481,11 +479,12 @@ export function contractMenNeeded(state: GameState, contract: Contract, worker: 
 }
 
 /** What the hall makes of this contract's piece in a week at full crew, against what the term
- *  wants: every joiner on the books on it, as many of them as the hall has places for at the
- *  family the piece wants, in the order they were hired (2.3), each at his own rate and the hall's
- *  pace for the family (2.4), over the working days of a week. No new rule, the arithmetic the
- *  engine already has [PIOTR, 21.09: "we take a contract and we do not know whether the hall can
- *  do it"] (CLAUDE.md T25 2.7). The owner is not in it, because a contract is work for a joiner. */
+ *  wants: every joiner on the books on it, each at his own rate and the hall's pace for the
+ *  piece's family (2.4), with what the families too few for the crew take off the whole hall, over
+ *  the working days of a week. Nobody waits for a place, so every joiner counts (v53). No new rule,
+ *  the arithmetic the engine already has [PIOTR, 21.09: "we take a contract and we do not know
+ *  whether the hall can do it"] (CLAUDE.md T25 2.7). The owner is not in it, because a contract is
+ *  work for a joiner. */
 export interface HallCapacity {
   /** Pieces a week, whole. */
   perWeek: number;
@@ -497,13 +496,10 @@ export interface HallCapacity {
 
 export function contractHallCapacity(state: GameState, contract: Contract): HallCapacity {
   const piece = contractPiece(contract);
-  const { stage } = pieceStageOn(state, piece, true);
-  const speed = stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
-  const family = contractFamilyOf(state, piece, true);
-  const places = family === null ? Number.POSITIVE_INFINITY : hallPlaces(state, family);
+  const speed = contractPieceSpeed(state, piece) * placeShortages(state).reduce((all, short) => all * short.factor, 1);
   const week = MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK;
   let perWeek = 0;
-  for (const worker of joiners(state).slice(0, places)) {
+  for (const worker of joiners(state)) {
     const rate = worker.rate > 0 ? worker.rate : 1;
     // His minutes over a piece, rounded the way his card rounds them (`resultAtSpeed`).
     const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
@@ -545,7 +541,7 @@ export function contractMachineTip(
   const piece = contractPiece(contract);
   const worker = contractWorkerOf(state, who);
   const now = contractResultFor(state, contract, worker);
-  const { stage, family } = pieceStage(state, who, piece);
+  const { stage, family } = pieceStage(state, piece);
   const staged = stagedJob(0, 'sheet', false);
   // The machines that would do this piece's own stage: the family it is done on, and the CNC,
   // which takes the cutting off the saw altogether (CLAUDE.md T7 3.4).
@@ -820,9 +816,9 @@ function pieceStageOn(state: GameState, piece: ContractPieceSpec, cnc: boolean):
   return { stage, family: familyForStage(staged, stage) };
 }
 
-/** The same for a man already on the contract: on the CNC or off it as the day plan put him. */
-function pieceStage(state: GameState, who: string, piece: ContractPieceSpec): { stage: StageId; family: string | null } {
-  return pieceStageOn(state, piece, cncOptions(state, who, { sawFallback: true }).cnc ?? true);
+/** The same for a man already on the contract: on the CNC while the hall has one that runs (v53). */
+function pieceStage(state: GameState, piece: ContractPieceSpec): { stage: StageId; family: string | null } {
+  return pieceStageOn(state, piece, true);
 }
 
 /** The family a man on a contract's piece is done on, the CNC's when `cnc` says the plan still
@@ -854,8 +850,8 @@ function stageShareOf(stage: StageId): number {
  *  finished and only its cutting is at the saw, so its wear falls to those minutes
  *  [PIOTR, 22.09] (CLAUDE.md T24 2.4). The card and the closing report read this one figure, so a
  *  piece cannot be said to cost the machine one thing before the term and another after it. */
-function pieceMachineShare(state: GameState, who: string, piece: ContractPieceSpec): number {
-  const { stage } = pieceStage(state, who, piece);
+function pieceMachineShare(state: GameState, piece: ContractPieceSpec): number {
+  const { stage } = pieceStage(state, piece);
   const first = piece.stages[0];
   const machine = stageShareOf(stage);
   let total = 0;
@@ -865,11 +861,11 @@ function pieceMachineShare(state: GameState, who: string, piece: ContractPieceSp
   return total <= 0 ? 0 : machine / total;
 }
 
-/** The machine this man's piece would be made on: the best CNC when he can have one, else the
+/** The machine a piece would be made on: the best CNC while the hall has one that runs, else the
  *  best of the piece's own family in the hall, else nothing, by hand. The card's wear and the
  *  closing report both read it, so what a piece is said to cost the machine is one reading. */
-function pieceMachine(state: GameState, who: string, piece: ContractPieceSpec): Equipment | null {
-  const { stage, family } = pieceStage(state, who, piece);
+function pieceMachine(state: GameState, piece: ContractPieceSpec): Equipment | null {
+  const { stage, family } = pieceStage(state, piece);
   if (stage === 'cnc') return bestMachineOf(state, 'cnc');
   if (family === null || !has(state, family) || machineIsShared(state, family)) return null;
   return bestMachineOf(state, family);
@@ -962,7 +958,7 @@ export function runContractMinute(
       if (place === undefined || !place.working) continue;
       // The hall's pace at his piece's stage, or the by hand penalty with no machine of the family
       // in the hall, through the one reading the stages give (CLAUDE.md T7 3.4, T25 2.4).
-      const { stage } = pieceStage(state, worker.id, piece);
+      const { stage } = pieceStage(state, piece);
       const speed = stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
       hall ??= hallProductivityFactor(state);
       const worth = worker.rate * away * speed * hall;
@@ -1054,9 +1050,9 @@ function labourMinuteCost(state: GameState): number {
 export function closingReport(state: GameState, contract: Contract): ClosingReport {
   const labourCost = pence(contract.labourMinutes * labourMinuteCost(state));
   const piece = contractPiece(contract);
-  const machine = pieceMachine(state, OWNER, piece);
+  const machine = pieceMachine(state, piece);
   // The same rule as the card's: the minutes at the machine and no others (CLAUDE.md T24 2.4).
-  const machineMinutes = contract.labourMinutes * pieceMachineShare(state, OWNER, piece);
+  const machineMinutes = contract.labourMinutes * pieceMachineShare(state, piece);
   const machineWear = pence(machineMinutes * (machine === null ? 0 : machineWearPerMinute(machine)));
   return {
     pieces: contract.piecesMade,

@@ -69,16 +69,29 @@ function withJoiner(state: GameState): GameState {
   return state;
 }
 
+/** The job's one pace in the day 1 hall with a saw of this class: the cutting's quarter of the job
+ *  at the saw's pace and the other three quarters at 1.00, the budget bench's and the hand
+ *  edgebander's (PIOTR, 24.09; v53). */
+function paceWithSaw(sawPace: number): number {
+  return 1 / (0.25 / sawPace + 0.75);
+}
+
 describe('the owner on his own', () => {
-  it('earns 38.00 an hour with the used saw', () => {
+  it('earns 39.48 an hour with the used saw', () => {
     const worked = tick(atTheBench('used'), 60);
     expect(worked.dayStats.workMinutes).toBe(60);
-    expect(earnedRate(worked, 'day')).toBe(38);
+    // 38.00 until v53, the whole hour at the used saw's 0.95 because he was at the cutting. From
+    // v53 a job is worked at one pace, and the used saw's 0.95 is on the cutting's quarter of it
+    // only: 40 an hour times 0.9870.
+    expect(earnedRate(worked, 'day')).toBe(Math.round(40 * paceWithSaw(0.95) * 100) / 100);
+    expect(earnedRate(worked, 'day')).toBe(39.48);
   });
 
-  it('earns 42.00 an hour with the standard saw', () => {
+  it('earns 40.48 an hour with the standard saw', () => {
     const worked = tick(atTheBench('standard'), 60);
-    expect(earnedRate(worked, 'day')).toBe(42);
+    // 42.00 until v53, the whole hour at the standard saw's 1.05; now the job's one pace, 1.0120.
+    expect(earnedRate(worked, 'day')).toBe(Math.round(40 * paceWithSaw(1.05) * 100) / 100);
+    expect(earnedRate(worked, 'day')).toBe(40.48);
   });
 
   it('earns nothing an hour before anybody has worked', () => {
@@ -87,15 +100,16 @@ describe('the owner on his own', () => {
 });
 
 describe('a joiner with no experience', () => {
-  it('earns 25.20 an hour on the standard saw, which is 0.6 of the owner', () => {
+  it('earns 24.29 an hour on the standard saw, which is 0.6 of the owner', () => {
     let state = withJoiner(atTheBench('standard'));
     // The job goes to the joiner, so the owner is in the workshop but not at a bench.
     state = act(state, { type: 'ASSIGN_JOB', jobId: firstJob(state).id, workerId: 'staff-1' });
     const worked = tick(state, 60);
     expect(worked.dayStats.workMinutes).toBe(60);
-    // His tier is 0.6 of the owner from tonight, so the hour he earns is 0.6 of the owner's 42
-    // (CLAUDE.md T21 2.9).
-    expect(earnedRate(worked, 'day')).toBe(25.2);
+    // His tier is 0.6 of the owner (CLAUDE.md T21 2.9), so the hour he earns is 0.6 of the owner's:
+    // 25.20 of 42.00 until v53, 24.29 of 40.48 now, the job's one pace. The owner and he are two
+    // men against the standard saw's two places, so the hall has no saw line.
+    expect(earnedRate(worked, 'day')).toBe(24.29);
   });
 });
 
@@ -107,7 +121,9 @@ describe('the two of them together', () => {
     expect(worked.owner.productionMinutes).toBe(60);
     expect(worked.workers[0]?.productionMinutes).toBe(60);
     expect(worked.dayStats.workMinutes).toBe(120);
-    expect(earnedRate(worked, 'day')).toBe((42 + 25.2) / 2);
+    // (42.00 + 25.20) / 2 = 33.60 until v53; (40.48 + 24.29) / 2 = 32.39 now, the job's one pace
+    // on both of them (v53).
+    expect(earnedRate(worked, 'day')).toBe(32.39);
   });
 
   it('weights by the hours each of them worked, four of the owner against eight of the joiner', () => {

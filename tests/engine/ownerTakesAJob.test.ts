@@ -5,9 +5,11 @@
 // and JOINS it, whoever is already on it [PIOTR, 21.09: "I should jump on the first job with a DL,
 // automatically"]. Turn 23 gave him the oldest job with nobody on it, and in a hall where the crew
 // hold every job that is no job at all, so he stood in the office exactly as he did before 2.3 was
-// written. He never takes a standing contract. From v52 he joins only a job whose current stage has
-// a place to spare: he is first in the day plan's order, and a job he walked on to by himself must
-// not take the place of a man the player put there (CLAUDE.md T25 1, 2.3).
+// written. He never takes a standing contract. From v52 to v53 he joined only a job whose current
+// stage had a place to spare, so as not to stand a man the player put there; from v53 nobody waits
+// for a machine, so he joins it whatever its saw's places: first in the day plan's order he takes
+// the first free place, and the man he displaces works the job at another of its machines or at a
+// bench (PIOTR, 24.09; CLAUDE.md T25 2.3; v53).
 //
 // `officeEmpty` is unchanged: no work of the board's about at all.
 
@@ -107,18 +109,25 @@ describe('an empty office sends the owner to the bench', () => {
     // click and is not what this is.
   });
 
-  it('stays off it when the saw has one place and the joiner has it', () => {
+  it('joins it at a saw of one place as well: he cuts, and the joiner works on at a bench', () => {
     let state = tick(emptyOffice({ withJoiner: true }), 1);
     const man = state.workers[0];
     if (!man) throw new Error('a joiner is wanted');
     state = act(state, { type: 'ASSIGN_JOB', jobId: firstJob(state).id, workerId: man.id });
-    // A budget saw of one place, and the joiner the player put on the job at it: the owner, first
-    // in the day plan's order, would take it from him, so he does not walk on (CLAUDE.md T25 2.3).
+    // A budget saw of one place, and the joiner the player put on the job at it. Until v53 the
+    // owner stayed off, because first in the day plan's order he would have stood the joiner at
+    // his home cell. Nobody waits for the saw now: he walks on, he has the saw, and the joiner
+    // goes on with the same job at a bench (PIOTR, 24.09; v53).
     const later = tick(clearOffice(state), 2);
-    expect(firstJob(later).assignees).toEqual([man.id]);
-    expect(man.id).toBe(later.workers[0]?.id);
+    expect(firstJob(later).assignees).toEqual([man.id, OWNER]);
+    expect(later.owner.station).toBe('machine:tableSaw');
+    expect(later.owner.working).toBe(true);
+    expect(later.workers[0]?.id).toBe(man.id);
+    expect(later.workers[0]?.station).toBe('machine:workbench');
     expect(later.workers[0]?.working).toBe(true);
-    expect(ownerIdleReason(later)).toBe('nothingAssigned');
+    expect(later.workers[0]?.noPlaceFor).toBe('');
+    // The one minute between the click and his next look at the board, and no more.
+    expect(later.owner.idleByReason.nothingAssigned ?? 0).toBeLessThanOrEqual(1);
   });
 
   it('goes to the soonest deadline and not to the oldest job', () => {

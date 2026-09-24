@@ -1,6 +1,7 @@
 // Standing contracts (CLAUDE.md T13 3.16): the offer from the second tier up, the weekly counter,
 // the short week's reputation hit, the renegotiation arithmetic, the closing report figures, and
-// that only people are assigned while the machines stay in the general queue.
+// that only people are assigned: a man on a contract takes a free place at his piece's machine or
+// at a bench like any man, and nobody waits for a machine (CLAUDE.md T25 2.3; PIOTR, 24.09; v53).
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -23,9 +24,11 @@ import {
   CONTRACT_FREE_END_DAYS,
   PRODUCTION_STAGES,
   SHEET_VALUE,
+  BY_HAND_DURATION_FACTOR,
 } from '../../src/engine/constants';
 import type { ContractPieceSpec } from '../../src/engine/constants';
 import { isWorkingDay } from '../../src/engine/clock';
+import { bubbleFor } from '../../src/engine/bubbles';
 import {
   acceptContract,
   activeContracts,
@@ -441,39 +444,86 @@ describe('the piece work', () => {
     expect(held?.item.id).not.toBe('kit-saw-pro');
   });
 
-  it('stands while the hall has no place for him at the saw, and works the minute it has one', () => {
+  it('goes to a bench while the saw is broken, at the by hand pace, and stands only when every place is taken', () => {
     const state = joinerHall();
     const contract = running(state);
+    const piece = contractPiece(contract);
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('a saw is wanted');
-    // A broken saw has no places (CLAUDE.md T25 2.1).
+    // A broken saw has no places (CLAUDE.md T25 2.1), and nobody waits for it to be mended: he
+    // takes a free bench, and his piece goes at the by hand pace, 1 / 1.5, because its family does
+    // not run. v52 stood him at his home cell and made nothing (PIOTR, 24.09; v53).
     saw.broken = true;
+    expect(contractPieceSpeed(state, piece)).toBeCloseTo(1 / BY_HAND_DURATION_FACTOR, 10);
     minutes(state, 100);
-    expect(contract.pieceMinutes).toBe(0);
-    expect(contract.labourMinutes).toBe(0);
-    expect(state.workers[0]?.station).toBe(STATION_HOME);
-    expect(state.workers[0]?.noPlaceFor).toBe('tableSaw');
-    expect(contractStationFor(state, state.workers[0] as Worker)).toBe(STATION_HOME);
+    const worth =
+      WORKER_RATES.novice * staffOutputFactor(state) * (1 / BY_HAND_DURATION_FACTOR) * hallProductivityFactor(state);
+    expect(contract.labourMinutes).toBe(100);
+    // A hundred of his minutes at 0.6 and 1 / 1.5 are 40 of the piece's: not one whole piece yet.
+    expect(contract.pieceMinutes).toBeCloseTo(100 * worth, 4);
+    expect(contract.pieceMinutes).toBeCloseTo(40, 4);
+    expect(contract.piecesMade).toBe(0);
+    const ben = state.workers[0] as Worker;
+    expect(ben.working).toBe(true);
+    expect(ben.noPlaceFor).toBe('');
+    expect(ben.station).toBe('machine:workbench');
+    expect(contractStationFor(state, ben)).toBe('machine:workbench');
+    expect(saw.hoursUsed).toBe(0);
+    // Two more men on it. The second has the hall's other bench; the third has every place he could
+    // take taken, the saw broken and both benches in use, and he is the one man who stands, at his
+    // home cell, with the mark that says so (PIOTR, 24.09; v53).
+    state.workers.push(joiner('staff-2', 'Ann'), joiner('staff-3', 'Cid'));
+    expect(assignContract(state, contract.id, 'staff-2', true).ok).toBe(true);
+    expect(assignContract(state, contract.id, 'staff-3', true).ok).toBe(true);
+    minutes(state, 1);
+    expect(state.workers.map((man) => [man.id, man.working, man.station])).toEqual([
+      ['staff-1', true, 'machine:workbench'],
+      ['staff-2', true, 'machine:workbench'],
+      ['staff-3', false, STATION_HOME],
+    ]);
+    const cid = state.workers[2] as Worker;
+    expect(cid.noPlaceFor).toBe('tableSaw');
+    expect(contractStationFor(state, cid)).toBe(STATION_HOME);
+    expect(bubbleFor(state, cid.id)?.text).toBe('no free machines');
+    // Mended, the saw's one place is the first man's and the two benches are the other two's:
+    // every man works, one to a place, and nobody is at another's.
     saw.broken = false;
+    const before = contract.labourMinutes;
     minutes(state, 10);
-    expect(contract.labourMinutes).toBe(10);
+    expect(contract.labourMinutes).toBe(before + 30);
     expect(menAtMachine(state, saw)).toEqual(['staff-1']);
+    const places = menAtPlaces(state).map((entry) => `${entry.item.id}:${entry.place}`);
+    expect(places).toHaveLength(3);
+    expect(new Set(places).size).toBe(3);
+    expect(state.workers.every((man) => man.working)).toBe(true);
   });
 
-  it('stops with the bags full, rests at dinner, and does nothing with nobody on it', () => {
+  it('goes to a bench with the bags full, rests at dinner, and does nothing with nobody on it', () => {
     const state = joinerHall();
     const contract = running(state);
     fillBags(state);
+    const full = state.bagFillM3;
+    // Nothing that makes dust runs with the bags full (CLAUDE.md T12 2.3), so the saw has no places
+    // this minute; nobody waits for the bags either, he works at a bench and his piece goes at the
+    // by hand pace. Twenty of his minutes are 8 of the piece's where v52 made none
+    // (PIOTR, 24.09; v53).
     minutes(state, 20);
-    expect(contract.labourMinutes).toBe(0);
+    expect(contract.labourMinutes).toBe(20);
+    const worth =
+      WORKER_RATES.novice * staffOutputFactor(state) * (1 / BY_HAND_DURATION_FACTOR) * hallProductivityFactor(state);
+    expect(contract.pieceMinutes).toBeCloseTo(20 * worth, 4);
+    expect(contract.pieceMinutes).toBeCloseTo(8, 4);
+    expect(state.workers[0]?.station).toBe('machine:workbench');
+    // A bench makes no dust, so the bags are no fuller for it.
+    expect(state.bagFillM3).toBe(full);
     state.bagFillM3 = 0;
     state.clock.minute = 250;
     minutes(state, 20);
-    expect(contract.labourMinutes).toBe(0);
+    expect(contract.labourMinutes).toBe(20);
     state.clock.minute = 60;
     assignContract(state, contract.id, 'staff-1', false);
     minutes(state, 20);
-    expect(contract.labourMinutes).toBe(0);
+    expect(contract.labourMinutes).toBe(20);
   });
 });
 
@@ -711,7 +761,7 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
     // is 0.95 of the owner's own speed (CLAUDE.md T20 2.1.1). A joiner with no experience does 45
     // minutes of the owner's work in 79 of his own on it, a very experienced one in 47
     // (CLAUDE.md T21 2.9).
-    const saw = contractPieceSpeed(state, green.id, piece);
+    const saw = contractPieceSpeed(state, piece);
     expect(saw).toBe(0.95);
     expect(greenResult.minutes).toBe(Math.round(45 / (WORKER_RATES.novice * saw)));
     expect(bestResult.minutes).toBe(Math.round(45 / (WORKER_RATES.senior * saw)));
@@ -721,7 +771,7 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
     // And with no saw at all it is the by hand reading, which is half again as long.
     const empty = newGame();
     empty.contracts.push(contract);
-    expect(contractPieceSpeed(empty, green.id, piece)).toBeCloseTo(1 / 1.5, 4);
+    expect(contractPieceSpeed(empty, piece)).toBeCloseTo(1 / 1.5, 4);
     expect(greenResult.margin).toBe(
       Math.round((contract.pricePerPiece - piece.material - greenResult.labourCost - greenResult.wear) * 100) / 100,
     );

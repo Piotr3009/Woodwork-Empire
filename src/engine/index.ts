@@ -307,13 +307,13 @@ export type {
 // Production in stages (CLAUDE.md T7 3.1)
 export {
   cncFactor,
-  cncOptions,
   currentStage,
   familyForStage,
   jobMinutesFor,
   jobOnCnc,
   labourDone,
   labourPerMinute,
+  jobPace,
   minutesLeftFor,
   stageDone,
   stageLabel,
@@ -523,9 +523,10 @@ export {
   weeksPastLife,
 } from './machines';
 
-// Who has a place at which machine (CLAUDE.md T25 2.3)
+// Who stands at which machine, and nobody waits for one (CLAUDE.md T25 2.3; v53)
 export {
   dayPlan,
+  familiesFor,
   hands,
   jobOf,
   placeLine,
@@ -731,7 +732,12 @@ export {
   paceOf,
   paceLines,
   placesLine,
+  crewOnTheFloor,
+  familyRuns,
+  placeShortages,
+  shortageLine,
 } from './machines';
+export type { PlaceShortage } from './machines';
 export {
   extractionLoad,
   extractionRunning,

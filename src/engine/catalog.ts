@@ -38,7 +38,7 @@ export function lockReasonFor(state: GameState, entry: ProductTemplate): string 
   const missing = missingEquipment(state, entry);
   if (missing.length === 0) return null;
   if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => hasOrOnOrder(state, id))) {
-    return 'Needs solid wood tools';
+    return 'Needs a thicknesser';
   }
   const names = missing.map((specId) => findSpec(specId)?.name ?? specId);
   return `Needs ${names.join(', ').toLowerCase()}`;

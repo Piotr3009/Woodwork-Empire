@@ -206,7 +206,7 @@ describe("a man on a contract is the contract's all day (PIOTR, 21.09; v42)", ()
     expect(ben.jobId).toBe(contractMarker(contract.id));
   });
 
-  it('stands him while the rack cannot cover the next piece, and gives his place at the saw up', () => {
+  it('stands him while the rack cannot cover the next piece, gives the saw up, and takes a bench when the sheets come', () => {
     let state = joinerHall();
     running(state, 60);
     state = runClock(state, 10);
@@ -237,14 +237,19 @@ describe("a man on a contract is the contract's all day (PIOTR, 21.09; v42)", ()
     state = runClock(state, 30);
     expect(saw()).toBe('owner');
     expect(theJob(state).productionMinutes).toBe(30);
-    // A delivery lands and the contract has him back, wanting a place at the saw like anybody: the
-    // saw's one place is the owner's, first in the day plan's order, so he has none and says so
-    // (CLAUDE.md T25 2.3).
+    // A delivery lands and the contract has him back. The saw's one place is the owner's, first in
+    // the day plan's order, so he takes a free bench and works there: nobody waits for the saw.
+    // v52 stood him at his home cell with no place at the saw (PIOTR, 24.09; v53).
     state.stock.sheets += 20;
     expect(contractWaitingForMaterial(state, theContract(state))).toBe(false);
     const him = dayPlan(state).find((entry) => entry.who === 'staff-1');
-    expect(him?.family).toBe('tableSaw');
-    expect(him?.working).toBe(false);
+    expect(him?.family).toBe('workbench');
+    expect(him?.working).toBe(true);
+    const before = theContract(state).piecesMade;
+    state = runClock(state, 120);
+    expect(saw()).toBe('owner');
+    expect(state.workers.find((worker) => worker.id === 'staff-1')?.station).toBe('machine:workbench');
+    expect(theContract(state).piecesMade).toBeGreaterThan(before);
   });
 
   it('wants no place at the saw at five, when the crew have gone home', () => {

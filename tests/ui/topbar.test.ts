@@ -232,9 +232,26 @@ describe("the boss's day meter", () => {
   });
 });
 
+/** Two men and one place for them: the owner and a joiner on their jobs' cutting, the saw away for
+ *  its service and the second bench taken out, so the one bench is the only place in the hall. The
+ *  owner is first in the plan and has it, and the joiner stands with every place he could take
+ *  taken. Until v53 the one budget saw did this on its own, because a man waited for the machine
+ *  of his stage; nobody waits now and he would work at the second bench, so the scene takes the
+ *  places away instead (PIOTR, 24.09; v53). */
+function onePlaceForTwo(): GameState {
+  const state = withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' }));
+  state.equipment = state.equipment.filter(
+    (item) => !(item.specId === 'workbench' && item.anchorX === 6 && item.anchorY === 6),
+  );
+  const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+  if (saw === undefined) throw new Error('the saw is wanted');
+  saw.inServiceUntilDay = state.clock.day + 1;
+  return state;
+}
+
 describe('the efficiency number next to the clock', () => {
   it('is one live number, worked over possible, in the clock block', () => {
-    const state = runClock(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' })), 200);
+    const state = runClock(onePlaceForTwo(), 200);
     const html = renderTopbar(state, 'hall');
     const clock = parse(html).querySelector('.clock-block');
     const number = clock?.querySelector('details.efficiency > summary');
@@ -245,7 +262,7 @@ describe('the efficiency number next to the clock', () => {
   });
 
   it('opens on a click, with no handler, on to the plate of the lost minutes lines', () => {
-    const state = runClock(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' })), 200);
+    const state = runClock(onePlaceForTwo(), 200);
     const page = parse(renderTopbar(state, 'hall'));
     const details = page.querySelector('details.efficiency');
     expect(details?.querySelector('summary')?.hasAttribute('data-do')).toBe(false);
@@ -258,10 +275,10 @@ describe('the efficiency number next to the clock', () => {
     for (const cause of EFFICIENCY_CAUSES) {
       expect(plate?.textContent, cause.id).toContain(cause.label);
     }
-    // Each line is its share of the lost minutes: the man the budget saw has no place for is all
-    // of it (CLAUDE.md T25 2.3).
+    // Each line is its share of the lost minutes: the man with every place in the hall taken is
+    // all of it, in the plate's new words (CLAUDE.md T25 2.3; PIOTR, 24.09; v53).
     const waiting = lines.find((line) => line.getAttribute('data-cause') === 'noPlace');
-    expect(waiting?.textContent).toBe('No place100%');
+    expect(waiting?.textContent).toBe('No free machines100%');
     expect(plate?.textContent).toContain('200 min worked of 400 min, 200 min lost');
     // A summary click toggles a details element in the browser itself; here in jsdom too.
     details?.querySelector('summary')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

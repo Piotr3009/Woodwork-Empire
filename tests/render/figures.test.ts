@@ -1,6 +1,7 @@
-// Where a figure stands: at his place at the machine of the stage he is working, or at his own
-// home cell when the hall has no place for him. The Turn 2 cycle of fifteen minutes at the bench
-// and five at the saw is gone (CLAUDE.md T7 3.1 and 3.9, T25 2.3, 2.6).
+// Where a figure stands: at his place at one of the machines his job is made on, or at his own
+// home cell when every place he could take is taken. The Turn 2 cycle of fifteen minutes at the
+// bench and five at the saw is gone (CLAUDE.md T7 3.1 and 3.9, T25 2.3, 2.6), and from v53 nobody
+// waits for the saw (PIOTR, 24.09).
 
 import { describe, expect, it } from 'vitest';
 import { footprintIn, renderHall, stationCell } from '../../src/render/hall';
@@ -25,6 +26,7 @@ import {
   firstJob,
   newGame,
   placeEnquiry,
+  testJoiner,
   twoMenOnSheetWork, withOnlyCuttingLeft } from '../helpers';
 
 /** The day 1 kit with a big job and the owner standing at it. */
@@ -68,17 +70,37 @@ describe('the figure of a man at work', () => {
     expect(renderHall(assembling)).toContain('workbench');
   });
 
-  it('stands the man the budget saw has no place for at his home cell, and says so', () => {
+  it('stands the man the budget saw has no place for at a bench, and draws no mark over him', () => {
     const state = tick(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' })), 1);
     const joiner = state.workers[0];
     if (!joiner) throw new Error('no joiner');
-    expect(joiner.station).toBe(STATION_HOME);
+    // Until v53 he stood at his home cell with `no place at the saw` over him. Nobody waits for
+    // the saw now: he works his job at a bench (PIOTR, 24.09; v53).
+    expect(joiner.station).toBe(machineStation('workbench'));
     const svg = renderHall(state);
-    expect(svg).toContain('no place at the saw');
-    // He is not in a heap at the saw: he stands at his own bench's cell (CLAUDE.md T25 2.3).
+    expect(svg).not.toContain(`data-bubble-for="${joiner.id}"`);
+    // He is not in a heap at the saw: he stands at a bench's place of his own.
     const working = stationCell(state, machineStation('tableSaw'), { x: 0, y: 0 }, OWNER);
-    const home = stationCell(state, STATION_HOME, { x: joiner.anchorX, y: joiner.anchorY }, joiner.id);
-    expect({ x: home.x, y: home.y }).not.toEqual({ x: working.x, y: working.y });
+    const bench = stationCell(state, joiner.station, { x: joiner.anchorX, y: joiner.anchorY }, joiner.id);
+    expect({ x: bench.x, y: bench.y }).not.toEqual({ x: working.x, y: working.y });
+  });
+
+  it('stands a man at his home cell with the mark only when every place he could take is taken', () => {
+    // A third man on the joiner's job and one bench of one place left in the hall: the owner has
+    // the saw, the joiner the bench, and the third man nothing (PIOTR, 24.09; v53).
+    let start = withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' }));
+    const first = start.equipment.find((item) => item.specId === 'workbench');
+    start.equipment = start.equipment.filter((item) => item.specId !== 'workbench' || item === first);
+    start.workers.push(testJoiner('staff-2', 'Tom', 8, 6));
+    const job = start.jobs.find((entry) => entry.assignees.includes('staff-1'));
+    if (!job) throw new Error('the joiner s job is wanted');
+    start = act(start, { type: 'ADD_TO_JOB', jobId: job.id, workerId: 'staff-2' });
+    const state = tick(start, 1);
+    expect(state.workers.map((worker) => worker.station)).toEqual([machineStation('workbench'), STATION_HOME]);
+    const svg = renderHall(state);
+    expect(svg).toContain('data-bubble-for="staff-2"');
+    expect(svg).toContain('no free machines');
+    expect(svg).not.toContain('data-bubble-for="staff-1"');
   });
 
   it('stands two men at a standard saw s two places, side by side and neither on it', () => {

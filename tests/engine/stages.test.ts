@@ -11,6 +11,7 @@ import {
   currentStage,
   familyForStage,
   jobMinutesFor,
+  jobPace,
   minutesLeftFor,
   stagePlanFor,
   stageSpeed,
@@ -75,7 +76,9 @@ describe('the stages a job is made in', () => {
     expect(familyForStage(sheet, 'finishing')).toBeNull();
     const timber = jobOfMinutes(480, { materialKind: 'solidWood' });
     expect(familyForStage(timber, 'cutting')).toBe('tableSaw');
-    expect(familyForStage(timber, 'machining')).toBe('solidWoodTools');
+    // The timber tool set until v53; it is gone from the game, and timber is machined on the
+    // thicknesser (PIOTR, 24.09; v53).
+    expect(familyForStage(timber, 'machining')).toBe('thicknesser');
     expect(familyForStage({ ...sheet, finish: 'lacquer' }, 'finishing')).toBe('sprayBooth');
   });
 
@@ -130,7 +133,7 @@ describe('what a machine does to the minutes', () => {
   it('falls back to the bench at half again as long where the family is not in the hall', () => {
     const bare = newGame();
     const timber = jobOfMinutes(480, { materialKind: 'solidWood' });
-    // No saw and no solid wood tools: cutting and machining are done by hand (T7 3.1).
+    // No saw and no thicknesser: cutting and machining are done by hand (T7 3.1; v53).
     expect(stageSpeed(bare, timber, 'cutting')).toEqual({
       speed: 1 / BY_HAND_DURATION_FACTOR,
       byHand: true,
@@ -173,13 +176,32 @@ describe('where a job has got to', () => {
     expect(currentStage(state, job)?.id).toBe('finishing');
   });
 
-  it('counts what is left of the stage in hand and every stage after it', () => {
+  it('counts what is left of the job at its one pace, whatever stage its bar stands at', () => {
     const state = jobInHall();
     const job = firstJob(state);
     expect(minutesLeftFor(state, job, 1)).toBeCloseTo(240, 6);
-    // Half the job done is half the minutes left, because every class in this hall is standard.
+    // Half the job done is half the minutes left, because every class in this hall is budget.
     job.labourRemaining = job.labourValue / 2;
     expect(minutesLeftFor(state, job, 1)).toBeCloseTo(120, 6);
+  });
+
+  it('takes a whole job in the minutes its stages add up to, and half of it in half of them', () => {
+    // An industrial saw, whose 1.12 is on the cutting's quarter of the job and nowhere else. The
+    // job's one pace folds it in (PIOTR, 24.09; v53): 1 / (0.25 / 1.12 + 0.75) = 1.0275.
+    const state = hallWithSaw('industrial');
+    const enquiry = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
+    const next = acceptNow(state, enquiry.id, false);
+    const job = firstJob(next);
+    expect(jobPace(next, job)).toBeCloseTo(1 / (0.25 / 1.12 + 0.75), 10);
+    // The whole of it at that pace is the minutes its stages add up to, 60 / 1.12 + 180.
+    expect(minutesLeftFor(next, job, 1)).toBeCloseTo(jobMinutesFor(next, job, 1), 6);
+    expect(minutesLeftFor(next, job, 1)).toBeCloseTo(60 / 1.12 + 180, 6);
+    // Half of it done, the bar at the assembly: until v53 what was left was counted stage by
+    // stage, the rest of the assembly and the finishing at 1.00, 120 minutes; from v53 it is the
+    // labour left at the job's one pace, 116.79.
+    job.labourRemaining = job.labourValue / 2;
+    expect(currentStage(next, job)?.id).toBe('assembly');
+    expect(minutesLeftFor(next, job, 1)).toBeCloseTo((60 / 1.12 + 180) / 2, 6);
   });
 
   it('writes down each run at a stage as the work goes into it', () => {

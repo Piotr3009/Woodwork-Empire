@@ -543,7 +543,12 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // boss's round once, at the start of the day, and a job that comes ready at eleven o'clock is
     // picked up the next morning instead of the same minute. Measured on the merged tree, not
     // tuned (CLAUDE.md T23 2.1, 2.11, 2.16).
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-639);
+    //
+    // -185 from v53, where it was -639. The whole move is the saw line of v53 (PIOTR, 24.09): the
+    // owner and his joiner are two men at one used saw with one place, `Too few saws: 1 place, 2
+    // men` at 0.83 on every minute. The same month played with that line taken out reads -639,
+    // exactly v52's, so nobody waiting moved nothing here [both measured].
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-185);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
@@ -960,29 +965,30 @@ describe('a month of six joiners behind two saws', () => {
     expect(two.longest).toBe(0);
   });
 
-  it('gets the whole book out on one saw too, and the second saw buys time at the saw and not a job (v37)', () => {
+  it('gets the whole book out on two saws and half of it on one: the second saw buys jobs (v53)', () => {
     const done = (month: CrewMonth): number =>
       month.state.jobs.filter((job) => job.stage === 'completed').length;
     const lastDay = (month: CrewMonth): number =>
       month.state.jobs.reduce((latest, job) => Math.max(latest, job.finishedDay ?? 99), 0);
-    // Re-measured for v37, the bag of work (PIOTR, 20.09). Until v37 a man whose job wanted the
-    // one taken saw stood at it, so the one saw month got five of its six jobs out and the second
-    // saw bought the sixth and 3,246 of money. From v37 that man edges or assembles his own job
-    // while the saw is busy and comes back to it, so the one saw month gets all six out as well,
-    // the last of them on day 26 against day 25, and the second saw ends the month 90 behind the
-    // one saw month, having cost 1,800: it buys the crew its time at the saw (the next test) and
-    // no longer a job. Piotr should read this as the price of a machine falling once the men have
-    // other work to fill its gaps with, which is what a real shop does.
+    // Re-measured for v53 (PIOTR, 24.09). Nobody waits for the saw any more, and a saw with fewer
+    // places than the crew costs the whole hall its pace instead: the man past the places works at
+    // 67%. Six men at one standard saw's two places is `Too few saws: 2 places, 6 men` on the
+    // Output sheet, 0.78 on every minute; at two saws' four places it is 0.89. So the one saw
+    // month gets three of its six jobs out, the other three at 91%, 92% and 98% of their making,
+    // and the two saw month all six by day 30; the second saw ends the month 9,888 ahead of the
+    // one saw month, having cost 1,800 [all measured]. From v37 to v52 the one saw month got all
+    // six out as well, and the second saw ended it 90 behind: it bought time at the saw and not a
+    // job. It buys jobs again, which is the push to invest Piotr asked for.
     expect(done(two)).toBe(6);
-    expect(done(one)).toBe(6);
-    expect(lastDay(two)).toBeLessThanOrEqual(lastDay(one));
-    expect(two.state.cash - one.state.cash).toBeGreaterThan(-1800);
-    expect(two.state.cash - one.state.cash).toBeLessThan(0);
+    expect(done(one)).toBe(3);
+    expect(lastDay(two)).toBe(30);
+    expect(lastDay(two)).toBeLessThan(lastDay(one));
+    expect(Math.round(two.state.cash - one.state.cash)).toBe(9888);
   });
 
   it('has no longest stand at all on one saw either, the one saw having the places the crew wants', () => {
-    // What a second saw buys a hall whose one saw has the places its crew wants is nothing: the
-    // cash test above measures it at a few pounds of power (CLAUDE.md T25 2.1).
+    // Nobody stands at a saw, one or two: a man past its places works elsewhere and the cost is the
+    // pace, which the cash test above measures (v53).
     expect(one.longest).toBe(0);
   });
 
@@ -1516,26 +1522,23 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
     expect(tables.some((job) => job.assignees[0] === 'owner' || job.stage === 'completed')).toBe(true);
   });
 
-  it('never stood a man at the thicknesser, so its two bags a day never reached the store', () => {
-    // The blocker at the top of REPORT-T12.md: the machining of timber is done with the solid
-    // wood tools, and no stage of any job stands a man at the thicknesser, so a played month
-    // cannot fill a bag off it. What the store was fed is the saw's and the bander's, at their
-    // figures, and one saw does not fill a bag in a month (CLAUDE.md T12 2.1, 2.3).
+  it('stands a man at the thicknesser, and the helper empties its one bag before it fills', () => {
+    // The blocker at the top of REPORT-T12.md is gone with v53: the timber tool set has left the
+    // game and the machining of timber is done on the thicknesser (PIOTR, 24.09: "the spindle
+    // moulder and the thicknesser are all a furniture shop needs"). So the month stands a man at
+    // it, 30 of its hours [measured], and its dust reaches the one bag. On v52 it had no hours at
+    // all and the store held the saw's and the bander's dust alone. The helper takes the bag at
+    // 80% (v46), nine times in the month [measured], so it is never full and no machine stops.
     const table = state.jobs.find((job) => job.templateId === 'oakDiningTable');
     if (table === undefined) throw new Error('no oak table on the books');
-    expect(familyForStage(table, 'machining')).toBe('solidWoodTools');
-    expect(machineOf(state, 'thicknesser').hoursUsed).toBe(0);
+    expect(familyForStage(table, 'machining')).toBe('thicknesser');
+    expect(machineOf(state, 'thicknesser').hoursUsed).toBeGreaterThan(30);
     expect(DUST_OUTPUT_M3_PER_HOUR.thicknesser).toBe(0.25);
     const store = bagStore(state);
-    expect(store.fillM3).toBeGreaterThan(0);
-    expect(store.fillM3).toBeCloseTo(dustOffTheClocks(state), 2);
     expect(store.full).toBe(false);
     expect(seen.filter((event) => event.kind === 'bagsFull')).toHaveLength(0);
-    expect(state.tasks.filter((task) => task.kind === 'emptyBags')).toHaveLength(0);
+    const empties = state.tasks.filter((task) => task.kind === 'emptyBags');
+    expect(empties).toHaveLength(9);
+    expect(empties.every((task) => task.done)).toBe(true);
   });
-
-  it.todo(
-    'has the helper empty the bag more than once a day, once a stage of some job stands a man at ' +
-      'the thicknesser (the blocker at the top of REPORT-T12.md)',
-  );
 });

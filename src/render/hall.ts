@@ -41,8 +41,11 @@ import {
   itemStandsInTheHall,
   itemZone,
   menAtPlaces,
+  placeShortages,
+  placedMachines,
   placesLine,
   sheetCapacityOf,
+  shortageLine,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
 import { rackCapacity } from '../engine/materials';
@@ -95,7 +98,7 @@ import {
   pointInPolygon,
   tileToScreen,
 } from './iso';
-import { formatCalendarDay, formatTime } from '../engine/clock';
+import { formatCalendarDay, formatTime, isBreak } from '../engine/clock';
 import { compressorIsLow, extractionCheck, hallAirCheck } from '../engine/media';
 import {
   type CharacterOptions,
@@ -115,7 +118,6 @@ import {
   spriteUrl,
 } from './sprites';
 import { placeholder } from './placeholder';
-import { cncOptions } from '../engine/stages';
 import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
 import type { StageId } from '../engine/types';
@@ -922,9 +924,9 @@ export function doorIsUsed(state: GameState, room: RoomId): boolean {
 function stationLabel(station: string, noPlaceFor = ''): string {
   const specId = stationMachine(station);
   if (specId !== null) return (findSpec(specId)?.name ?? specId).toLowerCase();
-  // Standing at his home cell: the one phrase for a machine the hall has no place for him at,
-  // the words the mark over his head and his card say too (CLAUDE.md T21 2.6, T25 2.3).
-  if (station === STATION_HOME) return noPlaceFor === '' ? 'standing' : placeLine(noPlaceFor);
+  // Standing at his home cell: the one phrase for every machine he could work at taken, the words
+  // the mark over his head and his card say too (CLAUDE.md T21 2.6, T25 2.3; v53).
+  if (station === STATION_HOME) return noPlaceFor === '' ? 'standing' : placeLine();
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
@@ -1435,6 +1437,15 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // The hall's bag store, read once: the full state is worn by the extractor the bags are on,
   // which is where the full bag used to be worn by the machine (CLAUDE.md T12 3.3).
   const store = bagStore(state);
+  // The one machine of each family too few for the crew that wears the mark: the first of it with
+  // places, in the order they are filled (PIOTR, 24.09: "an exclamation at the saw"; v53).
+  const markedMachines = new Map<string, string>();
+  // Nothing is marked while the hall is at its dinner, a machine no more than a man (T22 2.5).
+  const shortages = isBreak(state.clock.minute) ? [] : placeShortages(state);
+  for (const short of shortages) {
+    const first = placedMachines(state, short.family)[0];
+    if (first !== undefined) markedMachines.set(first.id, shortageLine(state, short.family));
+  }
   // Everything the player has bought, except the office furniture, which lives in the office
   // view, and the hand edgebander, which lives in a tool cabinet (CLAUDE.md T6 3.5).
   const welfare: Equipment[] = [];
@@ -1465,12 +1476,17 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const unconnected = wantsExtraction(item) && !isConnected(state, item);
     const name = `${spec.name}${bagLine}${serviceLine}${rackLine}`;
     // Pointing at the extractor reads the hall's store (CLAUDE.md T12 3.3).
-    // Its places and who is in them, off the day plan the figures stand by (CLAUDE.md T25 2.5).
+    // Its places and who is in them, off the day plan the figures stand by (CLAUDE.md T25 2.5),
+    // and the family too few for the crew when it is (v53).
     const places = placesLine(state, item, 'card');
+    const short = shortageLine(state, item.specId);
     const tooltip =
       item.specId === 'extractor' && store.exists
         ? `${name}. ${bagStoreLine(store)}. ${spec.effect}`
-        : `${name}${unconnected ? ', not connected' : ''}.${places === '' ? '' : ` ${places}.`} ${spec.effect}`;
+        : `${name}${unconnected ? ', not connected' : ''}.${places === '' ? '' : ` ${places}.`}` +
+          `${short === '' ? '' : ` ${short}.`} ${spec.effect}`;
+    const marked = markedMachines.get(item.id);
+    const top = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
     const fx = machineFx(state, item, spec);
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
@@ -1496,6 +1512,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         (unconnected ? notConnectedLabel(stands) : '') +
         (sheetCapacityOf(item) > 0 ? rackCount(item, state.stock.sheets) : '') +
         fx.svg +
+        (marked === undefined
+          ? ''
+          : `<g data-machine-mark="${item.id}" transform="translate(${round(top.x)},${round(top.y)})">` +
+            markArt({ who: item.id, key: 'tooFewPlaces', text: marked }, 0) +
+            '</g>') +
         '</g>',
     });
   }
@@ -1989,7 +2010,7 @@ function benchStagesNow(state: GameState): Array<{ stage: StageId; finish: strin
     if (job.stage !== 'inProduction') continue;
     const who = job.assignees.find((man) => manIsAtWork(state, man)) ?? null;
     if (who === null) continue;
-    const plan = jobStage(state, job, cncOptions(state, who, job));
+    const plan = jobStage(state, job);
     if (plan === null) continue;
     found.push({ stage: plan.id, finish: job.finish });
   }

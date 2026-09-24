@@ -4,15 +4,15 @@
 //
 // Nothing here is about the drawing: the disc, its tail and the hover are
 // `tests/render/bubbles.test.ts`. What is asserted here is that the words come out of the one table
-// in the constants with every slot filled off the state, that the phrase a man says about a machine
-// the hall has no place for him at is the one phrase his card says too (`placeLine`), and that a
-// man nothing is wrong with carries nothing at all (CLAUDE.md T25 2.3).
+// in the constants with every slot filled off the state, that the phrase a man says when every
+// place he could take is taken is the one phrase his card says too (`placeLine`), and that a man
+// nothing is wrong with carries nothing at all (CLAUDE.md T25 2.3; PIOTR, 24.09; v53).
 
 import { describe, expect, it } from 'vitest';
 import { BUBBLES } from '../../src/engine/constants';
 import { bubbleFor, bubblesFor } from '../../src/engine/bubbles';
 import { acceptContract, assignContract, drawContract } from '../../src/engine/contracts';
-import { OWNER, machineShortWord } from '../../src/engine/machines';
+import { OWNER } from '../../src/engine/machines';
 import { WAITING_FOR_MATERIAL, placeLine, planPlaces } from '../../src/engine/production';
 import { STATION_IDLE, STATION_LUNCH, STATION_OFFICE, stationNow } from '../../src/engine/stations';
 import type { BubbleKey, GameState, Job, TaskInstance } from '../../src/engine/index';
@@ -23,19 +23,25 @@ import {
   runClock,
   sixJoinersOnSheetWork, withOnlyCuttingLeft } from '../helpers';
 
-/** Three men on one job at its cutting stage with one budget saw in the hall, one place at it: the
- *  scene of the drawing, one man cutting and two the hall has no place for (CLAUDE.md T25 2.3). */
-function noPlaceAtTheSaw(): { state: GameState; job: Job } {
+/** Three men on one job at its cutting stage, one budget saw of one place and the day one kit's one
+ *  bench, the five other benches taken out: the saw and that bench are every place the hall has.
+ *  Nobody waits for the saw, so the first man cuts, the second takes the bench, and the third and
+ *  the three men on the other jobs stand with every place they could take taken
+ *  (PIOTR, 24.09; v53). Until v53 the one saw alone stood the second man. */
+function everyPlaceTaken(): { state: GameState; job: Job } {
   let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
   const first = state.jobs[0];
   if (!first) throw new Error('a job is wanted');
   state = act(state, { type: 'ADD_TO_JOB', jobId: first.id, workerId: 'staff-2' });
   state = act(state, { type: 'ADD_TO_JOB', jobId: first.id, workerId: 'staff-3' });
+  const kit = state.equipment.find((item) => item.specId === 'workbench');
+  state.equipment = state.equipment.filter((item) => item.specId !== 'workbench' || item === kit);
   const job = state.jobs.find((entry) => entry.id === first.id);
   if (!job) throw new Error('the job went missing');
   job.labourRemaining = job.labourValue * 0.95;
   job.stageLabour = {};
-  // Every job with nothing but its cutting left, so every man on the floor wants the one saw.
+  // Every job with nothing but its cutting left, so the saw is every man's first family and the
+  // bench his second.
   withOnlyCuttingLeft(state);
   planPlaces(state);
   return { state, job };
@@ -93,27 +99,31 @@ function keyOver(state: GameState, who: string): BubbleKey | null {
 }
 
 describe('the four things the player can put right (CLAUDE.md T22 2.5)', () => {
-  it('says which machine the hall has no place for him at, in the trade s own word', () => {
-    const { state } = noPlaceAtTheSaw();
-    const bubble = bubbleFor(state, 'staff-2');
-    expect(bubble?.key).toBe('noPlace');
-    expect(bubble?.text).toBe('no place at the saw');
-    // The one phrase: the mark fills its slot from the same word his card is built from, so the
-    // man and his card can never say different things (CLAUDE.md T22 2.5, T25 2.3).
-    expect(bubble?.text).toBe(placeLine('tableSaw'));
-    expect(machineShortWord('tableSaw')).toBe('saw');
-  });
-
-  it('says the same to every man past the saw s one place, and nothing to the man at it', () => {
-    const { state } = noPlaceAtTheSaw();
+  it('says no free machines to a man with every place he could take taken', () => {
+    const { state } = everyPlaceTaken();
     const bubble = bubbleFor(state, 'staff-3');
     expect(bubble?.key).toBe('noPlace');
-    expect(bubble?.text).toBe('no place at the saw');
+    expect(bubble?.text).toBe('no free machines');
+    // The one phrase: the mark and his card say the words of the one table, so the man and his
+    // card can never say different things, and the words name no machine, because he stands only
+    // when every one he could work at is taken (CLAUDE.md T22 2.5, T25 2.3; PIOTR, 24.09; v53).
+    expect(bubble?.text).toBe(placeLine());
+    expect(BUBBLES.noPlace).toBe('no free machines');
+  });
+
+  it('says the same to every man past the last place, and nothing to the man at the saw or the man at the bench', () => {
+    const { state } = everyPlaceTaken();
+    // Nobody waits for the saw: the second man on the job works at the bench and nothing is
+    // wrong with him (PIOTR, 24.09; v53).
     expect(keyOver(state, 'staff-1')).toBeNull();
+    expect(keyOver(state, 'staff-2')).toBeNull();
+    for (const who of ['staff-3', 'staff-4', 'staff-5', 'staff-6']) {
+      expect(bubbleFor(state, who), who).toEqual({ who, key: 'noPlace', text: 'no free machines' });
+    }
   });
 
   it('names the job the rack has no sheets for', () => {
-    const { state, job } = noPlaceAtTheSaw();
+    const { state, job } = everyPlaceTaken();
     job.blockedBy = WAITING_FOR_MATERIAL;
     const bubble = bubbleFor(state, 'staff-1');
     expect(bubble?.key).toBe('noMaterial');
@@ -138,21 +148,25 @@ describe('the four things the player can put right (CLAUDE.md T22 2.5)', () => {
   });
 
   it('says nothing at all while the job is stopped by something the mark has no word for', () => {
-    const { state, job } = noPlaceAtTheSaw();
+    const { state, job } = everyPlaceTaken();
     // The man who has the saw, on a job the hall has stopped for a reason of its own: the warning
-    // strip and the chips say the bags are full, and a mark the player cannot act on would be the
-    // one thing the section is against.
-    job.blockedBy = 'bags full';
+    // strip and the chips say the hall has no extraction, and a mark the player cannot act on
+    // would be the one thing the section is against. Full bags stopped a job here until v53; they
+    // take the machines that make dust out of the places now and stop nothing, so the whole hall's
+    // reason is the one left to ask with (PIOTR, 24.09; v53).
+    job.blockedBy = 'no extraction';
     expect(keyOver(state, 'staff-1')).toBeNull();
   });
 });
 
 describe('nothing at all over a man nothing is wrong with [PIOTR, 19.09]', () => {
   it('draws no mark over a man at work', () => {
-    const { state } = noPlaceAtTheSaw();
+    const { state } = everyPlaceTaken();
     // He has his place at the saw and he is cutting: the stage he is at is the T11 hover line's to say, and the
     // paper bubble that used to say it for three seconds is gone (CLAUDE.md T22 2.5).
     expect(keyOver(state, 'staff-1')).toBeNull();
+    // Nor over the man at the bench, who works the same job at its one pace (PIOTR, 24.09; v53).
+    expect(keyOver(state, 'staff-2')).toBeNull();
   });
 
   it('draws no mark over a helper at his chore', () => {
@@ -202,26 +216,32 @@ describe('nothing at all over a man nothing is wrong with [PIOTR, 19.09]', () =>
 });
 
 describe('the table itself', () => {
-  it('keeps five lines and no colour, and every one of them is a thing that is wrong', () => {
+  it('keeps six lines and no colour, and every one of them is a thing that is wrong', () => {
     // Four until Turn 23, which hung the bench on the compressor and stood a man who nobody has
     // put on anything (CLAUDE.md T23 2.1, 2.7); v43 took "no cut parts yet" out with the rule it
     // explained; v52 put the machine and the bench into one line, the place the hall has not got
-    // for him, and nobody waits for a machine any more (CLAUDE.md T25 2.2, 2.3).
+    // for him, and nobody waits for a machine any more (CLAUDE.md T25 2.2, 2.3). v53 made that
+    // line `no free machines`, every place he could take taken, and added the sixth, the one mark
+    // drawn over a machine and not a man: a family with too few places for the crew
+    // (PIOTR, 24.09; v53).
     expect(Object.keys(BUBBLES).sort()).toEqual([
       'noCompressor',
       'noMaterial',
       'noPlace',
       'nothingToDo',
+      'tooFewPlaces',
       'waitingForBoss',
     ]);
+    expect(BUBBLES.noPlace).toBe('no free machines');
+    expect(BUBBLES.tooFewPlaces).toBe('too few {machines} for the crew');
     for (const words of Object.values(BUBBLES)) expect(typeof words).toBe('string');
   });
 
   it('leaves no slot unfilled in any mark the hall can draw', () => {
-    // Every mark of every man of a working hall, a queue at a saw and the dinner hour: not one of
-    // them may come out with a `{slot}` still in it.
+    // Every mark of every man of a working hall, a hall with every place taken and the dinner
+    // hour: not one of them may come out with a `{slot}` still in it.
     const scenes: GameState[] = [
-      noPlaceAtTheSaw().state,
+      everyPlaceTaken().state,
       runClock(sixJoinersOnSheetWork({ saws: 1 }), 250),
       oneManAlone(),
     ];
@@ -238,9 +258,12 @@ describe('the table itself', () => {
   });
 
   it('draws one mark a man and none for a man the hall does not draw', () => {
-    const state = noPlaceAtTheSaw().state;
-    const worker = state.workers.find((entry) => entry.id === 'staff-2');
+    const state = everyPlaceTaken().state;
+    // The third man on the job, who stands with every place taken and carries a mark: the second
+    // works at the bench from v53 and carries none (PIOTR, 24.09; v53).
+    const worker = state.workers.find((entry) => entry.id === 'staff-3');
     if (!worker) throw new Error('a man is wanted');
+    expect(bubblesFor(state).some((bubble) => bubble.who === worker.id)).toBe(true);
     const before = bubblesFor(state).length;
     const whos = new Set(bubblesFor(state).map((bubble) => bubble.who));
     expect(whos.size).toBe(before);

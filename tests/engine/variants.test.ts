@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { classPaceOf, hallPace } from '../../src/engine/machines';
 import {
+  BY_HAND_DURATION_FACTOR,
   CLASS_BADGE,
   CLASS_LADDER_FAMILIES,
   CLASS_ORDER,
@@ -19,6 +20,7 @@ import {
 import {
   dailyPower,
   enduranceHoursFor,
+  familyForStage,
   findSpec,
   findVariant,
   footprintOf,
@@ -76,18 +78,16 @@ describe('every catalogue line is a family', () => {
 
   it('gives every family of the one ladder exactly five classes, in order, with a badge each', () => {
     // Five is the number: used, budget, standard, pro, industrial, and class 5 is always the
-    // industrial one (PIOTR; CLAUDE.md T13 1, 3.12). The thicknesser, the CNC, the solid wood
-    // tools, the spray booth, the drill and the spindle moulder joined the ladder in Turn 13.
+    // industrial one (PIOTR; CLAUDE.md T13 1, 3.12). The thicknesser, the CNC, the spray booth,
+    // the drill and the spindle moulder joined the ladder in Turn 13. The timber tool set joined
+    // it then as well and is gone from the game: the thicknesser and the spindle moulder are all a
+    // furniture shop needs (PIOTR, 24.09; v53).
     expect(CLASS_ORDER).toEqual(['used', 'budget', 'standard', 'pro', 'industrial']);
-    for (const family of [
-      'thicknesser',
-      'cnc',
-      'solidWoodTools',
-      'sprayBooth',
-      'spindleMoulder',
-    ]) {
+    for (const family of ['thicknesser', 'cnc', 'sprayBooth', 'spindleMoulder']) {
       expect(CLASS_LADDER_FAMILIES, family).toContain(family);
     }
+    expect(CLASS_LADDER_FAMILIES).not.toContain('solidWoodTools');
+    expect(findSpec('solidWoodTools')).toBeNull();
     for (const family of CLASS_LADDER_FAMILIES) {
       const spec = findSpec(family);
       expect(spec, family).not.toBeNull();
@@ -299,12 +299,18 @@ describe('what a class of saw does to the work', () => {
     expect(hallPace(state, 'tableSaw')).toBe(1.12);
   });
 
-  it('cuts a solid wood job too, and leaves its machining to the timber tools', () => {
+  it('cuts a solid wood job too, and machines it on the thicknesser, by hand while the hall has none', () => {
     const state = withSaw('industrial');
     const table = { ...firstJob(state), materialKind: 'solidWood' as const };
-    // Every job is cut on the saw (CLAUDE.md T7 3.1); only the machining takes the material.
+    // Every job is cut on the saw (CLAUDE.md T7 3.1); only the machining takes the material, and
+    // timber is machined on the thicknesser now the timber tool set is gone (PIOTR, 24.09; v53).
     expect(stageSpeed(state, table, 'cutting').speed).toBeCloseTo(1.12, 10);
+    expect(familyForStage(table, 'machining')).toBe('thicknesser');
     expect(stageSpeed(state, table, 'machining').byHand).toBe(true);
+    expect(stageSpeed(state, table, 'machining').speed).toBeCloseTo(1 / BY_HAND_DURATION_FACTOR, 10);
+    // A professional thicknesser in the hall machines it at the class's 1.08 (CLAUDE.md T25 2.4).
+    placeEquipment(state, 'thicknesser', { variantId: 'pro', x: 10, y: 8 });
+    expect(stageSpeed(state, table, 'machining')).toEqual({ speed: 1.08, byHand: false });
   });
 });
 

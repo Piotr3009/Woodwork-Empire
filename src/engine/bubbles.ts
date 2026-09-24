@@ -17,7 +17,7 @@
 
 import { BUBBLES } from './constants';
 import { contractOfWorker, contractWaitingForMaterial } from './contracts';
-import { OWNER, machineShortWord } from './machines';
+import { OWNER } from './machines';
 import { ownerIsAvailable } from './owner';
 import { standsForAir } from './media';
 import { WAITING_FOR_MATERIAL, jobOf, stageOfMan } from './production';
@@ -63,10 +63,9 @@ function noPlaceOf(state: GameState, who: string): string {
  *  over a man whose job has stopped for a reason he cannot mend would be the one thing the section
  *  is against. */
 function onAJob(state: GameState, who: string, job: Job): Bubble | null {
-  // The hall has no place for him: the thing to put right is a machine, or a man taken off
-  // (PIOTR, 21.09; CLAUDE.md T25 2.3).
-  const family = noPlaceOf(state, who);
-  if (family !== '') return bubble(who, 'noPlace', { machine: machineShortWord(family) });
+  // Every machine and bench he could work at is taken: the thing to put right is a machine, or a
+  // man taken off (PIOTR, 21.09 and 24.09; CLAUDE.md T25 2.3; v53).
+  if (noPlaceOf(state, who) !== '') return bubble(who, 'noPlace');
   if (job.blockedBy === WAITING_FOR_MATERIAL) {
     return bubble(who, 'noMaterial', { job: job.name });
   }
@@ -88,8 +87,7 @@ function onAContract(state: GameState, who: string, contract: Contract): Bubble 
   if (contractWaitingForMaterial(state, contract)) {
     return bubble(who, 'noMaterial', { job: contract.name });
   }
-  const family = noPlaceOf(state, who);
-  return family === '' ? null : bubble(who, 'noPlace', { machine: machineShortWord(family) });
+  return noPlaceOf(state, who) === '' ? null : bubble(who, 'noPlace');
 }
 
 /** The mark over this man's head this minute, or null while there is nothing wrong with him. `who`

@@ -76,9 +76,8 @@ export interface Port {
  *
  *  The two hand edgebanders (`used`, `budget`) want no extraction at all
  *  (`EXTRACTION_DEMAND` 0) and have no line, which is the one case where a missing line is right.
- *  The thicknessers landed on 22.09 and are measured below. The solid wood tools and the CNC have
- *  an extraction demand and no picture yet, so there is nothing to measure on them;
- *  `docs/art/REQUESTS-T22.md` 6 asks for the pictures. */
+ *  The thicknessers landed on 22.09 and are measured below. The CNC has an extraction demand and
+ *  no picture yet, so there is nothing to measure on it; the pack of 24.09 asks for its pictures. */
 export const PORTS: Record<string, Port> = {
   // The extractors: the mouth of the fan, and which way it opens [PIOTR, 19.09].
   'extractor.used.png': { px: 89, py: 61, faces: '+x', cell: { x: 1, y: 0 } },

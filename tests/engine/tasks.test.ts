@@ -171,7 +171,6 @@ describe('the daily list', () => {
       bespokeMaterial: false,
       express: false,
       byHand: false,
-      sawFallback: true,
       needsMeasure: false,
       labourValue: 160,
       labourRemaining: 160,

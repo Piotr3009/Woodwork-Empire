@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   OVERDUE_BREAKDOWN_CHANCE,
+  OWNER_LABOUR_PER_MINUTE,
   PAST_LIFE_WEEK_HOURS,
   SERVICE_COST_FRACTION,
   SERVICE_INTERVAL_DAYS,
@@ -206,8 +207,8 @@ function cutting(): GameState {
   return act(state, { type: 'WORK_HERE', jobId: null });
 }
 
-describe('what the day costs when the machine goes out (CLAUDE.md T20 2.9.3)', () => {
-  it('stops the stage from the call to the end of the day, and the day s work with it', () => {
+describe('what the day costs when the machine goes out (CLAUDE.md T20 2.9.3; v53)', () => {
+  it('takes the saw s places from the call to the end of the day, and slows the day s work with it', () => {
     // Four hours of the morning, once with the saw on the floor and once with it away.
     const worked = clearEvents(tick(cutting(), 240));
     const away = cutting();
@@ -216,11 +217,18 @@ describe('what the day costs when the machine goes out (CLAUDE.md T20 2.9.3)', (
     // It is still out at the end of those hours: the day is the unit, not the half hour.
     expect(machineIsOut(theSaw(stopped), stopped.clock.day)).toBe(true);
     expect(familyStopped(stopped, 'tableSaw')?.why).toBe('service');
-    // And the work did not happen: the stage the saw makes is stopped, so the day's output falls.
-    expect(jobProgress(firstJob(worked))).toBeGreaterThan(0);
-    expect(jobProgress(firstJob(stopped))).toBe(0);
-    // And the card says which of the two it is: away being serviced, not broken (T20 2.9.3).
-    expect(hallBlock(stopped, firstJob(stopped))).toBe('table saw is in for a service');
+    expect(placedMachines(stopped, 'tableSaw')).toEqual([]);
+    // Until v53 the work did not happen: the stage the saw makes stood, the job read `table saw is
+    // in for a service` and its progress stayed at 0. Now nothing stops the job: its cutting goes
+    // at the by hand 1 / 1.5 while the saw is away, and the day's output falls by that and no more
+    // (PIOTR, 24.09; v53). The morning's 157.92 of labour with the used saw, at the job's pace of
+    // 0.9870, is 142.22 with it away, at 0.8889: 0.0395 of the job against 0.0356.
+    expect(hallBlock(stopped, firstJob(stopped))).toBe('');
+    const done = (state: GameState): number => firstJob(state).labourValue - firstJob(state).labourRemaining;
+    expect(done(worked)).toBeCloseTo((240 * OWNER_LABOUR_PER_MINUTE) / (0.25 / 0.95 + 0.75), 6);
+    expect(done(stopped)).toBeCloseTo((240 * OWNER_LABOUR_PER_MINUTE) / (0.25 * 1.5 + 0.75), 6);
+    expect(jobProgress(firstJob(worked))).toBeCloseTo(0.0395, 4);
+    expect(jobProgress(firstJob(stopped))).toBeCloseTo(0.0356, 4);
   });
 });
 

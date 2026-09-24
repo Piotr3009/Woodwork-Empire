@@ -181,7 +181,9 @@ describe('the efficiency line on the summary', () => {
       row.querySelector('.row-main')?.textContent,
       row.querySelector('.row-figure')?.textContent,
     ]);
-    expect(rows).toContainEqual(['Efficiency', '73%, mostly no place']);
+    // The cause in the plate's own words: a man with every machine and bench he could work at
+    // taken is a man with no free machines (PIOTR, 24.09; v53).
+    expect(rows).toContainEqual(['Efficiency', '73%, mostly no free machines']);
     expect(html).not.toContain('Night shift');
     const night = renderDaySummary({ ...summary, nightMinutes: 120 });
     expect(parse(night).textContent).toContain('Night shift');

@@ -1,6 +1,8 @@
 // The bag lives on the extractor, and only there (PIOTR, 15.09; CLAUDE.md T12 2.3). Every machine
 // gives dust in cubic metres an hour of use, the hall keeps it in one store the size of every bag
-// on every fan standing in it, and nothing that makes dust runs while that store is full.
+// on every fan standing in it, and nothing that makes dust runs while that store is full. From v53
+// that stops no job: a family that does not run has no places, and its share of a job goes at the
+// by hand pace until the bags are emptied (PIOTR, 24.09).
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -9,7 +11,9 @@ import {
   BREAK_START_MINUTE,
   DUST_OUTPUT_M3_PER_HOUR,
   EXTRACTOR_BAGS,
+  OWNER_LABOUR_PER_MINUTE,
 } from '../../src/engine/constants';
+import { jobPace } from '../../src/engine/stages';
 import {
   bagStore,
   bagsFull,
@@ -19,7 +23,8 @@ import {
 } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
 // The clock's own booking of a minute at a machine, off the module: the tests stand a man at a
-// thicknesser, which no stage of any job does yet.
+// thicknesser without a timber job to take him there (the machining of timber is the
+// thicknesser's from v53).
 import { accumulateMachineMinute, menAtMachine } from '../../src/engine/machines';
 import {
   acceptNow,
@@ -50,8 +55,8 @@ function machineOf(state: GameState, specId: string): Equipment {
 }
 
 /** Somebody stands at each of these machines for so many minutes, booked a minute at a time the
- *  way the clock books them, so the rounding is the engine's own. The thicknesser has no stage of
- *  any job to be stood at yet, so the store is driven here rather than through a played day.
+ *  way the clock books them, so the rounding is the engine's own. The store is driven here rather
+ *  than through a played day, so no timber job is wanted to stand a man at the thicknesser.
  *  Returns the minute the store filled, or zero when it never did. */
 function standAt(state: GameState, machines: Equipment[], minutes: number): number {
   let filledAt = 0;
@@ -171,12 +176,19 @@ describe('emptying the bags', () => {
     expect(next.tasks.find((entry) => entry.kind === 'emptyBags')?.done).toBe(true);
   });
 
-  it('stops every machine that makes dust while the bags are full, and starts them again', () => {
+  it('stops every machine that makes dust while the bags are full, and the job goes on by hand', () => {
     let state = fillBags(ownerCutting());
+    // The saw and the hand edgebander both make dust, so neither runs: the cutting's quarter and
+    // the machining's fifteen per cent go at the by hand 1 / 1.5, the rest at 1.00.
+    expect(jobPace(state, firstJob(state))).toBeCloseTo(1 / (0.4 * 1.5 + 0.6), 10);
     const before = firstJob(state).labourRemaining;
     state = tick(state, 30);
-    expect(firstJob(state).blockedBy).toBe('bags full');
-    expect(firstJob(state).labourRemaining).toBe(before);
+    // Until v53 the job stood with `bags full` on it and not a minute went in. Now it is not
+    // stopped: the owner works it at a bench, 16.67 of labour in the half hour, and the saw has
+    // nobody at it (PIOTR, 24.09; v53).
+    expect(firstJob(state).blockedBy).toBe('');
+    expect(before - firstJob(state).labourRemaining).toBeCloseTo(30 * OWNER_LABOUR_PER_MINUTE / 1.2, 6);
+    expect(state.owner.station).toBe('machine:workbench');
     expect(menAtMachine(state, machineOf(state, 'tableSaw'))).toEqual([]);
     // Nothing asks on its own while they stand stopped; the extractor asks when it is clicked.
     expect(state.activeEvent).toBeNull();
@@ -185,9 +197,14 @@ describe('emptying the bags', () => {
     state = choose(state, 'owner');
     state = tick(state, BAG_CHANGE_MINUTES);
     expect(state.bagFillM3).toBe(0);
+    const emptied = firstJob(state).labourRemaining;
     const running = tick(state, 30);
     expect(firstJob(running).blockedBy).toBe('');
-    expect(firstJob(running).labourRemaining).toBeLessThan(before);
+    // The saw runs again and he is back at it, the job at its pace with the used saw: 0.9870.
+    expect(emptied - firstJob(running).labourRemaining).toBeCloseTo(
+      (30 * OWNER_LABOUR_PER_MINUTE) / (0.25 / 0.95 + 0.75),
+      6,
+    );
     expect(menAtMachine(running, machineOf(running, 'tableSaw'))).toEqual(['owner']);
   });
 
@@ -199,11 +216,15 @@ describe('emptying the bags', () => {
     expect(state.eventQueue.filter((event) => event.kind === 'bagsFull')).toHaveLength(0);
     expect(bagStore(state).fillM3).toBe(bagStore(state).capacityM3);
     expect(state.dayStats.dustM3).toBeGreaterThan(0);
-    // Left stopped, the saw stays stopped and nobody is asked twice.
+    // Left stopped, the saw stays stopped and nobody is asked twice. Until v53 the job read
+    // `bags full` all the while; now it goes on by hand at a bench (v53).
     state = choose(state, 'later');
+    const before = firstJob(state).labourRemaining;
     state = tick(state, 60);
     expect(state.activeEvent).toBeNull();
-    expect(firstJob(state).blockedBy).toBe('bags full');
+    expect(firstJob(state).blockedBy).toBe('');
+    expect(menAtMachine(state, machineOf(state, 'tableSaw'))).toEqual([]);
+    expect(before - firstJob(state).labourRemaining).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE / 1.2, 6);
   });
 
   it('is the helper s the minute they fill, for nothing, and nobody stops', () => {

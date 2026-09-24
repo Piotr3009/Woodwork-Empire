@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 // The men on a job, and there is no limit on how many (PIOTR, 17.09; CLAUDE.md T19 2.5). The two
 // fields of Turn 17, the man it was assigned to and the second man, are one list now. Everybody on
-// it books his own minutes into the job at his own rate, so twenty men do make it go faster; a
-// stage at a machine goes at the speed of as many men as the hall has places for at it, and the
-// rest say they have no place (CLAUDE.md T25 2.3); and every man at work has a place of his own.
+// it books his own minutes into the job at his own rate, so twenty men do make it go faster. Nobody
+// waits for a machine: a man the saw has no place for works the job at another of its machines or
+// at a bench, and a crew bigger than the saw's places costs the whole hall its line on the Output
+// sheet instead (PIOTR, 24.09; v53). Every man at work has a place of his own.
 
 import { stagePlanFor } from '../../src/engine/stages';
 import { describe, expect, it } from 'vitest';
@@ -18,7 +19,7 @@ import {
 } from '../../src/engine/jobs';
 import { hands, workMinute } from '../../src/engine/production';
 import { stationCell } from '../../src/render/hall';
-import { STATION_BENCH, STATION_HOME, machineStation } from '../../src/engine/stations';
+import { STATION_BENCH, machineStation } from '../../src/engine/stations';
 import { animationForStation } from '../../src/render/characters';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState, Job } from '../../src/engine/index';
@@ -63,7 +64,8 @@ function labourIn(
   if (!job) throw new Error('no job');
   // The labour by stage: at the cutting the machining and the assembly are already done, which
   // is how a job at its cutting has always been stood; at the assembly the cutting and the
-  // machining are behind it. Every man on it works its current stage (CLAUDE.md T25 2.2).
+  // machining are behind it. Every man on it works it at its one pace, and his minute is written
+  // on the stage its bar stands at (v53).
   const plan = stagePlanFor(state, job);
   const share = (id: string): number => {
     const stage = plan.find((entry) => entry.id === id);
@@ -129,25 +131,32 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     expect(done(twoMen)).toBeGreaterThan(done(oneMan) * 1.5);
   });
 
-  it('runs a cutting stage at one man s speed with three men and a saw of one place', () => {
-    // A budget saw has one place: the other two have none and the stage goes no faster than the
-    // man at it (CLAUDE.md T25 2.1, 2.3).
+  it('runs a cutting stage at three men s speed with three men and a saw of one place', () => {
+    // A budget saw has one place: until v53 the other two had none and the stage went no faster
+    // than the man at it. Now the other two work the job at the benches, and all three put their
+    // minutes in (PIOTR, 24.09; v53). The hall is the same seven men in both runs, so its line
+    // for the one saw is the same in both and the ratio is the men.
     const one = menOnOne(1, 1, 'budget');
     const three = menOnOne(3, 1, 'budget');
     const alone = labourIn(one, jobOfFirst(one).id, 'cutting', 20);
     const crowd = labourIn(three, jobOfFirst(three).id, 'cutting', 20);
     expect(alone).toBeGreaterThan(0);
-    expect(crowd).toBeCloseTo(alone, 4);
+    expect(crowd).toBeCloseTo(alone * 3, 4);
   });
 
-  it('runs it at two men s speed with the same three men and a saw of two places', () => {
-    const one = menOnOne(1, 1, 'standard');
-    const three = menOnOne(3, 1, 'standard');
-    const alone = labourIn(one, jobOfFirst(one).id, 'cutting', 20);
-    const crowd = labourIn(three, jobOfFirst(three).id, 'cutting', 20);
-    expect(alone).toBeGreaterThan(0);
-    // Two of the three at the saw's two places, the three being all novices at one rate.
-    expect(crowd).toBeCloseTo(alone * 2, 4);
+  it('runs the same three men faster behind a saw of two places, by the saw s class and its hall line', () => {
+    const budget = menOnOne(3, 1, 'budget');
+    const standard = menOnOne(3, 1, 'standard');
+    const slow = labourIn(budget, jobOfFirst(budget).id, 'cutting', 20);
+    const fast = labourIn(standard, jobOfFirst(standard).id, 'cutting', 20);
+    // Until v53 the standard saw's second place was a second man working, twice the one place
+    // saw. Now all three work behind either saw, and what the second place buys is the hall's
+    // line: seven men on the books and two places, (2 + 5 / 1.5) / 7, against one place,
+    // (1 + 6 / 1.5) / 7; and the standard saw's pace, 1.05 on the cutting's quarter of the job.
+    const pace = 1 / (0.25 / 1.05 + 0.75);
+    const line = (2 + 5 / 1.5) / (1 + 6 / 1.5);
+    expect(fast / slow).toBeCloseTo(pace * line, 6);
+    expect(fast / slow).toBeCloseTo(1.0795, 4);
   });
 
   it('runs the assembly stage at three men’s speed with the same three men', () => {
@@ -159,11 +168,12 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     expect(crowd).toBeGreaterThan(alone * 2.5);
   });
 
-  it('stands the men a one place saw has no place for at their home cells, and says why', () => {
+  it('spreads the men a one place saw has no place for over the benches, and nobody stands', () => {
     const state = menOnOne(3, 1, 'budget');
     const job = jobOfFirst(state);
     // The one job in the hall, so the places this test is about are the whole of the hall's work.
-    // Nobody is moved between jobs and nobody to another stage (CLAUDE.md T22 2.6, T25 2.2).
+    // Nobody is moved between jobs (CLAUDE.md T22 2.6), and nobody waits for the saw: the two men
+    // it has no place for work the job at the benches (PIOTR, 24.09; v53).
     state.jobs = [job];
     labourIn(state, job.id, 'cutting', 0);
     workMinute(
@@ -171,8 +181,13 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
       hands(state).filter((hand) => hand.job.id === job.id),
     );
     const men = job.assignees.map((who) => state.workers.find((worker) => worker.id === who));
-    expect(men.map((man) => man?.station)).toEqual([machineStation('tableSaw'), STATION_HOME, STATION_HOME]);
-    expect(men.map((man) => man?.noPlaceFor)).toEqual(['', 'tableSaw', 'tableSaw']);
+    expect(men.map((man) => man?.station)).toEqual([
+      machineStation('tableSaw'),
+      machineStation('workbench'),
+      machineStation('workbench'),
+    ]);
+    expect(men.map((man) => man?.working)).toEqual([true, true, true]);
+    expect(men.map((man) => man?.noPlaceFor)).toEqual(['', '', '']);
   });
 
   it('stands them at the benches places, every man at a place of his own', () => {

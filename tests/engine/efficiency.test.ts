@@ -2,8 +2,9 @@
 // each a share of the lost minutes (PIOTR: "without the breakdown it is just a pretty number";
 // CLAUDE.md T13 3.5). The number is worked over possible; the five lines sum to the lost minutes
 // and their percentages to a hundred; a day nobody could have worked reads 100. From v52 the
-// queue's line is `noPlace` and means that and only that, and a job the hall stopped has a line
-// of its own (CLAUDE.md T25 2.3).
+// queue's line is `noPlace`, and a job the hall stopped has a line of its own (CLAUDE.md T25 2.3).
+// From v53 `noPlace` is `No free machines` and means one thing: every place a man could take was
+// taken. A man past a saw's places works elsewhere and loses no minute (PIOTR, 24.09; v53).
 
 import { describe, expect, it } from 'vitest';
 import { EFFICIENCY_CAUSES } from '../../src/engine/constants';
@@ -11,7 +12,7 @@ import { efficiencyOf, emptyEfficiency, topCause, workshopEfficiency } from '../
 import { dayMinutesByCategory } from '../../src/engine/index';
 import type { EfficiencyStats, GameState } from '../../src/engine/index';
 import type { LostMinuteCause } from '../../src/engine/types';
-import { runClock, twoMenOnSheetWork, withOnlyCuttingLeft } from '../helpers';
+import { act, runClock, testJoiner, twoMenOnSheetWork, withOnlyCuttingLeft } from '../helpers';
 
 interface PartialStats {
   possible?: number;
@@ -68,7 +69,8 @@ describe('the five lines', () => {
     expect(found.lines.map((line) => line.id)).toEqual(EFFICIENCY_CAUSES.map((cause) => cause.id));
     expect(found.lines.map((line) => line.label)).toEqual([
       'No people',
-      'No place',
+      // 'No place' until v53: the words for every machine he could work at taken (v53).
+      'No free machines',
       'No material',
       'Hall stopped',
       'Owner away',
@@ -127,15 +129,30 @@ describe('on a played day, off the tally the production minute keeps', () => {
     expect(found.worked).toBe(meterMinutes(state));
   });
 
-  it('books a man the one saw has no place for as no place, and nothing else', () => {
-    // Two men, one budget saw of one place, both jobs at their cutting (CLAUDE.md T25 2.3).
-    const start = withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' }));
+  it('books a man with every place taken as no place, and the man past the saw s place not at all', () => {
+    // Two men, one budget saw of one place, both jobs at their cutting (CLAUDE.md T25 2.3). Until
+    // v53 the joiner stood the whole 200 minutes with no place at the saw and the day read 50.
+    // Now he works his job at a bench, so a third man is wanted to stand anybody: the hall is
+    // left one bench of one place, and the third man, on the joiner's job, has the saw and the
+    // bench both taken (PIOTR, 24.09; v53).
+    let start = withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' }));
+    const first = start.equipment.find((item) => item.specId === 'workbench');
+    start.equipment = start.equipment.filter((item) => item.specId !== 'workbench' || item === first);
+    start.workers.push(testJoiner('staff-2', 'Tom', 8, 6));
+    const job = start.jobs.find((entry) => entry.assignees.includes('staff-1'));
+    if (!job) throw new Error('the joiner s job is wanted');
+    start = act(start, { type: 'ADD_TO_JOB', jobId: job.id, workerId: 'staff-2' });
     const state = runClock(start, 200);
     const found = workshopEfficiency(state);
-    expect(found.percent).toBe(50);
+    // Three seats of 200 minutes: the owner at the saw and the joiner at the bench worked all of
+    // theirs, and the third man's 200 are the one line.
+    expect(found.possible).toBe(600);
+    expect(found.worked).toBe(400);
+    expect(found.percent).toBe(67);
     expect(found.lost).toBe(200);
     expect(found.lines.find((line) => line.id === 'noPlace')?.minutes).toBe(200);
     expect(found.lines.find((line) => line.id === 'noPlace')?.percent).toBe(100);
+    expect(state.workers.map((worker) => worker.productionMinutes)).toEqual([200, 0]);
     expect(found.worked).toBe(meterMinutes(state));
   });
 

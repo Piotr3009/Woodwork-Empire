@@ -2,13 +2,16 @@
 // and the hover column; CLAUDE.md T22 2.5). The words are `tests/engine/bubbles.test.ts`; what is
 // asserted here is the drawing: a 14 px disc with an exclamation in it over the four men something
 // is wrong with, nothing at all over the men nothing is wrong with, two marks over one cell side by
-// side, the words that come up on the hover, and all of it at x10 and x30 as well as at x1.
+// side, the words that come up on the hover, and all of it at x10 and x30 as well as at x1. From
+// v53 one mark is drawn over a machine and not a man: the first saw with places, while the crew is
+// more men than the saws have places for (PIOTR, 24.09; v53).
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { bubbleFor } from '../../src/engine/bubbles';
 import { WAITING_FOR_MATERIAL, planPlaces } from '../../src/engine/production';
 import { STATION_OFFICE } from '../../src/engine/stations';
+import { placeShortages, shortageLine } from '../../src/engine/machines';
 import { drawContract } from '../../src/engine/contracts';
 import { CAPSULE_HEAD_TOP, markArt, renderHall } from '../../src/render/hall';
 import type { GameState } from '../../src/engine/index';
@@ -47,14 +50,19 @@ function groupOf(svg: string, figure: string): string {
   throw new Error(`${figure} has no end`);
 }
 
-/** Three men on one job at its cutting stage with a budget saw of one place, so one man is
- *  cutting and two have no place at the saw (CLAUDE.md T25 2.3). */
-function noPlaceAtTheSaw(): GameState {
+/** Three men on one job at its cutting stage, a budget saw of one place and the day one kit's one
+ *  bench, the five other benches taken out: the saw and that bench are every place the hall has.
+ *  Nobody waits for the saw, so one man cuts, the second takes the bench, and the third and the
+ *  three men on the other jobs stand with every place taken (CLAUDE.md T25 2.3; PIOTR, 24.09;
+ *  v53). Until v53 the one saw alone stood the second man. */
+function everyPlaceTaken(): GameState {
   let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
   const first = state.jobs[0];
   if (!first) throw new Error('a job is wanted');
   state = act(state, { type: 'ADD_TO_JOB', jobId: first.id, workerId: 'staff-2' });
   state = act(state, { type: 'ADD_TO_JOB', jobId: first.id, workerId: 'staff-3' });
+  const kit = state.equipment.find((item) => item.specId === 'workbench');
+  state.equipment = state.equipment.filter((item) => item.specId !== 'workbench' || item === kit);
   const job = state.jobs.find((entry) => entry.id === first.id);
   if (!job) throw new Error('the job went missing');
   job.labourRemaining = job.labourValue * 0.95;
@@ -104,12 +112,13 @@ function markOver(svg: string, figure: string): string {
 
 describe('a mark only where something is wrong (CLAUDE.md T22 2.5)', () => {
   it('draws the disc with its exclamation over each of the five things the player can put right', () => {
-    const waiting = noPlaceAtTheSaw();
+    const waiting = everyPlaceTaken();
     const svg = renderHall(waiting);
-    // Every man the saw has no place for says so (CLAUDE.md T25 2.3).
+    // Every man with every place he could take taken says so, and names no machine
+    // (CLAUDE.md T25 2.3; PIOTR, 24.09; v53).
     for (const [who, key, words] of [
-      ['worker-staff-2', 'noPlace', 'no place at the saw'],
-      ['worker-staff-3', 'noPlace', 'no place at the saw'],
+      ['worker-staff-3', 'noPlace', 'no free machines'],
+      ['worker-staff-4', 'noPlace', 'no free machines'],
     ] as const) {
       const mark = markOver(svg, who);
       expect(mark, who).toContain(`data-bubble="${key}"`);
@@ -137,13 +146,17 @@ describe('a mark only where something is wrong (CLAUDE.md T22 2.5)', () => {
   });
 
   it('draws nothing at all over a man who is working', () => {
-    const state = noPlaceAtTheSaw();
+    const state = everyPlaceTaken();
     expect(bubbleFor(state, 'staff-1')).toBeNull();
     expect(markOver(renderHall(state), 'worker-staff-1')).toBe('');
+    // Nor over the second man on the job, who works it at the bench and waits for no saw
+    // (PIOTR, 24.09; v53).
+    expect(bubbleFor(state, 'staff-2')).toBeNull();
+    expect(markOver(renderHall(state), 'worker-staff-2')).toBe('');
   });
 
   it('draws nothing at all over a helper sweeping the floor', () => {
-    const state = noPlaceAtTheSaw();
+    const state = everyPlaceTaken();
     const worker = state.workers.find((entry) => entry.id === 'staff-4');
     if (!worker) throw new Error('a man is wanted');
     worker.jobId = null;
@@ -176,7 +189,11 @@ describe('a mark only where something is wrong (CLAUDE.md T22 2.5)', () => {
     const state = runClock(sixJoinersOnSheetWork({ saws: 1 }), 250);
     const svg = renderHall(state);
     // They are behind the canteen door and nothing is drawn after them: no mark at the door, and
-    // no group of words standing on an empty cell either (CLAUDE.md T21 2.12, T22 2.5).
+    // no group of words standing on an empty cell either (CLAUDE.md T21 2.12, T22 2.5). The saw is
+    // still too few for the crew of seven, and its mark is not drawn either: nothing is marked
+    // while the hall is at its dinner, a machine no more than a man (PIOTR, 24.09; v53).
+    expect(placeShortages(state)).toHaveLength(1);
+    expect(svg).not.toContain('data-machine-mark');
     expect(svg).not.toContain('class="mark"');
     expect(svg).not.toContain('data-away-door');
     for (const worker of state.workers) expect(bubbleFor(state, worker.id), worker.id).toBeNull();
@@ -215,11 +232,15 @@ describe('two marks over one cell (CLAUDE.md T22 2.5)', () => {
     // (CLAUDE.md T22 2.5).
     const svg = renderHall(threeJobsAtOneSaw());
     // Read it off the hall itself rather than off three names: every figure group carries the cell
-    // it stands on, so the three are whichever men the engine stood on that one cell.
+    // it stands on, so the three are whichever men the engine stood on that one cell. Only a man's
+    // own mark is counted, the one that carries his name: the saw's mark for a crew too big for it
+    // is drawn over the saw and stands on no man's cell (PIOTR, 24.09; v53).
     const marks = new Map<string, string[]>();
     for (const piece of svg.split('data-figure="').slice(1)) {
+      const who = piece.slice(0, piece.indexOf('"')).replace(/^worker-/, '');
       const cell = piece.match(/data-cell="([^"]*)"/)?.[1] ?? '';
-      const at = piece.indexOf('<g class="mark"');
+      const own = new RegExp(`<g class="mark" data-bubble="[^"]*" data-bubble-for="${who}"`).exec(piece);
+      const at = own === null ? -1 : own.index;
       if (cell === '' || at < 0) continue;
       const offset = piece.slice(at, at + 200).match(/transform="translate\((\d+),0\)"/)?.[1] ?? '0';
       marks.set(cell, [...(marks.get(cell) ?? []), offset]);
@@ -230,8 +251,8 @@ describe('two marks over one cell (CLAUDE.md T22 2.5)', () => {
   });
 
   it('hangs every disc over the head of whichever man was drawn', () => {
-    const svg = renderHall(noPlaceAtTheSaw());
-    const mark = markOver(svg, 'worker-staff-2');
+    const svg = renderHall(everyPlaceTaken());
+    const mark = markOver(svg, 'worker-staff-3');
     // The capsule's own crown, six pixels of gap, the tail and then the disc: the tail's point is
     // over his head and the disc is over the tail.
     const centre = Number(/<circle class="mark-disc" cx="0" cy="(-?[\d.]+)"/.exec(mark)?.[1] ?? '0');
@@ -244,9 +265,9 @@ describe('two marks over one cell (CLAUDE.md T22 2.5)', () => {
 
 describe('the words on the hover (CLAUDE.md T22 2.5)', () => {
   it('keeps the paper in the DOM beside the disc and lets the stylesheet bring it up', () => {
-    const mark = markOver(renderHall(noPlaceAtTheSaw()), 'worker-staff-2');
+    const mark = markOver(renderHall(everyPlaceTaken()), 'worker-staff-3');
     expect(mark).toContain('class="mark-line"');
-    expect(mark).toContain('<div class="bubble">no place at the saw</div>');
+    expect(mark).toContain('<div class="bubble">no free machines</div>');
     // Hidden until the pointer is on the figure, and the figure group is where the rule hangs, so
     // pointing at the disc and pointing at the man are the one hover. No JavaScript at all.
     expect(ruleBody('.mark-line')).toContain('visibility: hidden');
@@ -254,24 +275,80 @@ describe('the words on the hover (CLAUDE.md T22 2.5)', () => {
   });
 
   it('lets the disc be pointed at and the paper eat nothing', () => {
-    const mark = markOver(renderHall(noPlaceAtTheSaw()), 'worker-staff-2');
+    const mark = markOver(renderHall(everyPlaceTaken()), 'worker-staff-3');
     // The disc takes the mouse; the paper takes none, so it cannot eat a click meant for the hall.
     expect(ruleBody('.mark')).toContain('pointer-events: auto');
     expect(mark).toContain('pointer-events="none"');
     expect(mark).toContain('overflow="visible"');
     // The hover line of Turn 11 is still the group's own title and is not the mark's.
-    const group = groupOf(renderHall(noPlaceAtTheSaw()), 'worker-staff-2');
+    const group = groupOf(renderHall(everyPlaceTaken()), 'worker-staff-3');
     expect(group).toContain('<title>');
     expect(mark).not.toContain('data-character');
   });
 
   it('draws the discs and the words at x10 and x30, where the old paper bubbles came down', () => {
     for (const speed of [1, 4, 10, 30] as const) {
-      const fast = act(noPlaceAtTheSaw(), { type: 'SET_SPEED', speed });
-      const mark = markOver(renderHall(fast), 'worker-staff-2');
+      const fast = act(everyPlaceTaken(), { type: 'SET_SPEED', speed });
+      const mark = markOver(renderHall(fast), 'worker-staff-3');
       expect(mark, String(speed)).toContain('class="mark-disc"');
-      expect(mark, String(speed)).toContain('<div class="bubble">no place at the saw</div>');
+      expect(mark, String(speed)).toContain('<div class="bubble">no free machines</div>');
     }
+  });
+});
+
+describe('the mark over a machine (PIOTR, 24.09; v53)', () => {
+  it('draws the mark over the saw while the crew is more than its places, with its line on the hover, and none at dinner', () => {
+    // Six joiners and the owner, one budget saw of one place: seven men for one place [PIOTR,
+    // 24.09: "an exclamation at the saw"]. Nobody waits for it, and the mark is drawn over the
+    // machine that is short, not over a man.
+    const state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (saw === undefined) throw new Error('the saw is wanted');
+    const words = shortageLine(state, 'tableSaw');
+    expect(words).toBe('Too few saws for the crew: 7 men, 1 place, 6 work at 67%');
+    const svg = renderHall(state);
+    expect(svg.match(/data-machine-mark="/g)).toHaveLength(1);
+    // Inside the saw's own group: the last machine group opened before the mark is the saw's.
+    const at = svg.indexOf(`<g data-machine-mark="${saw.id}"`);
+    expect(at).toBeGreaterThan(-1);
+    const kitAt = svg.slice(0, at).lastIndexOf('data-kit="');
+    expect(svg.slice(kitAt, kitAt + `data-kit="${saw.id}"`.length)).toBe(`data-kit="${saw.id}"`);
+    // The same mark a man wears, the disc and its words, with the saw's line on the paper.
+    const mark = svg.slice(at, svg.indexOf('</foreignObject>', at));
+    expect(mark).toContain(`<g class="mark" data-bubble="tooFewPlaces" data-bubble-for="${saw.id}">`);
+    expect(mark).toContain('class="mark-disc"');
+    expect(mark).toContain('>!</text>');
+    expect(mark).toContain(`<div class="bubble">${words}</div>`);
+    // The saw's hover line carries the same words, after its places.
+    const title = svg.slice(svg.indexOf('<title>', kitAt), svg.indexOf('</title>', kitAt));
+    expect(title).toContain(`Places: 1 of 1 in use, Joiner 1. ${words}.`);
+    // No man's mark is touched by it: the marks over men are the men's own, and here that is the
+    // owner, who is on nothing.
+    const men = (svg.match(/data-bubble-for="[^"]*"/g) ?? []).filter(
+      (hit) => hit !== `data-bubble-for="${saw.id}"`,
+    );
+    expect(men).toEqual(['data-bubble-for="owner"']);
+    // At the dinner hour the saw is still too few and nothing is marked (CLAUDE.md T22 2.5).
+    const dinner = runClock(state, 250);
+    expect(shortageLine(dinner, 'tableSaw')).toBe(words);
+    expect(renderHall(dinner)).not.toContain('data-machine-mark');
+  });
+
+  it('wears it on the first saw with places, and moves it to the next while the first is down', () => {
+    // Two budget saws, a place each, for seven men: the one bought first is the one filled first
+    // and the one marked. Broken, it has no places, and the mark goes to the other.
+    const state = sixJoinersOnSheetWork({ saws: 2, sawVariant: 'budget' });
+    const [first, second] = state.equipment.filter((item) => item.specId === 'tableSaw');
+    if (first === undefined || second === undefined) throw new Error('two saws are wanted');
+    expect(renderHall(state).match(/data-machine-mark="[^"]*"/g)).toEqual([
+      `data-machine-mark="${first.id}"`,
+    ]);
+    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 7 men, 2 places, 5 work at 67%');
+    first.broken = true;
+    expect(renderHall(state).match(/data-machine-mark="[^"]*"/g)).toEqual([
+      `data-machine-mark="${second.id}"`,
+    ]);
+    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 7 men, 1 place, 6 work at 67%');
   });
 });
 

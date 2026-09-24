@@ -117,8 +117,10 @@ afterEach(() => {
 
 describe('a fresh game in this build', () => {
   it('is on the build the brief names', () => {
-    expect(APP_VERSION).toBe('v52');
-    expect(STATE_VERSION).toBe(28);
+    // v53 is state 29: the job card's switch for the CNC is gone from every job and the timber
+    // tool set from the game (PIOTR, 24.09; v53).
+    expect(APP_VERSION).toBe('v53');
+    expect(STATE_VERSION).toBe(29);
   });
 
   it('saves through the store, the file and the cloud row on day 1, and loads back three ways', async () => {

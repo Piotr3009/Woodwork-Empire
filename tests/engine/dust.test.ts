@@ -33,9 +33,11 @@ describe('dust is one figure per family, in cubic metres an hour of use', () => 
       thicknesser: 0.25,
       cnc: 0.06,
       cncHead: 0.06,
-      solidWoodTools: 0,
       sprayBooth: 0,
     });
+    // The timber tool set's 0 went with the family: it is no longer in the game, and the test
+    // above holds the table to the catalogue (PIOTR, 24.09; v53).
+    expect(DUST_OUTPUT_M3_PER_HOUR).not.toHaveProperty('solidWoodTools');
     // About half a bag a day off a CNC cutting all day (0.48 of one, to the figure), and a saw
     // at a quarter of that: the point of reference the whole table is drawn from (T12 2.1).
     expect((DUST_OUTPUT_M3_PER_HOUR.cnc ?? 0) * 8).toBeCloseTo(0.5 * BAG_M3, 1);

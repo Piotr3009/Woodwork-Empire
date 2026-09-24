@@ -103,10 +103,11 @@ describe('the tile and the card are one function', () => {
     expect(card.querySelector('[data-do="letGo"]')).not.toBeNull();
   });
 
-  it('says what the week idle was for, when it was a machine (v37)', () => {
-    // A week that stood six hours at the edgebander and two at the saw: the card names the one
-    // he waited for most, with its hours, so the player can see what a second one would buy
-    // (PIOTR, 20.09).
+  it('says how much of the week idle was no free machines (v37)', () => {
+    // A week that stood eight hours, six of them with every machine and bench he could work at
+    // taken: the card says so with its hours, so the player can see what another machine would
+    // buy (PIOTR, 20.09). From v53 the words are the mark's own and name no machine, because a
+    // man stands only when every place he could take is taken (PIOTR, 24.09; v53).
     const state = withAJoiner();
     const man = state.workers[0];
     if (!man) throw new Error('a joiner is wanted');
@@ -115,7 +116,7 @@ describe('the tile and the card are one function', () => {
       week,
       minutes: { jobs: 1200, contracts: 0, unloading: 0, cleaning: 0, desk: 0, site: 0 },
       paidMinutes: 1680,
-      waitedFor: { edgebander: 360, tableSaw: 120 },
+      waitedFor: { tableSaw: 360 },
       pieces: 0,
       jobs: [],
       day: state.clock.day,
@@ -125,8 +126,7 @@ describe('the tile and the card are one function', () => {
     };
     const card = parse(renderPerson(state, man.id, 'card'));
     const line = card.querySelector('[data-week="this week"]')?.textContent ?? '';
-    expect(line).toContain('8 h idle');
-    expect(line).toContain('6 h of it no place at the edgebander');
+    expect(line).toContain('8 h idle, 6 h of it no free machines');
     expect(line).not.toContain('saw');
   });
 

@@ -27,6 +27,7 @@ import {
   TIER_WORDS,
   MACHINE_PACE,
   MACHINE_PLACES,
+  MEN_PER_PLACE,
   PACED_FAMILIES,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
@@ -69,6 +70,7 @@ import {
   compressorFor,
   compressorIsLow,
   extractionCapacityOf,
+  familyAirBlock,
   extractionCheck,
   extractionDemandOf,
   isConnectedToExtraction,
@@ -82,7 +84,8 @@ import {
 import { lockReasonFor, template } from './catalog';
 import { jobHeldBy } from './jobs';
 import { stageOfMan } from './production';
-import { stageDoing } from './stages';
+import { jobPace, stageDoing, tradeFactor } from './stages';
+import { isWorkingToday, nightCrew } from './staff';
 import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
 import { andList, cubicMetres, trimmed } from './text';
@@ -340,11 +343,23 @@ export function placesOf(item: { specId: string; variantId: string }): number {
   return MACHINE_PLACES[item.specId]?.[item.variantId] ?? 0;
 }
 
-/** The machines of this family that have places today, in the order they were bought, which is
- *  the order they are filled in: standing in the hall, not sold, not broken and not away for its
- *  service. A broken machine has no places, which is what a breakdown costs beside its repair
- *  (CLAUDE.md T20 2.9.3, T25 2.1). */
+/** True while at least one machine of this family can be worked at this minute: one of them is
+ *  not sold, not broken and not away for its service, the air it wants is there, and it makes no
+ *  dust while the hall's bags are full. A family with none running has no places and its share of
+ *  a job goes at the by hand pace; nobody waits for it to run again (PIOTR, 24.09: "they never
+ *  wait for the saw"; v53). */
+export function familyRuns(state: GameState, family: string): boolean {
+  if (bestMachineOf(state, family) === null) return false;
+  if (dustOutputOf(family) > 0 && bagsFull(state)) return false;
+  return familyAirBlock(state, family) === '';
+}
+
+/** The machines of this family that have places this minute, in the order they were bought, which
+ *  is the order they are filled in: standing in the hall, not sold, not broken and not away for
+ *  its service, in a family that runs. A broken machine has no places, which is what a breakdown
+ *  costs beside its repair (CLAUDE.md T20 2.9.3, T25 2.1; v53). */
 export function placedMachines(state: GameState, family: string): Equipment[] {
+  if (!familyRuns(state, family)) return [];
   return floorMachines(state, family).filter(
     (item) => !item.broken && !machineIsOut(item, state.clock.day),
   );
@@ -431,6 +446,68 @@ export function placesLine(state: GameState, item: Equipment, form: 'card' | 'ti
  *  sums of (CLAUDE.md T10 3.1, 3.2). */
 export function machinesAtWork(state: GameState): Set<string> {
   return new Set(menAtPlaces(state).map((entry) => entry.item.id));
+}
+
+/** The crew of a shift, for the question whether the hall has places enough for it: the owner and
+ *  every man on the books who produces and is in today, by day [PIOTR, 24.09: "me and two men is
+ *  three"]; the men put on the second shift at night, who work without the owner (v53). */
+export function crewOnTheFloor(state: GameState, shift: 'day' | 'night' = 'day'): number {
+  if (shift === 'night') return nightCrew(state).length;
+  const men = state.workers.filter(
+    (worker) => PRODUCING_ROLES.includes(worker.role) && isWorkingToday(state, worker, 'day'),
+  ).length;
+  return men + 1;
+}
+
+/** One family the hall has too few places at for its crew. */
+export interface PlaceShortage {
+  family: string;
+  places: number;
+  men: number;
+  /** The men past the places. */
+  over: number;
+  /** What every minute of production in the hall is multiplied by for it: the men past the places
+   *  work at the by hand pace and the rest at their own, averaged over the crew. */
+  factor: number;
+}
+
+/** Every family of `MEN_PER_PLACE` the hall has fewer places at than its crew wants [PIOTR, 24.09:
+ *  "with three places at the saw and four men, too few saws for the men"]. Nobody waits for the
+ *  saw: the men past its places work elsewhere, slower, at the by hand pace, and the hall's
+ *  output falls by what they lose (v53). A family the hall has no running machine of is not on it:
+ *  its share of the work is by hand already, through the job's own pace. */
+export function placeShortages(state: GameState, shift: 'day' | 'night' = 'day'): PlaceShortage[] {
+  const men = crewOnTheFloor(state, shift);
+  const found: PlaceShortage[] = [];
+  for (const [family, perPlace] of Object.entries(MEN_PER_PLACE)) {
+    const places = hallPlaces(state, family);
+    if (places <= 0) continue;
+    const covered = places * perPlace;
+    if (men <= covered) continue;
+    const over = men - covered;
+    const factor = (covered + over / BY_HAND_DURATION_FACTOR) / men;
+    found.push({ family, places, men, over, factor });
+  }
+  return found;
+}
+
+/** The plural of what the trade calls a family: `saws`, `CNCs`, `booths`. */
+export function machinesWord(family: string): string {
+  return `${machineShortWord(family)}s`;
+}
+
+/** The line a machine's card and its hover carry while its family is short of places for the
+ *  crew, and the words of the mark drawn over it in the hall: `Too few saws for the crew: 4 men, 3
+ *  places, 1 works at 67%` (PIOTR, 24.09; v53). Empty while the family has places enough. */
+export function shortageLine(state: GameState, family: string): string {
+  const short = placeShortages(state).find((entry) => entry.family === family);
+  if (short === undefined) return '';
+  const pace = Math.round(100 / BY_HAND_DURATION_FACTOR);
+  const who = short.over === 1 ? '1 works' : `${short.over} work`;
+  return (
+    `Too few ${machinesWord(family)} for the crew: ${short.men} men, ` +
+    `${short.places} ${short.places === 1 ? 'place' : 'places'}, ${who} at ${pace}%`
+  );
 }
 
 /** The class of machine this is, or the cheapest one in the family when the id is unknown. */
@@ -737,7 +814,7 @@ function manWords(worker: { name: string; tier: WorkerTier | null; role: string 
 /** What the hall is turning out and why, line by line. The one selector for it: the number the
  *  engine multiplies production by is this list's total, so the board and the bench cannot
  *  disagree about the state of the hall (CLAUDE.md T9 3.10). */
-export function outputBreakdown(state: GameState): OutputBreakdown {
+export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'): OutputBreakdown {
   const lines: OutputLine[] = [];
   let running = 1;
   // Each line is worth what it takes off the running total, so the lines add up to the product
@@ -763,6 +840,16 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
   const extraction = extractionCheck(state);
   if (extraction.short) {
     hallLine(extraction.line, 1 - UNDER_EXTRACTION_OUTPUT_PENALTY);
+  }
+  // Too few places at a family for the crew: the men past them work elsewhere at the by hand
+  // pace, and the sheet says what that costs the whole hall (PIOTR, 24.09: "it has to be shown
+  // clearly what the penalty is and how many percent the saw slows the whole production"; v53).
+  for (const short of placeShortages(state, shift)) {
+    hallLine(
+      `Too few ${machinesWord(short.family)}: ${short.places} ${short.places === 1 ? 'place' : 'places'}, ` +
+        `${short.men} men`,
+      short.factor,
+    );
   }
   const total = running;
   let plus = 0;
@@ -842,8 +929,8 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
 
 /** What the state of the hall does to every minute of production: the total of the lines the
  *  board shows, and nothing else (CLAUDE.md T9 3.10). */
-export function hallProductivityFactor(state: GameState): number {
-  return outputBreakdown(state).total;
+export function hallProductivityFactor(state: GameState, shift: 'day' | 'night' = 'day'): number {
+  return outputBreakdown(state, shift).total;
 }
 
 /** Books one production minute's multiplier for the workshop's average output (v40): the jobs
@@ -952,12 +1039,6 @@ function whyWords(state: GameState, stage: StagePlan | null, machine: Equipment 
   return stage.byHand ? 'by hand' : 'at the bench';
 }
 
-/** The speed his stage ran at this minute: the stage's own, which is the hall's pace for its family
- *  whichever machine his place is at, the one figure `runProductionMinute` reads before the air
- *  factor (CLAUDE.md T7 3.1, T25 2.4). */
-function stageSpeedNow(stage: StagePlan | null): number {
-  return stage === null ? 1 : stage.speed;
-}
 
 /** One man's row. `rate` is his own rate, which for the owner is what his day has left him
  *  (`ownerEfficiency`) and for a man on the books is his grade's. */
@@ -975,12 +1056,15 @@ function manRow(
   const doing =
     job === null || stage === null ? '' : `${stageDoing(stage.id, job.finish === 'lacquer')} ${job.name}`;
   const mine = who === OWNER ? `your ${twoPlaceText(rate)}` : twoPlaceText(rate);
+  // The job's one pace, the figure `runProductionMinute` reads before the air factor (v53).
+  const role = who === OWNER ? null : (state.workers.find((worker) => worker.id === who)?.role ?? null);
+  const pace = job === null ? 1 : jobPace(state, job) * tradeFactor(role, machine?.specId ?? null);
   return {
     who,
     main: [name, trade, doing].filter((part) => part !== '').join(', '),
     words:
       `${whyWords(state, stage, machine)}, ${booked.minutes} min: ` +
-      `${mine} times ${twoPlaceText(stageSpeedNow(stage))}`,
+      `${mine} times ${twoPlaceText(pace)}`,
     minutes: booked.minutes,
     figure: booked.minutes <= 0 ? 0 : Math.round((booked.worth / booked.minutes) * 100) / 100,
   };
@@ -994,9 +1078,9 @@ function breakdownNote(state: GameState, hall: number): string {
   for (const id of state.dayStats.jobsAdvanced) {
     const job = state.jobs.find((entry) => entry.id === id);
     if (!job || !job.byHand) continue;
-    // The tools the enquiry was locked on, in the board's own words: "Needs solid wood tools".
+    // The tools the enquiry was locked on, in the board's own words: "Needs a thicknesser".
     const locked = lockReasonFor(state, template(job.templateId)) ?? '';
-    const tools = locked.replace(/^Needs /, '').toLowerCase();
+    const tools = locked.replace(/^Needs (an? )?/, '').toLowerCase();
     if (tools === '') continue;
     return (
       `${job.name} was taken by hand: no ${tools} in the hall, so every stage of it runs at ` +

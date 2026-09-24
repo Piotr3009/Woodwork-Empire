@@ -1813,9 +1813,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       walkTo('hall');
       dispatch({ type: 'WORK_HERE', jobId: id });
       return;
-    case 'sawFallback':
-      dispatch({ type: 'SET_SAW_FALLBACK', jobId: id, on: element.dataset.on === '1' });
-      return;
     case 'dropJob':
       // The first click opens the card that says what it costs; the red button on the card is the
       // second and the only one that drops anything (CLAUDE.md T9 3.9, T21 2.3).

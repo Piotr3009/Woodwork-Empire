@@ -41,6 +41,7 @@ import {
   hasCentralExtraction,
   pipeRunFor,
   placesLine,
+  shortageLine,
   wantsExtraction,
   orderSoftwareCheck,
   countOf,
@@ -612,6 +613,8 @@ export function ownedTile(
     // Its places and who is in them, the short form on the Owned tab's tile and the long one on
     // the machine's own card (CLAUDE.md T25 2.5).
     placesLine(state, item, form),
+    // Too few of its family for the crew, on the machine's own card (PIOTR, 24.09; v53).
+    form === 'card' ? shortageLine(state, item.specId) : '',
     pipeLine(state, item),
     airStateLine(state, item),
   ]

@@ -11,6 +11,7 @@ import {
   AIR_SANDING_DEMAND,
   COMPRESSOR_AIR,
   LOW_AIR_FACTOR,
+  OWNER_LABOUR_PER_MINUTE,
   WET_AIR_FINISH_RATING,
 } from '../../src/engine/constants';
 import {
@@ -23,10 +24,14 @@ import {
   compressorLabel,
   compressors,
   familyAirBlock,
+  familyRuns,
   hallAirCheck,
   hallBlock,
   needsDryAir,
+  tick,
 } from '../../src/engine/index';
+import { hallPlaces } from '../../src/engine/machines';
+import { jobPace, stageSpeed } from '../../src/engine/stages';
 import { applyRating } from '../../src/engine/reputation';
 import { renderCatalogue } from '../../src/ui/catalogue';
 import { hallProblems, renderHall } from '../../src/render/hall';
@@ -109,7 +114,7 @@ describe('rule 1, the bar', () => {
     expect(page).toContain('Needs 10 bar, 500 l/min, compressor gives 8');
   });
 
-  it('stops the machining stage of a job whose only bander will not start', () => {
+  it('stops no job for a bander that will not start: its places are gone and the machining goes by hand', () => {
     const state = fillRack(hallWithAir('budget'), 40);
     placeEquipment(state, 'workbench', { variantId: 'budget', x: 2, y: 8 });
     placeEquipment(state, 'tableSaw', { variantId: 'used', x: 6, y: 1 });
@@ -123,9 +128,24 @@ describe('rule 1, the bar', () => {
     // quarter of the labour and machining the fifteen per cent after it (CLAUDE.md T7 3.1).
     job.labourRemaining = job.labourValue * 0.68;
     next = act(next, { type: 'WORK_HERE', jobId: job.id });
-    expect(hallBlock(next, firstJob(next))).toBe(
-      'edgebander needs 10 bar, compressor gives 8',
-    );
+    // The bar still decides whether a machine runs at all, and this one does not: it has no
+    // places. Until v53 that stopped the job with `edgebander needs 10 bar, compressor gives 8`
+    // on it; now nothing stops a job but the whole hall, and the bander's share of the job goes
+    // at the by hand pace (PIOTR, 24.09; v53).
+    expect(familyAirBlock(next, 'edgebander')).toBe('needs 10 bar, compressor gives 8');
+    expect(familyRuns(next, 'edgebander')).toBe(false);
+    expect(hallPlaces(next, 'edgebander')).toBe(0);
+    expect(hallBlock(next, firstJob(next))).toBe('');
+    expect(stageSpeed(next, firstJob(next), 'machining')).toEqual({ speed: 1 / 1.5, byHand: true });
+    const before = firstJob(next).labourRemaining;
+    const worked = tick(next, 1);
+    expect(firstJob(worked).blockedBy).toBe('');
+    expect(worked.owner.station).toBe('machine:workbench');
+    // His minute at the job's one pace: the used saw's 0.95 on the cutting's quarter, the by hand
+    // 1 / 1.5 on the machining's fifteen per cent and 1.00 on the rest.
+    const pace = 1 / (0.25 / 0.95 + 0.15 * 1.5 + 0.6);
+    expect(jobPace(worked, firstJob(worked))).toBeCloseTo(pace, 10);
+    expect(before - firstJob(worked).labourRemaining).toBeCloseTo(OWNER_LABOUR_PER_MINUTE * pace, 10);
   });
 });
 
@@ -181,16 +201,20 @@ describe('rule 2, the litres', () => {
       }
       const before = firstJob(next).labourRemaining;
       const worked = runClock(next, 20);
-      return Math.round((before - firstJob(worked).labourRemaining) * 100000) / 100000;
+      // Unrounded: the figures moved in v53 with the job's one pace, and a figure rounded to five
+      // places times 0.7 is no longer a figure rounded to five places.
+      return before - firstJob(worked).labourRemaining;
     }
-    // One man at a bench draws 30 l/min, which a used compressor holds without noticing.
+    // One man at a bench draws 30 l/min, which a used compressor holds without noticing. His
+    // twenty minutes are 12.2531 of labour from v53, at the job's one pace with the used saw's
+    // 0.95 on its cutting's quarter.
     const fine = assembled('used', 0);
-    expect(fine).toBeGreaterThan(0);
+    expect(fine).toBeCloseTo(12.2531, 4);
     // Eight of them draw 240, worked at 0.6 that is 144 against the 128 the pipe carries.
     const low = assembled('used', 7);
-    expect(low).toBeCloseTo(fine * LOW_AIR_FACTOR, 5);
+    expect(low).toBeCloseTo(fine * LOW_AIR_FACTOR, 10);
     // The same eight on a compressor that holds them are back at full speed.
-    expect(assembled('pro', 7)).toBeCloseTo(fine, 5);
+    expect(assembled('pro', 7)).toBeCloseTo(fine, 10);
   });
 
   it('says so under the hall, with a lamp on the compressor', () => {

@@ -123,12 +123,17 @@ import type {
  *  Version 28 is v52 (PIOTR, 21.09): a machine is places and nobody takes one. Every man and the
  *  owner carry `working` and `noPlaceFor`, the day plan's answer; the old claim on a machine is a
  *  dead field the lift clears; the queue's lost minutes are `noPlace` (CLAUDE.md T25 section 4). Every v25, v26
- *  and v27 save loads. */
-export const STATE_VERSION = 28;
+ *  and v27 save loads.
+ *
+ *  Version 29 is v53 (PIOTR, 24.09): no job waits for a stage and nobody waits for a machine. The
+ *  job card's "wait for the CNC" switch is gone from every job, and the timber tool set is gone
+ *  from the game: every one in a hall or on order is paid back at its price. Every v25 to v28 save
+ *  loads. */
+export const STATE_VERSION = 29;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v52';
+export const APP_VERSION = 'v53';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -563,9 +568,6 @@ export const CNC_STAGE_FACTOR = 2;
 export const CNC_STAGE_FACTOR_WITH_HEAD = 2.1;
 /** Parts come off a CNC cut and drilled, so the assembly takes half the minutes (PIOTR). */
 export const CNC_ASSEMBLY_FACTOR = 2;
-/** A job goes on the saw when the CNC is taken, unless the player turns it off on the job card
- *  [TUNE: default on] (CLAUDE.md T7 3.4). */
-export const SAW_FALLBACK_DEFAULT = true;
 
 /** The piece leaving. It carries no labour: it is the Turn 2 transport, not work at a bench
  *  (CLAUDE.md T7 3.1). The Work Plan drew a bar for it until Turn 9 took the bars away. */
@@ -1168,7 +1170,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'solidWood',
     calls: 4,
     needsMeasure: false,
-    requiredEquipment: ['thicknesser', 'solidWoodTools'],
+    requiredEquipment: ['thicknesser'],
     allowedFinishes: FINISHES_SOLID,
     minReputation: 10,
     weightsByTier: [0, 2, 15],
@@ -1197,7 +1199,6 @@ export const DELIVERY_DAYS_BY_CLASS: Record<string, Record<string, number>> = {
   spindleMoulder: { used: 1, budget: 3, standard: 7, pro: 12, industrial: 20 },
   sprayBooth: { used: 5, budget: 10, standard: 20, pro: 25, industrial: 30 },
   thicknesser: { used: 1, budget: 5, standard: 5, pro: 7, industrial: 12 },
-  solidWoodTools: { used: 1, budget: 5, standard: 5, pro: 7, industrial: 12 },
 };
 
 /** What a lorry load of heavy kit costs somebody at the gate, before the handling kit shortens
@@ -1230,7 +1231,6 @@ export const HEAVY_SPECS = [
   'tableSaw',
   'edgebander',
   'thicknesser',
-  'solidWoodTools',
   'cnc',
   'cncHead',
   'sprayBooth',
@@ -1283,7 +1283,6 @@ export const CLASS_LADDER_FAMILIES: readonly string[] = [
   'toolCabinet',
   'edgebander',
   'thicknesser',
-  'solidWoodTools',
   'cnc',
   'sprayBooth',
   'spindleMoulder',
@@ -1442,11 +1441,19 @@ export const MACHINE_PACE: Record<string, number> = {
   industrial: 1.12,
 };
 
-/** The families whose class is a pace: every family of the places table, and the solid wood tools,
- *  the one stage family a man works at without a place because the tools are shared out of a
- *  cabinet (CLAUDE.md T25 2.3, 2.4) [TUNE: the tools are in it because their class was a speed on
- *  v51 too]. Every other family's class is its capacity, its air or its store, and never a speed. */
-export const PACED_FAMILIES: readonly string[] = [...Object.keys(MACHINE_PLACES), 'solidWoodTools'];
+/** The families whose class is a pace: every family of the places table (CLAUDE.md T25 2.4). Every
+ *  other family's class is its capacity, its air or its store, and never a speed. */
+export const PACED_FAMILIES: readonly string[] = Object.keys(MACHINE_PLACES);
+
+/** How many men of the crew one place at a machine of this family covers before the hall is short
+ *  of them: one man, one place at a saw [PIOTR, 24.09: "me and two men is three; with four, too few
+ *  saws for the men"]. A man past the places still works, somewhere else, and his minute goes at
+ *  the by hand pace, `1 / BY_HAND_DURATION_FACTOR`, which is what the Output sheet's line for it
+ *  prints (v53). A family that is not here is never short. The other families wait for Piotr's
+ *  own figures. */
+export const MEN_PER_PLACE: Record<string, number> = {
+  tableSaw: 1,
+};
 
 /** The five classes of workbench. Prices, places and footprints are Piotr's table; the endurance
  *  and the power are [TUNE] (CLAUDE.md T7 3.6, T23 2.17). A bench is not a machine, so its hours
@@ -2013,7 +2020,6 @@ export const EXTRACTION_DEMAND: Record<string, Record<string, number>> = {
   tableSaw: { used: 800, budget: 900, standard: 1100, pro: 1400, industrial: 2200 },
   edgebander: { used: 0, budget: 0, standard: 1400, pro: 1800, industrial: 2400 },
   thicknesser: { used: 1200, budget: 1300, standard: 1500, pro: 1700, industrial: 1800 },
-  solidWoodTools: { used: 1100, budget: 1200, standard: 1300, pro: 1400, industrial: 1500 },
   // The two classes the CNC gained in Turn 13, and the spindle moulder's whole ladder [TUNE]
   // (CLAUDE.md T13 3.12, 3.13).
   cnc: { used: 1400, budget: 1500, standard: 1600, pro: 2000, industrial: 2400 },
@@ -2195,87 +2201,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
       'A heavy three phase machine with a wide bed and a feed you could lean on. It takes the ' +
       'whole day without complaining and it takes a third off every board that goes through ' +
       'it.',
-  },
-];
-
-/** The five classes of the timber tool set (CLAUDE.md T13 3.12). Prices [TUNE]; the factors follow
- *  the saw's ladder. */
-export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
-  {
-    id: 'used',
-    name: 'Used timber tool set',
-    price: 800,
-    width: 2,
-    depth: 1,
-    height: 1,
-    zoneWidth: 3,
-    zoneDepth: 2,
-    enduranceFactor: 0.25,
-    powerPerDay: 3,
-    description:
-      'A router table with a tired router, a belt sander that wanders and a rack of sash ' +
-      'clamps with the threads half gone. It machines timber, slowly, and it needs coaxing.',
-  },
-  {
-    id: 'budget',
-    name: 'Budget timber tool set',
-    price: 2200,
-    width: 2,
-    depth: 1,
-    height: 1,
-    zoneWidth: 3,
-    zoneDepth: 2,
-    enduranceFactor: 1,
-    powerPerDay: 3,
-    description:
-      'A new router table, a hand router, a belt sander and a set of clamps: what a workshop ' +
-      'buys the first time it takes an oak table on. Everything works and nothing is fast.',
-  },
-  {
-    id: 'standard',
-    name: 'Standard timber tool set',
-    price: 4500,
-    width: 2,
-    depth: 1,
-    height: 1,
-    zoneWidth: 3,
-    zoneDepth: 2,
-    enduranceFactor: 1.2,
-    powerPerDay: 4,
-    description:
-      'A proper router table with a fence that locks square, a dust hood on the sander and ' +
-      'enough clamps to glue two tops at once. It saves a few minutes on every piece.',
-  },
-  {
-    id: 'pro',
-    name: 'Professional timber tool set',
-    price: 9000,
-    width: 3,
-    depth: 1,
-    height: 1,
-    zoneWidth: 4,
-    zoneDepth: 2,
-    enduranceFactor: 1.5,
-    powerPerDay: 5,
-    description:
-      'A lift and a fence with stops on the router table, a stroke sander, and clamps on a ' +
-      'rack of their own. The timber comes off it cleaner, which is less sanding later.',
-  },
-  {
-    id: 'industrial',
-    name: 'Industrial timber tool set',
-    price: 16000,
-    width: 3,
-    depth: 2,
-    height: 1.2,
-    zoneWidth: 5,
-    zoneDepth: 3,
-    enduranceFactor: 2,
-    powerPerDay: 7,
-    description:
-      'The timber station of a production shop: a router with a power feed, a wide stroke ' +
-      'sander and a clamp carrier. It eats oak and it costs more than most small workshops ' +
-      'make in a month.',
   },
 ];
 
@@ -2543,7 +2468,6 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   extractor: EXTRACTOR_VARIANTS,
   compressor: COMPRESSOR_VARIANTS,
   thicknesser: THICKNESSER_VARIANTS,
-  solidWoodTools: SOLID_WOOD_TOOLS_VARIANTS,
   cnc: CNC_VARIANTS,
   sprayBooth: SPRAY_BOOTH_VARIANTS,
   spindleMoulder: SPINDLE_MOULDER_VARIANTS,
@@ -2956,26 +2880,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     zoneDepth: 2,
     spriteKey: 'thicknesser',
     usedOn: 'solidWood',
-    effect: 'Solid wood tools, part 1.',
-  },
-  {
-    ...BASE_SPEC,
-    id: 'solidWoodTools',
-    // Five days for the solid wood machines (PIOTR).
-    deliveryDays: 5,
-    folder: 'Timber tool sets',
-    tab: 'timberMachines',
-    name: 'Planer, router, sander, clamps',
-    price: 2200,
-    category: 'machine',
-    width: 2,
-    depth: 1,
-    height: 1,
-    zoneWidth: 3,
-    zoneDepth: 2,
-    spriteKey: 'solidWoodTools',
-    usedOn: 'solidWood',
-    effect: 'Solid wood tools, part 2. With the thicknesser this unlocks solid wood.',
+    effect: 'Planes and thicknesses timber. With it the workshop takes on solid wood.',
   },
   {
     ...BASE_SPEC,
@@ -3123,7 +3028,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
 export const EQUIPMENT_SPECS: EquipmentSpec[] = SPEC_DRAFTS.map(withVariants);
 
 /** Machines that must be owned before solid wood jobs can be made without the by-hand path. */
-export const SOLID_WOOD_EQUIPMENT = ['thicknesser', 'solidWoodTools'];
+export const SOLID_WOOD_EQUIPMENT = ['thicknesser'];
 
 /** Fixed placement in cells, which are metres (docs/art/SPRITES.md 9.1). Free placement by the
  *  player is parked for the room blocks only: everything else he sets out himself (T2 3.10). */
@@ -3298,7 +3203,6 @@ export const PERSONNEL_DOOR = { y: 4.5, width: 1 };
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   tableSaw: { x: 5, y: 0 },
   thicknesser: { x: 8, y: 0 },
-  solidWoodTools: { x: 12, y: 0 },
   // The two central systems are plant, not machines: they stand outside on the apron by the
   // shutter, like the van, and draw their ducting along the rear wall (PIOTR, CLAUDE.md T10 3.4).
   dustSystem: { x: 0, y: 1, yard: true },
@@ -3731,7 +3635,6 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   thicknesser: 0.25, // two bags a day, it takes 6 to 8 mm off two faces
   cnc: 0.06, // half a bag a day, Piotr's point of reference
   cncHead: 0.06, // the same head, the same chips
-  solidWoodTools: 0, // the helper sweeps up after hand tools
   sprayBooth: 0, // its own extraction, off this table
   spindleMoulder: 0.12, // a bag a day, the figure the Turn 12 comment kept for it (PIOTR)
   // A compressor moves air and makes no chips. Not on Piotr's list: a zero so that every family
@@ -4007,14 +3910,12 @@ export const BURGLARY_MACHINES_MAX = 2;
  *  the lost minutes (PIOTR; CLAUDE.md T13 3.5). */
 export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: string }> = [
   { id: 'noPeople', label: 'No people' },
-  // A man the hall had no place for at the machine his work wanted, and nothing else: nobody
-  // queues for a machine from v52 (CLAUDE.md T25 2.3).
-  { id: 'noPlace', label: 'No place' },
+  // A man with every machine and every bench in the hall taken, and nothing else: nobody waits
+  // for a machine (PIOTR, 24.09; v53).
+  { id: 'noPlace', label: 'No free machines' },
   { id: 'noMaterial', label: 'No material' },
-  // A man with a place whose job the hall stopped: no extraction, the bags full, a machine that
-  // will not run on its air, kit still on the lorry, a bench with no air behind it. Until v52
-  // these were booked with the queue as "no machine free"; `noPlace` means one thing now, so
-  // they have a line of their own [TUNE: the words] (CLAUDE.md T25 2.3).
+  // A man with a place whose job the hall stopped: no extraction in the hall, no bench in it, a
+  // bench with no air behind it [TUNE: the words] (CLAUDE.md T25 2.3; v53).
   { id: 'hallStopped', label: 'Hall stopped' },
   { id: 'ownerAway', label: 'Owner away' },
 ];
@@ -4030,7 +3931,7 @@ export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: stri
  *  The two lists meet on the machine and the material, which is why the words here are the words
  *  there. */
 export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: string }> = [
-  { id: 'noPlace', label: 'No place at a machine' },
+  { id: 'noPlace', label: 'No free machines' },
   { id: 'noMaterial', label: 'No material' },
   { id: 'noCompressor', label: 'No air at the bench' },
   { id: 'hallStopped', label: 'Hall stopped' },
@@ -4046,7 +3947,7 @@ export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: str
  *  it shares with the owner are worded the same, because they are the same two things. */
 export const WORKER_IDLE_REASONS: ReadonlyArray<{ id: WorkerIdleReason; label: string }> = [
   { id: 'waitingForBoss', label: 'Waiting for the boss' },
-  { id: 'noPlace', label: 'No place at a machine' },
+  { id: 'noPlace', label: 'No free machines' },
   { id: 'noMaterial', label: 'No material' },
   { id: 'noCompressor', label: 'No air at the bench' },
   { id: 'hallStopped', label: 'Hall stopped' },
@@ -4066,11 +3967,12 @@ export const WORKER_IDLE_REASONS: ReadonlyArray<{ id: WorkerIdleReason; label: s
  *  lines, the paper lines of a stage just begun and the dashed grey lines of a man off the hall are
  *  gone with the classes that drew them. */
 export const BUBBLES: Record<BubbleKey, string> = {
-  noPlace: 'no place at the {machine}',
+  noPlace: 'no free machines',
   noMaterial: 'no sheets for {job}',
   noCompressor: 'no compressor',
   nothingToDo: 'nothing to do',
   waitingForBoss: 'waiting for the boss',
+  tooFewPlaces: 'too few {machines} for the crew',
 };
 
 /** How far over a figure's head the point of the mark's tail sits, in screen pixels [PIOTR's

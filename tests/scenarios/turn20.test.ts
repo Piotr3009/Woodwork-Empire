@@ -26,6 +26,7 @@ import {
   formatTime,
   helperOnDuty,
   isWorkingDay,
+  jobPace,
   joiners,
   lifeAfterServices,
   machineIsOut,
@@ -73,11 +74,13 @@ const CONTRACT_MONTH: Policy = {
   stockSheets: 60,
 };
 
-/** A week's work the man can keep up with inside his own week [TUNE: 40, the top of the board's
- *  own band of 20 to 40 cut sheet packs, which is a contract the board really offers]. He makes
- *  ten a day behind the day 1 used saw against the eight a day the week asks for, so no week of
- *  the term is short, and with no job of work of his own to go back to he spends the rest of each
- *  day on the contract too (CLAUDE.md T20 2.1.4). */
+/** A week's work the man can keep up with inside his own week on the card [TUNE: 40, the top of
+ *  the board's own band of 20 to 40 cut sheet packs, which is a contract the board really offers].
+ *  The card has him at eight a day behind the day 1 used saw against the eight a day the week asks
+ *  for, and with no job of work of his own to go back to he spends the whole of each day on the
+ *  contract (CLAUDE.md T20 2.1.4). From v53 the crew counts the owner beside him, two men at the
+ *  used saw's one place, so every minute of the hall goes at 0.83 of itself and he makes 33 a week
+ *  and not 40 (PIOTR, 24.09; v53). */
 const PACKS_A_WEEK = 40;
 const TERM_WEEKS = 4;
 
@@ -133,15 +136,17 @@ function theContract(state: GameState): Contract {
   return contract;
 }
 
-/** What the workshop really paid him while the term ran: the wage lines of the ledger between the
- *  first day of the term and the last, and no other cost of the workshop. Everybody is paid by the
- *  month from Turn 21, so a four week term holds one of them, on the month's last working day
+/** What the workshop really paid him over the month: the wage lines of the ledger over the four
+ *  weeks the term was taken for, from its first day, and no other cost of the workshop. Everybody is
+ *  paid by the month from Turn 21, so four weeks hold one pay day, on the month's last working day
  *  (CLAUDE.md T21 2.10). He is the only man on the books, so the wage bill is his wage and nobody
- *  else's. */
-function wagesOverTheTerm(state: GameState): { total: number; payDays: number[] } {
+ *  else's. Until v53 these four weeks were the term itself; from v53 the client ends the term after
+ *  two of them (below), a week before the pay day, and he is paid his month all the same
+ *  (PIOTR, 24.09; v53). */
+function wagesOverTheMonth(state: GameState): { total: number; payDays: number[] } {
   const contract = theContract(state);
   const from = contract.startDay ?? 0;
-  const to = contract.endDay ?? 0;
+  const to = from + TERM_WEEKS * DAYS_PER_WEEK - 1;
   const lines = state.ledger.filter(
     (entry) => entry.category === 'wages' && entry.day >= from && entry.day <= to,
   );
@@ -171,73 +176,83 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     expect(result.piecesPerDay).toBe(8);
     expect(result.piecesNeededPerDay).toBe(PACKS_A_WEEK / WORKING_DAYS_PER_WEEK);
     expect(result.piecesPerDay).toBe(result.piecesNeededPerDay);
+    // The card reads him at the hall's pace for the saw and before the hall's own lines, so it
+    // does not carry what the saw too few for the crew takes off from v53: on the floor a piece
+    // takes him about 71 minutes and not 59, and the week is 33 and not 40 (below). The hall line
+    // of the offer card does carry it (CLAUDE.md T25 2.7; PIOTR, 24.09; v53).
   });
 
-  it('delivers three of the four weeks in full and runs the term out, one point down for the fourth', () => {
+  it('comes up short in its first two weeks, and the client ends it for two points (PIOTR, 24.09; v53)', () => {
     const contract = theContract(CC.ended);
     expect(contract.status).toBe('ended');
-    // The term ran out; the client did not walk away and neither did the player (T20 2.1.6).
-    expect(contract.endedBy).toBe('term');
-    expect(contract.weeks).toHaveLength(TERM_WEEKS);
-    // Three weeks of forty and one of thirty eight. At eight pieces a day against eight wanted he
-    // has nothing in hand, so the week the part days fall in comes up short: the client takes the
-    // two off next week's order and docks a point of standing for it, and he keeps the contract
-    // (CLAUDE.md T20 2.1.3). Turn 20 read the same month with nothing short, because it had him a
-    // step faster up the ladder (CLAUDE.md T21 2.9). Measured on this build.
-    expect(contract.weeks.filter((week) => week.made >= week.wanted)).toHaveLength(TERM_WEEKS - 1);
-    expect(contract.weeks.filter((week) => week.made < week.wanted)).toEqual([
-      { week: 4, wanted: 40, made: 38 },
+    // Two men and one place at the used saw from v53: the owner counts in the crew, so the hall's
+    // minute is (1 + 1 / 1.5) / 2 of itself, 0.83, and a piece takes him about 71 minutes where the
+    // card says 59. Thirty three of forty in each of the first two weeks, and the client walks away
+    // on the Monday after the second (CLAUDE.md T20 2.1.6). v52 ran the term out: forty, forty,
+    // thirty eight and forty, one week short and one point down.
+    expect(contract.endedBy).toBe('client');
+    expect(contract.endDay).toBe(22);
+    expect(contract.weeks).toEqual([
+      { week: 2, wanted: 40, made: 33 },
+      { week: 3, wanted: 40, made: 33 },
     ]);
-    // 158 against the 160 the term wanted, which is his eight a day for the twenty working days of
-    // the term, less the two the part days at each end of it leave behind. The day fills with the
-    // contract first and a man with no job of work to go back to stays on it, because the client
-    // buys every piece he makes (CLAUDE.md T20 2.1.4).
-    expect(contract.piecesMade).toBe(158);
-    expect(contract.piecesMade).toBe(PACKS_A_WEEK * TERM_WEEKS - 2);
-    // One short week, one point of the workshop's standing, and the reason says the figures.
+    // 66 of the 80 the fortnight wanted; v52 made 158 of the term's 160.
+    expect(contract.piecesMade).toBe(66);
+    // Two short weeks, two points of the workshop's standing, and each reason says the figures.
     const log = CC.ended.reputationLog.filter((entry) => entry.reason.startsWith(contract.name));
-    expect(log).toHaveLength(1);
-    expect(log[0]?.points).toBe(-1);
-    expect(log[0]?.reason).toContain('38 of 40 this week');
+    expect(log).toHaveLength(2);
+    expect(log.every((entry) => entry.points === -1)).toBe(true);
+    expect(log.every((entry) => entry.reason.includes('33 of 40 this week'))).toBe(true);
+    // The rack never ran dry under him and nobody stood him for want of a place: the weeks are
+    // short by the pace of a hall one saw short and by nothing else.
+    const man = CC.ended.workers.find((worker) => worker.id === CC.man.id);
+    expect(man?.idleByReason.noMaterial).toBe(0);
+    expect(man?.idleByReason.noPlace).toBe(0);
   });
 
-  it('ends in profit after his wages, and the figure is the one the report quotes', () => {
+  it('ends the month barely in profit after his wages, and the report quotes its own margin', () => {
     const contract = theContract(CC.ended);
-    const wages = wagesOverTheTerm(CC.ended);
+    const wages = wagesOverTheMonth(CC.ended);
     const revenue = pounds(contract.revenue);
     const material = pounds(contract.materialCost);
     const profit = pounds(revenue - material - wages.total);
     // Four whole weeks hold one pay day, because everybody is paid by the month now and the month
-    // pays on its last working day (CLAUDE.md T21 2.10). One line, and it is his month whole.
+    // pays on its last working day (CLAUDE.md T21 2.10). One line, and it is his month whole: the
+    // client walked away on day 22 and the month is his all the same.
     expect(wages.payDays).toHaveLength(1);
+    expect(wages.payDays[0] ?? 0).toBeGreaterThan(contract.endDay ?? 0);
     expect(wages.total).toBe(pounds(CC.man.monthlyWage));
-    // 158 packs at the entry point's 69 (v51; 76 from v40, the typed 50 before that) is 10,902
-    // taken; 158 packs of 0.15 of a sheet at 200 a sheet is 4,740 of stock off the rack; the one
-    // pay day inside the term is his 2,470 by the v38 ladder. The entry point fell from 76 to 69
-    // because it carries the reference saw's wear, and the wear fell six fold when the service
-    // went from 80 hours to six months (PIOTR, 22.09; v51). The line of the cross check of
-    // CLAUDE.md T20 7, which the figures keep: a contract month with an experienced joiner ends
-    // in profit AFTER his wages, and from v40 after the saw's wear as well: 158 packs are about
-    // 119 hours of the used saw, which is 45 of service at 0.38 an hour, out of the 3,692.
-    expect(revenue).toBe(158 * contract.pricePerPiece);
-    expect(revenue).toBe(10902);
-    expect(material).toBe(4740);
+    // 66 packs at the entry point's 69 (v51; 76 from v40, the typed 50 before that) is 4,554
+    // taken; 66 packs of 0.15 of a sheet at 200 a sheet is 1,980 of stock off the rack; the one pay
+    // day of the month is his 2,470 by the v38 ladder. The month is 104 above water. v52 made 158
+    // packs, 10,902 taken, 4,740 of stock and 3,692 after the same 2,470: the two weeks the client
+    // took away are the difference, and the saw too few for the crew is why he took them
+    // (PIOTR, 24.09; v53). The line of the cross check of CLAUDE.md T20 7, that a contract month
+    // with an experienced joiner ends in profit AFTER his wages, holds by a hair on this hall; the
+    // saw's wear of v40 is on the closing report below, 30 on v53 against 59.83 on v52.
+    expect(revenue).toBe(66 * contract.pricePerPiece);
+    expect(revenue).toBe(4554);
+    expect(material).toBe(1980);
     expect(wages.total).toBe(2470);
-    expect(profit).toBe(3692);
+    expect(profit).toBe(104);
     expect(profit).toBeGreaterThan(0);
     // The closing report the player is handed says the same thing in its own arithmetic: it costs
     // the minutes he actually stood at the contract and not the days he was paid for, which reads
     // higher than the month's own profit, and from v40 it takes the saw's wear off as well, which
-    // the month's own sum above does not; both are well above water.
+    // the month's own sum above does not; both are above water. On v53 it is 1,391.33 over 80
+    // hours, where v52 read 3,803.56 over 159.5.
     const report = closingReport(CC.ended, contract);
     expect(report.machineWear).toBeGreaterThan(0);
     expect(report.margin).toBe(pounds(revenue - material - report.labourCost - report.machineWear));
+    expect(report.margin).toBe(1391.33);
+    expect(report.machineWear).toBe(30);
+    expect(report.labourHours).toBe(80);
     expect(report.margin + report.machineWear).toBeGreaterThan(profit);
     expect(report.margin).toBeGreaterThan(0);
     console.log(
       '(cc) A CONTRACT MONTH WITH AN EXPERIENCED JOINER\n' +
         `piece: ${contractPiece(contract).name} at ${formatMoney(contract.pricePerPiece)}, ` +
-        `${PACKS_A_WEEK} a week over ${TERM_WEEKS} weeks\n` +
+        `${PACKS_A_WEEK} a week over ${TERM_WEEKS} weeks, ended by the client on day ${contract.endDay ?? 0}\n` +
         `the man: ${CC.man.name}, experienced, ${formatMoney(CC.man.monthlyWage)} a month\n` +
         `pieces made ${contract.piecesMade}, revenue ${formatMoney(revenue)}, ` +
         `material ${formatMoney(material)}, his wages ${formatMoney(wages.total)}\n` +
@@ -601,6 +616,9 @@ interface ServiceRound {
   leftThatEvening: number;
   leftTheNextEvening: number;
   blocked: string | null;
+  /** The piece's one pace with the saw away, and the next working day with it back (v53). */
+  paceAway: number;
+  paceBack: number;
 }
 
 interface SawMonth {
@@ -652,10 +670,12 @@ function sawMonth(): SawMonth {
     const outUntil = saw.inServiceUntilDay ?? 0;
     const life = saw.enduranceHours;
     const blocked = hallBlock(state, watched(state));
+    const paceAway = jobPace(state, watched(state));
     // The rest of that day, and then the next working day beside it.
     state = playDay(state, SAW_MONTH, seen);
     const leftThatEvening = left(state);
     while (!isWorkingDay(state.clock.day)) state = playDay(state, SAW_MONTH, seen);
+    const paceBack = jobPace(state, watched(state));
     state = playDay(state, SAW_MONTH, seen);
     rounds.push({
       day,
@@ -667,6 +687,8 @@ function sawMonth(): SawMonth {
       leftThatEvening,
       leftTheNextEvening: left(state),
       blocked,
+      paceAway,
+      paceBack,
     });
   }
   const bills = state.ledger
@@ -706,16 +728,29 @@ describe('(ff) three services on one saw', () => {
     expect(tenth).toBe(180);
   });
 
-  it('takes the saw out for one working day each time, and the day s work with it', () => {
+  it('takes the saw out for one working day each time, and the piece goes on without it', () => {
     for (const [index, round] of FF.rounds.entries()) {
       expect(round.outUntil, `service ${index + 1}`).toBe(nextWorkingDay(round.day));
-      // The stage the saw makes is stopped, in the job card's own words, and not one minute of the
-      // piece was made between the call and the end of the day.
-      expect(round.blocked, `service ${index + 1}`).toBe('table saw is in for a service');
-      expect(round.leftThatEvening, `service ${index + 1}`).toBe(round.leftAtTheCall);
-      // And it runs again the next working day: the piece moves on.
-      expect(round.leftTheNextEvening, `service ${index + 1}`).toBeLessThan(round.leftAtTheCall);
+      // Nothing stops the piece and the job card has nothing to say. v52 stopped the stage the saw
+      // makes, 'table saw is in for a service', and not one minute of the piece was made until the
+      // saw was back (PIOTR, 24.09: "they never wait for the saw"; v53).
+      expect(round.blocked, `service ${index + 1}`).toBe('');
+      // The saw's share of the piece goes at the by hand pace while it is away, so the whole piece
+      // goes at 0.89 of the owner's minute, and at 0.99 with the saw back.
+      expect(round.paceAway, `service ${index + 1}`).toBeCloseTo(0.8889, 4);
+      expect(round.paceBack, `service ${index + 1}`).toBeCloseTo(0.9870, 4);
+      // So the day the saw is away moves the piece on, by less than the day it is back.
+      const away = round.leftAtTheCall - round.leftThatEvening;
+      const back = round.leftThatEvening - round.leftTheNextEvening;
+      expect(away, `service ${index + 1}`).toBeGreaterThan(0);
+      expect(away, `service ${index + 1}`).toBeLessThan(back);
     }
+    // The first of them in figures: 284.44 of the piece's labour the day the saw was away, 315.84
+    // the day it was back, which is 0.89 against 0.99. v52 made 0 and then 304.
+    const first = FF.rounds[0];
+    if (first === undefined) throw new Error('three services are wanted');
+    expect(first.leftAtTheCall - first.leftThatEvening).toBeCloseTo(284.44, 2);
+    expect(first.leftThatEvening - first.leftTheNextEvening).toBeCloseTo(315.84, 2);
     expect(machinesInService(FF.state)).toEqual([]);
     console.log(
       '(ff) THREE SERVICES ON ONE SAW\n' +
@@ -727,7 +762,8 @@ describe('(ff) three services on one saw', () => {
               `service ${index + 1} on day ${round.day}: ${formatMoney(round.cost)}, ` +
               `life ${round.life} h (+${round.gain} h, ` +
               `${Math.round((round.gain / FF.original) * 1000) / 10}% of the original), ` +
-              `out until day ${round.outUntil}, the piece stood still all day`,
+              `out until day ${round.outUntil}, the piece went on at ` +
+              `${Math.round(round.paceAway * 100) / 100} and not ${Math.round(round.paceBack * 100) / 100}`,
           )
           .join('\n'),
     );

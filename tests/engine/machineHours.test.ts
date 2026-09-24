@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { MINUTES_PER_WORKING_DAY, SERVICE_INTERVAL_DAYS } from '../../src/engine/constants';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { OWNER, menAtMachine, serviceIsDue } from '../../src/engine/machines';
-import { STATION_HOME } from '../../src/engine/stations';
+import { machineStation } from '../../src/engine/stations';
 import type { Equipment, GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
 import {
@@ -103,20 +103,25 @@ describe('the hours a machine gains', () => {
 });
 
 describe('the places at a machine', () => {
-  it('has one place at a budget saw: the owner cuts and the joiner has none, and says so', () => {
+  it('has one place at a budget saw: the owner cuts, and the joiner works his job at a bench', () => {
     const state = tick(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' }), 60);
     const saw = machine(state, 'tableSaw');
     expect(menAtMachine(state, saw)).toEqual([OWNER]);
     expect(saw.hoursUsed).toBeCloseTo(1, 4);
     const joiner = state.workers[0];
     if (!joiner) throw new Error('no joiner');
-    // Nobody is sent to another stage of his own job to fill the gap: he stands at his home cell
-    // and says what he has no place at (PIOTR, 21.09; CLAUDE.md T25 2.2, 2.3).
-    expect(joiner.station).toBe(STATION_HOME);
-    expect(joiner.noPlaceFor).toBe('tableSaw');
+    // Until v53 he stood at his home cell and said he had no place at the saw. Nobody waits for
+    // the saw now: he takes a free place at a bench and works his job the whole hour, and the saw
+    // books no hour of his (PIOTR, 24.09; v53).
+    expect(joiner.station).toBe(machineStation('workbench'));
+    expect(joiner.working).toBe(true);
+    expect(joiner.noPlaceFor).toBe('');
+    expect(joiner.productionMinutes).toBe(60);
+    expect(joiner.idleByReason.noPlace).toBe(0);
     const his = state.jobs.find((job) => job.assignees[0] === joiner.id);
-    expect(his?.labourRemaining).toBe(his?.labourValue);
-    expect(joiner.idleByReason.noPlace).toBeGreaterThan(0);
+    // Nothing went into his job until v53; now his hour: a novice's 24.00 of labour an hour at the
+    // job's pace of 1.00, times the hall's line for two men and one saw place, (1 + 1 / 1.5) / 2.
+    expect((his?.labourValue ?? 0) - (his?.labourRemaining ?? 0)).toBeCloseTo(20, 6);
   });
 
   it('has two places at a standard saw, and books an hour for each man at them', () => {

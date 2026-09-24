@@ -75,9 +75,12 @@ describe('section 7, the number', () => {
     );
   });
 
-  it('names the oak table and the solid wood tools in the one sentence under it', () => {
+  it('names the oak table and the thicknesser it was locked on in the one sentence under it', () => {
+    // The timber tool set is gone from the game and the oak table wants the thicknesser alone, so
+    // the sentence names the thicknesser, in the board's own words (PIOTR, 24.09; v53).
     expect(made.note).toContain('Oak dining table');
-    expect(made.note).toContain('no solid wood tools in the hall');
+    expect(made.note).toContain('was taken by hand: no thicknesser in the hall');
+    expect(made.note).not.toContain('solid wood tools');
     expect(made.note).toContain('every stage of it runs at 0.67, the saw included');
   });
 

@@ -50,7 +50,6 @@ function job(partial: Partial<Job>): Job {
     bespokeMaterial: false,
     express: false,
     byHand: false,
-    sawFallback: true,
     needsMeasure: false,
     labourValue: 160,
     labourRemaining: 0,
@@ -119,9 +118,14 @@ describe('tool gating', () => {
     expect(lockReasonFor(state, template('bookcase'))).toBe('Needs edgebander');
   });
 
-  it('locks solid wood behind the solid wood tools', () => {
-    const state = newGame();
-    expect(lockReasonFor(state, template('oakDiningTable'))).toBe('Needs solid wood tools');
+  it('locks solid wood behind the thicknesser alone', () => {
+    // The timber tool set is gone from the game: the oak table wants the thicknesser and nothing
+    // else, and the board says so in the machine's own name (PIOTR, 24.09; v53).
+    let state = newGame();
+    expect(missingEquipment(state, template('oakDiningTable'))).toEqual(['thicknesser']);
+    expect(lockReasonFor(state, template('oakDiningTable'))).toBe('Needs a thicknesser');
+    state = buyNow(state, 'thicknesser');
+    expect(lockReasonFor(state, template('oakDiningTable'))).toBeNull();
   });
 
   it('offers laminate only while there is no spray booth', () => {

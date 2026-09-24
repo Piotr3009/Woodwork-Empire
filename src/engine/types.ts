@@ -589,9 +589,6 @@ export interface Job {
   bespokeMaterial: boolean;
   express: boolean;
   byHand: boolean;
-  /** With a CNC in the hall, this job goes on the saw when the CNC is taken. Off means it waits
-   *  for the CNC instead (CLAUDE.md T7 3.4). */
-  sawFallback: boolean;
   needsMeasure: boolean;
   /** 0.40 P of the price: the labour the job carries. */
   labourValue: number;
@@ -1076,7 +1073,7 @@ export type WorkerIdleReason = 'waitingForBoss' | 'noPlace' | 'noMaterial' | 'no
  *  out measuring has nothing wrong with him and carries no key at all
  *  [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. */
 export type BubbleKey =
-  /** The hall has no place for him at the machine his work wants (CLAUDE.md T25 2.3). */
+  /** Every machine and every bench in the hall is taken (PIOTR, 24.09; v53). */
   | 'noPlace'
   | 'noMaterial'
   /** He is at a bench the hall has no air for (CLAUDE.md T23 2.7). */
@@ -1084,7 +1081,10 @@ export type BubbleKey =
   | 'nothingToDo'
   /** Nobody has put him on anything, and without a production manager nobody but the owner can
    *  (CLAUDE.md T23 2.1). */
-  | 'waitingForBoss';
+  | 'waitingForBoss'
+  /** Drawn over a machine and not a man: the crew is more men than the family has places for
+   *  (PIOTR, 24.09; v53). */
+  | 'tooFewPlaces';
 
 /** One mark over a man's head, ready to draw: the words it says on hover with every slot filled,
  *  and the figure it belongs to (CLAUDE.md T22 2.5). There is no tone on it: a mark is drawn only
@@ -1348,7 +1348,6 @@ export type GameAction =
   | { type: 'RESTOCK'; sheets?: number }
   /** Gives the client his deposit back and takes the job off the plan (CLAUDE.md T9 3.9). */
   | { type: 'DROP_JOB'; jobId: string }
-  | { type: 'SET_SAW_FALLBACK'; jobId: string; on: boolean }
   | { type: 'BUY_STOCK'; sheets: number }
   | { type: 'ORDER_TRANSPORT'; jobId: string }
   | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number; orientation?: Orientation }

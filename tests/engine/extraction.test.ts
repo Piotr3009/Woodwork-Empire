@@ -37,15 +37,20 @@ import {
   placeEnquiry,
   placeEquipment,
   runClock,
+  withAir,
 } from '../helpers';
 
 /** A two man shop: a standard saw and a floor edgebander, both with a man at them, and one
- *  extractor of the class the test names. Piotr's own example (CLAUDE.md T10 3.1). */
+ *  extractor of the class the test names. Piotr's own example (CLAUDE.md T10 3.1). The compressor
+ *  is there for the edgebander: a floor bander runs on air, and a family that will not run on the
+ *  air it has has no places, so without one nobody could stand at it at all (PIOTR, 24.09; v53).
+ *  It asks nothing of the extraction, so every sum below is the one it always was. */
 function twoManShop(extractorClass: string): GameState {
   const state = newGame({ difficulty: 'veryEasy' });
   placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 6, y: 1 });
   placeEquipment(state, 'edgebander', { variantId: 'standard', x: 12, y: 1 });
   placeEquipment(state, 'extractor', { variantId: extractorClass, x: 18, y: 6 });
+  withAir(state);
   atAPlace(state, 'owner', 'tableSaw');
   atAPlace(state, 'staff-1', 'edgebander');
   return state;
@@ -65,7 +70,9 @@ describe('what a machine asks of the air and what a fan gives it', () => {
     expect(extractionDemandOf({ specId: 'edgebander', variantId: 'budget' })).toBe(0);
     expect(extractionDemandOf({ specId: 'edgebander', variantId: 'standard' })).toBe(1400);
     expect(extractionDemandOf({ specId: 'thicknesser', variantId: 'standard' })).toBe(1500);
-    expect(extractionDemandOf({ specId: 'solidWoodTools', variantId: 'standard' })).toBe(1300);
+    // The timber tool set's line of the table went with it: it is no longer in the game
+    // (PIOTR, 24.09; v53).
+    expect(EXTRACTION_DEMAND).not.toHaveProperty('solidWoodTools');
     expect(extractionDemandOf({ specId: 'cnc', variantId: 'standard' })).toBe(1600);
     // The spray booth has extraction of its own and is not counted here.
     expect(extractionDemandOf({ specId: 'sprayBooth', variantId: 'standard' })).toBe(0);

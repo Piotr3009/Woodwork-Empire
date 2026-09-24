@@ -18,6 +18,7 @@ import {
   WEBSITE_START_LEVEL,
   WORKER_RATES,
 } from './constants';
+import { receive } from './economy';
 import { planPlaces } from './production';
 import type { GameState, WorkerTier } from './types';
 
@@ -783,6 +784,33 @@ function liftToVersion28(state: Raw): void {
   state.version = 28;
 }
 
+/** v29 (v53, PIOTR 24.09): no job waits for a stage and nobody for a machine. The job card's
+ *  switch for waiting on the CNC is gone from every job. The timber tool set leaves the game in
+ *  `takeTheTimberToolsBack`, once the lift is done, because paying it back goes through the books. */
+function liftToVersion29(state: Raw): void {
+  for (const job of records(state.jobs)) delete job.sawFallback;
+  state.version = 29;
+}
+
+/** The family the game no longer sells (PIOTR, 24.09: "the spindle moulder and the thicknesser are
+ *  all a furniture shop needs"; v53). */
+const GONE_TIMBER_TOOLS = 'solidWoodTools';
+
+/** Every timber tool set in the hall and on the lorry goes, and the money it cost comes back on one
+ *  line of the books: the player bought it in good faith, and nothing of the game may be lost by a
+ *  rule changing under him (PIOTR, 24.09; v53). */
+function takeTheTimberToolsBack(state: GameState): void {
+  const owned = state.equipment.filter((item) => item.specId === GONE_TIMBER_TOOLS);
+  const ordered = state.onOrder.filter((item) => item.specId === GONE_TIMBER_TOOLS);
+  if (owned.length === 0 && ordered.length === 0) return;
+  const back =
+    owned.reduce((total, item) => total + item.purchasePrice, 0) +
+    ordered.reduce((total, item) => total + item.pricePaid, 0);
+  state.equipment = state.equipment.filter((item) => item.specId !== GONE_TIMBER_TOOLS);
+  state.onOrder = state.onOrder.filter((item) => item.specId !== GONE_TIMBER_TOOLS);
+  receive(state, 'equipment', 'Timber tool set taken back: it is no longer in the game', back);
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -800,6 +828,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   25: liftToVersion26,
   26: liftToVersion27,
   27: liftToVersion28,
+  28: liftToVersion29,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -814,11 +843,19 @@ export function migrateState(raw: unknown, version: number): GameState | null {
     lift(state);
   }
   const lifted = state as unknown as GameState;
+  if (version < 29 && Array.isArray(lifted.equipment) && Array.isArray(lifted.onOrder)) {
+    try {
+      takeTheTimberToolsBack(lifted);
+    } catch {
+      // Not a whole hall, with no books to pay it back through: its first minute has no tool set
+      // to work at either, because the catalogue has none.
+    }
+  }
   // Who has a place, worked out the moment the save is open rather than left for the first
   // minute: an old save opens with the right men working (CLAUDE.md T25 section 4). A fragment of
   // a state that is not a whole hall cannot be planned, and is lifted as it is: its first minute
   // plans it, as every minute does.
-  if (version < 28) {
+  if (version < 29) {
     try {
       planPlaces(lifted);
     } catch {

@@ -77,8 +77,9 @@ describe('footprints in metres', () => {
       van: [4, 2, 2],
       forklift: [2, 2, 2],
       forkliftBetter: [2, 2, 2],
+      // The timber tool set's [3, 2, 2] went with it: it is no longer in the game
+      // (PIOTR, 24.09; v53).
       thicknesser: [3, 2, 2],
-      solidWoodTools: [3, 2, 2],
       cnc: [5, 3, 2],
       cncHead: [1, 1, 1],
     };

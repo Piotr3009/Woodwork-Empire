@@ -73,7 +73,7 @@ interface Person {
   /** True while nobody has put him on anything and there is no manager on duty to
    *  (CLAUDE.md T23 2.1). The owner never waits: he takes the oldest open job himself (2.3). */
   waiting: boolean;
-  /** The family the day plan has no place for him at, or '' (CLAUDE.md T25 2.3). */
+  /** Not '' while every machine and bench he could work at is taken (CLAUDE.md T25 2.3; v53). */
   noPlaceFor: string;
 }
 
@@ -203,12 +203,12 @@ function doingWords(state: GameState, person: Person): string {
   if (person.job !== null) {
     const stage = jobStage(state, person.job);
     const where = stage === null ? '' : ` (${stageLabel(stage.id).toLowerCase()})`;
-    // On his job and with no place at its machine: the words over his head (CLAUDE.md T25 2.3).
-    const place = person.noPlaceFor === '' ? '' : `, ${placeLine(person.noPlaceFor)}`;
+    // On his job and with every machine he could work at taken: the words over his head (v53).
+    const place = person.noPlaceFor === '' ? '' : `, ${placeLine()}`;
     return `${person.job.name}${where}${place}`;
   }
-  // A man on a contract with no place at its machine says so as well (CLAUDE.md T25 2.3).
-  if (person.noPlaceFor !== '') return placeLine(person.noPlaceFor);
+  // A man on a contract with every machine taken says so as well (CLAUDE.md T25 2.3; v53).
+  if (person.noPlaceFor !== '') return placeLine();
   if (person.worker !== null) return workerDoing(state, person.worker);
   return ownerDayLine(state);
 }
@@ -291,7 +291,7 @@ function weekLines(state: GameState, person: Person): string {
       }
     }
     const forWhat =
-      waitedFor === null ? '' : `, ${hoursText(waitedFor[1])} of it ${placeLine(waitedFor[0])}`;
+      waitedFor === null ? '' : `, ${hoursText(waitedFor[1])} of it ${placeLine()}`;
     return (
       `<p class="tile-figures" data-week="${label}">` +
       escapeHtml(`${label}: ${hoursText(worked)} worked · ${hoursText(stood)} idle${forWhat}`) +

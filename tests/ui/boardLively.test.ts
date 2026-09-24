@@ -82,7 +82,8 @@ describe('the jobs the workshop cannot take', () => {
       reason: 'reputation too low (needs 20)',
       where: '',
     });
-    // No timber machines: the table is solid wood and the hall has neither of them.
+    // No timber machines: the table is solid wood and the hall has no thicknesser, the one timber
+    // machine it wants now the timber tool set is gone from the game (PIOTR, 24.09; v53).
     bare.reputation = 40;
     expect(blockFor(bare, template('oakDiningTable'), 60, 12000)).toEqual({
       reason: 'no timber machines',
@@ -156,18 +157,13 @@ describe('the jobs the workshop cannot take', () => {
   });
 });
 
-/** A hall with every tool the catalogue asks for, and a reputation nothing is gated behind. */
+/** A hall with every tool the catalogue asks for, and a reputation nothing is gated behind. The
+ *  thicknesser is the whole of the timber side: the timber tool set is gone from the game
+ *  (PIOTR, 24.09; v53). */
 function withEverything(): GameState {
   const state = newGame({ difficulty: 'veryEasy' });
   state.reputation = 60;
-  for (const specId of [
-    'tableSaw',
-    'edgebander',
-    'thicknesser',
-    'solidWoodTools',
-    'extractor',
-    'workbench',
-  ]) {
+  for (const specId of ['tableSaw', 'edgebander', 'thicknesser', 'extractor', 'workbench']) {
     placeEquipment(state, specId, { x: 0, y: 0, id: `kit-all-${specId}` });
   }
   return state;

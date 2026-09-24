@@ -11,6 +11,7 @@ import {
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
   MACHINE_REPAIR_COST_FRACTION,
   OVERDUE_BREAKDOWN_CHANCE,
+  OWNER_LABOUR_PER_MINUTE,
   SERVICE_COST_FRACTION,
   SERVICE_INTERVAL_DAYS,
   EXTRACTOR_REPAIR_COST,
@@ -656,7 +657,7 @@ describe('the service, every six months on the calendar (PIOTR, 22.09; v51)', ()
     expect(bill?.amount).toBeCloseTo(-serviceCostFor(saw as Equipment), 6);
   });
 
-  it('gives an overdue machine a 2% chance a day of giving up, and it is out until repaired', () => {
+  it('gives an overdue machine a 2% chance a day of giving up, and it has no places until repaired', () => {
     const state = atTheBench();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     expect(overdueBreakdownChance(saw as Equipment, state.clock.day)).toBe(0);
@@ -667,12 +668,19 @@ describe('the service, every six months on the calendar (PIOTR, 22.09; v51)', ()
     if (target) target.broken = true;
     expect(familyStopped(broken, 'tableSaw')?.item.specId).toBe('tableSaw');
     const before = firstJob(broken).labourRemaining;
-    const idle = tick(broken, 60);
-    expect(firstJob(idle).labourRemaining).toBe(before);
-    expect(firstJob(idle).blockedBy).toBe('table saw is broken');
+    const later = tick(broken, 60);
+    // Until v53 the job stood with `table saw is broken` on it and not a minute went in. A broken
+    // saw has no places and stops no job now: the owner works it at a bench and its cutting goes at
+    // the by hand 1 / 1.5, 35.56 of labour in the hour (PIOTR, 24.09; v53).
+    expect(firstJob(later).blockedBy).toBe('');
+    expect(later.owner.station).toBe('machine:workbench');
+    expect(before - firstJob(later).labourRemaining).toBeCloseTo(
+      (60 * OWNER_LABOUR_PER_MINUTE) / (0.25 * 1.5 + 0.75),
+      6,
+    );
     // The repair is 90 minutes and 5% of what the saw cost.
-    const cash = idle.cash;
-    let fixed = act(idle, { type: 'REPAIR_MACHINE', equipmentId: target?.id ?? '' });
+    const cash = later.cash;
+    let fixed = act(later, { type: 'REPAIR_MACHINE', equipmentId: target?.id ?? '' });
     fixed = tick(fixed, REPAIR_MINUTES);
     expect(fixed.equipment.find((item) => item.specId === 'tableSaw')?.broken).toBe(false);
     expect(cash - fixed.cash).toBeCloseTo(1800 * MACHINE_REPAIR_COST_FRACTION, 6);
