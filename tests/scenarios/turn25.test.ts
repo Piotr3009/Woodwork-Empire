@@ -4,16 +4,17 @@
 //
 // (qq) Four men and one used saw: from v53 all four work, one at the saw and three wherever the
 //      hall has a free place, nobody is marked, and the one saw costs the hall its pace instead:
-//      `Too few saws: 1 place, 5 men` on the Output sheet (PIOTR, 24.09). On v52 one worked and
+//      `Too few saws: 1 place, 4 men` on the Output sheet (PIOTR, 24.09). On v52 one worked and
 //      three stood with `no place at the saw`.
 // (rr) The same four with an industrial saw: three at the saw at 1.12, the fourth elsewhere, and
-//      the saw two places short of the crew of five.
+//      the saw one place short of the crew of four.
 // (ss) A contract the hall cannot keep up with is red on its card before it is signed.
 //
 // The hall is the one the engine tests stand four men in (`sixJoinersOnSheetWork` less two men),
 // every job put back to the start of its cutting and made big enough that it outlasts the month,
 // so that what the month measures is the saw's places and nothing else. The crew the places are
-// counted against is the four and the owner (`crewOnTheFloor`: "me and two men is three"). The
+// counted against is the men at work (`crewOnTheFloor`: "me and two men is three"), which is the
+// four: the owner has no job here. v53 counted him as well, a crew of five, at work or not (v54). The
 // days are played through with every event answered by its first choice (`runDays`), as a player
 // who clicks OK.
 
@@ -84,10 +85,11 @@ function playMonth(sawVariant: string): Month {
 const used = playMonth('used');
 const industrial = playMonth('industrial');
 
-/** What the hall's minutes are multiplied by for a saw with this many places and a crew of five:
- *  the men past the places work at the by hand pace (PIOTR, 24.09; v53). */
+/** What the hall's minutes are multiplied by for a saw with this many places and the crew of four
+ *  at work: the men past the places work at the by hand pace (PIOTR, 24.09; v53). A crew of five
+ *  until v54, the owner counted with no job. */
 function sawFactor(places: number): number {
-  return (places + (5 - places) / BY_HAND_DURATION_FACTOR) / 5;
+  return (places + (4 - places) / BY_HAND_DURATION_FACTOR) / 4;
 }
 
 describe('(qq) four men and one used saw (CLAUDE.md T25 section 3; v53)', () => {
@@ -104,10 +106,11 @@ describe('(qq) four men and one used saw (CLAUDE.md T25 section 3; v53)', () => 
 
   it('says what the one saw costs, on the saw and on the Output sheet', () => {
     const state = used.start;
-    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 5 men, 1 place, 4 work at 67%');
+    // Four men at work and one place: three past it (v54; five men and four past it on v53).
+    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 4 men, 1 place, 3 work at 67%');
     const short = placeShortages(state).find((entry) => entry.family === 'tableSaw');
     expect(short?.places).toBe(1);
-    expect(short?.men).toBe(5);
+    expect(short?.men).toBe(4);
     expect(short?.factor).toBeCloseTo(sawFactor(1), 10);
   });
 
@@ -136,13 +139,14 @@ describe('(rr) the same four with an industrial saw (CLAUDE.md T25 section 3; v5
       expect(worker.working, worker.id).toBe(true);
       expect(bubbleFor(state, worker.id), worker.id).toBeNull();
     }
-    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 5 men, 3 places, 2 work at 67%');
+    // One past the three places (v54; two on v53, with the owner counted).
+    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 4 men, 3 places, 1 works at 67%');
     expect(placeShortages(state)[0]?.factor).toBeCloseTo(sawFactor(3), 10);
   });
 
   it('makes four men s month, the same minutes as the used saw s hall and a better pace', () => {
     // The minutes are the same at either saw from v53, 10,560 a man; what the industrial saw buys
-    // is its pace, 1.12, and two men short of the crew instead of four (asserted above). On v52 it
+    // is its pace, 1.12, and one man past its places instead of three (asserted above). On v52 it
     // was three men's months and the fourth's all no place.
     expect(industrial.worked).toEqual([industrial.oneMan, industrial.oneMan, industrial.oneMan, industrial.oneMan]);
     expect(industrial.oneMan).toBe(used.oneMan);

@@ -33,8 +33,9 @@ describe('the version in the corner', () => {
   it('is a v number that the turn bumped', () => {
     expect(APP_VERSION).toMatch(/^v\d+$/);
     // v53 took the waiting out of the hall and the timber tool set out of the game
-    // (PIOTR, 24.09; v53).
-    expect(APP_VERSION).toBe('v53');
+    // (PIOTR, 24.09; v53). v54 made the vans five classes and the pallet trucks and forklifts
+    // one family (PIOTR, 24.09).
+    expect(APP_VERSION).toBe('v54');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -50,7 +51,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v53'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v54'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

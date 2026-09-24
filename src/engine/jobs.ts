@@ -29,7 +29,13 @@ import {
   MINUTES_PER_WORKING_DAY,
   SITE_MEASURE_MINUTES,
   SITE_MEASURE_TAXI_COST,
+  MILES_PER_TRIP,
+  VAN_CLASSES,
+  VAN_REPAIR_FRACTION,
+  VAN_VARIANTS,
+  VAN_WORN_BREAKDOWN_FACTOR,
   WORKER_MINUTE_RATE_DIVISOR,
+  type VanClass,
 } from './constants';
 import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
@@ -49,6 +55,7 @@ import {
   hallHasABench,
   has,
   hasExtraction,
+  isSold,
 } from './machines';
 import {
   materialCostFor,
@@ -72,7 +79,7 @@ import {
   minutesLeftFor,
 } from './stages';
 import { applyRating, changeReputation } from './reputation';
-import { float, int, makeId } from './rng';
+import { float, int, makeId, next } from './rng';
 import { plural } from './text';
 import {
   AD_HOC_TASK_MINUTES,
@@ -87,6 +94,7 @@ import {
 } from './tasks';
 import type {
   EnquiryKind,
+  Equipment,
   Finish,
   GameState,
   Job,
@@ -603,10 +611,106 @@ export function autoOrderMaterial(state: GameState, job: Job): boolean {
   return true;
 }
 
-/** The site measure costs a taxi while there is no van (CLAUDE.md 8.10). */
+/** The site measure costs a taxi while there is no van (CLAUDE.md 8.10), and with one it is a
+ *  trip: its miles on the van's clock and its fuel (PIOTR, 24.09; v54). */
 export function chargeSiteMeasure(state: GameState, job: Job): void {
-  if (!has(state, 'van')) {
+  const van = tripVan(state);
+  if (van === null) {
     chargeUnavoidable(state, 'taxi', `Taxi to the site for ${job.name}`, SITE_MEASURE_TAXI_COST);
+    return;
+  }
+  driveTrip(state, van, `site measure for ${job.name}`);
+}
+
+/** The classes of van from the worst to the best, the order a trip picks the van it goes in by. */
+const VAN_LADDER = VAN_VARIANTS.map((variant) => variant.id);
+
+/** The van a trip goes in: the best class the company has and has not sold, or null while it has
+ *  none (PIOTR, 24.09; v54). */
+export function tripVan(state: GameState): Equipment | null {
+  let best: Equipment | null = null;
+  let rank = -1;
+  for (const item of state.equipment) {
+    if (item.specId !== 'van' || isSold(item)) continue;
+    const own = VAN_LADDER.indexOf(item.variantId);
+    if (own > rank) {
+      rank = own;
+      best = item;
+    }
+  }
+  return best;
+}
+
+/** What this van's class does on a trip; an unknown class reads as the standard van. */
+export function vanClassOf(item: { variantId: string }): VanClass {
+  return VAN_CLASSES[item.variantId] ?? (VAN_CLASSES.standard as VanClass);
+}
+
+/** How long a delivery takes in the van the company would send today (v54). */
+export function deliveryMinutes(state: GameState): number {
+  const van = tripVan(state);
+  return van === null ? AD_HOC_TASK_MINUTES.deliver : vanClassOf(van).deliveryMinutes;
+}
+
+/** One trip: its miles on the van's clock and its fuel through the books (v54). */
+function driveTrip(state: GameState, van: Equipment, what: string): void {
+  van.milesDriven += MILES_PER_TRIP;
+  const fuel = Math.round(vanClassOf(van).fuelPer100Miles * (MILES_PER_TRIP / 100) * 100) / 100;
+  chargeUnavoidable(state, 'transport', `Fuel: ${what}`, fuel);
+}
+
+/** Whether this trip ends at the roadside: the class's odds, three times them past its miles, off a
+ *  roll of the trip's own drawn from the game's seed, so a van's trips do not move every other
+ *  roll of the game [TUNE] (v54). */
+function breaksDownOnTheWay(state: GameState, van: Equipment): boolean {
+  const kind = vanClassOf(van);
+  const odds = kind.breakdownPerTrip * (van.milesDriven > kind.lifeMiles ? VAN_WORN_BREAKDOWN_FACTOR : 1);
+  const roll = next({ rng: (state.seed ^ Math.imul(van.milesDriven + 1, 0x9e3779b1)) | 0 });
+  return roll < odds;
+}
+
+/** True while somebody has this task in his hands, so it is not a piece that can ride along. */
+function taskInHands(state: GameState, taskId: string): boolean {
+  if (state.owner.currentTaskId === taskId) return true;
+  return state.workers.some((worker) => worker.taskId === taskId);
+}
+
+/** The van goes: the piece is delivered, with as many of the other pieces waiting at the gate for
+ *  the van as the class takes in one trip, or the van breaks down on the way, the recovery and
+ *  the repair are paid and the piece goes the next working day [PIOTR, 24.09: a shorter trip,
+ *  more pieces in it, breakdowns, fuel] (v54). */
+export function runVanDelivery(state: GameState, job: Job): void {
+  const van = tripVan(state);
+  if (van === null) {
+    deliverJob(state, job);
+    return;
+  }
+  driveTrip(state, van, `delivery of ${job.name}`);
+  if (breaksDownOnTheWay(state, van)) {
+    const repair = Math.round(van.purchasePrice * VAN_REPAIR_FRACTION);
+    chargeUnavoidable(state, 'repair', `Van broke down on the way to ${job.name}`, repair);
+    job.deliverOnDay = nextWorkingDay(state.clock.day);
+    queueEvent(state, {
+      kind: 'vanBrokeDown',
+      title: 'The van broke down',
+      body:
+        `On the way to ${job.name}. ${formatMoney(repair)} for the recovery and the repair, and ` +
+        'the piece goes the next working day.',
+      choices: [{ id: 'ok', label: 'Right' }],
+      data: { jobId: job.id, repair },
+    });
+    return;
+  }
+  const room = vanClassOf(van).piecesPerTrip - 1;
+  const riders = state.tasks
+    .filter((task) => task.kind === 'deliver' && !task.done && task.jobId !== job.id)
+    .filter((task) => !taskInHands(state, task.id))
+    .slice(0, Math.max(0, room));
+  deliverJob(state, job);
+  for (const task of riders) {
+    const other = task.jobId === null ? null : findJob(state, task.jobId);
+    if (other !== null) deliverJob(state, other);
+    state.tasks = state.tasks.filter((entry) => entry.id !== task.id);
   }
 }
 
@@ -803,7 +907,8 @@ export function startProductionCheck(state: GameState, job: Job): StartCheck {
   }
   if (job.stage === 'accepted' || job.stage === 'materialPending') {
     const short = shortfallOf(job);
-    return blocked(short > 0 ? `${plural(short, 'sheet', 'sheets')} short` : 'material not settled');
+    const unit = job.materialKind === 'sheet' ? plural(short, 'sheet', 'sheets') : `${plural(short, 'board', 'boards')} of timber`;
+    return blocked(short > 0 ? `${unit} short` : 'material not settled');
   }
   if (job.stage === 'materialOrdered') return blocked(arrivalReason(state, job));
   if (job.stage === 'materialInYard') return blocked('unload the delivery');
@@ -1150,11 +1255,13 @@ export function jobsAtGate(state: GameState): Job[] {
   return state.jobs.filter((job) => job.stage === 'awaitingTransport');
 }
 
-/** What ordering transport costs today: a courier, or 90 minutes of somebody with the van. */
+/** What ordering transport costs today: a courier, or the trip in the van the company would send,
+ *  its minutes and the pieces it takes (v54). */
 export function transportLabel(state: GameState): string {
-  return has(state, 'van')
-    ? `Take it in the van, ${AD_HOC_TASK_MINUTES.deliver} min`
-    : `Courier ${formatMoney(COURIER_COST)}, next working day`;
+  const van = tripVan(state);
+  if (van === null) return `Courier ${formatMoney(COURIER_COST)}, next working day`;
+  const pieces = vanClassOf(van).piecesPerTrip;
+  return `Take it in the van, ${deliveryMinutes(state)} min${pieces > 1 ? `, up to ${pieces} pieces a trip` : ''}`;
 }
 
 /** Books the piece out: the van goes today, a courier comes tomorrow (CLAUDE.md T2 3.7). */
@@ -1169,7 +1276,7 @@ export function orderTransport(state: GameState, jobId: string): boolean {
       createTask(state, {
         kind: 'deliver',
         label: `Deliver ${job.name}`,
-        minutes: AD_HOC_TASK_MINUTES.deliver,
+        minutes: deliveryMinutes(state),
         jobId: job.id,
       });
     }

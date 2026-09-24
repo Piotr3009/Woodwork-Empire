@@ -184,8 +184,10 @@ describe('the whole workshop fits on the painted floor', () => {
         reason: '',
       });
     }
-    // And every one of them actually found room: none fell back to nowhere.
-    expect(hallItems(state).length).toBeGreaterThan(20);
+    // And every one of them actually found room: none fell back to nowhere. Nineteen things from
+    // v54, where it was twenty one: the pallet truck and the better forklift are classes of the
+    // forklift's one family now, and one of it is bought (PIOTR, 24.09).
+    expect(hallItems(state).length).toBe(19);
   });
 
   it('stands the lorry on the lane, where nothing of the player is allowed', () => {

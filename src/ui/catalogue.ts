@@ -41,7 +41,6 @@ import {
   hasCentralExtraction,
   pipeRunFor,
   placesLine,
-  shortageLine,
   wantsExtraction,
   orderSoftwareCheck,
   countOf,
@@ -57,7 +56,16 @@ import {
   serviceIsDue,
 } from '../engine/index';
 import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/index';
-import { serviceCallCheck, serviceDueIn, toolSlotsLine } from '../engine/machines';
+import {
+  crewOnTheFloor,
+  hallPlaces,
+  machineShortWord,
+  placeShortages,
+  serviceCallCheck,
+  serviceDueIn,
+  toolSlotsLine,
+} from '../engine/machines';
+import { BY_HAND_DURATION_FACTOR, MEN_PER_PLACE, VAN_CLASSES } from '../engine/constants';
 import { slotsInUseIn } from '../engine/staff';
 import { nextSpriteOrientation } from '../render/sprites';
 import { orderName, orderProgress } from '../engine/orders';
@@ -560,6 +568,31 @@ function specBlock(state: GameState, item: Equipment): string {
   );
 }
 
+/** What the hall's machines of this family hold against the crew, on the machine's own card: green
+ *  while every man has a place at one, red with the crew beside it while they have not, and a
+ *  line saying how many men work at what [PIOTR, 24.09: "capacity 6 men green, capacity 6 and 7
+ *  men red, and the words one man works at 67 per cent"] (v54). A family with no crew rule says
+ *  nothing. */
+function capacityBlock(state: GameState, item: Equipment): string {
+  const perPlace = MEN_PER_PLACE[item.specId];
+  if (perPlace === undefined) return '';
+  const capacity = hallPlaces(state, item.specId) * perPlace;
+  const crew = crewOnTheFloor(state);
+  const word = machineShortWord(item.specId);
+  const title = `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
+  const short = placeShortages(state).find((entry) => entry.family === item.specId);
+  const head = `${title} capacity: ${plural(capacity, 'man', 'men')}`;
+  if (short === undefined) {
+    return `<p class="tile-figures good" data-capacity="${escapeHtml(item.specId)}">${escapeHtml(`${head}, crew ${crew}`)}</p>`;
+  }
+  const pace = Math.round(100 / BY_HAND_DURATION_FACTOR);
+  const who = short.over === 1 ? '1 man works' : `${short.over} men work`;
+  return (
+    `<p class="tile-figures bad" data-capacity="${escapeHtml(item.specId)}">${escapeHtml(`${head}, crew ${crew}`)}</p>` +
+    `<p class="tile-figures bad" data-capacity-over="${short.over}">${escapeHtml(`${who} at ${pace}% efficiency`)}</p>`
+  );
+}
+
 /** One machine's card as the Owned tab draws it. From Turn 17 the machine's own modal, opened by
  *  a click on it on the hall, is this same card: one drawing and one set of buttons, so Connect to
  *  extraction cannot be on one and missing from the other (CLAUDE.md T17 2.6). */
@@ -583,7 +616,13 @@ export function ownedTile(
     : serviceIsDue(item, state.clock.day)
       ? 'service due now'
       : `service on ${formatCalendarDay(serviceDueOn(item))}, in ${plural(serviceDueIn(item, state.clock.day), 'day', 'days')}`;
-  const life = machine ? `${hours(item.hoursUsed)} of ${hours(item.enduranceHours)}` : '';
+  // A van's life is its miles on the clock, 100 a trip (PIOTR, 24.09; v54).
+  const van = item.specId === 'van' ? VAN_CLASSES[item.variantId] : undefined;
+  const life = machine
+    ? `${hours(item.hoursUsed)} of ${hours(item.enduranceHours)}`
+    : van !== undefined
+      ? `${item.milesDriven.toLocaleString('en-GB')} of ${van.lifeMiles.toLocaleString('en-GB')} miles`
+      : '';
   // A service is called in and paid for, and the machine goes out for the working day, so the
   // card offers it only while the engine would take the call (CLAUDE.md T4 3.2, T20 2.9).
   const action = item.broken
@@ -613,14 +652,12 @@ export function ownedTile(
     // Its places and who is in them, the short form on the Owned tab's tile and the long one on
     // the machine's own card (CLAUDE.md T25 2.5).
     placesLine(state, item, form),
-    // Too few of its family for the crew, on the machine's own card (PIOTR, 24.09; v53).
-    form === 'card' ? shortageLine(state, item.specId) : '',
     pipeLine(state, item),
     airStateLine(state, item),
   ]
     .filter((line) => line !== '')
     .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
-    .join('');
+    .join('') + (form === 'card' ? capacityBlock(state, item) : '');
   // The card of a class the hall has wears the class badge and frame every class card wears, the
   // same across families (CLAUDE.md T13 3.12).
   const ladder = isMachineFamily(spec);

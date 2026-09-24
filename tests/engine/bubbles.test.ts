@@ -223,12 +223,14 @@ describe('the table itself', () => {
     // for him, and nobody waits for a machine any more (CLAUDE.md T25 2.2, 2.3). v53 made that
     // line `no free machines`, every place he could take taken, and added the sixth, the one mark
     // drawn over a machine and not a man: a family with too few places for the crew
-    // (PIOTR, 24.09; v53).
+    // (PIOTR, 24.09; v53). v54 split the contract's `no sheets` in two: sheets on the rack that the
+    // jobs are holding say so, `sheetsHeld` (PIOTR, 24.09).
     expect(Object.keys(BUBBLES).sort()).toEqual([
       'noCompressor',
       'noMaterial',
       'noPlace',
       'nothingToDo',
+      'sheetsHeld',
       'tooFewPlaces',
       'waitingForBoss',
     ]);

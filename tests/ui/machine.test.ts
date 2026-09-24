@@ -151,9 +151,12 @@ describe('the tiles inside a folder', () => {
     );
     expect(text(used.querySelector('.tile-price'))).toBe('£1,800');
     expect(text(used.querySelector('.tile-text')).length).toBeGreaterThan(80);
-    // The effects, in Piotr's order: what it does to the work, what it makes, what it needs of
-    // the air, how long it lasts, and what its class alone does (CLAUDE.md T12 3.1, T13 3.1).
+    // The effects, in Piotr's order: how many men can work at it at once first, from v54 [PIOTR,
+    // 24.09: "add the most men at one machine"], then what it does to the work, what it makes,
+    // what it needs of the air, how long it lasts, and what its class alone does (CLAUDE.md T12
+    // 3.1, T13 3.1).
     expect(effects(used)).toEqual([
+      'Up to 1 man at once',
       'Output -5%',
       'Dust 0.015 m\u00b3/h of use',
       // What it asks of the fans while somebody is standing at it (CLAUDE.md T10 3.1).
@@ -166,7 +169,8 @@ describe('the tiles inside a folder', () => {
     expect(costs(used)).toEqual([
       // What he waits for after he has paid for it (CLAUDE.md T8 3.2).
       'Delivered in 1 working day',
-      'Power 3 a day',
+      // In pounds from v54: the bare figure read like a count of men (PIOTR, 24.09).
+      'Power \u00a33 a day',
       insuranceLine(1800),
       'Takes 2 m by 1 m, works in 3 m by 3 m',
     ]);
@@ -174,7 +178,9 @@ describe('the tiles inside a folder', () => {
     expect(insuranceLine(1800)).toBe('Insurance \u00a336 a year');
     const industrial = tiles(state, 'tableSaw')[4];
     expect(effects(industrial)).toEqual([
-      // The industrial class's pace, +12% from v52 (CLAUDE.md T25 2.4).
+      // Three men at once (CLAUDE.md T25 2.1), and the industrial class's pace, +12% from v52
+      // (CLAUDE.md T25 2.4).
+      'Up to 3 men at once',
       'Output +12%',
       'Dust 0.015 m\u00b3/h of use',
       'Needs 2,200 m\u00b3/h of extraction',
@@ -184,7 +190,7 @@ describe('the tiles inside a folder', () => {
     expect(text(industrial?.querySelector('.tile-price') ?? null)).toBe('\u00a325,000');
     expect(costs(industrial)).toEqual([
       'Delivered in 12 working days',
-      'Power 7 a day',
+      'Power \u00a37 a day',
       insuranceLine(25000),
       'Takes 4 m by 2 m, works in 5 m by 4 m',
     ]);
@@ -236,22 +242,25 @@ describe('the tiles inside a folder', () => {
     // A dearer saw does not make more dust: the material makes the dust, not the price of the
     // machine (PIOTR, CLAUDE.md T12 2.1). The line is the family's and it is on every card.
     const state = newGame({ difficulty: 'veryEasy' });
+    // The dust is the third line from v54, after the men at once and the output.
     for (const card of tiles(state, 'tableSaw')) {
-      expect(figures(card)[1], card.getAttribute('data-variant') ?? '').toBe(
+      expect(figures(card)[2], card.getAttribute('data-variant') ?? '').toBe(
         'Dust 0.015 m\u00b3/h of use',
       );
     }
     const standard = effects(tiles(state, 'tableSaw')[2]);
-    expect(standard[0]).toBe('Output +5%');
-    expect(standard[1]).toBe('Dust 0.015 m\u00b3/h of use');
-    expect(standard[2]).toBe('Needs 1,100 m\u00b3/h of extraction');
-    expect(standard[3]).toBe(lifeLine('tableSaw', 'standard'));
+    expect(standard[0]).toBe('Up to 2 men at once');
+    expect(standard[1]).toBe('Output +5%');
+    expect(standard[2]).toBe('Dust 0.015 m\u00b3/h of use');
+    expect(standard[3]).toBe('Needs 1,100 m\u00b3/h of extraction');
+    expect(standard[4]).toBe(lifeLine('tableSaw', 'standard'));
     const standardCosts = costs(tiles(state, 'tableSaw')[2]);
-    expect(standardCosts[1]).toMatch(/^Power \d+ a day$/);
+    expect(standardCosts[1]).toMatch(/^Power \u00a3\d+ a day$/);
     expect(standardCosts[3]).toBe('Takes 3 m by 1 m, works in 4 m by 3 m');
     // Three decimals with the trailing zeros trimmed, and "none" where the family makes nothing.
-    expect(figures(tiles(state, 'thicknesser')[0])[1]).toBe('Dust 0.25 m\u00b3/h of use');
-    expect(figures(tiles(state, 'cnc')[0])[1]).toBe('Dust 0.06 m\u00b3/h of use');
+    expect(figures(tiles(state, 'thicknesser')[0])[2]).toBe('Dust 0.25 m\u00b3/h of use');
+    expect(figures(tiles(state, 'cnc')[0])[2]).toBe('Dust 0.06 m\u00b3/h of use');
+    // A compressor has no places, so its dust is its second line.
     expect(figures(tiles(state, 'compressor')[0])[1]).toBe('Dust none');
   });
 
@@ -259,12 +268,13 @@ describe('the tiles inside a folder', () => {
     const cards = tiles(newGame({ difficulty: 'veryEasy' }), 'tableSaw');
     const tone = (line: Element | null | undefined): string =>
       line?.querySelector('.figure')?.className ?? '';
+    // The output is the second line from v54, after the men at once.
     const outputLine = (card: Element | undefined): Element | null | undefined =>
-      card?.querySelector('.tile-figures');
+      card?.querySelectorAll('.tile-figures')[1];
     // Used at -5%, budget as a standard machine, industrial at +30%: red, the body colour, green
     // (CLAUDE.md T12 3.1, T13 1).
     expect(tone(outputLine(cards[0]))).toBe('figure bad');
-    expect(figures(cards[1])[0]).toBe('Output as a standard machine');
+    expect(figures(cards[1])[1]).toBe('Output as a standard machine');
     expect(tone(outputLine(cards[1]))).toBe('');
     expect(tone(outputLine(cards[4]))).toBe('figure good');
     for (const card of cards) {
@@ -298,7 +308,7 @@ describe('the tiles inside a folder', () => {
     ]);
     expect(costs(pro)).toEqual([
       deliveryLine('extractor', 'pro'),
-      'Power 8 a day',
+      'Power \u00a38 a day',
       insuranceLine(findSpec('extractor')?.variants[3]?.price ?? NaN),
       'Takes 3 m by 1 m, works in 3 m by 1 m',
     ]);
@@ -328,11 +338,17 @@ describe('the tiles inside a folder', () => {
     // Piotr delivered a picture per class of the saw, so the tile shows it rather than a box
     // (CLAUDE.md T3 3.6, T7 3.5).
     expect(slots.every((slot) => slot.querySelector('img') !== null)).toBe(true);
-    // And a family with no file at all still gets its box. The compressor has a picture since
-    // 13.09, so the family with none is the pelletiser's neighbour that has no art yet: the CNC.
+    // The CNC has a picture per class from v54 (the art side's pack of 24.09), so its tiles show
+    // them too.
+    const cnc = Array.from(parse(renderMachine(state, 'cnc')).querySelectorAll('.tile-picture'));
+    expect(cnc).toHaveLength(5);
+    expect(cnc.every((slot) => slot.querySelector('img') !== null)).toBe(true);
+    // And a family with no file at all still gets its box: the spray booth, which has no art yet.
+    // It was the CNC until v54.
     const boxes = Array.from(
-      parse(renderMachine(state, 'cnc')).querySelectorAll('.tile-picture'),
+      parse(renderMachine(state, 'sprayBooth')).querySelectorAll('.tile-picture'),
     );
+    expect(boxes.length).toBeGreaterThan(0);
     expect(boxes.every((slot) => slot.querySelector('.tile-picture-box') !== null)).toBe(true);
   });
 

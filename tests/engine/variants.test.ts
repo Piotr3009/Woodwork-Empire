@@ -71,7 +71,11 @@ describe('every catalogue line is a family', () => {
       expect(spec.price, spec.id).toBe(spec.variants[0]?.price);
       for (const variant of spec.variants) {
         expect(variant.description.length, `${spec.id}.${variant.id}`).toBeGreaterThan(10);
-        expect(variant.powerPerDay, `${spec.id}.${variant.id}`).toBeGreaterThan(0);
+        // Power is the machines' and the extraction's, and nothing else is charged it: a van or a
+        // pallet truck draws none (PIOTR, 24.09: "power only for the machines"; v54).
+        if (spec.category === 'machine' || spec.category === 'extraction') {
+          expect(variant.powerPerDay, `${spec.id}.${variant.id}`).toBeGreaterThan(0);
+        }
       }
     }
   });
@@ -211,7 +215,10 @@ describe('every catalogue line is a family', () => {
     // of 600 is what its budget class costs (CLAUDE.md T10 3.4).
     expect(findSpec('extractor')?.price).toBe(400);
     expect(findVariant('extractor', 'budget')?.price).toBe(600);
-    expect(findSpec('van')?.price).toBe(9000);
+    // The van is five classes from v54 and its line carries the used one; the Turn 1 van is the
+    // standard class, at the Turn 1 price (PIOTR, 24.09).
+    expect(findSpec('van')?.price).toBe(3500);
+    expect(findVariant('van', 'standard')?.price).toBe(9000);
     // The saw's cheapest class is the used one at the Turn 1 price (CLAUDE.md T3 3.5), and the
     // Turn 1 items of the three families that got their classes tonight are the budget ones
     // (CLAUDE.md T7 3.6).
@@ -299,18 +306,26 @@ describe('what a class of saw does to the work', () => {
     expect(hallPace(state, 'tableSaw')).toBe(1.12);
   });
 
-  it('cuts a solid wood job too, and machines it on the thicknesser, by hand while the hall has none', () => {
+  it('cuts a solid wood job too, and machines it half on the thicknesser and half on the spindle', () => {
     const state = withSaw('industrial');
     const table = { ...firstJob(state), materialKind: 'solidWood' as const };
     // Every job is cut on the saw (CLAUDE.md T7 3.1); only the machining takes the material, and
-    // timber is machined on the thicknesser now the timber tool set is gone (PIOTR, 24.09; v53).
+    // timber is machined half on the thicknesser and half on the spindle moulder now the timber
+    // tool set is gone (PIOTR, 24.09; v53, v54). With neither in the hall both halves are by hand.
     expect(stageSpeed(state, table, 'cutting').speed).toBeCloseTo(1.12, 10);
     expect(familyForStage(table, 'machining')).toBe('thicknesser');
     expect(stageSpeed(state, table, 'machining').byHand).toBe(true);
     expect(stageSpeed(state, table, 'machining').speed).toBeCloseTo(1 / BY_HAND_DURATION_FACTOR, 10);
-    // A professional thicknesser in the hall machines it at the class's 1.08 (CLAUDE.md T25 2.4).
+    // A professional thicknesser alone: its half at the class's 1.08 (CLAUDE.md T25 2.4), the
+    // spindle's half by hand, and the stage takes the minutes the two halves add up to.
     placeEquipment(state, 'thicknesser', { variantId: 'pro', x: 10, y: 8 });
-    expect(stageSpeed(state, table, 'machining')).toEqual({ speed: 1.08, byHand: false });
+    const half = 1 / (0.5 / 1.08 + 0.5 * BY_HAND_DURATION_FACTOR);
+    expect(stageSpeed(state, table, 'machining').byHand).toBe(true);
+    expect(stageSpeed(state, table, 'machining').speed).toBeCloseTo(half, 10);
+    // And a professional spindle moulder beside it: both halves at 1.08.
+    placeEquipment(state, 'spindleMoulder', { variantId: 'pro', x: 14, y: 8 });
+    expect(stageSpeed(state, table, 'machining').byHand).toBe(false);
+    expect(stageSpeed(state, table, 'machining').speed).toBeCloseTo(1.08, 10);
   });
 });
 

@@ -233,10 +233,6 @@ describe('the hiring pool', () => {
   });
 });
 
-/** What the Output sheet's line for the saw leaves of every minute in a hall of two men and a saw
- *  of one place: the one man past the place works at the by hand pace (PIOTR, 24.09; v53). */
-const TWO_MEN_ONE_SAW = (1 + 1 / 1.5) / 2;
-
 function jobReadyWith(price: number, tier: Worker['tier']): GameState {
   // The budget saw, whose factors are 1.0: these are the worker rates of CLAUDE.md 8.5. And a
   // fan big enough for it, so the rates are the rates and not the under extraction penalty
@@ -357,11 +353,12 @@ describe('joiners at the bench', () => {
     const state = atWorkOn(1600, 'novice');
     const before = firstJob(state).labourRemaining;
     const after = firstJob(tick(state, 60)).labourRemaining;
-    // 24.00 until v53, 20.00 now: the owner and the joiner are a crew of two against the budget
-    // saw's one place, and the Output sheet's line for it, (1 + 1 / 1.5) / 2, is on every minute
-    // of the hall (PIOTR, 24.09; v53).
-    expect(before - after).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice * TWO_MEN_ONE_SAW, 6);
-    expect(before - after).toBeCloseTo(20, 6);
+    // 24.00: the joiner is the one man at work, so the budget saw's one place is his and the hall
+    // is short of nothing. v53 read 20.00, when the owner was counted in the crew against the one
+    // place though he was at no job, and cut the joiner by (1 + 1 / 1.5) / 2 for a man who was
+    // not there [PIOTR, 24.09: "nobody worked and it still cuts"] (v54).
+    expect(before - after).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice, 6);
+    expect(before - after).toBeCloseTo(24, 6);
   });
 
   it('drops the output of everyone the owner is not there to run', () => {
@@ -369,13 +366,10 @@ describe('joiners at the bench', () => {
     state = act(state, { type: 'SKIP_DAY' });
     const before = firstJob(state).labourRemaining;
     const after = firstJob(tick(state, 60)).labourRemaining;
-    // 16.80 until v53, 14.00 now: the same saw line as above on top of the 0.7 of the owner's
-    // absence, the owner being one of the crew of two that the one place is counted against.
-    expect(before - after).toBeCloseTo(
-      60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice * 0.7 * TWO_MEN_ONE_SAW,
-      6,
-    );
-    expect(before - after).toBeCloseTo(14, 6);
+    // 16.80, the 0.7 of the owner's absence and nothing else: v53 read 14.00, the saw's line for
+    // a crew of two on top of it, with the owner counted in the crew on the day he was away (v54).
+    expect(before - after).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice * 0.7, 6);
+    expect(before - after).toBeCloseTo(16.8, 6);
   });
 });
 
@@ -412,12 +406,13 @@ describe('the places at the saw', () => {
     const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
     // One saw, one place, one man at it. Until v53 the other three stood with no place and put
     // nothing in; now nobody waits for the saw: they work their wardrobes at their benches, and
-    // every job gets the same hour (PIOTR, 24.09; v53). The hall's line for five men and one saw
-    // place, (1 + 4 / 1.5) / 5 = 0.7333, is on every minute: 32.00 at the saw and 0 for the other
-    // three until v53, 23.47 on each of the four now.
+    // every job gets the same hour (PIOTR, 24.09; v53). The hall's line for the four men at work
+    // and one saw place, (1 + 3 / 1.5) / 4 = 0.75, is on every minute: 32.00 at the saw and 0 for
+    // the other three until v53, 24.00 on each of the four now. v53 read 23.47, the owner counted
+    // as a fifth man against the place though he was at no job (v54).
     const full = 60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced;
-    for (const value of done) expect(value).toBeCloseTo(full * ((1 + 4 / 1.5) / 5), 6);
-    expect(done[0]).toBeCloseTo(23.4667, 4);
+    for (const value of done) expect(value).toBeCloseTo(full * ((1 + 3 / 1.5) / 4), 6);
+    expect(done[0]).toBeCloseTo(24, 4);
     expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(1);
     expect(worked.workers.filter((worker) => worker.station === 'machine:workbench')).toHaveLength(3);
     expect(worked.workers.filter((worker) => worker.station === STATION_HOME)).toHaveLength(0);

@@ -127,40 +127,47 @@ describe('the efficiency plate s pace lines (CLAUDE.md T25 2.4)', () => {
 });
 
 describe('the saws too few for the crew (PIOTR, 24.09; v53)', () => {
-  it('puts a hall line on the Output sheet and a line on the saw s own card, and says what it costs', () => {
-    // The owner and three men on the books, one used saw of one place: four men for one place.
-    // Nobody waits for it; the three past its place work elsewhere at the by hand pace, and the
-    // whole hall is multiplied by (1 + 3 / 1.5) / 4 = 0.75 [PIOTR, 24.09: "me and two men is
-    // three; with four, too few saws for the men"].
+  it('puts a hall line on the Output sheet and the capacity on the saw s own card, and says what it costs', () => {
+    // Three men on the books at work, one used saw of one place: three men for one place. Nobody
+    // waits for it; the two past its place work elsewhere at the by hand pace, and the whole hall
+    // is multiplied by (1 + 2 / 1.5) / 3 = 0.78 [PIOTR, 24.09: "me and two men is three; with
+    // four, too few saws for the men"]. The owner is on nothing here, and from v54 the crew is the
+    // men at work, so he is not counted (PIOTR, 24.09: "nobody worked and it still cuts").
     const state = fourAtOneSaw('used');
     state.workers = state.workers.slice(0, 3);
     planPlaces(state);
     expect(placeShortages(state)).toEqual([
-      { family: 'tableSaw', places: 1, men: 4, over: 3, factor: 0.75 },
+      { family: 'tableSaw', places: 1, men: 3, over: 2, factor: (1 + 2 / 1.5) / 3 },
     ]);
-    expect(hallProductivityFactor(state)).toBeCloseTo(0.75, 10);
+    expect(hallProductivityFactor(state)).toBeCloseTo((1 + 2 / 1.5) / 3, 10);
     const row = Array.from(
       parse(renderCompany(state)).querySelectorAll('[data-sheet="output"] [data-line="hall"]'),
-    ).find((node) => node.querySelector('.ledger-main')?.textContent === 'Too few saws: 1 place, 4 men');
-    expect(row?.querySelector('.ledger-points')?.textContent).toBe('\u22120.25');
+    ).find((node) => node.querySelector('.ledger-main')?.textContent === 'Too few saws: 1 place, 3 men');
+    expect(row?.querySelector('.ledger-points')?.textContent).toBe('\u22120.22');
     expect(row?.querySelector('.ledger-points')?.classList.contains('bad')).toBe(true);
-    // The saw's card says the same in a sentence, with the pace the men past its place work at.
+    // The saw's hover says it in a sentence, and its own card says the capacity against the crew
+    // in red with the men past it and their pace [PIOTR, 24.09: "capacity 6 men green, capacity 6
+    // and 7 men red, and one man works at 67 per cent"] (v54).
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (saw === undefined) throw new Error('the saw is wanted');
-    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 4 men, 1 place, 3 work at 67%');
-    expect(parse(renderMachineCard(state, saw.id, null)).textContent).toContain(
-      'Too few saws for the crew: 4 men, 1 place, 3 work at 67%',
-    );
-    // A second used saw is a place for one more man, and the line moves with it: (2 + 2 / 1.5) / 4.
+    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 3 men, 1 place, 2 work at 67%');
+    const card = parse(renderMachineCard(state, saw.id, null));
+    const capacity = card.querySelector('[data-capacity="tableSaw"]');
+    expect(capacity?.textContent).toBe('Saw capacity: 1 man, crew 3');
+    expect(capacity?.classList.contains('bad')).toBe(true);
+    expect(card.querySelector('[data-capacity-over]')?.textContent).toBe('2 men work at 67% efficiency');
+    // A second used saw is a place for one more man, and the line moves with it: (2 + 1 / 1.5) / 3.
     placeEquipment(state, 'tableSaw', { variantId: 'used', x: 14, y: 1, id: 'kit-saw-second' });
-    expect(outputBreakdown(state).lines.map((line) => line.label)).toContain('Too few saws: 2 places, 4 men');
-    expect(hallProductivityFactor(state)).toBeCloseTo((2 + 2 / 1.5) / 4, 10);
-    // Four saws are a place for every man, and the sheet and the card say nothing of it.
-    for (const extra of [3, 4]) {
-      placeEquipment(state, 'tableSaw', { variantId: 'used', x: 14, y: extra, id: `kit-saw-${extra}` });
-    }
+    expect(outputBreakdown(state).lines.map((line) => line.label)).toContain('Too few saws: 2 places, 3 men');
+    expect(hallProductivityFactor(state)).toBeCloseTo((2 + 1 / 1.5) / 3, 10);
+    // Three saws are a place for every man, and the sheet says nothing of it; the card says the
+    // capacity in green.
+    placeEquipment(state, 'tableSaw', { variantId: 'used', x: 14, y: 3, id: 'kit-saw-3' });
     expect(placeShortages(state)).toEqual([]);
     expect(shortageLine(state, 'tableSaw')).toBe('');
     expect(outputBreakdown(state).lines.some((line) => line.label.startsWith('Too few'))).toBe(false);
+    const enough = parse(renderMachineCard(state, saw.id, null)).querySelector('[data-capacity="tableSaw"]');
+    expect(enough?.textContent).toBe('Saw capacity: 3 men, crew 3');
+    expect(enough?.classList.contains('good')).toBe(true);
   });
 });

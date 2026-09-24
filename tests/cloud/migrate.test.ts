@@ -146,7 +146,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(29);
+    expect(STATE_VERSION).toBe(30);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -291,7 +291,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(29);
+    expect(lifted.version).toBe(30);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -417,7 +417,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(29);
+    expect(lifted.version).toBe(30);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
     // told the player he cost (CLAUDE.md T21 2.10). From v38 that holds until the v22 lift, which
@@ -635,7 +635,7 @@ describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
     // There is one track for money from tonight: a cost the player did not choose is paid out of
     // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
     // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
-    expect(lifted.version).toBe(29);
+    expect(lifted.version).toBe(30);
     expect(lifted.cash).toBe(-4998 - 2780);
   });
 
@@ -727,7 +727,7 @@ describe('a v35 save in this build (CLAUDE.md T23 section 4)', () => {
     // A played company starts its list at its next month end: the card the player was shown that
     // evening is the report, and one worked out again tonight would not be that card
     // (CLAUDE.md T23 2.14).
-    expect(lifted.version).toBe(29);
+    expect(lifted.version).toBe(30);
     expect(lifted.monthlyReports).toEqual([]);
   });
 
@@ -823,7 +823,7 @@ describe('a v23 save made under the split day (PIOTR, 21.09; v42)', () => {
   if (lifted === null) throw new Error('the lift refused a version 23 state');
 
   it('comes up at this build s version', () => {
-    expect(lifted.version).toBe(29);
+    expect(lifted.version).toBe(30);
   });
 
   it('takes every man on a running contract off the jobs he was standing on', () => {
@@ -850,7 +850,7 @@ describe('a v24 save in this build (v44)', () => {
   it('comes in with no evening take-over in hand', () => {
     const lifted = migrateState({ version: 24, owner: { wentHome: false } }, 24);
     if (lifted === null) throw new Error('the lift refused a version 24 state');
-    expect(lifted.version).toBe(29);
+    expect(lifted.version).toBe(30);
     expect(lifted.owner.tookOverJobId).toBe(null);
   });
 });
@@ -862,7 +862,7 @@ describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
       25,
     );
     if (lifted === null) throw new Error('the lift refused a version 25 state');
-    expect(lifted.version).toBe(29);
+    expect(lifted.version).toBe(30);
     expect(lifted.dayStats.byMan).toEqual({});
     // The figure the sheet prints above the block is the save's own and is not guessed at.
     expect(lifted.dayStats.workMinutes).toBe(12);
@@ -876,7 +876,7 @@ describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
       };
       const lifted = migrateState(raw.state, raw.state.version);
       if (lifted === null) throw new Error(`${path} did not open`);
-      expect(lifted.version).toBe(29);
+      expect(lifted.version).toBe(30);
       expect(lifted.dayStats.byMan).toEqual({});
     }
   });
@@ -895,7 +895,7 @@ describe('a v25 save in this build (PIOTR, 22.09; v51)', () => {
   if (lifted === null) throw new Error('the lift refused a version 25 state');
 
   it('comes up at this build s version, through v26 on the way', () => {
-    expect(lifted.version).toBe(29);
+    expect(lifted.version).toBe(30);
     expect(lifted.version).toBe(STATE_VERSION);
     expect(lifted.dayStats.byMan).toEqual({});
   });
@@ -926,7 +926,7 @@ describe('a v25 save in this build (PIOTR, 22.09; v51)', () => {
       26,
     );
     if (fromT24 === null) throw new Error('the lift refused a version 26 state');
-    expect(fromT24.version).toBe(29);
+    expect(fromT24.version).toBe(30);
     expect(fromT24.equipment[0]?.servicedDay).toBe(40);
   });
 });
@@ -984,7 +984,7 @@ describe('a v27 save in this build (CLAUDE.md T25 section 4)', () => {
 
   it('clears every claim on a machine and never writes one again', () => {
     const lifted = lifted27();
-    expect(lifted.version).toBe(29);
+    expect(lifted.version).toBe(30);
     for (const item of lifted.equipment) expect(item.takenBy, item.id).toBeNull();
   });
 
@@ -1096,7 +1096,7 @@ describe('a v28 save in this build (PIOTR, 24.09; v53)', () => {
 
   it('comes up at this build s version with no job waiting on the CNC', () => {
     const { after } = lifted28();
-    expect(after.version).toBe(29);
+    expect(after.version).toBe(30);
     for (const job of after.jobs) expect('sawFallback' in job, job.id).toBe(false);
   });
 
@@ -1106,5 +1106,57 @@ describe('a v28 save in this build (PIOTR, 24.09; v53)', () => {
     expect(after.onOrder.some((item) => item.specId === 'solidWoodTools')).toBe(false);
     // 2,200 for the one in the hall and 800 for the one on the lorry.
     expect(after.cash).toBe(before.cash + 3000);
+  });
+});
+
+describe('a v29 save in this build (PIOTR, 24.09; v54)', () => {
+  /** A whole hall saved on v53 with the three handling families of old: a pallet truck and a better
+   *  forklift in the hall, a forklift on the lorry, and a van. */
+  function lifted29(): GameState {
+    const before = twoMenOnSheetWork();
+    const raw = JSON.parse(JSON.stringify(before)) as Record<string, unknown> & {
+      version: number;
+      equipment: Array<Record<string, unknown>>;
+      onOrder: Array<Record<string, unknown>>;
+    };
+    raw.version = 29;
+    const first = raw.equipment[0];
+    if (first === undefined) throw new Error('the hall has no equipment to copy');
+    for (const item of raw.equipment) delete item.milesDriven;
+    raw.equipment.push({ ...first, id: 'kit-pt', specId: 'palletTruck', variantId: 'standard', spriteKey: 'palletTruck' });
+    raw.equipment.push({ ...first, id: 'kit-fb', specId: 'forkliftBetter', variantId: 'standard', spriteKey: 'forkliftBetter' });
+    raw.equipment.push({ ...first, id: 'kit-van', specId: 'van', variantId: 'standard', spriteKey: 'van' });
+    raw.onOrder.push({
+      id: 'order-fl',
+      specId: 'forkliftBetter',
+      variantId: 'standard',
+      pricePaid: 12000,
+      orderedDay: 1,
+      dueDay: 5,
+      anchorX: 18,
+      anchorY: 6,
+      arrived: false,
+      orientation: 0,
+    });
+    const after = migrateState(raw, 29);
+    if (after === null) throw new Error('the lift refused a version 29 state');
+    return after;
+  }
+
+  it('makes the pallet truck and the better forklift classes of the one family', () => {
+    const after = lifted29();
+    expect(after.version).toBe(30);
+    const byId = new Map(after.equipment.map((item) => [item.id, item]));
+    expect([byId.get('kit-pt')?.specId, byId.get('kit-pt')?.variantId]).toEqual(['forklift', 'used']);
+    expect([byId.get('kit-fb')?.specId, byId.get('kit-fb')?.variantId]).toEqual(['forklift', 'pro']);
+    expect(byId.get('kit-pt')?.spriteKey).toBe('forklift');
+    expect(after.onOrder.find((item) => item.id === 'order-fl')?.specId).toBe('forklift');
+    expect(after.onOrder.find((item) => item.id === 'order-fl')?.variantId).toBe('pro');
+  });
+
+  it('puts nought miles on every van and everything else, and keeps the van the standard one', () => {
+    const after = lifted29();
+    for (const item of after.equipment) expect(item.milesDriven, item.id).toBe(0);
+    expect(after.equipment.find((item) => item.id === 'kit-van')?.variantId).toBe('standard');
   });
 });

@@ -48,7 +48,7 @@ import {
   shortageLine,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
-import { rackCapacity } from '../engine/materials';
+import { sheetsOnRack } from '../engine/materials';
 import {
   STATION_BENCH,
   STATION_CLEANING,
@@ -868,6 +868,15 @@ export function stationCell(
   // every man of the hall at the dinner hour, who walks to this cell and goes through it
   // (CLAUDE.md T4 3.4, T11 3.4, T21 2.12). The walk is the walk the hall already had; what the lunch
   // station adds is that he does not stop in the doorway.
+  if ((station === STATION_DOOR || station === STATION_IDLE) && who !== null) {
+    // Men who stand at the door, a contract short of sheets among them (T24 2.3) and a man with
+    // nothing to do, stand side by side in front of it and not on one cell, where their names were
+    // drawn over each other [PIOTR, 24.09] (v54). The first of them in the order they were hired
+    // has the door's own cell.
+    // Every one of them faces the way the man in the doorway always has, out into the hall.
+    const cell = doorQueueCell(state, roomDoorCell('canteen'), who);
+    return { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) };
+  }
   if (station === STATION_IDLE || station === STATION_DOOR || station === STATION_LUNCH) {
     const cell = roomDoorCell('canteen');
     return { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) };
@@ -884,6 +893,38 @@ export function stationCell(
     return { ...cell, facing: facingAt(cell, under) };
   }
   return { ...bench, facing: facingTowards(bench, { x: bench.x, y: bench.y - 1 }) };
+}
+
+/** The cells in front of the canteen door, nearest first: the door's own, the one beside it, then
+ *  the row in front of them. A cell something stands on is passed over (v54). */
+const DOOR_QUEUE_OFFSETS: ReadonlyArray<{ x: number; y: number }> = [
+  { x: 0, y: 0 },
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 1, y: 1 },
+  { x: -1, y: 1 },
+  { x: 2, y: 1 },
+  { x: 0, y: 2 },
+  { x: 1, y: 2 },
+];
+
+/** The cell this man stands on at the canteen door: his turn among the men at the door this
+ *  minute, in the order they were hired, on the first free cells in front of it. */
+function doorQueueCell(
+  state: GameState,
+  door: { x: number; y: number },
+  who: string,
+): { x: number; y: number } {
+  const waits = (station: string): boolean => station === STATION_DOOR || station === STATION_IDLE;
+  const atDoor = [
+    ...(waits(state.owner.station) ? [OWNER] : []),
+    ...state.workers.filter((worker) => waits(worker.station)).map((worker) => worker.id),
+  ];
+  const turn = Math.max(0, atDoor.indexOf(who));
+  const free = DOOR_QUEUE_OFFSETS.map((offset) => ({ x: door.x + offset.x, y: door.y + offset.y })).filter(
+    (cell) => itemAtCell(state, cell) === null,
+  );
+  return free[turn % Math.max(1, free.length)] ?? door;
 }
 
 /** The cell the owner falls back to when his station is nothing in particular: his bench's own
@@ -1469,8 +1510,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
     const bagLine = item.specId === 'extractor' && store.full ? ' (bags full)' : '';
     const serviceLine = !item.broken && serviceIsDue(item, state.clock.day) ? ' (service due)' : '';
+    // A rack's name says what is on it and what it holds, the same share its plate is drawn with,
+    // and not the whole stock over every rack's room, which read the same on every rack (v54).
     const rackLine =
-      sheetCapacityOf(item) > 0 ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
+      sheetCapacityOf(item) > 0 ? `: ${sheetsOnRack(state, item)} / ${sheetCapacityOf(item)}` : '';
     // A machine that wants a pipe and has none is not served: the hall says so under its name, in
     // the game's red, and never writes "connected" anywhere (CLAUDE.md T16 2.3).
     const unconnected = wantsExtraction(item) && !isConnected(state, item);
@@ -1510,7 +1553,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           label: name,
         }) +
         (unconnected ? notConnectedLabel(stands) : '') +
-        (sheetCapacityOf(item) > 0 ? rackCount(item, state.stock.sheets) : '') +
+        (sheetCapacityOf(item) > 0 ? rackCount(item, sheetsOnRack(state, item)) : '') +
         fx.svg +
         (marked === undefined
           ? ''

@@ -219,11 +219,12 @@ function sourceFiles(directory: string): string[] {
 
 describe('a delivery at the gate (CLAUDE.md T13 3.21)', () => {
   it('takes 45 minutes by hand, about 30 with a pallet truck and about 15 with a forklift', () => {
-    // PIOTR's three figures, off the one table; the walk is what the handling kit shortens.
+    // PIOTR's three figures, off the one table; the walk is what the handling kit shortens. From
+    // v54 the pallet truck and the forklift are two classes of the one family (PIOTR, 24.09).
     const plain = newGame({ difficulty: 'veryEasy' });
     expect(unloadMinutes(plain)).toBe(45);
-    expect(unloadMinutes(buyNow(plain, 'palletTruck'))).toBe(30);
-    expect(unloadMinutes(buyNow(plain, 'forklift'))).toBe(15);
+    expect(unloadMinutes(buyNow(plain, 'forklift', 'used'))).toBe(30);
+    expect(unloadMinutes(buyNow(plain, 'forklift', 'standard'))).toBe(15);
   });
 
   it('is a pallet of sheets at the gate from the morning it arrives until it is unloaded', () => {

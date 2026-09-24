@@ -111,11 +111,11 @@ describe('who made it today', () => {
 
   it('names the tools the job was locked on, once, and says nothing about slow men', () => {
     const made = workshopBreakdownToday(runClock(byHandHall(), 14));
-    // The lock is `Needs a thicknesser` from v53, the timber tool set being gone from the game
-    // (PIOTR, 24.09; v53), so the tools the sentence names are the thicknesser.
+    // The lock is `Needs a thicknesser and a spindle moulder` from v54, timber being machined on
+    // the two of them (PIOTR, 24.09; v53, v54), so the sentence names the two.
     expect(made.note).toBe(
-      'Oak dining table was taken by hand: no thicknesser in the hall, so every stage of it ' +
-        'runs at 0.67, the saw included.',
+      'Oak dining table was taken by hand: no thicknesser and no spindle moulder in the hall, so ' +
+        'every stage of it runs at 0.67, the saw included.',
     );
   });
 
@@ -127,7 +127,9 @@ describe('who made it today', () => {
     const state = sawHall();
     placeEquipment(state, 'tableSaw', { variantId: 'industrial', x: 12, y: 1, id: 'kit-saw-good' });
     const made = workshopBreakdownToday(runClock(state, 5));
-    expect(made.men[0]?.words).toMatch(/^saw, industrial, \d+ min: your [\d.]+ times 1\.03$/);
+    // From v54 the row says what the hall did to the minutes as well, so it multiplies out
+    // (PIOTR, 24.09: "something does not add up").
+    expect(made.men[0]?.words).toMatch(/^saw, industrial, \d+ min: your [\d.]+ times 1\.03( times the hall's [\d.]+)?$/);
   });
 
   it('says what the hall was, in the words the sheet already has for it', () => {
@@ -207,7 +209,8 @@ describe('the day fixtures Piotr sent, one minute in', () => {
       'at the bench, 1 min',
       'at the bench, 1 min',
     ]);
-    for (const row of made.men) expect(row.words, row.main).toMatch(/ times 1\.07$/);
+    // And the hall's 0.75 after it from v54, so the row multiplies out to its figure (PIOTR, 24.09).
+    for (const row of made.men) expect(row.words, row.main).toMatch(/ times 1\.07 times the hall's 0\.75$/);
     expect(made.total).toBe(workshopOutputToday(state));
     // The hall was clean with its extraction working and said nothing until v53. Four men and the
     // saw's one place is the hall's own line now, (1 + 3 / 1.5) / 4 = 0.75, and the sentence under
@@ -222,15 +225,17 @@ describe('the day fixtures Piotr sent, one minute in', () => {
     const made = workshopBreakdownToday(state);
     expect(made.men).toHaveLength(4);
     // Three saw places and four men: the hall's line for it, (3 + 1 / 1.5) / 4 = 0.9167, is on
-    // every minute from v53. Until v53 this hall ran at 1.00 and every row's two figures
-    // multiplied out to the one beside it; now they do with the hall's factor on them.
+    // every minute from v53. From v54 every row says the hall's part itself, so its three figures
+    // multiply out to the one beside it (PIOTR, 24.09).
     const hall = hallProductivityFactor(state);
     expect(hall).toBeCloseTo((3 + 1 / 1.5) / 4, 10);
     for (const row of made.men) {
-      const figures = row.words.match(/([\d.]+) times ([\d.]+)$/);
+      const figures = row.words.match(/([\d.]+) times ([\d.]+) times the hall's ([\d.]+)$/);
       if (figures === null) throw new Error(`no arithmetic in ${row.words}`);
-      // Both figures are printed to two places, so the product can sit a penny off the average.
-      expect(Math.abs(Number(figures[1]) * Number(figures[2]) * hall - row.figure), row.main).toBeLessThan(0.011);
+      // Every figure is printed to two places, so the product can sit a penny or two off.
+      const product = Number(figures[1]) * Number(figures[2]) * Number(figures[3]);
+      expect(Math.abs(product - row.figure), row.main).toBeLessThan(0.02);
+      expect(Number(figures[3]), row.main).toBeCloseTo(hall, 2);
     }
     expect(made.total).toBe(workshopOutputToday(state));
     // The table's lock is `Needs a thicknesser` from v53, the timber tool set being gone from the

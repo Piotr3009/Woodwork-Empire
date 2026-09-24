@@ -113,13 +113,17 @@ describe('minute curves', () => {
     const plain = newGame({ difficulty: 'veryEasy' });
     expect(unloadMinutes(plain)).toBe(45);
     // PIOTR's three figures of CLAUDE.md T13 3.21: 45 by hand, about 30 with a pallet truck,
-    // about 15 with a forklift; the better forklift is [TUNE].
-    const truck = buyNow(plain, 'palletTruck');
+    // about 15 with a forklift; the better forklift is [TUNE]. From v54 they are the classes of
+    // one family, with the electric pallet truck and the heavy forklift beside them [TUNE]
+    // (PIOTR, 24.09).
+    const truck = buyNow(plain, 'forklift', 'used');
     expect(unloadMinutes(truck)).toBe(30);
-    const forklift = buyNow(plain, 'forklift');
+    expect(unloadMinutes(buyNow(plain, 'forklift', 'budget'))).toBe(22);
+    const forklift = buyNow(plain, 'forklift', 'standard');
     expect(unloadMinutes(forklift)).toBe(15);
-    const better = buyNow(forklift, 'forkliftBetter');
+    const better = buyNow(forklift, 'forklift', 'pro');
     expect(unloadMinutes(better)).toBe(10);
+    expect(unloadMinutes(buyNow(plain, 'forklift', 'industrial'))).toBe(5);
   });
 
   it('charges nobody a minute for assigning, however many joiners are on the books', () => {

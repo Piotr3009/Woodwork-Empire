@@ -6,6 +6,7 @@ import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
 import { CLASS_BADGE, FINISHED_GOODS_LAYOUT } from '../../src/engine/constants';
 import { placesOf, sheetCapacityOf } from '../../src/engine/machines';
+import { sheetsOnRack } from '../../src/engine/materials';
 import { machineStation } from '../../src/engine/stations';
 import { centreOf } from '../../src/render/iso';
 import type { GameState } from '../../src/engine/index';
@@ -13,6 +14,7 @@ import { tick } from '../../src/engine/index';
 import {
   acceptNow,
   act,
+  buyNow,
   buyStartingKit,
   clearEvents,
   fillBags,
@@ -50,6 +52,30 @@ describe('the hall on day 1', () => {
     const svg = renderHall(state);
     expect(svg).toContain('data-rack="1"');
     expect(svg).toContain('Sheet rack: 12 / 50');
+  });
+
+  it('draws on every rack its own share of the sheets and not the whole stock (v54)', () => {
+    // Two racks both said 28 with 28 sheets in the hall [PIOTR, 24.09]. The sheets fill the racks
+    // in the order they were bought, each up to what it holds, and a rack's plate and its hover
+    // say what is on it.
+    const kit = buyStartingKit(newGame());
+    kit.cash = 50_000;
+    const state = buyNow(kit, 'sheetRack', 'budget');
+    state.stock.sheets = 60;
+    const racks = state.equipment.filter((item) => item.specId === 'sheetRack');
+    expect(racks).toHaveLength(2);
+    expect(racks.map((rack) => sheetsOnRack(state, rack))).toEqual([50, 10]);
+    const svg = renderHall(state);
+    const page = document.createElement('div');
+    page.innerHTML = svg;
+    // The hall draws by depth and not by the order they were bought, so the plates are compared
+    // as a set.
+    const plates = Array.from(page.querySelectorAll('text.rack-count')).map((node) => node.textContent);
+    expect(plates.sort()).toEqual(['10', '50']);
+    expect(svg).toContain('Sheet rack: 50 / 50');
+    expect(svg).toContain('Sheet rack: 10 / 50');
+    // The whole stock over the room of both, which every rack said until v54, is on neither.
+    expect(svg).not.toContain('Sheet rack: 60 / 100');
   });
 
   it('draws what has been bought, and leaves the office furniture in the office', () => {

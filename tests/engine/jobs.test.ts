@@ -493,8 +493,10 @@ describe('the piece at the gate', () => {
     expect(run.state.jobs[0]?.balancePaid).toBe(200);
   });
 
-  it('costs 90 minutes and no money with a van, and goes the same day', () => {
-    let state = clearEvents(buyNow(finished(), 'van'));
+  it('costs 90 minutes and the fuel with the standard van, and goes the same day', () => {
+    // The standard van is the one van of v53, 90 minutes a trip; the used one of v54 takes 120
+    // (PIOTR, 24.09).
+    let state = clearEvents(buyNow(finished(), 'van', 'standard'));
     const before = state.cash;
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
     expect(state.cash).toBe(before);
@@ -508,6 +510,10 @@ describe('the piece at the gate', () => {
     expect(firstJob(state).stage).toBe('completed');
     expect(firstJob(state).completedDay).toBe(1);
     expect(state.owner.minutesByCategory.workshop).toBe(OWN_DELIVERY_MINUTES);
+    // The trip is 100 miles on the van's clock and £20 of fuel through the books (v54).
+    const fuel = state.ledger.filter((entry) => entry.label.startsWith('Fuel: delivery of'));
+    expect(fuel.map((entry) => entry.amount)).toEqual([-20]);
+    expect(state.equipment.find((item) => item.specId === 'van')?.milesDriven).toBe(100);
   });
 
   it('slows the whole hall to 0.7 above three pieces at the gate', () => {
@@ -519,7 +525,7 @@ describe('the piece at the gate', () => {
   });
 
   it('lets a joiner take the van run instead of the owner', () => {
-    let state = clearEvents(buyNow(finished(), 'van'));
+    let state = clearEvents(buyNow(finished(), 'van', 'standard'));
     for (const specId of missingForHire(state, 'joiner')) {
       state = buyNow(state, specId);
     }
@@ -558,7 +564,7 @@ describe('emails nobody answered', () => {
     const job = firstJob(state);
     job.stage = 'awaitingTransport';
     job.finishedDay = 1;
-    state = clearEvents(buyNow(state, 'van'));
+    state = clearEvents(buyNow(state, 'van', 'standard'));
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: job.id });
     state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
     return clearEvents(tick(state, OWN_DELIVERY_MINUTES));

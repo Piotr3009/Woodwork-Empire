@@ -114,7 +114,7 @@ describe('the sprite check page', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('draws the spindle moulder classes from their files (delivered 19.09), and the pallet truck as a placeholder', () => {
+  it('draws the spindle moulder classes from their files (delivered 19.09), and the pallet truck as the used forklift (v54)', () => {
     const page = parse(renderSpriteCheck());
     for (const classId of ['used', 'budget', 'standard', 'pro', 'industrial']) {
       const cell = page.querySelector(`[data-sprite-target="spindleMoulder.${classId}"]`);
@@ -122,8 +122,12 @@ describe('the sprite check page', () => {
       expect(cell?.querySelector('.sprite-shot.is-placeholder'), classId).toBeNull();
       expect(cell?.innerHTML, classId).toContain(`/sprites/spindleMoulder.${classId}.png`);
     }
-    const truck = page.querySelector('[data-sprite-target="palletTruck"] [data-placeholder]');
-    expect(truck?.getAttribute('data-placeholder')).toBe('palletTruck');
+    // The pallet truck is the first class of the one family of pallet trucks and forklifts from v54
+    // (PIOTR, 24.09), and its picture is that class's file, so there is no key of its own left.
+    const truck = page.querySelector('[data-sprite-target="forklift.used"]');
+    expect(truck?.querySelector('.sprite-shot.is-placeholder')).toBeNull();
+    expect(truck?.innerHTML).toContain('/sprites/forklift.used.png');
+    expect(page.querySelector('[data-sprite-target="palletTruck"]')).toBeNull();
   });
 
   it('prints the measured connection point of every file a pipe is drawn to (CLAUDE.md T22 2.8)', () => {
@@ -186,8 +190,9 @@ describe('the sprite check page', () => {
       expect(cell?.textContent, name).toContain('2 of 4 orientations drawn');
       expect(cell?.textContent, name).toContain('the rest mirrored or the base picture');
     }
-    // A key with no file at all says none, and still says it.
-    const truck = page.querySelector('[data-sprite-target="palletTruck"] [data-turns]');
+    // A key with no file at all says none, and still says it: the budget class of the pallet
+    // trucks and forklifts, which the art side has not drawn yet (v54).
+    const truck = page.querySelector('[data-sprite-target="forklift.budget"] [data-turns]');
     expect(truck?.getAttribute('data-turns')).toBe('');
     expect(truck?.textContent).toContain('0 of 4 orientations drawn: none');
   });
@@ -242,10 +247,11 @@ describe('the sprite check page', () => {
     );
     // Piotr delivered a batch with this brief, so the page is no longer all placeholders.
     expect(delivered.length).toBeGreaterThan(0);
-    // A Turn 13 picture the art side owes is drawn as its placeholder rather than as "no file":
-    // the pallet truck (the spindle moulder's five classes landed on 19.09).
+    // A Turn 13 picture the art side owes is drawn as its placeholder rather than as "no file", and
+    // none is owed from v54: the spindle moulder's five classes landed on 19.09, and the pallet
+    // truck is the used forklift's file (PIOTR, 24.09).
     const placeholders = Array.from(page.querySelectorAll('.sprite-grid .sprite-shot.is-placeholder'));
-    expect(placeholders).toHaveLength(1);
+    expect(placeholders).toHaveLength(0);
     expect(page.querySelectorAll('.sprite-grid .sprite-shot.is-missing')).toHaveLength(
       targets.length - delivered.length - placeholders.length,
     );

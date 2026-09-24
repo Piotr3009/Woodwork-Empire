@@ -284,10 +284,12 @@ describe('(gg) four men, one saw and two jobs, on Very easy', () => {
   it('marks nobody, and says on the saw what one saw costs the crew', () => {
     // Nothing was wrong with any of the four, so nobody carried a mark all day (v53; on v52 the
     // second man of the cutting job carried `no place at the saw` all day). What the one saw
-    // costs is written on the saw and on the Output sheet: five men, the owner among them, and one
-    // place (PIOTR, 24.09: "me and two men is three").
+    // costs is written on the saw and on the Output sheet: the four men at work and one place
+    // (PIOTR, 24.09: "me and two men is three"). v53 counted five, the owner among them though he
+    // spends the day on his own list and never at a bench (below); from v54 the crew is the men at
+    // work (v54).
     for (const man of GG.men) expect(GG.said.get(man.name), man.name).toBeUndefined();
-    expect(shortageLine(GG.opening, 'tableSaw')).toBe('Too few saws for the crew: 5 men, 1 place, 4 work at 67%');
+    expect(shortageLine(GG.opening, 'tableSaw')).toBe('Too few saws for the crew: 4 men, 1 place, 3 work at 67%');
     console.log(
       '(gg) FOUR MEN, ONE SAW, TWO JOBS\n' +
         `the hall on day ${GG.opening.clock.day}: ${GG.men.length} joiners, ` +

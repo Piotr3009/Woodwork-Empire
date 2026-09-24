@@ -85,6 +85,16 @@ function onAJob(state: GameState, who: string, job: Job): Bubble | null {
  *  `contractWaitingForMaterial`, so the mark and the cell are one answer. */
 function onAContract(state: GameState, who: string, contract: Contract): Bubble | null {
   if (contractWaitingForMaterial(state, contract)) {
+    // Sheets on the rack that the jobs are holding are not the contract's: say so, or the player
+    // reads the number on the rack and thinks the game has lost them (PIOTR, 24.09; v54).
+    const held = Math.round(
+      state.jobs
+        .filter((job) => job.stage !== 'completed')
+        .reduce((total, job) => total + job.sheetsReserved, 0),
+    );
+    if (state.stock.sheets > 0 && held > 0) {
+      return bubble(who, 'sheetsHeld', { job: contract.name, held: String(held) });
+    }
     return bubble(who, 'noMaterial', { job: contract.name });
   }
   return noPlaceOf(state, who) === '' ? null : bubble(who, 'noPlace');

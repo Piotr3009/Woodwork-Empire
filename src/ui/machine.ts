@@ -42,9 +42,12 @@ import {
   DUST_WASTE_MONTHLY,
   EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
+  MILES_PER_TRIP,
+  UNLOAD_MINUTES_BY_HANDLING,
+  VAN_CLASSES,
   bagsToM3,
 } from '../engine/constants';
-import { insuranceAddedYearly } from '../engine/index';
+import { insuranceForClass } from '../engine/machines';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import {
@@ -91,18 +94,58 @@ function dustLine(spec: EquipmentSpec): string {
 }
 
 function lifeLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
+  // A van's life is its miles, 100 a trip (PIOTR, 24.09; v54).
+  const van = VAN_CLASSES[variant.id];
+  if (spec.id === 'van' && van !== undefined) return `Life about ${van.lifeMiles.toLocaleString('en-GB')} miles`;
   const hours = enduranceHoursFor(spec.id, variant.id);
   return `Life about ${hours.toLocaleString('en-GB')} hours`;
 }
 
-function powerLine(variant: EquipmentVariant): string {
-  return `Power ${variant.powerPerDay} a day`;
+/** What a class of van does on a trip, and what a class of pallet truck or forklift does at the
+ *  lorry: the effects each class is bought for (PIOTR, 24.09; v54). */
+function tripLines(spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
+  if (spec.id === 'van') {
+    const van = VAN_CLASSES[variant.id];
+    if (van === undefined) return [];
+    const oneIn = Math.round(1 / van.breakdownPerTrip);
+    return [
+      line(`A delivery takes ${van.deliveryMinutes} min`),
+      line(`Up to ${plural(van.piecesPerTrip, 'piece', 'pieces')} a trip`),
+      line(`Fuel ${money(van.fuelPer100Miles)} per ${MILES_PER_TRIP} miles, every trip ${MILES_PER_TRIP} miles`),
+      line(`Breaks down about 1 trip in ${oneIn.toLocaleString('en-GB')}`),
+    ];
+  }
+  if (spec.id === 'forklift') {
+    const minutes = UNLOAD_MINUTES_BY_HANDLING[variant.id];
+    const bare = UNLOAD_MINUTES_BY_HANDLING.none;
+    if (minutes === undefined) return [];
+    return [line(`A load of sheets off the lorry in ${minutes} min, ${bare ?? minutes} by hand`)];
+  }
+  return [];
+}
+
+/** What this class costs in power, in pounds, every day it stands in the hall: the machines and
+ *  the extraction and nothing else, which is exactly what the books charge (`poweredMachines`)
+ *  [PIOTR, 24.09: "power only for the machines"; the bare figure read like a count of men] (v54). */
+function powerLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
+  if (spec.category !== 'machine' && spec.category !== 'extraction') return '';
+  return `Power ${money(variant.powerPerDay)} a day`;
+}
+
+/** How many men can work at one machine of this class at once, its places (CLAUDE.md T25 2.1),
+ *  said on every class card of a family that has them [PIOTR, 24.09: "add the most men at one
+ *  machine"] (v54). The bench says it in its own line with its pace. */
+function atOnceLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
+  if (spec.id === 'workbench') return '';
+  const places = placesOf({ specId: spec.id, variantId: variant.id });
+  if (places <= 0) return '';
+  return `Up to ${places} ${places === 1 ? 'man' : 'men'} at once`;
 }
 
 /** What this class adds to the property premium a year, off the one rate the cover is written at
  *  (CLAUDE.md T13 3.1, 3.15). */
 function insuranceLine(variant: EquipmentVariant): string {
-  return `Insurance ${money(insuranceAddedYearly(variant.price))} a year`;
+  return `Insurance ${money(insuranceForClass(variant))} a year`;
 }
 
 /** What this class asks of the air, and what the hall would give it. The catalogue says it before
@@ -276,6 +319,8 @@ function figureLines(lines: Line[]): string {
 function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
   const machine = spec.category === 'machine';
   return [
+    line(atOnceLine(spec, variant)),
+    ...tripLines(spec, variant),
     ...(machine ? [outputLine(spec, variant), line(dustLine(spec))] : []),
     line(extractionLine(spec, variant)),
     line(spec.id === COMPRESSOR ? '' : airLine(state, spec, variant)),
@@ -297,7 +342,7 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
 function costLines(spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
   return [
     line(deliveryLine(spec, variant)),
-    line(powerLine(variant)),
+    line(powerLine(spec, variant)),
     line(insuranceLine(variant)),
     line(floorLine(spec.id, variant.id)),
   ];

@@ -213,17 +213,26 @@ export function materialLine(state: GameState, job: Job): string {
   if (job.stage === 'completed' || job.stage === 'awaitingTransport') return '';
   const short = shortfallOf(job);
   const held = job.sheetsReserved + job.sheetsUsed;
-  const sheets = plural(job.sheets, 'sheet', 'sheets');
+  // Timber is boards and not sheets, and the racks hold sheets, so a timber job's material is
+  // always ordered for it, bespoke or not [PIOTR, 24.09: "why does it not take from the
+  // shelves?"] (v54). The card says so.
+  const timber = job.materialKind !== 'sheet';
+  const sheets = timber
+    ? `${plural(job.sheets, 'board', 'boards')} of timber`
+    : plural(job.sheets, 'sheet', 'sheets');
   const figure =
     short > 0
       ? `<span class="row-figure bad shortfall">${short} of ${sheets} short</span>`
       : `<span class="row-figure good sheets-reserved">${held} of ${sheets} in hand</span>`;
   if (short <= 0) return figure;
+  const why = timber
+    ? '<span class="hint">Timber is ordered for the job: the racks hold sheets.</span>'
+    : '';
   const check = orderForJobCheck(state, job);
   const control = check.ok
     ? button('orderForJob', `Order for this job, ${money(orderForJobCost(job))}`, `data-id="${job.id}"`)
     : lockedButton('Order for this job', check.reason);
-  return figure + `<span class="row-action">${control}</span>`;
+  return figure + why + `<span class="row-action">${control}</span>`;
 }
 
 /** Dropping the project: one button, which opens the card that says what the drop costs. The card

@@ -107,17 +107,21 @@ export function cncFactor(state: GameState): number {
   return has(state, 'cncHead') ? CNC_STAGE_FACTOR_WITH_HEAD : CNC_STAGE_FACTOR;
 }
 
+/** The families a job's Machining is done on. Timber goes half on the thicknesser and half on
+ *  the spindle moulder [PIOTR, 24.09: "the thicknesser and the spindle moulder, half each"] (v54):
+ *  the timber tool set is gone from the game (v53). A sheet job is banded, or moulded on the
+ *  spindle when it wants a profile. */
+export function machiningFamilies(job: StagedJob): string[] {
+  if (job.materialKind !== 'sheet') return ['thicknesser', 'spindleMoulder'];
+  return [job.needsSpindle ? 'spindleMoulder' : 'edgebander'];
+}
+
 /** The family a stage is done on for a job of this material and finish, or null when it is done
  *  at the bench with nothing but hands (CLAUDE.md T7 3.1). */
 export function familyForStage(job: StagedJob, stage: StageId): string | null {
   if (stage === 'cnc') return 'cnc';
   if (stage === 'cutting') return 'tableSaw';
-  if (stage === 'machining') {
-    if (job.needsSpindle) return 'spindleMoulder';
-    // Timber is machined on the thicknesser: the timber tool set is gone from the game, and the
-    // thicknesser and the spindle moulder are all a furniture shop needs (PIOTR, 24.09; v53).
-    return job.materialKind === 'sheet' ? 'edgebander' : 'thicknesser';
-  }
+  if (stage === 'machining') return machiningFamilies(job)[0] ?? null;
   if (stage === 'assembly') return 'workbench';
   if (stage === 'finishing') return job.finish === 'lacquer' ? SPRAY_BOOTH : null;
   return null;
@@ -141,6 +145,20 @@ export function stageSpeed(
   if (job.byHand) return { speed: 1 / BY_HAND_DURATION_FACTOR, byHand: true };
   // The CNC's own head times the hall's pace at it, like every family (CLAUDE.md T25 2.4).
   if (stage === 'cnc') return { speed: cncFactor(state) * hallPace(state, 'cnc'), byHand: false };
+  // Timber's Machining is shared between two machines, half the work on each: the stage takes
+  // the minutes the two halves add up to, each at its own machine's pace or by hand (v54).
+  if (stage === 'machining' && machiningFamilies(job).length > 1) {
+    let minutes = 0;
+    let byHand = false;
+    const halves = machiningFamilies(job);
+    for (const half of halves) {
+      const runs = has(state, half) && familyRuns(state, half);
+      const speed = runs ? hallPace(state, half) : 1 / BY_HAND_DURATION_FACTOR;
+      if (!runs) byHand = true;
+      minutes += 1 / halves.length / speed;
+    }
+    return { speed: 1 / minutes, byHand };
+  }
   const family = familyForStage(job, stage);
   if (family === null) return { speed: 1, byHand: false };
   // Parts come off a CNC cut and drilled, so the bench takes half the minutes (CLAUDE.md T7 3.4).

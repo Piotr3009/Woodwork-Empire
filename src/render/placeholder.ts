@@ -16,7 +16,6 @@ const COLOUR_BY_PREFIX: Record<string, { fill: string; edge: string }> = {
   pipe: { fill: '#1f5a3a', edge: '#3f8a5f' },
   gate: { fill: '#8a8f96', edge: '#b8bcc2' },
   pallet: { fill: '#c9a23b', edge: '#9c7d2d' },
-  palletTruck: { fill: '#6b7f9c', edge: '#526278' },
   character: { fill: '#5a7fa8', edge: '#3d5a7a' },
   thumb: { fill: '#f3ecdc', edge: '#d9d1bd' },
   spindleMoulder: { fill: '#7a6a9c', edge: '#5d5178' },

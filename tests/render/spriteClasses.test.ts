@@ -198,8 +198,9 @@ describe('the file on disk and the footprint in the engine', () => {
     // here: this loop counts one file a class, and the turned ones are measured below. Fifty two
     // from v49: the five thicknessers, the van, the forklift, the pallet truck and the hand tool
     // set of the pack of 22.09 (tools, thicknessers and vehicles), every one measured against its
-    // footprint above.
-    expect(checked).toBe(52);
+    // footprint above. Fifty seven from v54: the five CNCs of the pack of 24.09. The pallet truck's
+    // file is the used forklift's from v54, the same picture under the name of its class.
+    expect(checked).toBe(57);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }
@@ -228,7 +229,8 @@ describe('the file on disk and the footprint in the engine', () => {
     const turnedFiles = spriteFiles().filter((name) => name.endsWith('.r.png'));
     expect(turnedFiles).toContain(turned);
     // Fifty one from v49: the pack of 22.09 turned the five thicknessers, the van, the forklift
-    // and the pallet truck; the hand tool set is a catalogue picture and has no turn.
-    expect(turnedFiles).toHaveLength(51);
+    // and the pallet truck; the hand tool set is a catalogue picture and has no turn. Fifty six
+    // from v54, with the five CNCs' turns of the pack of 24.09.
+    expect(turnedFiles).toHaveLength(56);
   });
 });

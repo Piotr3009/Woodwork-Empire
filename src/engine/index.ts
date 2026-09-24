@@ -733,6 +733,7 @@ export {
   paceLines,
   placesLine,
   crewOnTheFloor,
+  fullCrew,
   familyRuns,
   placeShortages,
   shortageLine,

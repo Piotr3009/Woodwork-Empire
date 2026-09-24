@@ -22,10 +22,11 @@ export const SPRITE_DIR = '/sprites';
 const DELIVERED: readonly string[] = deliveredFiles();
 
 /** The families whose picture is a Turn 13 placeholder until the art side paints it: the spindle
- *  moulder's five classes and the pallet truck (CLAUDE.md T13 1, 3.13, 3.21; the requests are in
- *  docs/art/REQUESTS-T13.md). Everything else with no file falls back to the flat box the hall
- *  has always drawn. */
-export const PLACEHOLDER_SPRITES: readonly string[] = ['spindleMoulder', 'palletTruck'];
+ *  moulder's five classes (CLAUDE.md T13 1, 3.13; the requests are in docs/art/REQUESTS-T13.md).
+ *  The pallet truck was the other until v54 made it a class of the forklift family, whose picture
+ *  it now is (PIOTR, 24.09). Everything else with no file falls back to the flat box the hall has
+ *  always drawn. */
+export const PLACEHOLDER_SPRITES: readonly string[] = ['spindleMoulder'];
 
 /** The placeholder kind for a sprite key and its class, `spindleMoulder.used`, or null when the
  *  family is not one the placeholder helper draws. */

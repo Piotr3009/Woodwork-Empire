@@ -17,7 +17,7 @@ import {
   drawContract,
 } from '../../src/engine/contracts';
 import type { Contract, GameState } from '../../src/engine/index';
-import { hallPace, placeShortages } from '../../src/engine/machines';
+import { fullCrew, hallPace, placeShortages } from '../../src/engine/machines';
 import { planPlaces } from '../../src/engine/production';
 import { renderContracts } from '../../src/ui/contracts';
 import { renderWorkPlan } from '../../src/ui/workPlan';
@@ -58,13 +58,21 @@ function shortage(places: number, men: number): number {
   return (places + (men - places) / BY_HAND_DURATION_FACTOR) / men;
 }
 
+/** The shortage the contract's line reckons with: the whole crew on the books, whoever is at work
+ *  this minute, because the line says what the hall makes "at full crew" (v54). */
+function atFullCrew(state: GameState): ReturnType<typeof placeShortages> {
+  return placeShortages(state, 'day', fullCrew(state));
+}
+
 describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
   it('counts every joiner on the books, at his rate, the hall s pace and what too few saws take off', () => {
     const { state, contract } = offered(1, 'budget', 20);
     // One budget saw: one place for a crew of seven, the owner and six joiners with no experience.
     // Nobody waits for the saw from v53, so all six count, and the six past its one place work at
     // the by hand pace: the hall's minute is (1 + 6 / 1.5) / 7 of itself, 0.71 (PIOTR, 24.09; v53).
-    const [short] = placeShortages(state);
+    // The seven are the crew on the books and not the men at work this minute (v54).
+    expect(fullCrew(state)).toBe(7);
+    const [short] = atFullCrew(state);
     expect(short).toMatchObject({ family: 'tableSaw', places: 1, men: 7, over: 6 });
     expect(short?.factor).toBeCloseTo(shortage(1, 7), 10);
     // A piece of 45 of the owner's minutes is 105 of a novice's at 0.6, the budget pace 1.00 and
@@ -83,8 +91,8 @@ describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
     // The same six men in both halls: one place leaves six of the seven by hand, three places four
     // of them, so the one saw hall's minute is 0.71 of itself and the three saw hall's 0.81. v52
     // capped the men at the places and read 32 against 96, three times over (PIOTR, 24.09; v53).
-    expect(placeShortages(one.state)[0]?.factor).toBeCloseTo(shortage(1, 7), 10);
-    expect(placeShortages(three.state)[0]?.factor).toBeCloseTo(shortage(3, 7), 10);
+    expect(atFullCrew(one.state)[0]?.factor).toBeCloseTo(shortage(1, 7), 10);
+    expect(atFullCrew(three.state)[0]?.factor).toBeCloseTo(shortage(3, 7), 10);
     const small = contractHallCapacity(one.state, one.contract).perWeek;
     const big = contractHallCapacity(three.state, three.contract).perWeek;
     expect(small).toBe(crewWeek(one.state, one.contract, shortage(1, 7)));
@@ -122,7 +130,10 @@ describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
     const after = contractHallCapacity(sold, sold.contracts[0] ?? contract).perWeek;
     // Two places for the seven are 0.76 of the hall's minute and 144 a week; one place is 0.71
     // and 132. v52 halved it with the places, 64 to 32 (PIOTR, 24.09; v53).
-    expect(placeShortages(sold)[0]?.places).toBe(1);
+    expect(atFullCrew(sold)[0]?.places).toBe(1);
+    // With every man off his job nobody is at work, so the hall's own minute is short of nothing
+    // and its Output sheet says so; the line still reckons with the seven (v54).
+    expect(placeShortages(sold)).toEqual([]);
     expect(before).toBe(144);
     expect(after).toBe(132);
     expect(after).toBeLessThan(before);
@@ -135,8 +146,8 @@ describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
     // the same 0.76 and the pace alone parts them: 1.05 against 1.08, 150 a week against 156. The
     // old reading set an industrial saw's three places against a budget saw's one, which is the
     // shortage and not the pace (PIOTR, 24.09; v53).
-    const factor = placeShortages(standard.state)[0]?.factor;
-    expect(placeShortages(pro.state)[0]?.factor).toBe(factor);
+    const factor = atFullCrew(standard.state)[0]?.factor;
+    expect(atFullCrew(pro.state)[0]?.factor).toBe(factor);
     expect(factor).toBeCloseTo(shortage(2, 7), 10);
     expect(hallPace(standard.state, 'tableSaw')).toBe(1.05);
     expect(hallPace(pro.state, 'tableSaw')).toBe(1.08);

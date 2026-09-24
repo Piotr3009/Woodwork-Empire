@@ -271,20 +271,25 @@ export function designMinutes(basePrice: number, tier: SoftwareTier): number {
   return Math.round(raw * SOFTWARE_DESIGN_FACTOR[tier]);
 }
 
-/** The best handling kit in the hall: the key of the one table the unloading minutes are read
- *  off, `none` for bare hands (CLAUDE.md T13 3.21). */
+/** The best handling kit in the hall: the class of pallet truck or forklift the unloading minutes
+ *  are read off, `none` for bare hands (CLAUDE.md T13 3.21). From v54 the pallet trucks and the
+ *  forklifts are one family and the table is keyed by its class (PIOTR, 24.09). */
 export function handlingIn(state: GameState): string {
   let best = 'none';
   let minutes = UNLOAD_MINUTES_BY_HANDLING.none ?? UNLOAD_BASE_MINUTES;
-  for (const [specId, figure] of Object.entries(UNLOAD_MINUTES_BY_HANDLING)) {
-    if (specId === 'none' || !has(state, specId)) continue;
-    if (figure < minutes) {
+  for (const item of state.equipment) {
+    if (item.specId !== HANDLING_FAMILY) continue;
+    const figure = UNLOAD_MINUTES_BY_HANDLING[item.variantId];
+    if (figure !== undefined && figure < minutes) {
       minutes = figure;
-      best = specId;
+      best = item.variantId;
     }
   }
   return best;
 }
+
+/** The one family of pallet trucks and forklifts (v54). */
+export const HANDLING_FAMILY = 'forklift';
 
 /** What the handling kit does to a walk at the gate, as a factor of the bare handed figure: the
  *  one table, read for the sheets and for the machines alike (CLAUDE.md T13 3.21). */

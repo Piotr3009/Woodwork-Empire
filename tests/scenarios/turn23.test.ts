@@ -212,16 +212,19 @@ describe('(ll) three men, no manager, and the boss assigns each morning', () => 
   });
 
   it('puts the whole of every man s day into the jobs, and finishes none of them', () => {
-    // 3,918.39 of labour over the ten days [measured on this build]. It is quoted here so that
+    // 4,418.84 of labour over the ten days [measured on this build]. It is quoted here so that
     // (mm) below is read against a figure and not against itself, and the three jobs are all still
     // on the bench at the end of it, so the figure is ten days of three men and nothing else.
     //
     // 4,091.97 on v52. Two things moved it on v53 (PIOTR, 24.09), both measured: nobody waits for a
-    // stage or a machine any more, which alone reads 4,418.84, eight per cent more; and the three
-    // used saws are three places for four men, the owner among them, so the Output sheet carries
-    // `Too few saws: 3 places, 4 men` and the man past the places works at 67%, which brings it to
-    // 3,918.39.
-    expect(NO_MANAGER.done).toBeCloseTo(3918.39, 2);
+    // stage or a machine any more, which alone read 4,418.84, eight per cent more; and the three
+    // used saws were three places for four men, the owner counted among them, so the Output sheet
+    // carried `Too few saws: 3 places, 4 men` and the man past the places worked at 67%, which
+    // brought it to 3,918.39. From v54 the crew is the men at work, and the owner, at no job, is
+    // not one: three men at three places, no saw line, and the figure is the
+    // 4,418.84 of nobody waiting alone. The same ten days with v53's count read 3,918.39 [both
+    // measured].
+    expect(NO_MANAGER.done).toBeCloseTo(4418.84, 2);
     expect(NO_MANAGER.state.jobs.every((job) => job.stage === 'inProduction')).toBe(true);
   });
 });
@@ -252,9 +255,9 @@ describe('(mm) the same crew with a novice manager over them', () => {
     // with no manager in it. So the pace reached the second shift alone while the efficiency sheet
     // printed `Manager: +3%` over a day crew that was not getting it. The lead put the same factor
     // on the day's hands, which is the one path 2.4 asks for, and this is the month that measures
-    // it: 3,918.39 without him, 4,070.84 with him [both measured on this build; 4,091.97 and
-    // 4,261.25 on v52, before nobody waited and the three saws were counted against four men, the
-    // note under (ll)].
+    // it: 4,418.84 without him, 4,589.83 with him [both measured on this build; 3,918.39 and
+    // 4,070.84 on v53, when the three saws were counted against four men with the owner among
+    // them, and 4,091.97 and 4,261.25 on v52, before nobody waited; the note under (ll)].
     //
     // **Four per cent, and not the three the grade says**, and the one per cent over is not the
     // manager either: it is the hall. Every one of the 14,400 hand minutes of the month carries
@@ -274,7 +277,7 @@ describe('(mm) the same crew with a novice manager over them', () => {
     // month reads what the grade puts in it. Measured on this build: no repair line in either
     // month, every saw whole.
     expect(NOVICE.done).toBeGreaterThan(NO_MANAGER.done);
-    expect(NOVICE.done).toBeCloseTo(4070.84, 2);
+    expect(NOVICE.done).toBeCloseTo(4589.83, 2);
   });
 
   it('never sends the owner to the Work Plan', () => {

@@ -17,6 +17,7 @@ import {
 import { dayOfMonth } from './clock';
 import { canAfford, charge, formatMoney } from './economy';
 import { queueEvent } from './events';
+import { variantFor } from './machines';
 import { int } from './rng';
 import type { GameState } from './types';
 
@@ -43,9 +44,22 @@ export function insuredMachinesValue(state: GameState): number {
   let value = 0;
   for (const item of state.equipment) {
     if (item.soldOnDay !== null) continue;
+    // A class with an insurance of its own is covered by that figure and not by its price (v54).
+    if (variantFor(item)?.insuranceYearly !== undefined) continue;
     value += item.purchasePrice;
   }
   return Math.round(value);
+}
+
+/** The classes covered at a yearly figure of their own, the vans: what they add to the property
+ *  premium, a better van the less [PIOTR, 24.09] (v54). */
+export function ownFigureCoverYearly(state: GameState): number {
+  let yearly = 0;
+  for (const item of state.equipment) {
+    if (item.soldOnDay !== null) continue;
+    yearly += variantFor(item)?.insuranceYearly ?? 0;
+  }
+  return yearly;
 }
 
 /** The stock's share: the sheets on the rack at their value. */
@@ -60,7 +74,7 @@ export function insuredValue(state: GameState): number {
 }
 
 export function propertyPremiumYearly(state: GameState): number {
-  return pence(insuredValue(state) * PROPERTY_INSURANCE_RATE_YEARLY);
+  return pence(insuredValue(state) * PROPERTY_INSURANCE_RATE_YEARLY + ownFigureCoverYearly(state));
 }
 
 /** Hired people: everybody on the books. */

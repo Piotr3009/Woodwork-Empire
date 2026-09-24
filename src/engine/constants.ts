@@ -128,12 +128,17 @@ import type {
  *  Version 29 is v53 (PIOTR, 24.09): no job waits for a stage and nobody waits for a machine. The
  *  job card's "wait for the CNC" switch is gone from every job, and the timber tool set is gone
  *  from the game: every one in a hall or on order is paid back at its price. Every v25 to v28 save
- *  loads. */
-export const STATE_VERSION = 29;
+ *  loads.
+ *
+ *  Version 30 is v54 (PIOTR, 24.09): the vans are five classes with miles on the clock, and the
+ *  pallet trucks and the forklifts one family of five. Every v25 to v29 save loads: a pallet
+ *  truck becomes the hand pallet truck, a better forklift the better forklift of the one family,
+ *  and every van the standard one it was. */
+export const STATE_VERSION = 30;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v53';
+export const APP_VERSION = 'v54';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1170,7 +1175,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'solidWood',
     calls: 4,
     needsMeasure: false,
-    requiredEquipment: ['thicknesser'],
+    requiredEquipment: ['thicknesser', 'spindleMoulder'],
     allowedFinishes: FINISHES_SOLID,
     minReputation: 10,
     weightsByTier: [0, 2, 15],
@@ -1199,6 +1204,10 @@ export const DELIVERY_DAYS_BY_CLASS: Record<string, Record<string, number>> = {
   spindleMoulder: { used: 1, budget: 3, standard: 7, pro: 12, industrial: 20 },
   sprayBooth: { used: 5, budget: 10, standard: 20, pro: 25, industrial: 30 },
   thicknesser: { used: 1, budget: 5, standard: 5, pro: 7, industrial: 12 },
+  // Three days for a van and five for a forklift (PIOTR); the pallet trucks are off the shelf
+  // like the compressors [TUNE] (v54).
+  van: { used: 3, budget: 3, standard: 3, pro: 3, industrial: 3 },
+  forklift: { used: 1, budget: 2, standard: 5, pro: 5, industrial: 5 },
 };
 
 /** What a lorry load of heavy kit costs somebody at the gate, before the handling kit shortens
@@ -1212,9 +1221,15 @@ export const EQUIPMENT_UNLOAD_MINUTES = 120;
  *  are gone (CLAUDE.md T13 3.21). The key is the handling spec, `none` for bare hands. */
 export const UNLOAD_MINUTES_BY_HANDLING: Record<string, number> = {
   none: 45,
-  palletTruck: 30,
-  forklift: 15,
-  forkliftBetter: 10,
+  // From v54 the pallet trucks and the forklifts are one family of five classes, keyed by class
+  // [PIOTR, 24.09: "the same category, from the pallet truck to the super forklift"]: the hand
+  // pallet truck's 30 and the forklift's 15 are Piotr's, the better forklift's 10 as it was, the
+  // electric pallet truck and the heavy forklift [TUNE].
+  used: 30,
+  budget: 22,
+  standard: 15,
+  pro: 10,
+  industrial: 5,
 };
 /** Sheets carried per trip between the pallet and the rack [TUNE] (CLAUDE.md T13 3.21). */
 export const SHEETS_PER_TRIP = 2;
@@ -1290,6 +1305,9 @@ export const CLASS_LADDER_FAMILIES: readonly string[] = [
   'compressor',
   'workbench',
   'sheetRack',
+  // Five vans and one family of pallet trucks and forklifts (PIOTR, 24.09; v54).
+  'van',
+  'forklift',
 ];
 
 /** Class 3 or above on the spindle moulder is the future gate to timber production. The branch
@@ -1789,7 +1807,7 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     description:
       'A single sided floor machine with a glue pot, a pressure roller and an end trimmer. The ' +
       'parts go in one end and come out banded, which is a different job from standing at a ' +
-      'bench with an iron. It takes one man at a time and it wants extraction on it.',
+      'bench with an iron. It wants extraction on it.',
   },
   {
     id: 'pro',
@@ -2206,7 +2224,9 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
 
 /** The five classes of CNC (CLAUDE.md T13 3.12). The standard one is Piotr's 45,000; the rest of the
  *  prices are [TUNE], and the factors follow the saw's ladder. Every class wants an extractor and dry
- *  air, like the family. */
+ *  air, like the family. The heights are the pictures' own, 2 m for the three flatbeds of 3 by 2,
+ *  2.2 m for the professional machine and 2.4 m for the industrial cell (the art side's CNC pack of
+ *  24.09), the way the saw's and the thicknesser's are (v54). */
 export const CNC_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -2214,7 +2234,7 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     price: 18000,
     width: 3,
     depth: 2,
-    height: 1,
+    height: 2,
     zoneWidth: 5,
     zoneDepth: 4,
     enduranceFactor: 0.25,
@@ -2230,7 +2250,7 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     price: 30000,
     width: 3,
     depth: 2,
-    height: 1,
+    height: 2,
     zoneWidth: 5,
     zoneDepth: 4,
     enduranceFactor: 1,
@@ -2246,7 +2266,7 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     price: 45000,
     width: 3,
     depth: 2,
-    height: 1,
+    height: 2,
     zoneWidth: 5,
     zoneDepth: 4,
     enduranceFactor: 1.2,
@@ -2262,7 +2282,7 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     price: 75000,
     width: 4,
     depth: 2,
-    height: 1.2,
+    height: 2.2,
     zoneWidth: 6,
     zoneDepth: 4,
     enduranceFactor: 1.5,
@@ -2278,7 +2298,7 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     price: 120000,
     width: 4,
     depth: 3,
-    height: 1.2,
+    height: 2.4,
     zoneWidth: 6,
     zoneDepth: 5,
     enduranceFactor: 2,
@@ -2460,6 +2480,138 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
   },
 ];
 
+/** One trip in the van, to a client or to a site measure, in miles [PIOTR, 24.09: "every delivery
+ *  is 100 miles"] (v54). */
+export const MILES_PER_TRIP = 100;
+
+/** What a class of van does on a trip [PIOTR, 24.09: "the dearer the van, the cheaper its
+ *  insurance", life in miles, "all the ideas are ok": a shorter trip, more pieces in it, fewer
+ *  breakdowns, less fuel]. The standard van's price and insurance are the one van of v53; every
+ *  other figure is [TUNE] (v54). */
+export interface VanClass {
+  /** Minutes of a man's day the trip takes. */
+  deliveryMinutes: number;
+  /** Finished pieces standing at the gate that go in one trip. */
+  piecesPerTrip: number;
+  /** The miles it is good for. Past them it breaks down three times as often. */
+  lifeMiles: number;
+  /** Pounds of fuel for a hundred miles. */
+  fuelPer100Miles: number;
+  /** The chance a delivery trip ends at the roadside, the pieces going the next working day. */
+  breakdownPerTrip: number;
+}
+
+export const VAN_CLASSES: Record<string, VanClass> = {
+  used: { deliveryMinutes: 120, piecesPerTrip: 1, lifeMiles: 30000, fuelPer100Miles: 30, breakdownPerTrip: 0.05 },
+  budget: { deliveryMinutes: 105, piecesPerTrip: 1, lifeMiles: 60000, fuelPer100Miles: 25, breakdownPerTrip: 0.02 },
+  standard: { deliveryMinutes: 90, piecesPerTrip: 2, lifeMiles: 100000, fuelPer100Miles: 20, breakdownPerTrip: 0.01 },
+  pro: { deliveryMinutes: 75, piecesPerTrip: 3, lifeMiles: 150000, fuelPer100Miles: 18, breakdownPerTrip: 0.005 },
+  industrial: { deliveryMinutes: 60, piecesPerTrip: 4, lifeMiles: 200000, fuelPer100Miles: 15, breakdownPerTrip: 0.0025 },
+};
+
+/** A van past its miles breaks down this many times as often [TUNE] (v54). */
+export const VAN_WORN_BREAKDOWN_FACTOR = 3;
+/** What a breakdown at the roadside costs, as a share of what the van cost [TUNE] (v54). */
+export const VAN_REPAIR_FRACTION = 0.03;
+
+/** The five classes of van. Their insurance is their own, falling as the van gets better
+ *  [PIOTR, 24.09], and not the property rate on the price (v54). */
+export const VAN_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used van',
+    price: 3500,
+    insuranceYearly: 300,
+    enduranceFactor: 1,
+    powerPerDay: 0,
+    description: 'A high mileage panel van with a dent in the side door. It starts, mostly.',
+  },
+  {
+    id: 'budget',
+    name: 'Small van',
+    price: 6000,
+    insuranceYearly: 240,
+    enduranceFactor: 1,
+    powerPerDay: 0,
+    description: 'A small new van. One piece at a time and it knows the way.',
+  },
+  {
+    id: 'standard',
+    name: 'Van',
+    price: 9000,
+    insuranceYearly: 180,
+    enduranceFactor: 1,
+    powerPerDay: 0,
+    description: 'A medium panel van with racking inside. Two pieces a trip.',
+  },
+  {
+    id: 'pro',
+    name: 'Large van',
+    price: 14000,
+    insuranceYearly: 140,
+    enduranceFactor: 1,
+    powerPerDay: 0,
+    description: 'A long wheelbase van with a tail lift. Three pieces a trip, and quicker there and back.',
+  },
+  {
+    id: 'industrial',
+    name: 'Luton van',
+    price: 22000,
+    insuranceYearly: 100,
+    enduranceFactor: 1,
+    powerPerDay: 0,
+    description: 'A Luton box van with a lift: a whole kitchen in one trip.',
+  },
+];
+
+/** The five classes of pallet truck and forklift, from the hand pallet truck to the heavy
+ *  forklift (PIOTR, 24.09; v54). The hand pallet truck's, the forklift's and the better forklift's
+ *  prices are the ones they had as families of their own; the electric pallet truck's and the
+ *  heavy forklift's are [TUNE]. What a class buys is its unloading time,
+ *  `UNLOAD_MINUTES_BY_HANDLING`. */
+export const FORKLIFT_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Hand pallet truck',
+    price: PALLET_TRUCK_PRICE,
+    enduranceFactor: 1,
+    powerPerDay: 0,
+    description: 'A hand pallet truck. A load of sheets is off the lorry in about thirty minutes instead of forty five.',
+  },
+  {
+    id: 'budget',
+    name: 'Electric pallet truck',
+    price: 1800,
+    enduranceFactor: 1,
+    powerPerDay: 0,
+    description: 'A pallet truck with a motor in it. About twenty two minutes a load.',
+  },
+  {
+    id: 'standard',
+    name: 'Forklift',
+    price: 6000,
+    enduranceFactor: 1,
+    powerPerDay: 0,
+    description: 'A counterbalance forklift. A load of sheets is off the lorry in about fifteen minutes.',
+  },
+  {
+    id: 'pro',
+    name: 'Better forklift',
+    price: 12000,
+    enduranceFactor: 1,
+    powerPerDay: 0,
+    description: 'A newer forklift with a side shift. A load of sheets is off the lorry in ten minutes.',
+  },
+  {
+    id: 'industrial',
+    name: 'Heavy forklift',
+    price: 20000,
+    enduranceFactor: 1,
+    powerPerDay: 0,
+    description: 'A heavy forklift with a sheet clamp. A load of sheets is off the lorry in five minutes.',
+  },
+];
+
 const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   tableSaw: TABLE_SAW_VARIANTS,
   workbench: WORKBENCH_VARIANTS,
@@ -2474,6 +2626,9 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   // The cabinet is a family of five from Turn 22, and what a class is for is how many men's hand
   // tools it holds (PIOTR, 19.09; CLAUDE.md T22 2.12).
   toolCabinet: TOOL_CABINET_VARIANTS,
+  // Five vans and one family of pallet trucks and forklifts (PIOTR, 24.09; v54).
+  van: VAN_VARIANTS,
+  forklift: FORKLIFT_VARIANTS,
 };
 
 const BASE_SPEC = {
@@ -2595,7 +2750,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     height: 1,
     spriteKey: 'tableSaw',
     usedOn: 'sheet',
-    effect: 'Cuts sheets and timber. One man at a time.',
+    effect: 'Cuts sheets and timber. Its class says how many men can cut at once.',
   },
   {
     ...BASE_SPEC,
@@ -2618,8 +2773,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'edgebander',
     usedOn: 'sheet',
     effect:
-      'Edges sheet goods. The two hand classes live in a tool cabinet; the floor ones take one ' +
-      'man at a time and want extraction.',
+      'Edges sheet goods. The two hand classes live in a tool cabinet; the floor ones want ' +
+      'extraction, and their class says how many men can work at them at once.',
   },
   {
     ...BASE_SPEC,
@@ -2812,55 +2967,24 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 1,
     height: 1,
     spriteKey: 'van',
-    effect: 'Removes taxi and transport costs.',
+    effect: 'Removes the courier and the taxi. Every trip is 100 miles on the clock and its fuel.',
   },
   {
     ...BASE_SPEC,
     id: 'forklift',
-    // Five days for a forklift (PIOTR).
+    // One family from the hand pallet truck to the heavy forklift (PIOTR, 24.09; v54): the
+    // pallet truck and the better forklift were families of their own until tonight.
     deliveryDays: 5,
-    folder: 'Forklifts',
+    folder: 'Pallet trucks and forklifts',
     tab: 'handling',
-    name: 'Forklift',
-    price: 6000,
-    category: 'vehicle',
-    width: 1,
-    depth: 1,
-    height: 1,
-    spriteKey: 'forklift',
-    effect: 'A load of sheets is off the lorry in about fifteen minutes.',
-  },
-  {
-    ...BASE_SPEC,
-    id: 'palletTruck',
-    // Off the shelf, in tomorrow, like the compressors [TUNE].
-    deliveryDays: 1,
-    folder: 'Pallet trucks',
-    tab: 'handling',
-    name: 'Pallet truck',
+    name: 'Pallet truck or forklift',
     price: PALLET_TRUCK_PRICE,
     category: 'vehicle',
     width: 1,
     depth: 1,
     height: 1,
-    spriteKey: 'palletTruck',
-    effect: 'A load of sheets is off the lorry in about thirty minutes instead of forty five.',
-  },
-  {
-    ...BASE_SPEC,
-    id: 'forkliftBetter',
-    // The five days of the forklift; Piotr named the one family [TUNE].
-    deliveryDays: 5,
-    folder: 'Better forklifts',
-    tab: 'handling',
-    name: 'Better forklift',
-    price: 12000,
-    category: 'vehicle',
-    width: 1,
-    depth: 1,
-    height: 1,
-    spriteKey: 'forkliftBetter',
-    effect: 'A load of sheets is off the lorry in ten minutes.',
+    spriteKey: 'forklift',
+    effect: 'Gets a load of sheets off the lorry faster: the better the class, the faster.',
   },
   {
     ...BASE_SPEC,
@@ -2903,7 +3027,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'spindleMoulder',
     effect:
       'Moulds a profile on an edge: the J profile of a handleless kitchen and the fronts of a ' +
-      'sprayed one on the sheet side, and every moulding on the timber side. One man at a time.',
+      'sprayed one on the sheet side, and every moulding on the timber side.',
   },
   {
     ...BASE_SPEC,
@@ -2924,7 +3048,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
     effect:
       'Cuts and drills a sheet job in one go, in place of the saw and the edgebander, and halves ' +
-      'the assembly after it. One man at a time. Timber still goes on the saw.',
+      'the assembly after it. Timber still goes on the saw.',
   },
   {
     ...BASE_SPEC,
@@ -3028,7 +3152,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
 export const EQUIPMENT_SPECS: EquipmentSpec[] = SPEC_DRAFTS.map(withVariants);
 
 /** Machines that must be owned before solid wood jobs can be made without the by-hand path. */
-export const SOLID_WOOD_EQUIPMENT = ['thicknesser'];
+export const SOLID_WOOD_EQUIPMENT = ['thicknesser', 'spindleMoulder'];
 
 /** Fixed placement in cells, which are metres (docs/art/SPRITES.md 9.1). Free placement by the
  *  player is parked for the room blocks only: everything else he sets out himself (T2 3.10). */
@@ -3215,7 +3339,6 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   sheetRack: { x: 11, y: 6 },
   edgebander: { x: 13, y: 6 },
   forklift: { x: 18, y: 6 },
-  forkliftBetter: { x: 18, y: 7 },
   van: { x: 0, y: 7, yard: true },
 };
 
@@ -3969,6 +4092,7 @@ export const WORKER_IDLE_REASONS: ReadonlyArray<{ id: WorkerIdleReason; label: s
 export const BUBBLES: Record<BubbleKey, string> = {
   noPlace: 'no free machines',
   noMaterial: 'no sheets for {job}',
+  sheetsHeld: 'no free sheets for {job}: {held} held by jobs',
   noCompressor: 'no compressor',
   nothingToDo: 'nothing to do',
   waitingForBoss: 'waiting for the boss',

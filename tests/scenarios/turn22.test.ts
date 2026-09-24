@@ -103,12 +103,18 @@ const TRADING_UNDER: Policy = {
  *  inside the -15,000 the bank allows, and the scenario measures what it was written to
  *  measure.
  *
- *  A thousand again from v53. The owner and his one joiner are two men at one used saw with one
- *  place, so the Output sheet carries `Too few saws: 1 place, 2 men` at -0.17 (PIOTR, 24.09), and
- *  the company no longer climbs under the limit: it drifts down about 25 a working day, and the
+ *  A thousand again from v53. The owner and his one joiner were two men at one used saw with one
+ *  place, so the Output sheet carried `Too few saws: 1 place, 2 men` at -0.17 (PIOTR, 24.09), and
+ *  the company no longer climbed under the limit: it drifted down about 25 a working day, and the
  *  month's bills on day 30 took the three thousand run to -15,214, past what the bank allows,
- *  before the thirty days were counted. A thousand under stays under the limit every morning and
- *  reads about -13,500 on the thirtieth. */
+ *  before the thirty days were counted.
+ *
+ *  A thousand still from v54, measured again. The crew of the saw line is the men at work, and the
+ *  owner, with no job here, is not one: the joiner has the one place to himself and the company
+ *  climbs about 50 a working day under the limit, as on v52. From a thousand under, the nearest it
+ *  comes back to the limit is the morning of day 26, 568 under it, and the month's wages on day 30
+ *  take it down for the rest of the run: -12,119 on the thirtieth morning, 2,881 inside what the
+ *  bank allows [measured]. */
 const UNDER_BY = 1000;
 
 interface ThirtyDays {
@@ -179,20 +185,22 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
     // before that. The entry point carries the reference saw's wear, which fell six fold when the
     // service went from 80 hours to six months, PIOTR 22.09). Fifty three pieces were made and
     // paid for before the money was written, so the run's income is proven before the rule is.
-    // Forty five from v53, where it was fifty three: the owner and his joiner are two men at one
-    // saw place, and the man past it works at 67% (PIOTR, 24.09).
+    // Forty five on v53, where it was fifty three: the owner and his joiner were two men at one saw
+    // place, and the man past it worked at 67% (PIOTR, 24.09). Fifty four from v54: the owner has
+    // no job here and the crew is the men at work, so the joiner has the one place to himself; the
+    // same days with v53's count read forty five [both measured].
     const contract = contractOf(JJ.under);
     expect(contract.name).toBe('Cut sheet packs for Northgate Interiors');
     expect(contract.pieceId).toBe('cutSheetPack');
     expect(contract.quantityPerWeek).toBe(20);
     expect(contract.pricePerPiece).toBe(66);
     expect(contract.startDay).toBe(3);
-    expect(contract.piecesMade).toBe(45);
-    // Sixty sheets bought on day 1, fifty three of them still on the rack (fifty two on v52, one
-    // sheet more cut before the saw's places were counted): the contract's material
+    expect(contract.piecesMade).toBe(54);
+    // Sixty sheets bought on day 1, fifty one of them still on the rack (fifty three on v53 and
+    // fifty two on v52, the fewer pieces cut, the more left): the contract's material
     // comes off the rack and never off the account, so nothing the company does from here is a
     // purchase (CLAUDE.md T17 2.22). Buying is refused under the limit and it never needs to buy.
-    expect(JJ.under.stock.sheets).toBe(53);
+    expect(JJ.under.stock.sheets).toBe(51);
     expect(JJ.under.jobs).toHaveLength(0);
     // The one written figure, and where it puts the company: a thousand under a 10,000 limit,
     // which is four thousand inside the -15,000 the bank allows (v53; the note above UNDER_BY).
@@ -205,24 +213,24 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
 
   it('keeps trading under the limit for twenty nine days, and the strip counts them', () => {
     // Twenty nine calendar days in a row closed under the limit, played one at a time: the account
-    // stands at -13,598 on the twenty ninth morning, which is day 45 of the calendar, and the
-    // company is still trading. It is three thousand six hundred under the limit after twenty
-    // nine days of it and 1,402 inside the -15,000 the bank allows: from v53 the contract pays
-    // about what the days take out, a few tens a day either way with one saw place for two men
-    // (-14,161 on v52, when it climbed about 50 a working day from three thousand under), and
-    // only the month's wages on day 30 push the account down (CLAUDE.md T22 2.1, 2.2; the note
-    // above UNDER_BY).
+    // stands at -12,208 on the twenty ninth morning, which is day 45 of the calendar, and the
+    // company is still trading. It is two thousand two hundred under the limit after twenty nine
+    // days of it and 2,792 inside the -15,000 the bank allows: from v54 the contract climbs about
+    // 50 a working day under the limit again, as on v52, and only the month's wages on day 30 push
+    // the account down (CLAUDE.md T22 2.1, 2.2; the note above UNDER_BY). v53 read -13,598, a saw
+    // line that counted the owner with no job having it drift down a few tens a day, and v52
+    // -14,161 from three thousand under [measured].
     expect(JJ.twentyNine.finance.daysBelowOverdraft).toBe(BANKRUPTCY_DAYS_BELOW_LIMIT - 1);
     expect(JJ.twentyNine.finance.daysBelowOverdraft).toBe(29);
     expect(JJ.twentyNine.clock.day).toBe(45);
     expect(JJ.twentyNine.gameOver).toBeNull();
-    expect(Math.round(JJ.twentyNine.cash)).toBe(-13598);
+    expect(Math.round(JJ.twentyNine.cash)).toBe(-12208);
     expect(JJ.twentyNine.cash).toBeLessThan(JJ.twentyNine.finance.overdraftLimit);
     expect(JJ.twentyNine.cash).toBeGreaterThan(bankruptcyFloor(JJ.twentyNine));
     // And the player was told, every one of those days, in the one line the warning strip carries
     // under the top bar (CLAUDE.md T22 2.2).
     expect(limitLine(JJ.twentyNine)).toBe(
-      "Account -£13,598 is below the bank's -£10,000 limit: day 29 of 30.",
+      "Account -£12,208 is below the bank's -£10,000 limit: day 29 of 30.",
     );
     expect(limitLine(JJ.under)).toBe(
       "Account -£11,000 is below the bank's -£10,000 limit: day 1 of 30.",
@@ -232,7 +240,8 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
     // weekends, whose two days the clock rolls through in one go with their own bills and their own
     // count. No day of the thirty closed at or above the limit, which is what the three thousand
     // the scenario wrote is for: the nearest the account ever came back to the limit was the
-    // morning of day 26, 2,502 under it (2,166 at v40's price; CLAUDE.md T22 2.2).
+    // morning of day 26, 568 under it (v54; on v53 the morning of day 18, 954 under, and on v52
+    // from three thousand under the morning of day 26, 2,502 under; CLAUDE.md T22 2.2).
     expect(JJ.counts[0]).toBe(1);
     expect(JJ.counts[JJ.counts.length - 1]).toBe(BANKRUPTCY_DAYS_BELOW_LIMIT);
     expect(JJ.counts).toHaveLength(22);
@@ -254,13 +263,13 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
     expect(JJ.thirty.clock.day).toBe(46);
     // The look is the day's first act, so the clock is at the top of the morning it closed on.
     expect(JJ.thirty.clock.minute).toBe(0);
-    // The amount was never the reason: the account is -13,575 against the -15,000 the bank allows,
-    // 1,425 the right side of the line it never reached (v53; 928 on v51 and v52 from three
-    // thousand under, 1,854 at v40's price). This is the
-    // whole of the rule: a company can be closed while it can still pay.
-    expect(Math.round(JJ.thirty.cash)).toBe(-13575);
+    // The amount was never the reason: the account is -12,119 against the -15,000 the bank allows,
+    // 2,881 the right side of the line it never reached (v54; 1,425 on v53, 928 on v51 and v52
+    // from three thousand under, 1,854 at v40's price). This is the whole of the rule: a company
+    // can be closed while it can still pay.
+    expect(Math.round(JJ.thirty.cash)).toBe(-12119);
     expect(JJ.thirty.cash).toBeGreaterThan(bankruptcyFloor(JJ.thirty));
-    expect(Math.round(JJ.thirty.cash - bankruptcyFloor(JJ.thirty))).toBe(1425);
+    expect(Math.round(JJ.thirty.cash - bankruptcyFloor(JJ.thirty))).toBe(2881);
     expect(bankruptcyFloor(JJ.thirty)).toBe(
       JJ.thirty.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR,
     );
@@ -269,7 +278,7 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
     expect(JJ.thirty.activeEvent?.data).toEqual({
       day: 46,
       month: 2,
-      cash: -13575,
+      cash: -12119,
       allowed: -15000,
       daysBelow: BANKRUPTCY_DAYS_BELOW_LIMIT,
       daysAllowed: BANKRUPTCY_DAYS_BELOW_LIMIT,
@@ -277,16 +286,16 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
     // And the card says the three figures of 2.2 and no fourth one: what was in the bank, what the
     // bank allowed, and how long the account stood under the limit.
     expect(JJ.card).toContain('The bank has closed you');
-    for (const figure of ['-£13,575', '-£15,000', '30 of 30']) {
+    for (const figure of ['-£12,119', '-£15,000', '30 of 30']) {
       expect(JJ.card, figure).toContain(figure);
     }
   });
 
   it('paid a month of wages out of an account that was already under the limit', () => {
     // 2.1 inside 2.2, and it is the clause the brief asks for: the monthly wages went out on the
-    // last working day of the month, day 30, out of an account that was already 2,538 under the
-    // limit (2,118 at v40's price), and the ledger line's own balance says where it left the
-    // account. Turn 21 would have
+    // last working day of the month, day 30, out of an account that was already 604 under the
+    // limit (v54; 1,264 on v53, 2,538 on v52 from three thousand under, 2,118 at v40's price), and
+    // the ledger line's own balance says where it left the account. Turn 21 would have
     // paid nothing at all: the whole 1,950 would have gone to arrears and the account would have
     // stayed parked on the limit.
     const wages = JJ.thirty.ledger.filter((entry) => entry.category === 'wages');
@@ -296,10 +305,10 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
     expect(line?.label).toBe('Monthly wages');
     expect(line?.amount).toBe(-1950);
     expect(line?.unpaid).toBe(false);
-    expect(Math.round(line?.balance ?? 0)).toBe(-13214);
+    expect(Math.round(line?.balance ?? 0)).toBe(-12554);
     expect(line?.balance).toBeLessThan(JJ.thirty.finance.overdraftLimit);
     // The account before the wages went out, which is the balance plus the bill: already under.
-    expect(Math.round((line?.balance ?? 0) - (line?.amount ?? 0))).toBe(-11264);
+    expect(Math.round((line?.balance ?? 0) - (line?.amount ?? 0))).toBe(-10604);
     expect((line?.balance ?? 0) - (line?.amount ?? 0)).toBeLessThan(
       JJ.thirty.finance.overdraftLimit,
     );
@@ -309,15 +318,14 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
   });
 
   it('was trading the whole way, off the rack and the contract s own pieces', () => {
-    // What kept it alive: 109 more pieces made after the money was written, 154 in all, and a line
+    // What kept it alive: 131 more pieces made after the money was written, 185 in all, and a line
     // of contract revenue on every working day from that morning to the last one it traded. Twenty
-    // two lines, 7,194 in all at 66 a piece (v53, with the man past the one saw place at 67%;
-    // 8,712 and 185 pieces on v52, 9,636 at v40's 73, 6,600 at the 50 of the table), 264, 330 or
-    // 396 a day beside the 307 the day itself takes out. That is the company
-    // a shade above break even under the limit, and it is why the thirty days are reachable at
-    // all.
+    // two lines, 8,646 in all at 66 a piece (v54; 7,194 and 154 pieces on v53, with a saw line
+    // that counted the owner; 8,712 and 185 on v52, 9,636 at v40's 73, 6,600 at the 50 of the
+    // table), 330, 396 or 462 a day beside the 307 the day itself takes out. That is the company a
+    // shade above break even under the limit, and it is why the thirty days are reachable at all.
     const contract = contractOf(JJ.thirty);
-    expect(contract.piecesMade).toBe(154);
+    expect(contract.piecesMade).toBe(185);
     const pieces = JJ.thirty.ledger.filter(
       (entry) => entry.day >= 16 && entry.label === `${contract.name}: pieces`,
     );
@@ -325,12 +333,12 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
     expect(pieces[0]?.day).toBe(16);
     expect(pieces[pieces.length - 1]?.day).toBe(45);
     for (const entry of pieces) expect(entry.amount).toBeGreaterThan(0);
-    expect(pieces.reduce((total, entry) => total + entry.amount, 0)).toBe(7194);
-    // The rack was never dry, so the contract never missed a day for want of a sheet: thirty six of
-    // the sixty sheets are still on it when the bank closes the company (thirty two on v52, when
-    // more pieces were cut).
+    expect(pieces.reduce((total, entry) => total + entry.amount, 0)).toBe(8646);
+    // The rack was never dry, so the contract never missed a day for want of a sheet: thirty two of
+    // the sixty sheets are still on it when the bank closes the company (thirty two on v52 too;
+    // thirty six on v53, when fewer pieces were cut).
     expect(JJ.thirty.stock.sheets).toBeGreaterThan(0);
-    expect(Math.round(JJ.thirty.stock.sheets * 100) / 100).toBe(36);
+    expect(Math.round(JJ.thirty.stock.sheets * 100) / 100).toBe(32);
     console.log(
       '(jj) THIRTY DAYS UNDER THE OVERDRAFT LIMIT, WITH THE WAGES PAID THROUGH IT\n' +
         `the hall on the morning of day ${JJ.under.clock.day}: one joiner, ` +

@@ -548,7 +548,16 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // owner and his joiner are two men at one used saw with one place, `Too few saws: 1 place, 2
     // men` at 0.83 on every minute. The same month played with that line taken out reads -639,
     // exactly v52's, so nobody waiting moved nothing here [both measured].
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-185);
+    //
+    // -934 from v54. The line counts the men at work, so the joiner has the saw to himself while
+    // the owner is off the floor, and the work goes faster: day 12's bookcase has 216 minutes left
+    // against 248, and from day 16 the book is empty where v53 is still making shelves. The
+    // enquiries after that land on other minutes and are other jobs, and fewer of them are out by
+    // the month's end: fourteen against seventeen, with 4,167 of balances paid against 5,358, 360
+    // less on couriers, 275 more in deposits and 230 more on material. The lowest point is the
+    // owner's draw on the morning of day 32 in both. The same month with v53's count reads -185
+    // exactly [both measured].
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-934);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
@@ -974,16 +983,21 @@ describe('a month of six joiners behind two saws', () => {
     // places than the crew costs the whole hall its pace instead: the man past the places works at
     // 67%. Six men at one standard saw's two places is `Too few saws: 2 places, 6 men` on the
     // Output sheet, 0.78 on every minute; at two saws' four places it is 0.89. So the one saw
-    // month gets three of its six jobs out, the other three at 91%, 92% and 98% of their making,
-    // and the two saw month all six by day 30; the second saw ends the month 9,888 ahead of the
-    // one saw month, having cost 1,800 [all measured]. From v37 to v52 the one saw month got all
-    // six out as well, and the second saw ended it 90 behind: it bought time at the saw and not a
-    // job. It buys jobs again, which is the push to invest Piotr asked for.
+    // month gets four of its six jobs out, the other two at 97% and 98% of their making, and the
+    // two saw month all six by day 26; the second saw ends the month 5,976 ahead of the one saw
+    // month, having cost 1,800 [all measured]. From v37 to v52 the one saw month got all six out
+    // as well, and the second saw ended it 90 behind: it bought time at the saw and not a job. It
+    // buys jobs again, which is the push to invest Piotr asked for.
+    //
+    // v53 read three jobs, day 30 and 9,888: it counted the owner in the crew, seven men, though
+    // he is at no job all month, so the line was 0.76 and 0.86. From v54 the crew is the men at
+    // work (PIOTR, 24.09: "nobody worked and it still cuts"); the same month with v53's count
+    // reads v53's three figures exactly [both measured].
     expect(done(two)).toBe(6);
-    expect(done(one)).toBe(3);
-    expect(lastDay(two)).toBe(30);
+    expect(done(one)).toBe(4);
+    expect(lastDay(two)).toBe(26);
     expect(lastDay(two)).toBeLessThan(lastDay(one));
-    expect(Math.round(two.state.cash - one.state.cash)).toBe(9888);
+    expect(Math.round(two.state.cash - one.state.cash)).toBe(5976);
   });
 
   it('has no longest stand at all on one saw either, the one saw having the places the crew wants', () => {

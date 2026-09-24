@@ -163,7 +163,8 @@ import {
   chargeSiteMeasure,
   checkOverdueJobs,
   endOwnerTakeOver,
-  deliverJob,
+  runVanDelivery,
+  deliveryMinutes,
   findJob,
   oldestReadyJob,
   onDeliveryArrived,
@@ -1135,7 +1136,8 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       fetchFromStorage(state);
       break;
     case 'deliver':
-      if (job) deliverJob(state, job);
+      // The van goes: its miles, its fuel, the pieces that fit in it, or the roadside (v54).
+      if (job) runVanDelivery(state, job);
       break;
     case 'unload': {
       // One van is one unloading: everything heavy that came on it stands on the cells that were
@@ -1769,7 +1771,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
  *  so the only question is who takes it there (CLAUDE.md T2 3.7). */
 function raiseJobAtGate(state: GameState, job: Job): void {
   const choices = has(state, 'van')
-    ? adHocChoices(state, AD_HOC_TASK_MINUTES.deliver, 'Take it in the van', 'Leave it at the gate')
+    ? adHocChoices(state, deliveryMinutes(state), 'Take it in the van', 'Leave it at the gate')
     : [
         { id: 'transport', label: transportLabel(state) },
         { id: 'later', label: 'Leave it at the gate' },
@@ -2548,6 +2550,7 @@ function standItem(
     minutesSavedLastWeek: 0,
     enduranceHours: enduranceHoursFor(specId, variant.id),
     hoursUsed: 0,
+    milesDriven: 0,
     purchasePrice: variant.price,
     soldOnDay: null,
     // Everything draws on the first compressor in the hall until the player says otherwise

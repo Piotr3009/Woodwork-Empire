@@ -41,8 +41,9 @@ describe('GameState', () => {
     // section 4). v51 put the service on the calendar: the day a machine was last serviced in
     // place of its hours, and the day a shop last rang (PIOTR, 22.09). v52 put `working` and
     // `noPlaceFor` on every man (PIOTR, 21.09), and v53 took `sawFallback` off every job and the
-    // timber tool set out of the hall (PIOTR, 24.09; v53).
-    expect(STATE_VERSION).toBe(29);
+    // timber tool set out of the hall (PIOTR, 24.09; v53); v54 put miles on every van and made the
+    // pallet trucks and forklifts one family (PIOTR, 24.09).
+    expect(STATE_VERSION).toBe(30);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

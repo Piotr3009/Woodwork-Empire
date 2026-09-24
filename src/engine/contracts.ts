@@ -52,6 +52,7 @@ import {
   classPaceOf,
   bookOutputMinute,
   findSpec,
+  fullCrew,
   placeShortages,
   hallProductivityFactor,
   has,
@@ -496,7 +497,10 @@ export interface HallCapacity {
 
 export function contractHallCapacity(state: GameState, contract: Contract): HallCapacity {
   const piece = contractPiece(contract);
-  const speed = contractPieceSpeed(state, piece) * placeShortages(state).reduce((all, short) => all * short.factor, 1);
+  // At full crew: every joiner on the books against the hall's places, whoever is at work this
+  // minute (v54).
+  const shortages = placeShortages(state, 'day', fullCrew(state));
+  const speed = contractPieceSpeed(state, piece) * shortages.reduce((all, short) => all * short.factor, 1);
   const week = MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK;
   let perWeek = 0;
   for (const worker of joiners(state)) {

@@ -75,8 +75,9 @@ describe('footprints in metres', () => {
       locker: [1, 1, 2],
       handToolSet: [1, 1, 1],
       van: [4, 2, 2],
+      // The better forklift's [2, 2, 2] is a class of the forklift's family from v54, and so is the
+      // pallet truck below it (PIOTR, 24.09).
       forklift: [2, 2, 2],
-      forkliftBetter: [2, 2, 2],
       // The timber tool set's [3, 2, 2] went with it: it is no longer in the game
       // (PIOTR, 24.09; v53).
       thicknesser: [3, 2, 2],
@@ -107,10 +108,9 @@ describe('footprints in metres', () => {
       extractor: [1, 1, 2],
       compressor: [1, 1, 1],
       airDryer: [1, 1, 1.5],
-      // Turn 13: the spindle moulder is 2 by 1 in a 3 by 3 zone [TUNE] and the pallet truck
-      // parks in one cell (CLAUDE.md T13 3.13, 3.21).
+      // Turn 13: the spindle moulder is 2 by 1 in a 3 by 3 zone [TUNE] (CLAUDE.md T13 3.13). The
+      // pallet truck's one cell went with it into the forklift's family (v54).
       spindleMoulder: [2, 1, 1],
-      palletTruck: [1, 1, 1],
     };
     // Every line of the catalogue is in one of the two lists: nothing slips in unmeasured.
     expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(

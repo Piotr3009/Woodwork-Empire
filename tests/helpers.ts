@@ -338,6 +338,7 @@ export function placeEquipment(
     minutesSavedLastWeek: 0,
     enduranceHours: enduranceHoursFor(specId, variantId),
     hoursUsed: 0,
+    milesDriven: 0,
     takenBy: null,
     purchasePrice: variant ? variant.price : spec.price,
     soldOnDay: null,

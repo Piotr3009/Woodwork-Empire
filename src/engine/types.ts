@@ -158,6 +158,9 @@ export interface EquipmentVariant {
   enduranceFactor: number;
   /** Power this one draws a day. */
   powerPerDay: number;
+  /** A yearly insurance of its own, for a class the property rate on its price does not fit: the
+   *  vans, whose better classes are the cheaper to insure (PIOTR, 24.09; v54). */
+  insuranceYearly?: number;
   /** Two or three lines of plain English about what this class of machine is. */
   description: string;
   /** What the picture stands on, in metres. Left out means the family's own footprint
@@ -275,6 +278,9 @@ export interface Equipment {
   enduranceHours: number;
   /** Hours of use it has had. Past its endurance it starts giving up. */
   hoursUsed: number;
+  /** Miles on the clock: a van's life is counted in miles, 100 a trip (PIOTR, 24.09; v54).
+   *  Nought on everything else. */
+  milesDriven: number;
   /** The hours it actually ran this week and this month, so the Machines column of the Company
    *  board and the month end can say what it saved. `hoursUsed` is the machine's whole life and
    *  cannot answer either (CLAUDE.md T17 2.24, 2.25). Both start again on their own boundary. */
@@ -773,6 +779,8 @@ export type GameEventKind =
   | 'monthEnd'
   /** The workshop was broken into overnight (CLAUDE.md T13 3.17). */
   | 'burglary'
+  /** The van broke down on the way to a client (PIOTR, 24.09; v54). */
+  | 'vanBrokeDown'
   /** A standing contract's term is over: the closing report and the renegotiation
    *  (CLAUDE.md T13 3.16). */
   | 'contractEnded'
@@ -1076,6 +1084,9 @@ export type BubbleKey =
   /** Every machine and every bench in the hall is taken (PIOTR, 24.09; v53). */
   | 'noPlace'
   | 'noMaterial'
+  /** A contract whose sheets are all on the rack but held by the jobs: the rack is not empty, the
+   *  jobs have it [PIOTR, 24.09: "28 on the rack and no sheets"] (v54). */
+  | 'sheetsHeld'
   /** He is at a bench the hall has no air for (CLAUDE.md T23 2.7). */
   | 'noCompressor'
   | 'nothingToDo'

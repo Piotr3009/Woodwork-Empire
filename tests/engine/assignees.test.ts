@@ -131,17 +131,20 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     expect(done(twoMen)).toBeGreaterThan(done(oneMan) * 1.5);
   });
 
-  it('runs a cutting stage at three men s speed with three men and a saw of one place', () => {
+  it('runs a cutting stage at three men s speed less the saw s line, with three men and a saw of one place', () => {
     // A budget saw has one place: until v53 the other two had none and the stage went no faster
     // than the man at it. Now the other two work the job at the benches, and all three put their
-    // minutes in (PIOTR, 24.09; v53). The hall is the same seven men in both runs, so its line
-    // for the one saw is the same in both and the ratio is the men.
+    // minutes in (PIOTR, 24.09; v53). The line counts the men at work and not the seven on the
+    // books (v54): the man alone is short of nothing, and the three are one at the saw and two
+    // at the by hand pace, (1 + 2 / 1.5) / 3 of three men, 7.20 and 16.80. Until v54 both runs
+    // took the seven's line and the ratio was the men, 21.60.
     const one = menOnOne(1, 1, 'budget');
     const three = menOnOne(3, 1, 'budget');
     const alone = labourIn(one, jobOfFirst(one).id, 'cutting', 20);
     const crowd = labourIn(three, jobOfFirst(three).id, 'cutting', 20);
     expect(alone).toBeGreaterThan(0);
-    expect(crowd).toBeCloseTo(alone * 3, 4);
+    expect(crowd).toBeCloseTo(alone * 3 * ((1 + 2 / 1.5) / 3), 4);
+    expect(crowd).toBeCloseTo(16.8, 4);
   });
 
   it('runs the same three men faster behind a saw of two places, by the saw s class and its hall line', () => {
@@ -151,12 +154,13 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     const fast = labourIn(standard, jobOfFirst(standard).id, 'cutting', 20);
     // Until v53 the standard saw's second place was a second man working, twice the one place
     // saw. Now all three work behind either saw, and what the second place buys is the hall's
-    // line: seven men on the books and two places, (2 + 5 / 1.5) / 7, against one place,
-    // (1 + 6 / 1.5) / 7; and the standard saw's pace, 1.05 on the cutting's quarter of the job.
+    // line: the three at work and two places, (2 + 1 / 1.5) / 3, against one place,
+    // (1 + 2 / 1.5) / 3; and the standard saw's pace, 1.05 on the cutting's quarter of the job.
+    // 1.0795 until v54, when the line counted the seven on the books and not the three at work.
     const pace = 1 / (0.25 / 1.05 + 0.75);
-    const line = (2 + 5 / 1.5) / (1 + 6 / 1.5);
+    const line = (2 + 1 / 1.5) / (1 + 2 / 1.5);
     expect(fast / slow).toBeCloseTo(pace * line, 6);
-    expect(fast / slow).toBeCloseTo(1.0795, 4);
+    expect(fast / slow).toBeCloseTo(1.1566, 4);
   });
 
   it('runs the assembly stage at three men’s speed with the same three men', () => {

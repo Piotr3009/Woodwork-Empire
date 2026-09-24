@@ -235,10 +235,11 @@ describe('what turning does to the picture', () => {
     // 20.09: every class of every floor family the game draws has a true quarter turn now, and
     // only the character sheets, the rooms and the old better rack have none.
     // Fifty one from v49: the thicknessers, the van, the forklift and the pallet truck of the
-    // pack of 22.09 turned too.
+    // pack of 22.09 turned too. Fifty six from v54: the five CNCs of the pack of 24.09, each a true
+    // quarter turn of its mesh and never a mirror.
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    expect(turned).toHaveLength(51);
-    for (const family of ['compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'tableSaw', 'toolCabinet', 'workbench']) {
+    expect(turned).toHaveLength(56);
+    for (const family of ['cnc', 'compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'tableSaw', 'toolCabinet', 'workbench']) {
       for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
         expect(turned, `${family}.${tier}`).toContain(`${family}.${tier}.r.png`);
       }

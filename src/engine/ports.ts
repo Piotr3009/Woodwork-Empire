@@ -76,8 +76,7 @@ export interface Port {
  *
  *  The two hand edgebanders (`used`, `budget`) want no extraction at all
  *  (`EXTRACTION_DEMAND` 0) and have no line, which is the one case where a missing line is right.
- *  The thicknessers landed on 22.09 and are measured below. The CNC has an extraction demand and
- *  no picture yet, so there is nothing to measure on it; the pack of 24.09 asks for its pictures. */
+ *  The thicknessers landed on 22.09 and the CNC on 24.09, and both are measured below. */
 export const PORTS: Record<string, Port> = {
   // The extractors: the mouth of the fan, and which way it opens [PIOTR, 19.09].
   'extractor.used.png': { px: 89, py: 61, faces: '+x', cell: { x: 1, y: 0 } },
@@ -145,6 +144,23 @@ export const PORTS: Record<string, Port> = {
   'thicknesser.standard.r.png': { px: 56, py: 21, cell: { x: 0, y: 1 } },
   'thicknesser.pro.r.png': { px: 81, py: 42, cell: { x: 0, y: 1 } },
   'thicknesser.industrial.r.png': { px: 126, py: 55, cell: { x: 0, y: 1 } },
+  // The CNC (the art side's pack of 24.09; v54): the mouth of the round duct stub on top of the
+  // gantry, which the brief asked for so the pipe has one place to go to. Every picture of the
+  // pack is a render of a mesh in metres, and the stub's centre in the mesh, projected by the
+  // pack's own formula, lands on the middle of the mouth in all ten files, checked by eye on each.
+  // The industrial cell has two spindles and two stubs: the line is the rear one's. The cell is
+  // the footprint cell under the mouth, in the file's own orientation. [TUNE until Piotr confirms
+  // them on the hall.]
+  'cnc.used.png': { px: 97, py: 49, cell: { x: 0, y: 0 } },
+  'cnc.budget.png': { px: 85, py: 51, cell: { x: 0, y: 1 } },
+  'cnc.standard.png': { px: 109, py: 61, cell: { x: 1, y: 1 } },
+  'cnc.pro.png': { px: 121, py: 74, cell: { x: 1, y: 1 } },
+  'cnc.industrial.png': { px: 180, py: 70, cell: { x: 1, y: 0 } },
+  'cnc.used.r.png': { px: 83, py: 87, cell: { x: 0, y: 2 } },
+  'cnc.budget.r.png': { px: 86, py: 94, cell: { x: 1, y: 2 } },
+  'cnc.standard.r.png': { px: 111, py: 79, cell: { x: 1, y: 1 } },
+  'cnc.pro.r.png': { px: 136, py: 98, cell: { x: 1, y: 2 } },
+  'cnc.industrial.r.png': { px: 124, py: 94, cell: { x: 0, y: 2 } },
 };
 
 /** The suffix each orientation's file carries: 0 the base picture, then a quarter turn at a time

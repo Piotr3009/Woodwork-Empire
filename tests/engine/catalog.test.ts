@@ -118,13 +118,18 @@ describe('tool gating', () => {
     expect(lockReasonFor(state, template('bookcase'))).toBe('Needs edgebander');
   });
 
-  it('locks solid wood behind the thicknesser alone', () => {
-    // The timber tool set is gone from the game: the oak table wants the thicknesser and nothing
-    // else, and the board says so in the machine's own name (PIOTR, 24.09; v53).
+  it('locks solid wood behind the thicknesser and the spindle moulder', () => {
+    // The timber tool set is gone from the game (v53): the oak table wants the thicknesser and the
+    // spindle moulder, and the board names the ones missing in the machines' own names
+    // [PIOTR, 24.09: "the thicknesser and the spindle moulder, we have them already"] (v54).
     let state = newGame();
-    expect(missingEquipment(state, template('oakDiningTable'))).toEqual(['thicknesser']);
-    expect(lockReasonFor(state, template('oakDiningTable'))).toBe('Needs a thicknesser');
+    expect(missingEquipment(state, template('oakDiningTable'))).toEqual(['thicknesser', 'spindleMoulder']);
+    expect(lockReasonFor(state, template('oakDiningTable'))).toBe(
+      'Needs a thicknesser and a spindle moulder',
+    );
     state = buyNow(state, 'thicknesser');
+    expect(lockReasonFor(state, template('oakDiningTable'))).toBe('Needs a spindle moulder');
+    state = buyNow(state, 'spindleMoulder');
     expect(lockReasonFor(state, template('oakDiningTable'))).toBeNull();
   });
 

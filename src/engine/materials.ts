@@ -40,6 +40,23 @@ export function rackCapacity(state: GameState): number {
   return capacity;
 }
 
+/** The sheets standing on this one rack: the hall's stock put on its racks in the order they were
+ *  bought, each filled to what it holds, and anything past the last one's room on the last rack.
+ *  A sold rack holds nothing. Every rack used to print the whole stock, so two racks showed it
+ *  twice [PIOTR, 24.09: "28 and 28"] (v54). */
+export function sheetsOnRack(state: GameState, item: { id: string }): number {
+  const racks = state.equipment.filter(
+    (entry) => sheetCapacityOf(entry) > 0 && !isSold(entry) && itemStandsInTheHall(entry),
+  );
+  let left = Math.max(0, state.stock.sheets);
+  for (const [index, rack] of racks.entries()) {
+    const here = index === racks.length - 1 ? left : Math.min(left, sheetCapacityOf(rack));
+    if (rack.id === item.id) return here;
+    left -= here;
+  }
+  return 0;
+}
+
 /** Nothing comes off a lorry until there is somewhere to put it (CLAUDE.md T2 3.6). */
 export function canUnload(state: GameState): boolean {
   return rackCapacity(state) > 0;

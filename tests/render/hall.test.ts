@@ -7,11 +7,12 @@ import { PLACEHOLDER_SPRITES, placeholderKindFor } from '../../src/render/sprite
 import { newGame, placeEquipment } from '../helpers';
 
 describe('a picture the art side owes', () => {
-  it('names the spindle moulder classes and the pallet truck, and nothing else', () => {
-    expect([...PLACEHOLDER_SPRITES]).toEqual(['spindleMoulder', 'palletTruck']);
+  it('names the spindle moulder classes, and nothing else', () => {
+    // The pallet truck was the other until v54 made it the used class of the forklift's family,
+    // whose picture it now is (PIOTR, 24.09).
+    expect([...PLACEHOLDER_SPRITES]).toEqual(['spindleMoulder']);
     expect(placeholderKindFor('spindleMoulder', 'used')).toBe('spindleMoulder.used');
-    expect(placeholderKindFor('palletTruck', 'standard')).toBe('palletTruck.standard');
-    expect(placeholderKindFor('palletTruck', null)).toBe('palletTruck');
+    expect(placeholderKindFor('forklift', 'used')).toBeNull();
     expect(placeholderKindFor('cnc', 'used')).toBeNull();
   });
 

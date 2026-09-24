@@ -207,6 +207,13 @@ export function insuranceAddedYearly(price: number): number {
   return Math.round(price * PROPERTY_INSURANCE_RATE_YEARLY * 100) / 100;
 }
 
+/** What one class costs to insure a year: its own figure where it has one, the vans, whose better
+ *  classes are the cheaper to cover [PIOTR, 24.09] (v54), and the property rate on its price
+ *  otherwise. The card and the premium both read this. */
+export function insuranceForClass(variant: { price: number; insuranceYearly?: number }): number {
+  return variant.insuranceYearly ?? insuranceAddedYearly(variant.price);
+}
+
 /** The same question of something already bought, in the hall or still on its way. */
 export function itemIsHeavy(item: { specId: string; variantId: string }): boolean {
   return isHeavy(item.specId, item.variantId);
@@ -448,11 +455,22 @@ export function machinesAtWork(state: GameState): Set<string> {
   return new Set(menAtPlaces(state).map((entry) => entry.item.id));
 }
 
-/** The crew of a shift, for the question whether the hall has places enough for it: the owner and
- *  every man on the books who produces and is in today, by day [PIOTR, 24.09: "me and two men is
- *  three"]; the men put on the second shift at night, who work without the owner (v53). */
+/** The crew of a shift this minute, for the question whether the hall has places enough for it:
+ *  the men at work in production, the owner among them while he is, off the day plan [PIOTR,
+ *  24.09: "me and two men is three"]; the men put on the second shift at night, who work without
+ *  the owner (v53). A man standing for want of sheets, at his desk or gone home wants no saw:
+ *  until v54 he was counted all the same and cut the hall for nothing [PIOTR, 24.09: "nobody
+ *  worked and it still cuts"]. */
 export function crewOnTheFloor(state: GameState, shift: 'day' | 'night' = 'day'): number {
   if (shift === 'night') return nightCrew(state).length;
+  return [state.owner, ...state.workers].filter((man) => man.working).length;
+}
+
+/** The whole day crew on the books: the owner and every man who produces and is in today, at work
+ *  this minute or not. What a contract's line reckons with, because it says what the hall makes
+ *  "at full crew" (CLAUDE.md T25 2.7), where the hall's own minute reckons with the men at work in
+ *  it (`crewOnTheFloor`; v54). */
+export function fullCrew(state: GameState): number {
   const men = state.workers.filter(
     (worker) => PRODUCING_ROLES.includes(worker.role) && isWorkingToday(state, worker, 'day'),
   ).length;
@@ -476,8 +494,11 @@ export interface PlaceShortage {
  *  saw: the men past its places work elsewhere, slower, at the by hand pace, and the hall's
  *  output falls by what they lose (v53). A family the hall has no running machine of is not on it:
  *  its share of the work is by hand already, through the job's own pace. */
-export function placeShortages(state: GameState, shift: 'day' | 'night' = 'day'): PlaceShortage[] {
-  const men = crewOnTheFloor(state, shift);
+export function placeShortages(
+  state: GameState,
+  shift: 'day' | 'night' = 'day',
+  men: number = crewOnTheFloor(state, shift),
+): PlaceShortage[] {
   const found: PlaceShortage[] = [];
   for (const [family, perPlace] of Object.entries(MEN_PER_PLACE)) {
     const places = hallPlaces(state, family);
@@ -1059,14 +1080,20 @@ function manRow(
   // The job's one pace, the figure `runProductionMinute` reads before the air factor (v53).
   const role = who === OWNER ? null : (state.workers.find((worker) => worker.id === who)?.role ?? null);
   const pace = job === null ? 1 : jobPace(state, job) * tradeFactor(role, machine?.specId ?? null);
+  const figure = booked.minutes <= 0 ? 0 : Math.round((booked.worth / booked.minutes) * 100) / 100;
+  // What the hall did to his minutes, off what they were really booked at: the saws too few for
+  // the crew, the dust, the air. Without it the row said "0.97 times 1.05" beside 0.79, which does
+  // not multiply out [PIOTR, 24.09: "something does not add up"] (v54).
+  const hall = booked.minutes <= 0 || rate * pace <= 0 ? 1 : booked.worth / booked.minutes / (rate * pace);
+  const hallWords = Math.abs(hall - 1) < 0.005 ? '' : ` times the hall's ${twoPlaceText(hall)}`;
   return {
     who,
     main: [name, trade, doing].filter((part) => part !== '').join(', '),
     words:
       `${whyWords(state, stage, machine)}, ${booked.minutes} min: ` +
-      `${mine} times ${twoPlaceText(pace)}`,
+      `${mine} times ${twoPlaceText(pace)}${hallWords}`,
     minutes: booked.minutes,
-    figure: booked.minutes <= 0 ? 0 : Math.round((booked.worth / booked.minutes) * 100) / 100,
+    figure,
   };
 }
 
@@ -1080,7 +1107,13 @@ function breakdownNote(state: GameState, hall: number): string {
     if (!job || !job.byHand) continue;
     // The tools the enquiry was locked on, in the board's own words: "Needs a thicknesser".
     const locked = lockReasonFor(state, template(job.templateId)) ?? '';
-    const tools = locked.replace(/^Needs (an? )?/, '').toLowerCase();
+    // "Needs a thicknesser and a spindle moulder" reads "no thicknesser and no spindle moulder".
+    const tools = locked
+      .replace(/^Needs /, '')
+      .replace(/\ban? /g, '')
+      .split(' and ')
+      .join(' and no ')
+      .toLowerCase();
     if (tools === '') continue;
     return (
       `${job.name} was taken by hand: no ${tools} in the hall, so every stage of it runs at ` +

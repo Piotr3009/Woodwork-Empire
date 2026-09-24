@@ -89,6 +89,7 @@ import {
   type StagePlan,
   currentStage,
   jobPace,
+  machiningFamilies,
   labourPerMinute,
   stageLeft,
   stagePlanFor,
@@ -223,8 +224,12 @@ export function familiesFor(state: GameState, job: Job): string[] {
   const order = [...plan.slice(at), ...plan.slice(0, at)];
   const families: string[] = [];
   for (const stage of order) {
-    const family = placeFamilyOf(state, stage, job.byHand);
-    if (family !== null && !families.includes(family)) families.push(family);
+    // Timber's Machining is shared by the thicknesser and the spindle moulder (v54).
+    const done = stage.id === 'machining' ? machiningFamilies(job).map((family) => ({ family })) : [stage];
+    for (const at of done) {
+      const family = placeFamilyOf(state, at, job.byHand);
+      if (family !== null && !families.includes(family)) families.push(family);
+    }
   }
   if (families.length > 0 && !families.includes(BENCH)) families.push(BENCH);
   return families;

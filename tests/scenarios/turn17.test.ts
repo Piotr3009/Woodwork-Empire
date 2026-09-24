@@ -23,10 +23,11 @@ const SEED = 20260911;
 // ---------------------------------------------------------------------------
 
 /** Three joiners with a saw each, sheets on the rack from day 1, and nothing taken off the board:
- *  the month is about the one piece the men stand at and the contract the third of them keeps. From
- *  v53 the crew counts the owner beside the three, so the hall is four men at three saw places and
- *  every minute of it goes at 0.92 of itself, `Too few saws: 3 places, 4 men`, whoever is at work
- *  (PIOTR, 24.09; v53). The three saws are kept: the month measures what the rule does to it. */
+ *  the month is about the one piece the men stand at and the contract the third of them keeps. v53
+ *  counted the owner and all three in the crew, four men at three saw places, and every minute went
+ *  at 0.92 of itself, `Too few saws: 3 places, 4 men`, whoever was at work (PIOTR, 24.09; v53).
+ *  From v54 the crew is the men at work, and the owner and the joiner with no job are not: the
+ *  three saws have places for everyone at work and the month has no saw line (v54). */
 const QUIET_MONTH: Policy = {
   ...CAREFUL,
   maxOpenJobs: 0,
@@ -129,10 +130,17 @@ describe('(y) two men on one job, on Very easy', () => {
     // minute by minute in tests/engine/assignees.test.ts.
     //
     // Re-measured on v53: 22 days alone and 13 together, 0.59, where v52 measured 26 and 13, 0.50.
-    // The piece alone is four days sooner because the contract beside it is lost on day 15 (below):
-    // from then on one saw runs and not two, the extraction is no longer short of it, and the lone
-    // man's minute is 0.54 of the owner's where it was 0.40 (PIOTR, 24.09; v53).
-    expect(daysAlone).toBe(22);
+    // The piece alone was four days sooner because the contract beside it was lost on day 15: from
+    // then on one saw ran and not two, the extraction was no longer short of it, and the lone man's
+    // minute was 0.54 of the owner's where it was 0.40 (PIOTR, 24.09; v53).
+    //
+    // Re-measured on v54: 26 and 13 again, v52's figures. v53 counted the owner and the joiner with
+    // no job in the crew of its saw line, four men against the three used saws' three places,
+    // `Too few saws: 3 places, 4 men` on every minute, and the line cost the contract. From v54 the
+    // crew is the men at work, the man on the piece and the man on the contract, two against three
+    // places, and the hall is short of no saw. The same month with v53's count reads 22 and 13
+    // [both measured].
+    expect(daysAlone).toBe(26);
     expect(daysTogether).toBe(13);
     expect(daysAlone).toBeGreaterThan(15);
     expect(daysTogether).toBeLessThan(daysAlone);
@@ -149,8 +157,7 @@ describe('(y) two men on one job, on Very easy', () => {
 
 describe('(y) a contract whose material comes off the rack', () => {
   it('holds sheets on the rack for the week in hand, and the free stock is short of them', () => {
-    // Read in the middle of the month, while the term runs: from v53 the client ends it on day 15
-    // (below), so by the month's end it holds nothing (PIOTR, 24.09; v53).
+    // Read in the middle of the month, while the term runs (v53).
     const contract = contractOf(MIDMONTH);
     expect(contract?.status).toBe('active');
     expect(contract?.sheetsReserved ?? 0).toBeGreaterThan(0);
@@ -158,19 +165,19 @@ describe('(y) a contract whose material comes off the rack', () => {
     // the contract's alike (CLAUDE.md T17 2.22).
     expect(reservedSheets(MIDMONTH)).toBeGreaterThanOrEqual(contract?.sheetsReserved ?? 0);
     expect(freeSheets(MIDMONTH)).toBe(Math.max(0, MIDMONTH.stock.sheets - reservedSheets(MIDMONTH)));
-    // And the term that ended gave the rack its sheets back: v52 still held 3 at the month's end,
-    // with the term running on.
-    const ended = contractOf(TOGETHER);
-    expect(ended?.status).toBe('ended');
-    expect(ended?.sheetsReserved).toBe(0);
+    // And the term runs on to the month's end holding 3, as it did on v52. v53 lost it to the client
+    // on day 15 with nothing held, to a saw line that counted two men who were not at work (v54).
+    const running = contractOf(TOGETHER);
+    expect(running?.status).toBe('active');
+    expect(running?.sheetsReserved).toBe(3);
   });
 
   it('draws them as the pieces are made, and never buys them as money on the contract line', () => {
     const contract = contractOf(TOGETHER);
-    // 26 packs and 4 sheets over the two weeks it ran; v52 made 112 and drew 17 over the month,
-    // with the term running on (PIOTR, 24.09; v53).
-    expect(contract?.piecesMade).toBe(26);
-    expect(contract?.sheetsUsed).toBe(4);
+    // 112 packs and 17 sheets over the month with the term running on, v52's figures again; v53
+    // made 26 and drew 4 over the two weeks it ran before the client ended it (v54).
+    expect(contract?.piecesMade).toBe(112);
+    expect(contract?.sheetsUsed).toBe(17);
     // The rack is lower than the day it was filled by what the job cut and the contract drew.
     expect(TOGETHER.stock.sheets).toBeLessThan(OPENING.state.stock.sheets);
     // The one thing 2.22 forbids: a material charge on the contract.
@@ -180,23 +187,24 @@ describe('(y) a contract whose material comes off the rack', () => {
     expect(lines.every((entry) => entry.amount > 0)).toBe(true);
   });
 
-  it('comes up short by the saw and never by the rack, the same whether one man or two are on the other job', () => {
+  it('keeps every week in full and never stands for the rack, the same whether one man or two are on the other job', () => {
     for (const state of [ALONE, TOGETHER]) {
       const contract = contractOf(state);
-      // A novice at 0.6, the used saw's 0.95, the extraction short at 0.7 and, from v53, the saws
-      // too few for the crew at 0.92: seven of the part week's eight and nineteen of the first
-      // full week's twenty. Two short weeks and the client ends it on the Monday after the second
-      // (CLAUDE.md T20 2.1.6). v52 kept every week in full, 8 of 8 and then 20 or 21 of 20, and the
-      // term ran on (PIOTR, 24.09; v53).
+      // A novice at 0.6, the used saw's 0.95 and the extraction short at 0.7, and no saw line:
+      // two men at work against three places. The part week's eight of eight, then 21, 21, 21, 20
+      // and 21 of twenty, and the term runs on, as on v52. v53 counted four men against the three
+      // places, `Too few saws: 3 places, 4 men`, and made seven and nineteen: two short weeks, and
+      // the client ended it on day 15 (CLAUDE.md T20 2.1.6; v54) [both measured].
       expect(contract?.weeks).toEqual([
-        { week: 1, wanted: 8, made: 7 },
-        { week: 2, wanted: 20, made: 19 },
+        { week: 1, wanted: 8, made: 8 },
+        { week: 2, wanted: 20, made: 21 },
+        { week: 3, wanted: 20, made: 21 },
+        { week: 4, wanted: 20, made: 21 },
+        { week: 5, wanted: 20, made: 20 },
+        { week: 6, wanted: 20, made: 21 },
       ]);
-      expect(contract?.status).toBe('ended');
-      expect(contract?.endedBy).toBe('client');
-      expect(contract?.endDay).toBe(15);
-      // The rack never ran dry under him: not one of his minutes stood for want of sheets. The
-      // weeks are short by the saws and by nothing the rack did.
+      expect(contract?.status).toBe('active');
+      // The rack never ran dry under him: not one of his minutes stood for want of sheets.
       const man = state.workers.find((worker) => worker.id === OPENING.men[2]);
       expect(man?.idleByReason.noMaterial).toBe(0);
     }

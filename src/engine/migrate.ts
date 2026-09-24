@@ -792,6 +792,30 @@ function liftToVersion29(state: Raw): void {
   state.version = 29;
 }
 
+/** v30 (v54, PIOTR 24.09): miles on every van, nought on everything, and the pallet trucks and the
+ *  forklifts one family: a pallet truck is its hand pallet truck, a better forklift its better
+ *  forklift, a forklift the forklift it was. Bought or on the lorry alike. */
+function liftToVersion30(state: Raw): void {
+  const into: Record<string, string> = { palletTruck: 'used', forkliftBetter: 'pro' };
+  for (const item of records(state.equipment)) {
+    if (typeof item.milesDriven !== 'number') item.milesDriven = 0;
+    const variant = typeof item.specId === 'string' ? into[item.specId] : undefined;
+    if (variant !== undefined) {
+      item.specId = 'forklift';
+      item.variantId = variant;
+      item.spriteKey = 'forklift';
+    }
+  }
+  for (const order of records(state.onOrder)) {
+    const variant = typeof order.specId === 'string' ? into[order.specId] : undefined;
+    if (variant !== undefined) {
+      order.specId = 'forklift';
+      order.variantId = variant;
+    }
+  }
+  state.version = 30;
+}
+
 /** The family the game no longer sells (PIOTR, 24.09: "the spindle moulder and the thicknesser are
  *  all a furniture shop needs"; v53). */
 const GONE_TIMBER_TOOLS = 'solidWoodTools';
@@ -829,6 +853,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   26: liftToVersion27,
   27: liftToVersion28,
   28: liftToVersion29,
+  29: liftToVersion30,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
