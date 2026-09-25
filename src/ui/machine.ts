@@ -37,6 +37,7 @@ import {
   CENTRAL_EXTRACTION_SPECS,
   CLASS_BADGE,
   CLASS_LADDER_FAMILIES,
+  CNC_TOOL_CHANGER_SPRITE,
   COMPRESSOR,
   COMPRESSOR_AIR,
   COMPRESSOR_WITH_DRYER,
@@ -233,6 +234,12 @@ function deliveryLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   return `Delivered in ${plural(days, 'working day', 'working days')}`;
 }
 
+/** The picture a card or a row of this family shows: its own, except the tool changer head's, which
+ *  has none of its own because it is bolted to a CNC, and shows the standard CNC with one on (v56). */
+export function pictureKeyOf(spec: { id: string; spriteKey: string }): string {
+  return spec.id === 'cncHead' ? CNC_TOOL_CHANGER_SPRITE : spec.spriteKey;
+}
+
 /** Where the picture of this class goes: the file the art side delivered for this very class,
  *  through the loader, and a box while there is none (CLAUDE.md T3 3.6, T7 3.7). */
 export function pictureSlot(spriteKey: string, tier: string, small = false): string {
@@ -265,7 +272,11 @@ export function lifeFigures(item: { hoursUsed: number; enduranceHours: number })
 export function floorLine(specId: string, variantId: string): string {
   const stands = footprintOf(specId, variantId);
   const zone = zoneOf(specId, variantId);
-  if (zone.width <= 0 || zone.depth <= 0) return 'Kept in a tool cabinet';
+  if (zone.width <= 0 || zone.depth <= 0) {
+    // The tool changer head is bolted to the CNC's own frame; everything else that holds no floor is
+    // a hand tool kept in a cabinet (v56).
+    return specId === 'cncHead' ? 'Bolted to a CNC, takes no floor' : 'Kept in a tool cabinet';
+  }
   return `Takes ${metresBy(stands)}, works in ${metresBy(zone)}`;
 }
 
@@ -385,7 +396,7 @@ function classCard(
     `${owned === '' ? '' : ' is-owned'}${onTheList ? ' is-ordered' : ''}"${frame.style} ` +
     `data-variant="${variant.id}">` +
     `<h3 class="tile-name">${escapeHtml(variant.name)} ${badge}${owned}</h3>` +
-    pictureSlot(spec.spriteKey, variant.id) +
+    pictureSlot(pictureKeyOf(spec), variant.id) +
     `<div class="card-effects">${figureLines(effectLines(state, spec, variant))}</div>` +
     `<div class="card-costs"><p class="tile-price">${money(variant.price)}</p>` +
     `${figureLines(costLines(spec, variant))}</div>` +

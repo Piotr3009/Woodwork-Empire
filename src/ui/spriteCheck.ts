@@ -2,7 +2,7 @@
 // placeholder box, and the picture beside it when the art side has delivered one. This page is
 // the acceptance tool of docs/art/SPRITES.md item 7 (CLAUDE.md T3 3.6).
 
-import { EQUIPMENT_SPECS } from '../engine/constants';
+import { CNC_TOOL_CHANGER_SPRITE, EQUIPMENT_SPECS } from '../engine/constants';
 import {
   HALL_CANVAS,
   HALL_LAYERS,
@@ -56,6 +56,10 @@ export interface SpriteTarget {
   zoneDepth: number;
   /** Where in the game this object is drawn. */
   where: string;
+  /** The file whose measured connection point the pipe lands by, when it is not this picture's own:
+   *  a CNC with its tool changer is piped to the CNC's own outlet, which is the same pixel in both
+   *  pictures (v56). */
+  portFile?: string;
 }
 
 /** Every key the game can ask for, once each: the catalogue families and their classes, and the
@@ -104,6 +108,25 @@ export function spriteTargets(): SpriteTarget[] {
       zoneWidth: spec.zoneWidth,
       zoneDepth: spec.zoneDepth,
       where: 'catalogue',
+    });
+  }
+  // A CNC with its tool changer head bolted on is a picture of its own of the same machine, on the
+  // same footprint and zone, drawn in the hall in place of the CNC's own (v56).
+  for (const variant of EQUIPMENT_SPECS.find((spec) => spec.id === 'cnc')?.variants ?? []) {
+    const stands = footprintOf('cnc', variant.id);
+    const zone = zoneOf('cnc', variant.id);
+    add({
+      name: `${CNC_TOOL_CHANGER_SPRITE}.${variant.id}`,
+      specId: 'cnc',
+      spriteKey: CNC_TOOL_CHANGER_SPRITE,
+      tier: variant.id,
+      width: stands.width,
+      depth: stands.depth,
+      height: stands.height,
+      zoneWidth: zone.width,
+      zoneDepth: zone.depth,
+      where: `${variant.name.toLowerCase()} with a tool changer`,
+      portFile: spriteFileName('cnc', variant.id),
     });
   }
   // The pallet of sheets at the gate is not in the catalogue, so its size comes from where it
@@ -215,7 +238,7 @@ function zoneLine(target: SpriteTarget): string {
 function portLine(target: SpriteTarget, ports: Record<string, Port>): string {
   const item = { specId: target.specId, variantId: target.tier ?? '' };
   if (!needsPortData(item)) return '';
-  const file = spriteFileName(target.spriteKey, target.tier);
+  const file = target.portFile ?? spriteFileName(target.spriteKey, target.tier);
   const port = portFor(file, ports);
   if (port === null) {
     return '<p class="sprite-figures warn" data-port="none">no port data</p>';

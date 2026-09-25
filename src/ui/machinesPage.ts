@@ -25,7 +25,7 @@ import {
 } from '../engine/index';
 import type { Equipment, EquipmentSpec, GameState } from '../engine/index';
 import { button, emptyLine, escapeHtml, money, reasonLabel } from './modal';
-import { lifeFigures, pictureSlot } from './machine';
+import { lifeFigures, pictureKeyOf, pictureSlot } from './machine';
 
 /** What stands on the floor and has a life to run out: the machines and the extraction kit. The
  *  office furniture, the rack and a tool in a cabinet are not plant and are not on this page. */
@@ -84,7 +84,7 @@ function machineRow(state: GameState, item: Equipment, spec: EquipmentSpec): str
   const share = Math.round(lifeUsedShare(item) * 100);
   return (
     `<div class="row" data-machine="${escapeHtml(item.id)}">` +
-    pictureSlot(spec.spriteKey, item.variantId, true) +
+    pictureSlot(pictureKeyOf(spec), item.variantId, true) +
     `<span class="row-main">${escapeHtml(spec.name)}` +
     `<span class="hint"> · ${escapeHtml(className)}` +
     `${label === '' ? '' : ` · ${escapeHtml(label)}`}</span></span>` +

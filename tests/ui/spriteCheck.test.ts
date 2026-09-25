@@ -2,7 +2,7 @@
 // The sprite check page is the acceptance tool for a batch of art (CLAUDE.md T3 3.6).
 
 import { describe, expect, it } from 'vitest';
-import { EQUIPMENT_SPECS } from '../../src/engine/constants';
+import { CNC_TOOL_CHANGER_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { HALL_LAYERS, PALLET_SPRITE } from '../../src/render/hall';
 import { OFFICE_LAYERS, OFFICE_LIT_LAYERS } from '../../src/render/office';
 import { standsInTheHall } from '../../src/engine/machines';
@@ -36,6 +36,12 @@ describe('the sprite check page', () => {
       }
       if (standsInTheHall(spec.id)) wanted.add(spec.spriteKey);
     }
+    // And the CNC with its tool changer bolted on, a picture of its own for every class of the CNC
+    // (v56). The head is on no list of its own: it holds no floor, and the CNC is drawn with it.
+    for (const variant of EQUIPMENT_SPECS.find((spec) => spec.id === 'cnc')?.variants ?? []) {
+      wanted.add(`${CNC_TOOL_CHANGER_SPRITE}.${variant.id}`);
+    }
+    expect(names).not.toContain('cncHead');
     expect(new Set(names)).toEqual(wanted);
     // The family key of a family with classes is not asked for on its own any more.
     expect(names).not.toContain('tableSaw');

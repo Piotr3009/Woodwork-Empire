@@ -295,6 +295,20 @@ export function isSold(item: Equipment): boolean {
   return item.soldOnDay !== null;
 }
 
+/** The CNCs that carry a tool changer head (v56). A head is bolted to a CNC's own frame and holds no
+ *  floor, so the heads the hall owns go on its CNCs one a machine, in the order the CNCs were
+ *  bought, and a head with no CNC left to go on stays in its crate. It is what the hall draws a CNC
+ *  with and nothing else: the head's 5% is the CNC stage's, on whichever machine it sits
+ *  (`cncFactor`). */
+export function cncsWithToolChangers(state: GameState): Set<string> {
+  const heads = owned(state, 'cncHead').filter((item) => !isSold(item)).length;
+  return new Set(
+    floorMachines(state, 'cnc')
+      .slice(0, heads)
+      .map((item) => item.id),
+  );
+}
+
 /** What the buyer pays for it: half what it cost, and a third and a bit for one that was second
  *  hand when it was bought (PIOTR, CLAUDE.md T8 3.5). */
 export function salePriceFor(item: Equipment): number {

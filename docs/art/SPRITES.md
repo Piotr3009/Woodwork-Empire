@@ -111,6 +111,13 @@ door facing south-east), `forkliftBetter`, `cnc` (5 × 3 × 2, 384 × 288), `cnc
 office desk items (`laptop`, `ledgerFolder`, `materialsBinder`, `catalogue`, `teamBoard`, `phone`),
 `drill`, `handToolSet`, and the machine tier variants of the table saw.
 
+From v56 (PIOTR, 25.09) the CNC tool changer head has no picture of its own: it is bolted to the
+CNC, and the hall draws a CNC that carries one as `cncToolChanger.<class>.png` and its `.r`, on the
+CNC's own canvas and anchor, with the extraction outlet on the same pixel (the art side's pack of
+24.09, delivered as `cnc.<class>.with-toolchanger`). The spray booths are the size of their pictures:
+3 × 2 × 2.5 m used (drawn 3 × 1.6 and stood at the front of its 3 × 2), 3 × 2 × 2.6 budget,
+4 × 3 × 3 standard, 5 × 3 × 3.2 pro and 6 × 4 × 3.4 industrial.
+
 ## 7. Acceptance checklist (Piotr and Claude use this before merging a batch)
 
 1. File name equals the `spriteKey`, `.png`, in `public/sprites/`.

@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { EQUIPMENT_SPECS } from '../../src/engine/constants';
+import { CNC_TOOL_CHANGER_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { footprintOf, zoneOf } from '../../src/engine/machines';
 import { SPRITE_PADDING, SPRITE_SCALE, spriteAnchorIn, spriteBox, spriteFiles, spriteFileSize, spriteUrl } from '../../src/render/sprites';
 import { footprintIn } from '../../src/render/hall';
@@ -199,8 +199,10 @@ describe('the file on disk and the footprint in the engine', () => {
     // from v49: the five thicknessers, the van, the forklift, the pallet truck and the hand tool
     // set of the pack of 22.09 (tools, thicknessers and vehicles), every one measured against its
     // footprint above. Fifty seven from v54: the five CNCs of the pack of 24.09. The pallet truck's
-    // file is the used forklift's from v54, the same picture under the name of its class.
-    expect(checked).toBe(57);
+    // file is the used forklift's from v54, the same picture under the name of its class. Sixty two
+    // from v56: the five spray booths of the pack of 24.09, at the size the pictures were drawn at
+    // (PIOTR, 25.09), the used one stood at the front of its 3 by 2 on the canvas that owes.
+    expect(checked).toBe(62);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }
@@ -230,7 +232,26 @@ describe('the file on disk and the footprint in the engine', () => {
     expect(turnedFiles).toContain(turned);
     // Fifty one from v49: the pack of 22.09 turned the five thicknessers, the van, the forklift
     // and the pallet truck; the hand tool set is a catalogue picture and has no turn. Fifty six
-    // from v54, with the five CNCs' turns of the pack of 24.09.
-    expect(turnedFiles).toHaveLength(56);
+    // from v54, with the five CNCs' turns of the pack of 24.09. Sixty six from v56: the five
+    // booths' turns, and the turns of the five CNCs with their tool changers.
+    expect(turnedFiles).toHaveLength(66);
+  });
+
+  it('draws the CNC with its tool changer on the CNC s own canvas, both ways round (v56)', () => {
+    // The head is bolted to the CNC and the picture of the two is the whole machine drawn again: the
+    // same canvas and the same anchor as the CNC's own picture, class by class and turn by turn (the
+    // art side's pack of 24.09, delivered as `cnc.<class>.with-toolchanger`).
+    let measured = 0;
+    for (const variantId of ['used', 'budget', 'standard', 'pro', 'industrial']) {
+      for (const [suffix, orientation] of [['', 0], ['.r', 1]] as const) {
+        const stands = footprintOf('cnc', variantId, orientation);
+        const owed = spriteFileSize(stands.width, stands.depth, stands.height);
+        const name = `${CNC_TOOL_CHANGER_SPRITE}.${variantId}${suffix}.png`;
+        expect(pngSize(name), name).toEqual(pngSize(`cnc.${variantId}${suffix}.png`));
+        expect(pngSize(name).width, name).toBe(owed.width);
+        measured += 1;
+      }
+    }
+    expect(measured).toBe(10);
   });
 });

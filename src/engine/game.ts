@@ -2469,6 +2469,13 @@ export function canBuy(
     const names = oneOf.map((id) => findSpec(id)?.name ?? id).join(' or ');
     return { ok: false, reason: `Needs ${names} first` };
   }
+  // A tool changer head is bolted to a CNC, one a machine: with every CNC fitted, or one on its way
+  // for it, there is nothing to bolt another to (v56).
+  if (specId === 'cncHead') {
+    const counted = (id: string): number =>
+      state.equipment.filter((item) => item.specId === id && !isSold(item)).length + onOrderCount(state, id);
+    if (counted('cncHead') >= counted('cnc')) return { ok: false, reason: 'Every CNC has a tool changer' };
+  }
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
   }

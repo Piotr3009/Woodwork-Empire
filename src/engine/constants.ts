@@ -137,12 +137,17 @@ import type {
  *
  *  Version 31 is v55 (PIOTR, 24.09): one stage a machine, a quarter each, and the booth's
  *  Finishing for lacquer alone. Every v25 to v30 save loads: the bag of the Machining that is gone
- *  is poured into the new stages in order, and nothing of a job is lost. */
-export const STATE_VERSION = 31;
+ *  is poured into the new stages in order, and nothing of a job is lost.
+ *
+ *  Version 32 is v56 (PIOTR, 25.09): the spray booths are the size of their pictures, walk in
+ *  booths of 3 by 2 to 6 by 4 metres, and the CNC tool changer head is bolted to a CNC and holds
+ *  no floor of its own. Every v25 to v31 save loads: a booth that no longer fits where it stood
+ *  goes to the first free place in the hall that holds it, or to the yard. */
+export const STATE_VERSION = 32;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v55';
+export const APP_VERSION = 'v56';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -2339,7 +2344,12 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
 
 /** The five classes of spray booth (CLAUDE.md T13 3.12). The standard one is the Turn 1 booth; the
  *  rest of the prices are [TUNE], and the factors follow the saw's ladder. Its own extraction, so it
- *  is on no demand table (CLAUDE.md T10 3.1). */
+ *  is on no demand table (CLAUDE.md T10 3.1).
+ *
+ *  The sizes and the heights are the pictures' own from v56 [PIOTR, 25.09: "from the pictures"]: walk
+ *  in booths a man stands up in, where the booths before were 3 by 2 to 4 by 3 metres and 1.5 to 2
+ *  high. The used booth is drawn 3 by 1.6 and stands at the front of its 3 by 2. The zones are a
+ *  metre more each way, the room the smaller booths had round them [TUNE]. */
 export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -2347,7 +2357,7 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     price: 6000,
     width: 3,
     depth: 2,
-    height: 1.5,
+    height: 2.5,
     zoneWidth: 4,
     zoneDepth: 3,
     enduranceFactor: 0.25,
@@ -2363,7 +2373,7 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     price: 11000,
     width: 3,
     depth: 2,
-    height: 1.5,
+    height: 2.6,
     zoneWidth: 4,
     zoneDepth: 3,
     enduranceFactor: 1,
@@ -2376,11 +2386,11 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     id: 'standard',
     name: 'Standard spray booth',
     price: 18000,
-    width: 3,
-    depth: 2,
-    height: 1.5,
-    zoneWidth: 4,
-    zoneDepth: 3,
+    width: 4,
+    depth: 3,
+    height: 3,
+    zoneWidth: 5,
+    zoneDepth: 4,
     enduranceFactor: 1.2,
     powerPerDay: 5,
     description:
@@ -2392,11 +2402,11 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     id: 'pro',
     name: 'Professional spray booth',
     price: 32000,
-    width: 4,
-    depth: 2,
-    height: 1.8,
-    zoneWidth: 5,
-    zoneDepth: 3,
+    width: 5,
+    depth: 3,
+    height: 3.2,
+    zoneWidth: 6,
+    zoneDepth: 4,
     enduranceFactor: 1.5,
     powerPerDay: 7,
     description:
@@ -2407,11 +2417,11 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     id: 'industrial',
     name: 'Industrial spray booth',
     price: 55000,
-    width: 4,
-    depth: 3,
-    height: 2,
-    zoneWidth: 6,
-    zoneDepth: 4,
+    width: 6,
+    depth: 4,
+    height: 3.4,
+    zoneWidth: 7,
+    zoneDepth: 5,
     enduranceFactor: 2,
     powerPerDay: 10,
     description:
@@ -3093,9 +3103,13 @@ const SPEC_DRAFTS: SpecDraft[] = [
     width: 1,
     depth: 1,
     height: 1,
+    // Bolted to the CNC's own frame and never stood on the floor (v56): it holds no cell, and the
+    // CNC it is fitted to is drawn with it (`cncsWithToolChangers`).
+    zoneWidth: 0,
+    zoneDepth: 0,
     spriteKey: 'cncHead',
     requires: ['cnc'],
-    effect: 'A further 5% out of the CNC\u0027s own stage.',
+    effect: 'Bolted to a CNC, no floor of its own. A further 5% out of the CNC\u0027s own stage.',
   },
   {
     ...BASE_SPEC,
@@ -3107,9 +3121,11 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Spray booth',
     price: 18000,
     category: 'machine',
+    // The cheapest class's own, which is what every family's catalogue line carries
+    // (CLAUDE.md T7 3.3): the used booth, at its picture's height from v56.
     width: 3,
     depth: 2,
-    height: 1.5,
+    height: 2.5,
     zoneWidth: 4,
     zoneDepth: 3,
     spriteKey: 'sprayBooth',
@@ -3439,6 +3455,11 @@ export const GATE_LANE_CELLS = GATE_LANE.width;
  *  the shutter, which is why too many of them slow the whole hall down (CLAUDE.md T2 3.7). */
 export const FINISHED_GOODS_LAYOUT = { x: 0, y: 9, width: 2, depth: 1, height: 1 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';
+/** The picture of a CNC with its tool changer head bolted on: the whole machine drawn again with
+ *  the magazine on its frame, one per class and turn, `cncToolChanger.standard.png` and its `.r`
+ *  (the art side's pack of 24.09, delivered as `cnc.<class>.with-toolchanger`). Same canvas, same
+ *  anchor and the same extraction outlet as the CNC's own picture (v56). */
+export const CNC_TOOL_CHANGER_SPRITE = 'cncToolChanger';
 
 /** Width of the apron drawn beyond the front kerb, where the company van and the two central
  *  extraction systems stand, in cells. */

@@ -343,10 +343,18 @@ describe('the tiles inside a folder', () => {
     const cnc = Array.from(parse(renderMachine(state, 'cnc')).querySelectorAll('.tile-picture'));
     expect(cnc).toHaveLength(5);
     expect(cnc.every((slot) => slot.querySelector('img') !== null)).toBe(true);
-    // And a family with no file at all still gets its box: the spray booth, which has no art yet.
-    // It was the CNC until v54.
+    // The spray booth has a picture per class from v56 (the art side's pack of 24.09), and the tool
+    // changer head's card shows the standard CNC with one bolted on, since it has no picture of its
+    // own (v56).
+    const booths = Array.from(parse(renderMachine(state, 'sprayBooth')).querySelectorAll('.tile-picture'));
+    expect(booths).toHaveLength(5);
+    expect(booths.every((slot) => slot.querySelector('img') !== null)).toBe(true);
+    const head = parse(renderMachine(state, 'cncHead')).querySelector('.tile-picture img');
+    expect(head?.getAttribute('src')).toBe('/sprites/cncToolChanger.standard.png');
+    // And a family with no file at all still gets its box: the air dryer, which has no art yet. It
+    // was the spray booth until v56 and the CNC until v54.
     const boxes = Array.from(
-      parse(renderMachine(state, 'sprayBooth')).querySelectorAll('.tile-picture'),
+      parse(renderMachine(state, 'airDryer')).querySelectorAll('.tile-picture'),
     );
     expect(boxes.length).toBeGreaterThan(0);
     expect(boxes.every((slot) => slot.querySelector('.tile-picture-box') !== null)).toBe(true);

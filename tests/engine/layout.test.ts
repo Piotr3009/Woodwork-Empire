@@ -186,8 +186,10 @@ describe('the whole workshop fits on the painted floor', () => {
     }
     // And every one of them actually found room: none fell back to nowhere. Nineteen things from
     // v54, where it was twenty one: the pallet truck and the better forklift are classes of the
-    // forklift's one family now, and one of it is bought (PIOTR, 24.09).
-    expect(hallItems(state).length).toBe(19);
+    // forklift's one family now, and one of it is bought (PIOTR, 24.09). Eighteen from v56: the
+    // CNC's tool changer head is bolted to the CNC and holds no floor of its own (PIOTR, 25.09).
+    expect(hallItems(state).length).toBe(18);
+    expect(hallItems(state).some((item) => item.specId === 'cncHead')).toBe(false);
   });
 
   it('stands the lorry on the lane, where nothing of the player is allowed', () => {

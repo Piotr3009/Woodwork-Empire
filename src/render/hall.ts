@@ -3,6 +3,7 @@
 
 import {
   BUBBLE_HEAD_GAP,
+  CNC_TOOL_CHANGER_SPRITE,
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
   GATE_CROWD_LIMIT,
@@ -36,6 +37,7 @@ import { placeLine } from '../engine/production';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
   OWNER,
+  cncsWithToolChangers,
   isSold,
   itemFootprint,
   itemStandsInTheHall,
@@ -692,6 +694,15 @@ export interface MachineFx {
 }
 
 const NO_FX: MachineFx = { className: '', svg: '' };
+
+/** The picture key a thing in the hall is drawn with: its own, or for a CNC with a tool changer head
+ *  bolted to it the picture of the two together, while that file has landed (v56). The pipe still
+ *  lands where the CNC's own picture says: the outlet on the beam is the same pixel in both. */
+function artKeyOf(item: Equipment, headed: ReadonlySet<string>, files: readonly string[]): string {
+  if (!headed.has(item.id)) return item.spriteKey;
+  const picture = pictureFor(files, CNC_TOOL_CHANGER_SPRITE, item.variantId, item.orientation);
+  return picture.file === null ? item.spriteKey : CNC_TOOL_CHANGER_SPRITE;
+}
 
 /** True for a thing with a measured connection point: a picture `PORTS` has a line for, at the
  *  orientation it is standing in (CLAUDE.md T22 2.8). It is the one test for "a pipe is fixed to a
@@ -1488,8 +1499,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     if (first !== undefined) markedMachines.set(first.id, shortageLine(state, short.family));
   }
   // Everything the player has bought, except the office furniture, which lives in the office
-  // view, and the hand edgebander, which lives in a tool cabinet (CLAUDE.md T6 3.5).
+  // view, and the hand edgebander, which lives in a tool cabinet (CLAUDE.md T6 3.5). A CNC with a
+  // tool changer head bolted to it is drawn in the picture of the two together, and the head, which
+  // holds no floor, is not drawn on its own (v56).
   const welfare: Equipment[] = [];
+  const headed = cncsWithToolChangers(state);
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') continue;
@@ -1540,7 +1554,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<title>${escapeText(tooltip)}</title>` +
         objectArt({
           files,
-          spriteKey: item.spriteKey,
+          spriteKey: artKeyOf(item, headed, files),
           tier: item.variantId,
           orientation: item.orientation,
           x: stands.x,

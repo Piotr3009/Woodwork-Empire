@@ -12,7 +12,10 @@ import {
   OWNER_LABOUR_PER_MINUTE,
   WORKER_RATES,
 } from '../../src/engine/constants';
-import { OWNER } from '../../src/engine/machines';
+import { OWNER, cncsWithToolChangers, standsInTheHall } from '../../src/engine/machines';
+import { canBuy } from '../../src/engine/game';
+import { floorLine } from '../../src/ui/machine';
+import { hallItems } from '../../src/engine/layout';
 import {
   cncFactor,
   currentStage,
@@ -93,6 +96,26 @@ describe('what a CNC does to a sheet job', () => {
     placeEquipment(state, 'cncHead', { x: 18, y: 8 });
     expect(cncFactor(state)).toBe(CNC_STAGE_FACTOR_WITH_HEAD);
     expect(stageSpeed(state, jobOfMinutes(1000), 'cnc').speed).toBe(2.1);
+  });
+
+  it('bolts the head to the CNC: no floor of its own, and one head a CNC (v56)', () => {
+    const state = withCnc();
+    state.cash = 100000;
+    const cnc = state.equipment.find((item) => item.specId === 'cnc');
+    if (cnc === undefined) throw new Error('a CNC is wanted here');
+    // It holds no cell and reserves no zone, so it is bought without a free patch of floor
+    // (PIOTR, 25.09: the art side's heads are bolted to the CNC's frame).
+    expect(standsInTheHall('cncHead')).toBe(false);
+    expect(floorLine('cncHead', 'standard')).toBe('Bolted to a CNC, takes no floor');
+    expect(canBuy(state, 'cncHead').ok).toBe(true);
+    placeEquipment(state, 'cncHead', { x: 18, y: 8 });
+    expect(hallItems(state).some((item) => item.specId === 'cncHead')).toBe(false);
+    // The hall's CNC carries it, which is what the hall draws it with (tests/render/hall.test.ts).
+    expect([...cncsWithToolChangers(state)]).toEqual([cnc.id]);
+    // One CNC takes one head: a second has nothing to be bolted to, until a second CNC stands.
+    expect(canBuy(state, 'cncHead')).toEqual({ ok: false, reason: 'Every CNC has a tool changer' });
+    placeEquipment(state, 'cnc', { variantId: 'budget', x: 12, y: 6 });
+    expect(canBuy(state, 'cncHead').ok).toBe(true);
   });
 
   it('leaves a timber job on the saw', () => {

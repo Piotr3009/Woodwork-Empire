@@ -44,7 +44,8 @@ describe('GameState', () => {
     // timber tool set out of the hall (PIOTR, 24.09; v53); v54 put miles on every van and made the
     // pallet trucks and forklifts one family (PIOTR, 24.09).
     // v55 is 31: one stage a machine, and the bags of the stages that are gone emptied.
-    expect(STATE_VERSION).toBe(31);
+    // v56 is 32: the booths at their pictures' size, stood again where they fit (PIOTR, 25.09).
+    expect(STATE_VERSION).toBe(32);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

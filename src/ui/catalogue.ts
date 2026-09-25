@@ -70,7 +70,7 @@ import { slotsInUseIn } from '../engine/staff';
 import { nextSpriteOrientation } from '../render/sprites';
 import { orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
-import { classBadge, classFrame, isMachineFamily, pictureSlot, renderMachine } from './machine';
+import { classBadge, classFrame, isMachineFamily, pictureKeyOf, pictureSlot, renderMachine } from './machine';
 import { arrivalLine, cancelButton, progressBar } from './shopping';
 import {
   emptyLine,
@@ -288,7 +288,7 @@ function orderedTile(state: GameState, item: OnOrderItem, spec: EquipmentSpec): 
     `<div class="tile is-ordered" data-order="${item.id}">` +
     `<h3 class="tile-name">${escapeHtml(spec.name)} ` +
     '<span class="badge badge-ordered">On order</span></h3>' +
-    pictureSlot(spec.spriteKey, item.variantId) +
+    pictureSlot(pictureKeyOf(spec), item.variantId) +
     lines +
     `<p class="tile-figures">${progressBar(line)}</p>` +
     `<div class="tile-action">${cancelButton(line)}</div>` +
@@ -666,7 +666,7 @@ export function ownedTile(
     `<div class="tile is-owned${frame.className}"${frame.style} data-owned="${item.id}">` +
     `<h3 class="tile-name">${escapeHtml(spec.name)} ${badge}` +
     '<span class="badge badge-owned">Owned</span></h3>' +
-    pictureSlot(spec.spriteKey, item.variantId) +
+    pictureSlot(pictureKeyOf(spec), item.variantId) +
     lines +
     specBlock(state, item) +
     bagStoreBlock(state, item) +

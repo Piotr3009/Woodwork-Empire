@@ -18,8 +18,10 @@ import {
   WORKER_RATES,
 } from './constants';
 import { receive } from './economy';
+import { canPlace, firstFreeCell } from './layout';
+import { isSold } from './machines';
 import { planPlaces } from './production';
-import type { GameState, WorkerTier } from './types';
+import type { GameState, Orientation, WorkerTier } from './types';
 
 /** The weeks in a month that the Turn 20 build converted a monthly wage with, thirty days over
  *  seven. Turn 21 deleted `WEEKS_PER_MONTH` from the constants because nothing in the game converts
@@ -858,6 +860,50 @@ function liftToVersion31(state: Raw): void {
   state.version = 31;
 }
 
+/** Version 31 to 32 (v56): the spray booths are the size of their pictures and the CNC tool changer
+ *  head holds no floor. Nothing in the save's own shape moves: the head's cell is simply no longer
+ *  one it holds, and the booths are stood again once the save is a whole hall
+ *  (`standTheBoothsAgain`). */
+function liftToVersion32(state: Raw): void {
+  state.version = 32;
+}
+
+/** A thing standing in the hall, or the outline held for one on its way: what a booth is stood
+ *  again as, either way. */
+interface StandingThing {
+  id: string;
+  specId: string;
+  variantId: string;
+  anchorX: number;
+  anchorY: number;
+  orientation: Orientation;
+}
+
+/** Every booth of a save stood again at its picture's size (PIOTR, 25.09; v56). One that still fits
+ *  where it stood stays there, turned as it was; one that does not goes to the first free place in
+ *  the hall that holds it, the way a new one is placed; and one the hall has no room for goes to the
+ *  yard, where the player picks it up in setup mode, which is the tool cabinet lift's own shape
+ *  (CLAUDE.md T21 2.13). A booth on its way has the outline held for it stood again the same way. */
+export function standTheBoothsAgain(state: GameState): void {
+  const again = (thing: StandingThing): void => {
+    if (thing.specId !== 'sprayBooth') return;
+    if (thing.anchorX >= state.unit.widthCells) return;
+    if (canPlace(state, thing.id, thing.anchorX, thing.anchorY, thing.orientation).ok) return;
+    // Off the floor while the hall is searched, so it is not standing in its own way.
+    thing.anchorX = state.unit.widthCells;
+    thing.anchorY = 0;
+    thing.orientation = 0;
+    const free = firstFreeCell(state, thing.specId, thing.variantId);
+    if (free === null) return;
+    thing.anchorX = free.x;
+    thing.anchorY = free.y;
+  };
+  for (const item of state.equipment) {
+    if (!isSold(item)) again(item);
+  }
+  for (const held of state.onOrder) again(held);
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -878,6 +924,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   28: liftToVersion29,
   29: liftToVersion30,
   30: liftToVersion31,
+  31: liftToVersion32,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -898,6 +945,15 @@ export function migrateState(raw: unknown, version: number): GameState | null {
     } catch {
       // Not a whole hall, with no books to pay it back through: its first minute has no tool set
       // to work at either, because the catalogue has none.
+    }
+  }
+  // The booths at their pictures' size, stood where they fit (v56). A fragment of a state that is
+  // not a whole hall has no floor to stand them on and is lifted as it is.
+  if (version < 32 && Array.isArray(lifted.equipment) && Array.isArray(lifted.onOrder)) {
+    try {
+      standTheBoothsAgain(lifted);
+    } catch {
+      // Not a whole hall: nothing to stand them on.
     }
   }
   // Who has a place, worked out the moment the save is open rather than left for the first

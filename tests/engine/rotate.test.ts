@@ -236,10 +236,11 @@ describe('what turning does to the picture', () => {
     // only the character sheets, the rooms and the old better rack have none.
     // Fifty one from v49: the thicknessers, the van, the forklift and the pallet truck of the
     // pack of 22.09 turned too. Fifty six from v54: the five CNCs of the pack of 24.09, each a true
-    // quarter turn of its mesh and never a mirror.
+    // quarter turn of its mesh and never a mirror. Sixty six from v56: the five spray booths and the
+    // five CNCs with their tool changers, of the same pack.
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    expect(turned).toHaveLength(56);
-    for (const family of ['cnc', 'compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'tableSaw', 'toolCabinet', 'workbench']) {
+    expect(turned).toHaveLength(66);
+    for (const family of ['cnc', 'cncToolChanger', 'compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'sprayBooth', 'tableSaw', 'toolCabinet', 'workbench']) {
       for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
         expect(turned, `${family}.${tier}`).toContain(`${family}.${tier}.r.png`);
       }

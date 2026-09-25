@@ -6,6 +6,27 @@ import { objectArt, renderHall } from '../../src/render/hall';
 import { PLACEHOLDER_SPRITES, placeholderKindFor } from '../../src/render/sprites';
 import { newGame, placeEquipment } from '../helpers';
 
+describe('a CNC with its tool changer head (v56)', () => {
+  it('is drawn in the picture of the two together, and a CNC with no head in its own', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    placeEquipment(state, 'cnc', { variantId: 'standard', x: 2, y: 6 });
+    placeEquipment(state, 'cnc', { variantId: 'pro', x: 12, y: 6 });
+    const bare = renderHall(state);
+    expect(bare).toContain('/sprites/cnc.standard.png');
+    expect(bare).not.toContain('cncToolChanger');
+    // One head: it goes on the CNC bought first, and the other stays as it was. The head itself
+    // holds no floor and is not drawn on its own.
+    placeEquipment(state, 'cncHead', { x: 18, y: 8 });
+    const headed = renderHall(state);
+    expect(headed).toContain('/sprites/cncToolChanger.standard.png');
+    expect(headed).not.toContain('/sprites/cnc.standard.png');
+    expect(headed).toContain('/sprites/cnc.pro.png');
+    expect(headed).not.toContain('data-sprite="cncHead"');
+    // With no picture of the two delivered, the CNC keeps its own.
+    expect(renderHall(state, { files: ['cnc.standard.png', 'cnc.pro.png'] })).toContain('/sprites/cnc.standard.png');
+  });
+});
+
 describe('a picture the art side owes', () => {
   it('names the spindle moulder classes, and nothing else', () => {
     // The pallet truck was the other until v54 made it the used class of the forklift's family,
