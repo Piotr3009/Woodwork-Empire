@@ -247,14 +247,16 @@ export const WITH_HELPER: Policy = {
 };
 
 /** A month with a thicknesser and the solid wood tools behind the day 1 fan, which holds one
- *  bag, and a helper to empty it: the oak table comes onto the board beside the sheet work
- *  (CLAUDE.md T12 T12-07). The standing is the lacquer month's, which is more than the table
- *  wants, so the board offers it from day 1. */
+ *  bag, and a helper to empty it (CLAUDE.md T12 T12-07). The standing is the lacquer month's. Until
+ *  v57 the oak table came onto the board beside the sheet work from day 1; the board offers no
+ *  timber until the timber branch (PIOTR, 25.09), so the month is the sheet work. */
 export const THICKNESSER_ONE_BAG: Policy = {
   maxOpenJobs: 2,
   buyKit: true,
   cleanAbove: 55,
-  wanted: ['oakDiningTable', 'tvUnit', 'bookcase', 'garageShelves'],
+  // The oak table was the first of these until v57: the board offers no timber until the timber
+  // branch (PIOTR, 25.09).
+  wanted: ['tvUnit', 'bookcase', 'garageShelves'],
   hireJoiner: false,
   hireHelper: true,
   stockSheets: 0,

@@ -184,7 +184,7 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // 71 minutes on the floor, 33 a week (v54).
   });
 
-  it('makes its forty in the first two weeks, one short in the last two, and the client ends it for two points (v54)', () => {
+  it('makes its forty in the first three weeks, one short in the last, and runs its term for one point (v57)', () => {
     const contract = theContract(CC.ended);
     expect(contract.status).toBe('ended');
     // The man alone at the used saw's one place: forty and forty, then thirty nine and thirty
@@ -195,19 +195,25 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // minute, made thirty three and thirty three and lost it on day 22; the same month with v53's
     // count reads those figures exactly (v54). v52 ran the term out: forty, forty, thirty eight
     // and forty, one week short and one point down.
-    expect(contract.endedBy).toBe('client');
-    expect(contract.endDay).toBe(36);
+    //
+    // From v57 the term runs out: forty, forty, forty and thirty nine, one week short and one point
+    // down, and it ends on day 35 with its last week [measured]. The board draws no timber until
+    // the timber branch (PIOTR, 25.09), its greyed offers are drawn from day 1 with the oak table
+    // among them, and the random stream the month shares with them moves: the extractor that broke
+    // on day 23 does not break inside the term, so week 4 is made in full.
+    expect(contract.endedBy).toBe('term');
+    expect(contract.endDay).toBe(35);
     expect(contract.weeks).toEqual([
       { week: 2, wanted: 40, made: 40 },
       { week: 3, wanted: 40, made: 40 },
-      { week: 4, wanted: 40, made: 39 },
+      { week: 4, wanted: 40, made: 40 },
       { week: 5, wanted: 40, made: 39 },
     ]);
-    // 158 of the term's 160, v52's figure; v53 made 66 of the fortnight's 80.
-    expect(contract.piecesMade).toBe(158);
-    // Two short weeks, two points of the workshop's standing, and each reason says the figures.
+    // 159 of the term's 160 (158 on v54 to v56, v52's figure; v53 made 66 of the fortnight's 80).
+    expect(contract.piecesMade).toBe(159);
+    // One short week, one point of the workshop's standing, and the reason says the figures.
     const log = CC.ended.reputationLog.filter((entry) => entry.reason.startsWith(contract.name));
-    expect(log).toHaveLength(2);
+    expect(log).toHaveLength(1);
     expect(log.every((entry) => entry.points === -1)).toBe(true);
     expect(log.every((entry) => entry.reason.includes('39 of 40 this week'))).toBe(true);
     // The rack never ran dry under him and nobody stood him for want of a place.
@@ -237,11 +243,13 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // CLAUDE.md T20 7, that a contract month with an experienced joiner ends in profit AFTER his
     // wages, holds; the saw's wear of v40 is on the closing report below, 60 on v54 against 30 on
     // v53 and 59.83 on v52.
-    expect(revenue).toBe(158 * contract.pricePerPiece);
-    expect(revenue).toBe(10902);
-    expect(material).toBe(4740);
+    // From v57, 159 packs (the term above): 10,971 taken, 4,770 of stock, the same 2,470, and the
+    // month is 3,731 above water [measured].
+    expect(revenue).toBe(159 * contract.pricePerPiece);
+    expect(revenue).toBe(10971);
+    expect(material).toBe(4770);
     expect(wages.total).toBe(2470);
-    expect(profit).toBe(3692);
+    expect(profit).toBe(3731);
     expect(profit).toBeGreaterThan(0);
     // The closing report the player is handed says the same thing in its own arithmetic: it costs
     // the minutes he actually stood at the contract and not the days he was paid for, which reads
@@ -251,7 +259,8 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     const report = closingReport(CC.ended, contract);
     expect(report.machineWear).toBeGreaterThan(0);
     expect(report.margin).toBe(pounds(revenue - material - report.labourCost - report.machineWear));
-    expect(report.margin).toBe(3796.67);
+    // 3,835.67 over the same 160 hours from v57, the one pack more of the term above.
+    expect(report.margin).toBe(3835.67);
     expect(report.machineWear).toBe(60);
     expect(report.labourHours).toBe(160);
     expect(report.margin + report.machineWear).toBeGreaterThan(profit);
@@ -259,7 +268,7 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     console.log(
       '(cc) A CONTRACT MONTH WITH AN EXPERIENCED JOINER\n' +
         `piece: ${contractPiece(contract).name} at ${formatMoney(contract.pricePerPiece)}, ` +
-        `${PACKS_A_WEEK} a week over ${TERM_WEEKS} weeks, ended by the client on day ${contract.endDay ?? 0}\n` +
+        `${PACKS_A_WEEK} a week over ${TERM_WEEKS} weeks, ended by the ${contract.endedBy ?? ''} on day ${contract.endDay ?? 0}\n` +
         `the man: ${CC.man.name}, experienced, ${formatMoney(CC.man.monthlyWage)} a month\n` +
         `pieces made ${contract.piecesMade}, revenue ${formatMoney(revenue)}, ` +
         `material ${formatMoney(material)}, his wages ${formatMoney(wages.total)}\n` +

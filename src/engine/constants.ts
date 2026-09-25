@@ -142,12 +142,16 @@ import type {
  *  Version 32 is v56 (PIOTR, 25.09): the spray booths are the size of their pictures, walk in
  *  booths of 3 by 2 to 6 by 4 metres, and the CNC tool changer head is bolted to a CNC and holds
  *  no floor of its own. Every v25 to v31 save loads: a booth that no longer fits where it stood
- *  goes to the first free place in the hall that holds it, or to the yard. */
-export const STATE_VERSION = 32;
+ *  goes to the first free place in the hall that holds it, or to the yard.
+ *
+ *  Version 33 is v57 (PIOTR, 25.09): the board offers no timber work until the timber branch. Every
+ *  v25 to v32 save loads, with the timber offers standing on its board taken off it; a timber job
+ *  already taken stays on the books. */
+export const STATE_VERSION = 33;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v56';
+export const APP_VERSION = 'v57';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1488,23 +1492,29 @@ export const PACED_FAMILIES: readonly string[] = Object.keys(MACHINE_PLACES);
 export const DRAW_BLOCK_MINUTES = 30;
 
 /** How many men one machine of a class keeps busy before the hall is short of that family: the
- *  saw from one man to four up its ladder, the edgebander and the spindle moulder twice that
- *  because the trade uses them less, a CNC from four to ten, so a hall with one needs no saw at
- *  all, and the booth and the thicknesser like the saw [PIOTR, 24.09: "from one man to four for
- *  the best saw, the same with the other machines; a CNC replaces four to ten men's saws"] (v55).
- *  Only the men whose work goes through the family count against it (`crewAtFamily`), and a man
- *  past the capacity still works, somewhere else, at the by hand pace,
- *  `1 / BY_HAND_DURATION_FACTOR`, which is what the Output sheet's line for it prints (v53). A
- *  family that is not here is never short: its quarter of the work is by hand already. The two
- *  hand edgebanders live in a cabinet and have no capacity to be short of. */
+ *  saw from one man to four up its ladder, a CNC from four to ten, so a hall with one needs no saw
+ *  at all [PIOTR, 24.09: "from one man to four for the best saw; a CNC replaces four to ten men's
+ *  saws"] (v55); the edgebander, the spindle moulder and the thicknesser from six men to sixteen,
+ *  and the booth from eight to forty [PIOTR, 25.09: "the rest of the machines apart from the CNC at
+ *  least 6, 8, 8, 12, 16; the booth starts at 8, 12, 12, 20, 40"] (v57). Only the men whose work
+ *  goes through the family count against it, and of those only the owner and the joiners
+ *  (`crewAtFamily`, `CAPACITY_ROLES`); a man past the capacity still works, somewhere else, at the
+ *  by hand pace, `1 / BY_HAND_DURATION_FACTOR`, which is what the Output sheet's line for it prints
+ *  (v53). A family that is not here is never short: its quarter of the work is by hand already.
+ *  The two hand edgebanders live in a cabinet and have no capacity to be short of. */
 export const MACHINE_CAPACITY: Record<string, Record<string, number>> = {
   tableSaw: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
-  edgebander: { used: 2, budget: 4, standard: 4, pro: 6, industrial: 8 },
-  spindleMoulder: { used: 2, budget: 4, standard: 4, pro: 6, industrial: 8 },
+  edgebander: { used: 6, budget: 8, standard: 8, pro: 12, industrial: 16 },
+  spindleMoulder: { used: 6, budget: 8, standard: 8, pro: 12, industrial: 16 },
   cnc: { used: 4, budget: 5, standard: 6, pro: 8, industrial: 10 },
-  sprayBooth: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
-  thicknesser: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
+  sprayBooth: { used: 8, budget: 12, standard: 12, pro: 20, industrial: 40 },
+  thicknesser: { used: 6, budget: 8, standard: 8, pro: 12, industrial: 16 },
 };
+
+/** Who a machine's capacity is counted against, beside the owner: the joiners [PIOTR, 25.09: "we do
+ *  not count the helpers or the people in the office, only me plus the joiners"]. The sprayer is left
+ *  out with them: the booth is his own trade (v57). */
+export const CAPACITY_ROLES: ReadonlyArray<WorkerRole> = ['joiner'];
 
 /** The five classes of workbench. Prices, places and footprints are Piotr's table; the endurance
  *  and the power are [TUNE] (CLAUDE.md T7 3.6, T23 2.17). A bench is not a machine, so its hours
@@ -3199,6 +3209,12 @@ export const EQUIPMENT_SPECS: EquipmentSpec[] = SPEC_DRAFTS.map(withVariants);
 
 /** Machines that must be owned before solid wood jobs can be made without the by-hand path. */
 export const SOLID_WOOD_EQUIPMENT = ['thicknesser', 'spindleMoulder'];
+
+/** The board offers no timber work until the timber branch lands [PIOTR, 25.09: "while we have no
+ *  timber machines, take every offer off the board that wants the thicknesser or the timber
+ *  machines"]. The timber templates stay in the catalogue, so a timber job can still be made; the
+ *  board simply never draws one, neither into the band nor greyed beside it (v57). */
+export const TIMBER_ON_THE_BOARD = false;
 
 /** Fixed placement in cells, which are metres (docs/art/SPRITES.md 9.1). Free placement by the
  *  player is parked for the room blocks only: everything else he sets out himself (T2 3.10). */

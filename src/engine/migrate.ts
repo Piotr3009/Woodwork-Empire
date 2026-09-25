@@ -11,6 +11,7 @@ import {
   EQUIPMENT_SPECS,
   HIRING_SPECS,
   LOCKER_SLOT_LAYOUT,
+  PRODUCT_TEMPLATES,
   SOUND_VOLUME_DEFAULT,
   STATE_VERSION,
   UNIT_WIDTH_CELLS,
@@ -904,6 +905,21 @@ export function standTheBoothsAgain(state: GameState): void {
   for (const held of state.onOrder) again(held);
 }
 
+/** Version 32 to 33 (v57): the board offers no timber work until the timber branch [PIOTR, 25.09],
+ *  so the timber offers standing on a save's board go, greyed or not. A timber job already taken is
+ *  a job on the books and not an offer, and stays. */
+function liftToVersion33(state: Raw): void {
+  const timber = new Set(
+    PRODUCT_TEMPLATES.filter((entry) => entry.material === 'solidWood').map((entry) => entry.id),
+  );
+  if (Array.isArray(state.enquiries)) {
+    state.enquiries = records(state.enquiries).filter(
+      (enquiry) => typeof enquiry.templateId !== 'string' || !timber.has(enquiry.templateId),
+    );
+  }
+  state.version = 33;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -925,6 +941,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   29: liftToVersion30,
   30: liftToVersion31,
   31: liftToVersion32,
+  32: liftToVersion33,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

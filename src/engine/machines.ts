@@ -2,6 +2,7 @@
 // ownership and power side that the economy needs.
 
 import {
+  CAPACITY_ROLES,
   CENTRAL_EXTRACTION_SPECS,
   DUST_BANDS,
   DUST_OUTPUT_M3_PER_HOUR,
@@ -470,13 +471,14 @@ export function machinesAtWork(state: GameState): Set<string> {
   return new Set(menAtPlaces(state).map((entry) => entry.item.id));
 }
 
-/** The whole day crew on the books: the owner and every man who produces and is in today, at work
- *  this minute or not. What a contract's line reckons with, because it says what the hall makes
- *  "at full crew" (CLAUDE.md T25 2.7), where the hall's own minute reckons with the men at work in
- *  it (`crewAtFamily`; v54, v55). */
+/** The whole day crew on the books: the owner and every joiner who is in today, at work this minute
+ *  or not; the helpers, the office and the sprayer are not counted (PIOTR, 25.09; v57). What a
+ *  contract's line reckons with, because it says what the hall makes "at full crew"
+ *  (CLAUDE.md T25 2.7), where the hall's own minute reckons with the men at work in it
+ *  (`crewAtFamily`; v54, v55). */
 export function fullCrew(state: GameState): number {
   const men = state.workers.filter(
-    (worker) => PRODUCING_ROLES.includes(worker.role) && isWorkingToday(state, worker, 'day'),
+    (worker) => CAPACITY_ROLES.includes(worker.role) && isWorkingToday(state, worker, 'day'),
   ).length;
   return men + 1;
 }
@@ -497,13 +499,17 @@ export function hallCapacity(state: GameState, family: string): number {
  *  with a stage of the family in its plan, and a man on a standing contract whose piece is done on
  *  it [PIOTR, 24.09: "only the men whose work goes through the machine"] (v55). A job cut on a
  *  CNC has no stage at the saw, so its men are the CNC's and not the saw's; a job that is not
- *  lacquered never counts against the booth. By day the men the plan has working, the owner among
- *  them; by night the second shift. */
+ *  lacquered never counts against the booth. By day the owner and the joiners the plan has working,
+ *  and never a helper, the office or the sprayer (`CAPACITY_ROLES`; PIOTR, 25.09; v57); by night
+ *  the second shift, which is joiners. */
 export function crewAtFamily(state: GameState, family: string, shift: 'day' | 'night' = 'day'): number {
   const men: Array<{ id: string; working: boolean }> =
     shift === 'night'
       ? nightCrew(state).map((worker) => ({ id: worker.id, working: true }))
-      : [{ id: OWNER, working: state.owner.working }, ...state.workers];
+      : [
+          { id: OWNER, working: state.owner.working },
+          ...state.workers.filter((worker) => CAPACITY_ROLES.includes(worker.role)),
+        ];
   let count = 0;
   for (const man of men) {
     if (!man.working) continue;

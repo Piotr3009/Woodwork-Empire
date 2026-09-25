@@ -265,7 +265,19 @@ const control = play('veryEasy');
  *  against 8,672, the contract 8,712 against 8,910, material 8,060 against 7,830 and transport
  *  1,200 against 840, less 1,000 of wages for the novice from day 71 in place of the experienced
  *  man from day 65 and no repair. The bank does not pull the overdraft and the run ends trading.
- *  Nothing is tuned. */
+ *  Nothing is tuned.
+ *
+ *  **Re-measured for v57 (PIOTR, 25.09): no timber on the board.** The board draws no timber work
+ *  until the timber branch, and the greyed offers beside the band are drawn from day 1 with the oak
+ *  table among them, so from the first one the offers are others and the random stream the whole
+ *  run shares moves with them. Off the month reports: month 1 closes at 4,208, month 2 at 2,627 and
+ *  month 3 at -6,452. The novice manager starts on day 64, the account at 2,627 carrying his month
+ *  of pay from the first day of month 3, and the owner is away on days 64 to 68. A burglary on day
+ *  79 takes the standard saw, the used compressor and five sheets, 8,300 of kit and stock with 6,640
+ *  back from the insurance, and the script buys no saw again: from day 80 the hall stands on the
+ *  cutting of every job it holds, which is month 3's efficiency of 77, two jobs out in month 3 and
+ *  revenue 3,451 against 7,426. The bank does not pull the overdraft and the run ends trading, with
+ *  the contract's thirteen weeks made in full after the opening one. Nothing is tuned. */
 describe('the three month playthrough of 10.4, on Easy as the brief scripts it', () => {
   it('has the crew, the kit and the paper the brief asked for, in the order it asked', () => {
     // It traded all three months and is still trading on day 91 (v53, the note above; on v52 the
@@ -279,16 +291,24 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // a month of lets him through (CLAUDE.md T17 2.11, T23 2.12). On v52 a novice on day 73; from
     // v53 an experienced man on day 65, the month closing 1,168 better (the note above); from v55
     // a novice on day 71, month 2 closing at 48 and the account reaching a novice's month of pay
-    // on day 68 and an experienced man's not before it (the note above).
+    // on day 68 and an experienced man's not before it (the note above); from v57 a novice on day
+    // 64, month 2 closing at 2,627 (the note above).
     expect(state.workers.some((worker) => worker.role === 'estimator' && worker.startDay <= 35)).toBe(true);
     expect(
       state.workers.some(
-        (worker) => worker.role === 'productionManager' && worker.tier === 'novice' && worker.startDay === 71,
+        (worker) => worker.role === 'productionManager' && worker.tier === 'novice' && worker.startDay === 64,
       ),
     ).toBe(true);
-    expect(state.equipment.some((item) => item.specId === 'tableSaw' && item.variantId === 'standard')).toBe(true);
+    // The standard saw of 10.4 was bought in week 1. From v57 the burglary of day 79 takes it and
+    // the script buys none again (the note above the describe), so it is on the books and gone from
+    // the hall.
+    expect(state.ledger.some((entry) => entry.category === 'equipment' && entry.label === 'Standard table saw')).toBe(true);
+    expect(state.ledger.some((entry) => entry.category === 'burglary' && entry.label.includes('standard table saw'))).toBe(true);
+    expect(state.equipment.some((item) => item.specId === 'tableSaw')).toBe(false);
     expect(state.equipment.some((item) => item.specId === 'extractor' && item.variantId === 'standard')).toBe(true);
-    expect(state.pipes.length).toBeGreaterThanOrEqual(1);
+    // The saw's run of pipe was laid in month 1, and from v57 it went with the saw on day 79.
+    expect(state.ledger.some((entry) => entry.category === 'pipes')).toBe(true);
+    expect(state.pipes).toHaveLength(0);
     expect(state.security.level).toBe(1);
     expect(state.insurance.property && state.insurance.liability).toBe(true);
     expect(state.ownerDraw.tier).toBe(1);
@@ -362,9 +382,12 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // worse, revenue 13,322 against 13,767, material 8,000 against 7,600 and no delivery on the
     // morning the line is read; month 3 is 1,286 worse, revenue 7,426 against 8,672 and a novice
     // manager's wages in place of an experienced man's.
-    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(4093);
-    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(48);
-    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-11700);
+    // Re-measured for v57: 4,208, 2,627 and -6,452 (the note above the describe): the board draws
+    // no timber, its offers and the stream behind them are others from day 1, and month 3 has the
+    // burglary of day 79 and a hall with no saw after it.
+    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(4208);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(2627);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-6452);
     // Two charges in three months: 7 on day 31 for the few days month 1 ran under, and 72 on day
     // 91 for month 3. Month 2 never went under and pays nothing on day 61 (CLAUDE.md T23 2.12).
     const overdraft = state.ledger.filter((entry) => entry.category === 'overdraftInterest');
@@ -399,9 +422,11 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // days the owner was away are not seats the day counts (CLAUDE.md T25 2.3).
     // Ninety one from v55, 90.86 against 90.00 off the day records: the run parts from v54's on
     // day 18 and month 3's days fall differently, the owner away on days 71 to 75 and not 65 to 71
-    // (the note above the describe).
+    // (the note above the describe). Seventy seven from v57, 76.86: the burglary of day 79 takes
+    // the saw and the script buys none, so from day 80 the hall stands on the cutting, a day at 50
+    // from day 81 to the end of the month (the note above the describe).
     expect(months[1]?.efficiencyMean ?? 0).toBeGreaterThan(55);
-    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(91);
+    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(77);
   });
 
   it('took the first contract its crew could keep up with and made every week of it in full', () => {
@@ -438,7 +463,9 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(running.renegotiatedPrice).toBeNull();
     expect(state.gameOver).toBeNull();
     // Three months of one money track: nothing waited anywhere but the account (CLAUDE.md T22 2.1).
-    expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
+    // The one line with no cash behind it is the burglary's note of what was taken on day 79,
+    // which is what such a line is for (CLAUDE.md T22 2.4; v57): no bill of the run went unpaid.
+    expect(state.ledger.filter((entry) => entry.unpaid).map((entry) => entry.category)).toEqual(['burglary']);
   });
 
   it('pays every trade by the month, on its last working day, and never by the week', () => {

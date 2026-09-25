@@ -23,6 +23,7 @@ import {
   EXPRESS_PRICE_UPLIFT_MAX,
   EXPRESS_PRICE_UPLIFT_MIN,
   EXPRESS_PROBABILITY,
+  TIMBER_ON_THE_BOARD,
   UNREACHABLE_MAX,
   UNREACHABLE_MIN,
   SIZE_MULTIPLIER_MAX,
@@ -42,6 +43,8 @@ import {
   qualifiesForCommercial,
   reachableEnquiries,
   arriveEnquiries,
+  offeredOnTheBoard,
+  refillUnreachable,
   refreshBoard,
   removeEnquiry,
   skewed,
@@ -49,6 +52,7 @@ import {
   websiteEnquiriesOn,
 } from '../../src/engine/board';
 import { labourValueFor, ownerDaysFor } from '../../src/engine/jobs';
+import { template } from '../../src/engine/catalog';
 import { tick } from '../../src/engine/index';
 import type { Enquiry, GameState, WorkerRole } from '../../src/engine/index';
 import {
@@ -127,7 +131,30 @@ describe('enquiry generation', () => {
     const names = new Set(draw(state, 600).map((enquiry) => enquiry.templateId));
     expect(names.has('wardrobe')).toBe(true);
     expect(names.has('smallKitchen')).toBe(true);
-    expect(names.has('oakDiningTable')).toBe(true);
+    // Never the oak table from v57: no timber work on the board until the timber branch
+    // (PIOTR, 25.09), and the test below says so of the greyed ones too.
+    expect(names.has('oakDiningTable')).toBe(false);
+  });
+
+  it('offers no timber work, in the band or greyed beside it, until the timber branch (v57)', () => {
+    // [PIOTR, 25.09: "while we have no timber machines, take every offer off the board that wants
+    // the thicknesser or the timber machines"]. The oak table stays in the catalogue, where a
+    // timber job can still be made from; the board just never draws one.
+    expect(TIMBER_ON_THE_BOARD).toBe(false);
+    expect(offeredOnTheBoard(template('oakDiningTable'))).toBe(false);
+    expect(offeredOnTheBoard(template('bookcase'))).toBe(true);
+    const state = newGame();
+    state.reputation = 40;
+    state.enquiries = [];
+    expect(draw(state, 600).some((enquiry) => enquiry.templateId === 'oakDiningTable')).toBe(false);
+    const greyed = new Set<string>();
+    for (let round = 0; round < 60; round += 1) {
+      state.enquiries = [];
+      refillUnreachable(state);
+      for (const enquiry of state.enquiries) greyed.add(enquiry.templateId);
+    }
+    expect(greyed.size).toBeGreaterThan(1);
+    expect(greyed.has('oakDiningTable')).toBe(false);
   });
 
   it('never puts two of the same template at the same price side by side', () => {

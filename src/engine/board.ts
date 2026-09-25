@@ -28,6 +28,7 @@ import {
   SIZE_MULTIPLIER_MAX,
   SIZE_MULTIPLIER_MIN,
   SOLID_WOOD_EQUIPMENT,
+  TIMBER_ON_THE_BOARD,
   UNREACHABLE_MAX,
   UNREACHABLE_MIN,
   WORKING_DAYS_PER_WEEK,
@@ -76,9 +77,15 @@ export function enquiryQualityTier(state: GameState): number {
   return Math.max(0, Math.min(top, tier));
 }
 
+/** True for a template the board offers: every one but timber, until the timber branch lands
+ *  [PIOTR, 25.09] (v57). */
+export function offeredOnTheBoard(entry: ProductTemplate): boolean {
+  return TIMBER_ON_THE_BOARD || entry.material !== 'solidWood';
+}
+
 function drawTemplate(state: GameState): ProductTemplate | null {
   const tier = enquiryQualityTier(state);
-  const candidates = templatesForReputation(effectiveReputation(state));
+  const candidates = templatesForReputation(effectiveReputation(state)).filter(offeredOnTheBoard);
   return pickWeighted(state, candidates, (entry) => entry.weightsByTier[tier] ?? 0);
 }
 
@@ -340,7 +347,7 @@ export function generateUnreachable(state: GameState): Enquiry | null {
   const already = new Set(
     state.enquiries.filter((other) => other.unreachable).map((other) => other.templateId),
   );
-  const left = PRODUCT_TEMPLATES.filter((entry) => !already.has(entry.id));
+  const left = PRODUCT_TEMPLATES.filter((entry) => offeredOnTheBoard(entry) && !already.has(entry.id));
   if (left.length === 0) return null;
   const short = left.filter((entry) => kitBlockFor(state, entry) !== null);
   // Where it is short of nothing, the only reason left is the hands against the deadline, and

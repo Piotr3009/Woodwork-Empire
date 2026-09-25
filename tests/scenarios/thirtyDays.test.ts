@@ -188,13 +188,17 @@ describe('30 days on Easy, working the board', () => {
     // bank's limit. The lowest balance of the month is its last line, 2,829 on day 31, so the
     // count of days below the limit never started (CLAUDE.md T22 2.1, 2.2). It was 2,789 until
     // tonight: the canteen seat is out of the game, so the forty pounds the scripted player spent
-    // on one stays in the account (CLAUDE.md T23 2.11).
+    // on one stays in the account (CLAUDE.md T23 2.11). 1,879 from v57, the owner's draw on day 31
+    // again: the board draws no timber until the timber branch (PIOTR, 25.09), the greyed offers
+    // beside the band are drawn from day 1 with the oak table among them, and from the first one the
+    // post brings other enquiries and the month other jobs: a TV unit taken on day 30 has its
+    // material bought and is not made yet [measured].
     for (const entry of state.ledger) {
       expect(entry.balance, `${entry.day} ${entry.label}`).toBeGreaterThan(
         state.finance.overdraftLimit,
       );
     }
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(2829);
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(1879);
     expect(state.finance.daysBelowOverdraft).toBe(0);
   });
 
@@ -205,9 +209,11 @@ describe('30 days on Easy, working the board', () => {
     // express at 0.6 of the standard deadline (T10 3.7), which takes some of that back again.
     // Turn 13 brings one enquiry a day and takes the client's number (T13 3.4, 3.24): the script
     // takes what the post brings, none of it express in this seed, and delivers seven on time
-    // where Turn 12 delivered five with some of them late. Measured, not tuned.
+    // where Turn 12 delivered five with some of them late. Measured, not tuned. From v57 the post
+    // is other enquiries (the board draws no timber, above) and one of the seven is an express
+    // bookcase taken on day 10, five points where an on time job is three: 23 where it was 21.
     expect(state.reputation).toBeGreaterThan(0);
-    expect(state.reputation).toBeCloseTo(21, 6);
+    expect(state.reputation).toBeCloseTo(23, 6);
     expect(state.jobs.filter((job) => job.stage === 'completed')).toHaveLength(7);
   });
 
@@ -573,7 +579,14 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // with 5,472 of balances paid against 4,168, 275 less in deposits, 230 less on material and
     // 360 more on couriers. The lowest point is the owner's draw on the morning of day 32 in both
     // [both measured].
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-71);
+    //
+    // -435 from v57. The board draws no timber until the timber branch (PIOTR, 25.09), and the
+    // greyed offers beside the band are drawn from day 1 with the oak table among them, so from the
+    // first one the post brings other enquiries: fifteen jobs out by the month's end against
+    // seventeen, with 4,793 of balances paid against 5,472, 850 less in deposits, 200 less on
+    // material and 240 less on couriers. The lowest point is the owner's draw on the morning of day
+    // 32 in both [measured].
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-435);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
@@ -1550,7 +1563,7 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
     seen,
   );
 
-  it('stands the thicknesser and the tools behind the one bag fan, with the oak table on the books', () => {
+  it('stands the thicknesser and the tools behind the one bag fan, and takes sheet work only', () => {
     expect(state.gameOver).toBeNull();
     expect(state.clock.day).toBe(31);
     for (const specId of SOLID_WOOD_EQUIPMENT) {
@@ -1558,9 +1571,11 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
     }
     expect(bagStore(state)).toMatchObject({ exists: true, bags: 1, capacityM3: 1 });
     expect(helperOnDuty(state)).toBe(true);
-    const tables = state.jobs.filter((job) => job.templateId === 'oakDiningTable');
-    expect(tables.length).toBeGreaterThan(0);
-    expect(tables.some((job) => job.assignees[0] === 'owner' || job.stage === 'completed')).toBe(true);
+    // Until v57 the month took an oak table off the board. The board offers no timber until the
+    // timber branch [PIOTR, 25.09], so the machines stand for it and the month is sheet work: ten
+    // jobs out of the door [measured].
+    expect(state.jobs.some((job) => job.templateId === 'oakDiningTable')).toBe(false);
+    expect(state.jobs.filter((job) => job.stage === 'completed')).toHaveLength(10);
   });
 
   it('stands nobody at the thicknesser until the timber branch, and the helper empties the one bag before it fills', () => {
@@ -1568,14 +1583,14 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
     // and timber was machined on the thicknesser, 30 of its hours in the month. From v55 every
     // job goes through the same four machines, the saw, the edgebander, the spindle moulder and
     // the bench, and the thicknesser has no stage until the timber branch [PIOTR, 24.09], so it
-    // stands with no hours; the oak table's moulding is the spindle moulder's, and its dust
-    // reaches the one bag with the saw's and the bander's. The helper takes the bag at 80% (v46),
-    // seven times in the month [measured], so it is never full and no machine stops. Nine on v54,
-    // when the thicknesser ran 30.55 hours at 0.25 m3 an hour; from v55 the spindle moulder does
-    // the moulding at 0.12 m3 an hour, 44.58 of its hours in the month, and the bag fills slower.
-    const table = state.jobs.find((job) => job.templateId === 'oakDiningTable');
-    if (table === undefined) throw new Error('no oak table on the books');
-    expect(familyForStage(table, 'moulding')).toBe('spindleMoulder');
+    // stands with no hours; a timber job's moulding is the spindle moulder's, like a sheet job's,
+    // and its dust reaches the one bag with the saw's and the bander's. The helper takes the bag at
+    // 80% (v46), six times in the month [measured], so it is never full and no machine stops. Nine on
+    // v54, when the thicknesser ran 30.55 hours at 0.25 m3 an hour; seven on v55 and v56, the
+    // spindle moulder doing the moulding at 0.12 m3 an hour, 44.58 of its hours in the month with
+    // the oak table among the jobs. From v57 the board offers no timber (above) and the month's
+    // sheet jobs keep it 38.47 hours.
+    expect(familyForStage(stagedJob(1000, 'solidWood', false), 'moulding')).toBe('spindleMoulder');
     expect(machineOf(state, 'thicknesser').hoursUsed).toBe(0);
     expect(machineOf(state, 'spindleMoulder').hoursUsed).toBeGreaterThan(0);
     expect(DUST_OUTPUT_M3_PER_HOUR.thicknesser).toBe(0.25);
@@ -1583,7 +1598,7 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
     expect(store.full).toBe(false);
     expect(seen.filter((event) => event.kind === 'bagsFull')).toHaveLength(0);
     const empties = state.tasks.filter((task) => task.kind === 'emptyBags');
-    expect(empties).toHaveLength(7);
+    expect(empties).toHaveLength(6);
     expect(empties.every((task) => task.done)).toBe(true);
   });
 });
