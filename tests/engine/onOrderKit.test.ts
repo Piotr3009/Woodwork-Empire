@@ -84,12 +84,13 @@ describe('kit that is bought and still on the road', () => {
   it('stops no job for the saw on the lorry: the cutting goes by hand until it comes', () => {
     const state = sawOnTheRoad();
     // Until v53 the job stood with `saw on order, due ...` on it and Start production refused it.
-    // Now the lorry stops nothing: the cutting, and the machining with no edgebander in the hall,
-    // go at the by hand 1 / 1.5, and the rest at 1.00 (PIOTR, 24.09; v53).
+    // Now the lorry stops nothing: the cutting, the edging with no edgebander in the hall and the
+    // moulding with no spindle moulder go at the by hand 1 / 1.5, and the assembly at 1.00
+    // (PIOTR, 24.09; v53, v55).
     expect(hallBlock(state, firstJob(state))).toBe('');
     expect(startProductionCheck(state, firstJob(state))).toEqual({ ok: true, reason: '' });
     expect(stageSpeed(state, firstJob(state), 'cutting')).toEqual({ speed: 1 / 1.5, byHand: true });
-    expect(jobPace(state, firstJob(state))).toBeCloseTo(1 / (0.4 * 1.5 + 0.6), 10);
+    expect(jobPace(state, firstJob(state))).toBeCloseTo(1 / (0.75 * 1.5 + 0.25), 10);
   });
 
   it('writes nothing on the job the minute the owner stands at it, and he cuts by hand at a bench', () => {
@@ -100,9 +101,10 @@ describe('kit that is bought and still on the road', () => {
     expect(job.blockedBy).toBe('');
     expect(next.owner.station).toBe('machine:workbench');
     // Until v53 nothing was cut while it waited; now ten minutes of it at the job's one pace,
-    // 5.56 of labour, all of it on the cutting where the bar stands.
-    expect(job.labourValue - job.labourRemaining).toBeCloseTo((10 * OWNER_LABOUR_PER_MINUTE) / 1.2, 6);
-    expect(job.stageLabour.cutting ?? 0).toBeCloseTo((10 * OWNER_LABOUR_PER_MINUTE) / 1.2, 6);
+    // 4.85 of labour (5.56 on v53, with the old shares), all of it on the cutting where the bar
+    // stands.
+    expect(job.labourValue - job.labourRemaining).toBeCloseTo((10 * OWNER_LABOUR_PER_MINUTE) / 1.375, 6);
+    expect(job.stageLabour.cutting ?? 0).toBeCloseTo((10 * OWNER_LABOUR_PER_MINUTE) / 1.375, 6);
   });
 
   it('puts the cutting on the saw the moment the same saw is standing in the hall', () => {
@@ -110,11 +112,12 @@ describe('kit that is bought and still on the road', () => {
     placeEquipment(state, 'tableSaw', { variantId: 'budget', x: 2, y: 1 });
     state.onOrder = [];
     expect(hallBlock(state, firstJob(state))).toBe('');
-    // The saw's one place, and the cutting at its pace: the job's one pace rises from 0.8333 by
-    // hand to 0.9302, the machining still by hand with no edgebander in the hall (v53).
+    // The saw's one place, and the cutting at its pace: the job's one pace rises from 0.7273 by
+    // hand to 0.8000, the edging and the moulding still by hand with neither machine in the hall
+    // (v53, v55).
     expect(hallPlaces(state, 'tableSaw')).toBe(1);
     expect(stageSpeed(state, firstJob(state), 'cutting')).toEqual({ speed: 1, byHand: false });
-    expect(jobPace(state, firstJob(state))).toBeCloseTo(1 / (0.25 + 0.15 * 1.5 + 0.6), 10);
+    expect(jobPace(state, firstJob(state))).toBeCloseTo(1 / (0.25 + 0.5 * 1.5 + 0.25), 10);
   });
 
   it('falls back to a pair of hands when nothing of the family is owned or ordered', () => {

@@ -497,9 +497,10 @@ export interface HallCapacity {
 
 export function contractHallCapacity(state: GameState, contract: Contract): HallCapacity {
   const piece = contractPiece(contract);
-  // At full crew: every joiner on the books against the hall's places, whoever is at work this
-  // minute (v54).
-  const shortages = placeShortages(state, 'day', fullCrew(state));
+  // At full crew: every joiner on the books at the piece's own machine, whoever is at work this
+  // minute (v54), and nobody at any other family, whose machines this piece never touches (v55).
+  const own = pieceStage(state, piece).family;
+  const shortages = placeShortages(state, 'day', (family) => (family === own ? fullCrew(state) : 0));
   const speed = contractPieceSpeed(state, piece) * shortages.reduce((all, short) => all * short.factor, 1);
   const week = MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK;
   let perWeek = 0;

@@ -151,12 +151,12 @@ describe('the tiles inside a folder', () => {
     );
     expect(text(used.querySelector('.tile-price'))).toBe('£1,800');
     expect(text(used.querySelector('.tile-text')).length).toBeGreaterThan(80);
-    // The effects, in Piotr's order: how many men can work at it at once first, from v54 [PIOTR,
-    // 24.09: "add the most men at one machine"], then what it does to the work, what it makes,
-    // what it needs of the air, how long it lasts, and what its class alone does (CLAUDE.md T12
-    // 3.1, T13 3.1).
+    // The effects, in Piotr's order: how many men it keeps busy first, from v54 [PIOTR, 24.09:
+    // "add the most men at one machine"], its capacity from v55 (a used saw one man, up to four
+    // for the best), then what it does to the work, what it makes, what it needs of the air, how
+    // long it lasts, and what its class alone does (CLAUDE.md T12 3.1, T13 3.1).
     expect(effects(used)).toEqual([
-      'Up to 1 man at once',
+      'Keeps up to 1 man busy',
       'Output -5%',
       'Dust 0.015 m\u00b3/h of use',
       // What it asks of the fans while somebody is standing at it (CLAUDE.md T10 3.1).
@@ -178,9 +178,9 @@ describe('the tiles inside a folder', () => {
     expect(insuranceLine(1800)).toBe('Insurance \u00a336 a year');
     const industrial = tiles(state, 'tableSaw')[4];
     expect(effects(industrial)).toEqual([
-      // Three men at once (CLAUDE.md T25 2.1), and the industrial class's pace, +12% from v52
+      // Four men kept busy (v55), and the industrial class's pace, +12% from v52
       // (CLAUDE.md T25 2.4).
-      'Up to 3 men at once',
+      'Keeps up to 4 men busy',
       'Output +12%',
       'Dust 0.015 m\u00b3/h of use',
       'Needs 2,200 m\u00b3/h of extraction',
@@ -249,7 +249,7 @@ describe('the tiles inside a folder', () => {
       );
     }
     const standard = effects(tiles(state, 'tableSaw')[2]);
-    expect(standard[0]).toBe('Up to 2 men at once');
+    expect(standard[0]).toBe('Keeps up to 2 men busy');
     expect(standard[1]).toBe('Output +5%');
     expect(standard[2]).toBe('Dust 0.015 m\u00b3/h of use');
     expect(standard[3]).toBe('Needs 1,100 m\u00b3/h of extraction');

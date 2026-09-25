@@ -671,11 +671,12 @@ describe('the service, every six months on the calendar (PIOTR, 22.09; v51)', ()
     const later = tick(broken, 60);
     // Until v53 the job stood with `table saw is broken` on it and not a minute went in. A broken
     // saw has no places and stops no job now: the owner works it at a bench and its cutting goes at
-    // the by hand 1 / 1.5, 35.56 of labour in the hour (PIOTR, 24.09; v53).
+    // the by hand 1 / 1.5 (PIOTR, 24.09; v53), and so does the moulding on a hall with no spindle
+    // moulder: 32.00 of labour in the hour (v55; 35.56 on v53, with the old shares).
     expect(firstJob(later).blockedBy).toBe('');
     expect(later.owner.station).toBe('machine:workbench');
     expect(before - firstJob(later).labourRemaining).toBeCloseTo(
-      (60 * OWNER_LABOUR_PER_MINUTE) / (0.25 * 1.5 + 0.75),
+      (60 * OWNER_LABOUR_PER_MINUTE) / (0.25 * 1.5 + 0.25 + 0.25 * 1.5 + 0.25),
       6,
     );
     // The repair is 90 minutes and 5% of what the saw cost.

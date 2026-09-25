@@ -129,23 +129,26 @@ describe('the walk between the pallet and the rack (CLAUDE.md T13 3.21)', () => 
 });
 
 describe('where the owner stands', () => {
-  it('stands at the saw for the cutting and at his bench for the assembly', () => {
+  it('stands at the saw one half hour and at his bench the next, whatever the bar says', () => {
     const state = atTheBench();
-    // The stage is what puts him somewhere, not a cycle of minutes (CLAUDE.md T7 3.1).
+    // From v55 the half hour is what puts him somewhere: the men go round their job's machines,
+    // the saw and a bench on this hall, and the bar of the job says where its work has got to and
+    // nothing about where he stands [PIOTR, 24.09]. The first half hour is the saw.
     expect(tick(state, 1).owner.station).toBe(machineStation('tableSaw'));
     const job = firstJob(state);
     job.labourRemaining = job.labourValue * 0.5;
-    const assembling = tick(state, 1);
-    // At a place at the bench, a family with places like any other (CLAUDE.md T25 2.2).
-    expect(assembling.owner.station).toBe(machineStation('workbench'));
-    // The edgebander comes out of a tool cabinet, so the machining is done at the bench too
+    expect(tick(state, 1).owner.station).toBe(machineStation('tableSaw'));
+    // The second half hour is a place at the bench, a family with places like any other
+    // (CLAUDE.md T25 2.2).
+    const later = tick(state, 31);
+    expect(later.owner.station).toBe(machineStation('workbench'));
+    // The edgebander comes out of a tool cabinet, so the edging is done at the bench too
     // (CLAUDE.md T6 3.5): from v53 at a place at it, with the tool out of the cabinet in his hands,
-    // where until v53 he stood at his bench with no place.
+    // where until v53 he stood at his bench with no place. With the bar at the edging, his half
+    // hour at the bench is the bander's half hour of hours.
     job.labourRemaining = job.labourValue * 0.7;
-    const machining = tick(state, 1);
-    expect(machining.owner.station).toBe(machineStation('workbench'));
-    // His one minute is the bander's one minute of hours.
-    expect(machining.equipment.find((item) => item.specId === 'edgebander')?.hoursUsed).toBeCloseTo(1 / 60, 6);
+    const edging = tick(state, 60);
+    expect(edging.equipment.find((item) => item.specId === 'edgebander')?.hoursUsed).toBeCloseTo(0.5, 4);
   });
 
   it('stands at the office door on a desk task, and at the gate unloading', () => {

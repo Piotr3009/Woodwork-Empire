@@ -1728,9 +1728,11 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
       speed /= WET_AIR_FINISH_FACTOR;
       hand.job.wetFinish = true;
     }
-    // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3).
+    // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3): one
+    // minute of the clock a minute, however many men draw on it. Until v55 it booked a minute for
+    // every man, and wore out four times as fast as the clock in a hall of four (v55).
     const compressor = drawingOn(state, machine, atTheBench);
-    if (compressor !== null) used.set(compressor.id, (used.get(compressor.id) ?? 0) + 1);
+    if (compressor !== null) used.set(compressor.id, 1);
     const minute = labourPerMinute(hand.rate, speed) * hall;
     // The minute's own multiplier, for the workshop's average output (v40): the same things the
     // labour is made of, and nothing else, booked against the man who worked it so the Output

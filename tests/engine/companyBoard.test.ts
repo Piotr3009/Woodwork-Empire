@@ -173,16 +173,19 @@ describe('the Machines column (CLAUDE.md T17 2.24)', () => {
     const savings = machineSavings(state, 'week');
     const saw = savings.rows.find((row) => row.name === 'Standard table saw');
     expect(saw).toBeDefined();
-    // An hour at the standard saw: its class is worth 5% and an hour of it saves three minutes.
-    expect(saw?.hours).toBe(1);
+    // Half an hour at the standard saw, the owner's turn at it being the first half hour of the
+    // two and a bench the second (v55): its class is worth 5% and the half hour saves a minute
+    // and a half, which the column rounds to a whole two.
+    expect(saw?.hours).toBe(0.5);
     expect(saw?.effect).toBeCloseTo(0.05, 4);
-    expect(saw?.minutesSaved).toBe(3);
+    expect(saw?.minutesSaved).toBe(2);
     expect(saw?.gate).toBe(false);
     expect(saw?.minus).toBe(0);
-    // Nobody stood at the compressor, so it ran no hours and saved nothing; the edgebander and
+    // The owner's half hour at the bench with a nailer drew on the compressor, so it ran that half
+    // hour of the clock (v55) and saved nothing, a compressor being no pace; the edgebander and
     // the hand tool set live in a cabinet and are not machines standing in the hall.
     const other = savings.rows.find((row) => row.name === 'Used compressor');
-    expect(other?.hours).toBe(0);
+    expect(other?.hours).toBe(0.5);
     expect(other?.minutesSaved).toBe(0);
     expect(savings.rows.map((row) => row.name)).toEqual(['Standard table saw', 'Used compressor']);
     // And the total is the rows added up.

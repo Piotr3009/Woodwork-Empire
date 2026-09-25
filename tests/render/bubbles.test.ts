@@ -303,15 +303,15 @@ describe('the words on the hover (CLAUDE.md T22 2.5)', () => {
 
 describe('the mark over a machine (PIOTR, 24.09; v53)', () => {
   it('draws the mark over the saw while the crew is more than its places, with its line on the hover, and none at dinner', () => {
-    // Six joiners at work, one budget saw of one place: six men for one place [PIOTR, 24.09: "an
-    // exclamation at the saw"]. Nobody waits for it, and the mark is drawn over the machine that is
-    // short, not over a man. The owner is on nothing, so from v54 he is not counted: the crew is
-    // the men at work (PIOTR, 24.09).
+    // Six joiners at work, one budget saw, which keeps two men busy (v55): six men for two [PIOTR,
+    // 24.09: "an exclamation at the saw"]. Nobody waits for it, and the mark is drawn over the
+    // machine that is short, not over a man. The owner is on nothing, so from v54 he is not
+    // counted: the crew is the men whose work goes through the saw (PIOTR, 24.09).
     const state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (saw === undefined) throw new Error('the saw is wanted');
     const words = shortageLine(state, 'tableSaw');
-    expect(words).toBe('Too few saws for the crew: 6 men, 1 place, 5 work at 67%');
+    expect(words).toBe('Too few saws for the crew: 6 men, capacity 2, 4 work at 67%');
     const svg = renderHall(state);
     expect(svg.match(/data-machine-mark="/g)).toHaveLength(1);
     // Inside the saw's own group: the last machine group opened before the mark is the saw's.
@@ -325,9 +325,10 @@ describe('the mark over a machine (PIOTR, 24.09; v53)', () => {
     expect(mark).toContain('class="mark-disc"');
     expect(mark).toContain('>!</text>');
     expect(mark).toContain(`<div class="bubble">${words}</div>`);
-    // The saw's hover line carries the same words, after its places.
+    // The saw's hover line carries the same words, after its places: the second man's, whose
+    // turn the saw is in the first half hour (v55).
     const title = svg.slice(svg.indexOf('<title>', kitAt), svg.indexOf('</title>', kitAt));
-    expect(title).toContain(`Places: 1 of 1 in use, Joiner 1. ${words}.`);
+    expect(title).toContain(`Places: 1 of 1 in use, Joiner 2. ${words}.`);
     // No man's mark is touched by it: the marks over men are the men's own, and here that is the
     // owner, who is on nothing.
     const men = (svg.match(/data-bubble-for="[^"]*"/g) ?? []).filter(
@@ -342,20 +343,21 @@ describe('the mark over a machine (PIOTR, 24.09; v53)', () => {
   });
 
   it('wears it on the first saw with places, and moves it to the next while the first is down', () => {
-    // Two budget saws, a place each, for six men at work: the one bought first is the one filled
-    // first and the one marked. Broken, it has no places, and the mark goes to the other.
+    // Two budget saws, a place each and two men's capacity each, for six men at work: the one
+    // bought first is the one filled first and the one marked. Broken, it has no places and no
+    // capacity, and the mark goes to the other (v55).
     const state = sixJoinersOnSheetWork({ saws: 2, sawVariant: 'budget' });
     const [first, second] = state.equipment.filter((item) => item.specId === 'tableSaw');
     if (first === undefined || second === undefined) throw new Error('two saws are wanted');
     expect(renderHall(state).match(/data-machine-mark="[^"]*"/g)).toEqual([
       `data-machine-mark="${first.id}"`,
     ]);
-    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 6 men, 2 places, 4 work at 67%');
+    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 6 men, capacity 4, 2 work at 67%');
     first.broken = true;
     expect(renderHall(state).match(/data-machine-mark="[^"]*"/g)).toEqual([
       `data-machine-mark="${second.id}"`,
     ]);
-    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 6 men, 1 place, 5 work at 67%');
+    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 6 men, capacity 2, 4 work at 67%');
   });
 });
 

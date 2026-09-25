@@ -85,23 +85,27 @@ describe('the loops the hall is running', () => {
     expect(hallLoops(state).has('sprayBooth')).toBe(true);
   });
 
-  it('sands a bench that is finishing something that is not lacquered', () => {
+  it('sands nothing at a bench finishing something that is not lacquered, from v55', () => {
+    // The sanding is in the Assembly from v55 and a job that is not lacquered has no Finishing,
+    // so the hall never asks for the sander (PIOTR, 24.09); the last of the job is knocks and
+    // screws at the bench.
     const state = inProduction(quiet(), 'laminate');
     const job = firstJob(state);
     job.labourRemaining = job.labourValue * 0.02;
     const loops = hallLoops(state);
-    expect(loops.has('sander')).toBe(true);
+    expect(loops.has('sander')).toBe(false);
     expect(loops.has('sprayBooth')).toBe(false);
+    expect(hallOneShots(state).has('hammer')).toBe(true);
     // And nothing at all when the job has nobody on it.
     job.assignees = [];
-    expect(hallLoops(state).has('sander')).toBe(false);
+    expect(hallOneShots(state).has('hammer')).toBe(false);
   });
 
   it('knocks and drives screws at a bench that is assembling, and nowhere else', () => {
     const state = inProduction(quiet(), 'laminate');
     const job = firstJob(state);
-    // Half way through the labour is the assembly stage on this job's plan.
-    job.labourRemaining = job.labourValue * 0.5;
+    // The last quarter of the labour is the assembly stage on this job's plan (v55).
+    job.labourRemaining = job.labourValue * 0.2;
     const shots = hallOneShots(state);
     expect(shots.has('hammer')).toBe(true);
     expect(shots.has('drill')).toBe(true);

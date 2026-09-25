@@ -50,6 +50,7 @@ import {
   hireNow,
   newGame,
   placeEnquiry,
+  placeEquipment,
   runClock,
   runToDay,
 } from '../helpers';
@@ -236,10 +237,12 @@ describe('the hiring pool', () => {
 function jobReadyWith(price: number, tier: Worker['tier']): GameState {
   // The budget saw, whose factors are 1.0: these are the worker rates of CLAUDE.md 8.5. And a
   // fan big enough for it, so the rates are the rates and not the under extraction penalty
-  // (CLAUDE.md T10 3.1).
+  // (CLAUDE.md T10 3.1). A budget spindle moulder beside it from v55, so the moulding's quarter
+  // runs at 1.00 too and not by hand.
   let state = withExtraction(
     buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' }),
   );
+  placeEquipment(state, 'spindleMoulder', { variantId: 'budget', x: 14, y: 1, id: 'kit-spindle' });
   state.reputation = 40;
   state = withCrew(state, 1, tier);
   const enquiry = placeEnquiry(state, {
@@ -407,12 +410,14 @@ describe('the places at the saw', () => {
     // One saw, one place, one man at it. Until v53 the other three stood with no place and put
     // nothing in; now nobody waits for the saw: they work their wardrobes at their benches, and
     // every job gets the same hour (PIOTR, 24.09; v53). The hall's line for the four men at work
-    // and one saw place, (1 + 3 / 1.5) / 4 = 0.75, is on every minute: 32.00 at the saw and 0 for
-    // the other three until v53, 24.00 on each of the four now. v53 read 23.47, the owner counted
-    // as a fifth man against the place though he was at no job (v54).
+    // and a budget saw that keeps two busy, (2 + 2 / 1.5) / 4 = 0.8333, is on every minute, and
+    // the moulding's quarter is by hand on this hall, the job's pace 0.8889 (v55): 32.00 at the
+    // saw and 0 for the other three until v53, 23.70 on each of the four now (24.00 on v54, one
+    // saw place and the old shares; 23.47 on v53, the owner counted as a fifth man).
     const full = 60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced;
-    for (const value of done) expect(value).toBeCloseTo(full * ((1 + 3 / 1.5) / 4), 6);
-    expect(done[0]).toBeCloseTo(24, 4);
+    const pace = 1 / (0.75 + 0.25 * 1.5);
+    for (const value of done) expect(value).toBeCloseTo(full * pace * ((2 + 2 / 1.5) / 4), 6);
+    expect(done[0]).toBeCloseTo(23.7037, 4);
     expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(1);
     expect(worked.workers.filter((worker) => worker.station === 'machine:workbench')).toHaveLength(3);
     expect(worked.workers.filter((worker) => worker.station === STATION_HOME)).toHaveLength(0);

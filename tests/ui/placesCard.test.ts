@@ -9,6 +9,7 @@ import { findSpec } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
 import { menAtMachine, placesLine } from '../../src/engine/machines';
 import { planPlaces } from '../../src/engine/production';
+import { machineStation } from '../../src/engine/stations';
 import { renderHall } from '../../src/render/hall';
 import { ownedTile } from '../../src/ui/catalogue';
 import { renderMachineCard } from '../../src/ui/machineCard';
@@ -35,6 +36,12 @@ function twoAtAStandardSaw(): { state: GameState; saw: Equipment } {
   eddie.name = 'Eddie';
   withOnlyCuttingLeft(state);
   planPlaces(state);
+  // Their turns at the saw fall in different half hours (v55), so both are stood at it by hand,
+  // the way the plan stands them when the turns fall together: the card reads the stations.
+  for (const man of [pete, eddie]) {
+    man.working = true;
+    man.station = machineStation('tableSaw');
+  }
   const saw = state.equipment.find((item) => item.specId === 'tableSaw');
   if (saw === undefined) throw new Error('a saw is wanted');
   return { state, saw };

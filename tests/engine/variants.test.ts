@@ -259,13 +259,17 @@ describe('buying a class of machine', () => {
 
 describe('what a class of saw does to the work', () => {
   /** The cutting quarter of a 400 job, at this class of saw, and the three quarters after it. */
+  /** The 400 job's 240 minutes on the day one hall: the cutting's quarter at the saw's pace, the
+   *  edging's on the hand bander at 1.00, the moulding's by hand, the hall having no spindle
+   *  moulder, and the assembly's at 1.00 (v55). */
   function minutesWithSaw(factor: number): number {
-    return 240 * (0.25 / factor + 0.75);
+    return 240 * (0.25 / factor + 0.25 + 0.25 * BY_HAND_DURATION_FACTOR + 0.25);
   }
 
   it('moves the cutting quarter and leaves the other three alone', () => {
     const budget = withSaw('budget');
-    expect(minutesRemainingFor(budget, firstJob(budget), 1)).toBeCloseTo(240, 6);
+    expect(minutesRemainingFor(budget, firstJob(budget), 1)).toBeCloseTo(minutesWithSaw(1), 6);
+    expect(minutesRemainingFor(budget, firstJob(budget), 1)).toBeCloseTo(270, 6);
     const used = withSaw('used');
     expect(stageSpeed(used, firstJob(used), 'cutting').speed).toBeCloseTo(0.95, 10);
     expect(minutesRemainingFor(used, firstJob(used), 1)).toBeCloseTo(minutesWithSaw(0.95), 6);
@@ -306,26 +310,22 @@ describe('what a class of saw does to the work', () => {
     expect(hallPace(state, 'tableSaw')).toBe(1.12);
   });
 
-  it('cuts a solid wood job too, and machines it half on the thicknesser and half on the spindle', () => {
+  it('cuts a solid wood job too, and moulds it on the spindle moulder like every job', () => {
     const state = withSaw('industrial');
     const table = { ...firstJob(state), materialKind: 'solidWood' as const };
-    // Every job is cut on the saw (CLAUDE.md T7 3.1); only the machining takes the material, and
-    // timber is machined half on the thicknesser and half on the spindle moulder now the timber
-    // tool set is gone (PIOTR, 24.09; v53, v54). With neither in the hall both halves are by hand.
+    // Every job is cut on the saw (CLAUDE.md T7 3.1) and moulded on the spindle moulder, timber
+    // and sheet alike (PIOTR, 24.09; v55). With no spindle moulder in the hall the moulding is by
+    // hand; the thicknesser has no stage until the timber branch and changes nothing here.
     expect(stageSpeed(state, table, 'cutting').speed).toBeCloseTo(1.12, 10);
-    expect(familyForStage(table, 'machining')).toBe('thicknesser');
-    expect(stageSpeed(state, table, 'machining').byHand).toBe(true);
-    expect(stageSpeed(state, table, 'machining').speed).toBeCloseTo(1 / BY_HAND_DURATION_FACTOR, 10);
-    // A professional thicknesser alone: its half at the class's 1.08 (CLAUDE.md T25 2.4), the
-    // spindle's half by hand, and the stage takes the minutes the two halves add up to.
+    expect(familyForStage(table, 'moulding')).toBe('spindleMoulder');
+    expect(stageSpeed(state, table, 'moulding').byHand).toBe(true);
+    expect(stageSpeed(state, table, 'moulding').speed).toBeCloseTo(1 / BY_HAND_DURATION_FACTOR, 10);
     placeEquipment(state, 'thicknesser', { variantId: 'pro', x: 10, y: 8 });
-    const half = 1 / (0.5 / 1.08 + 0.5 * BY_HAND_DURATION_FACTOR);
-    expect(stageSpeed(state, table, 'machining').byHand).toBe(true);
-    expect(stageSpeed(state, table, 'machining').speed).toBeCloseTo(half, 10);
-    // And a professional spindle moulder beside it: both halves at 1.08.
+    expect(stageSpeed(state, table, 'moulding').byHand).toBe(true);
+    // A professional spindle moulder: the moulding at the class's 1.08 (CLAUDE.md T25 2.4).
     placeEquipment(state, 'spindleMoulder', { variantId: 'pro', x: 14, y: 8 });
-    expect(stageSpeed(state, table, 'machining').byHand).toBe(false);
-    expect(stageSpeed(state, table, 'machining').speed).toBeCloseTo(1.08, 10);
+    expect(stageSpeed(state, table, 'moulding').byHand).toBe(false);
+    expect(stageSpeed(state, table, 'moulding').speed).toBeCloseTo(1.08, 10);
   });
 });
 
@@ -353,9 +353,10 @@ describe('what a class of saw does to the life of the machine', () => {
     expect(saw.hoursUsed).toBe(0);
     expect(saw.enduranceHours).toBe(750);
     // An hour of cutting is an hour on the saw's own clock: its hours are the minutes somebody
-    // stood at it (CLAUDE.md T7 2).
+    // stood at it (CLAUDE.md T7 2). The owner's turn at the saw is the first half hour of the two
+    // and a bench the second (v55), so the hour books half an hour on it.
     const worked = machineOf(tick(state, 60), 'tableSaw');
-    expect(worked.hoursUsed).toBeCloseTo(1, 2);
+    expect(worked.hoursUsed).toBeCloseTo(0.5, 2);
     expect(pastEndurance(worked)).toBe(false);
     worked.hoursUsed = 750;
     expect(pastEndurance(worked)).toBe(true);

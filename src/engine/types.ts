@@ -18,9 +18,12 @@ export type MaterialKind = 'sheet' | 'solidWood';
 
 export type Finish = 'laminate' | 'lacquer' | 'veneer';
 
-/** The stages a job goes through in the hall (CLAUDE.md T7 3.1). `cnc` is the one stage a CNC
- *  does instead of Cutting and Machining; `delivery` carries no labour at all. */
-export type StageId = 'cutting' | 'machining' | 'cnc' | 'assembly' | 'finishing' | 'delivery';
+/** The stages a job goes through in the hall (CLAUDE.md T7 3.1): from v55 one stage a machine,
+ *  Cutting on the saw, Edging on the edgebander, Moulding on the spindle moulder and Assembly at
+ *  the bench, a quarter each, and Finishing in the booth for a lacquered job [PIOTR, 24.09: "every
+ *  machine has its own stage, split evenly"]. `cnc` is the one stage a CNC does instead of Cutting;
+ *  `delivery` carries no labour at all. `machining`, the 15% of v53 and before, is gone. */
+export type StageId = 'cutting' | 'edging' | 'moulding' | 'cnc' | 'assembly' | 'finishing' | 'delivery';
 
 /** One stage of the work, as the catalogue of stages holds it. */
 export interface StageSpec {

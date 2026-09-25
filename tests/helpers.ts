@@ -608,7 +608,7 @@ export const CREW = 6;
  *  done stays where the one cursor of Turns 1 to 23 put it, cutting first; the two stages are added
  *  on top and taken off what is left. */
 export function withOnlyCuttingLeft(state: GameState, jobIds: string[] | null = null): GameState {
-  const filled = ['machining', 'assembly'];
+  const filled = ['edging', 'moulding', 'assembly'];
   for (const job of state.jobs) {
     if (jobIds !== null && !jobIds.includes(job.id)) continue;
     const plan = stagePlanFor(state, job);

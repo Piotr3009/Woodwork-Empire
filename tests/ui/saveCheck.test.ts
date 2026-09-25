@@ -120,8 +120,9 @@ describe('a fresh game in this build', () => {
     // v53 is state 29: the job card's switch for the CNC is gone from every job and the timber
     // tool set from the game (PIOTR, 24.09; v53). v54 is state 30: miles on the vans and one family
     // of pallet trucks and forklifts (PIOTR, 24.09).
-    expect(APP_VERSION).toBe('v54');
-    expect(STATE_VERSION).toBe(30);
+    // v55 is state 31: one stage a machine and the bags of the old Machining emptied (PIOTR, 24.09).
+    expect(APP_VERSION).toBe('v55');
+    expect(STATE_VERSION).toBe(31);
   });
 
   it('saves through the store, the file and the cloud row on day 1, and loads back three ways', async () => {

@@ -133,12 +133,16 @@ import type {
  *  Version 30 is v54 (PIOTR, 24.09): the vans are five classes with miles on the clock, and the
  *  pallet trucks and the forklifts one family of five. Every v25 to v29 save loads: a pallet
  *  truck becomes the hand pallet truck, a better forklift the better forklift of the one family,
- *  and every van the standard one it was. */
-export const STATE_VERSION = 30;
+ *  and every van the standard one it was.
+ *
+ *  Version 31 is v55 (PIOTR, 24.09): one stage a machine, a quarter each, and the booth's
+ *  Finishing for lacquer alone. Every v25 to v30 save loads: the bag of the Machining that is gone
+ *  is poured into the new stages in order, and nothing of a job is lost. */
+export const STATE_VERSION = 31;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v54';
+export const APP_VERSION = 'v55';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -552,23 +556,33 @@ export const WORK_EPSILON = 1e-9;
 
 /** What a job is made of, in the order the workshop does it, and what share of the labour each
  *  stage carries [TUNE]. They add up to 1 (CLAUDE.md T7 3.1). */
-export const PRODUCTION_STAGES: StageSpec[] = [
+/** The four machine stages of every job, whatever it is made of, a quarter of the work each: one
+ *  stage a machine, so every machine in the hall has its own work and its own hours [PIOTR, 24.09:
+ *  "split it evenly over every machine, every job the same, sheet or timber"] (v55). The sanding of
+ *  v53's Finishing is in the Assembly now; the thicknesser has no stage until the timber branch. */
+export const MACHINE_STAGES: StageSpec[] = [
   { id: 'cutting', label: 'Cutting', share: 0.25 },
-  { id: 'machining', label: 'Machining', share: 0.15 },
-  { id: 'assembly', label: 'Assembly', share: 0.45 },
-  { id: 'finishing', label: 'Finishing', share: 0.15 },
+  { id: 'edging', label: 'Edging', share: 0.25 },
+  { id: 'moulding', label: 'Moulding', share: 0.25 },
+  { id: 'assembly', label: 'Assembly', share: 0.25 },
 ];
 
-/** A CNC does the cutting and the machining of a sheet job as one stage, so it carries the two
- *  shares together (CLAUDE.md T7 3.4). */
-export const CNC_STAGE: StageSpec = {
-  id: 'cnc',
-  label: 'CNC',
-  share: (PRODUCTION_STAGES[0]?.share ?? 0) + (PRODUCTION_STAGES[1]?.share ?? 0),
-};
+/** A lacquered job's Finishing: the booth's own stage and the sprayer's own work, 15% of the job,
+ *  and the four machine stages share the rest between them [PIOTR, 24.09] (v55). A job that is not
+ *  lacquered has no Finishing stage at all. */
+export const FINISHING_STAGE: StageSpec = { id: 'finishing', label: 'Finishing', share: 0.15 };
 
-/** What the CNC does to the minutes of that one stage: it replaces three saws, which is about a
- *  fifth off the whole job (PIOTR). The tool changer head takes it a little further [TUNE]. */
+/** Every stage a job can carry, once each, for the lists that name them (the bar's labels, the
+ *  bags a save carries). The shares here are the machine stages' quarters and the booth's 15%;
+ *  `stagesOf` in stages.ts scales them for the job in hand. */
+export const PRODUCTION_STAGES: StageSpec[] = [...MACHINE_STAGES, FINISHING_STAGE];
+
+/** A CNC does the cutting of a sheet job instead of the saw: its stage carries the Cutting's share
+ *  (CLAUDE.md T7 3.4; v55). The edging and the moulding stay on their own machines. */
+export const CNC_STAGE: StageSpec = { id: 'cnc', label: 'CNC', share: MACHINE_STAGES[0]?.share ?? 0 };
+
+/** What the CNC does to the minutes of its own stage: it replaces the saws, twice as fast as one
+ *  (PIOTR). The tool changer head takes it a little further [TUNE]. */
 export const CNC_STAGE_FACTOR = 2;
 export const CNC_STAGE_FACTOR_WITH_HEAD = 2.1;
 /** Parts come off a CNC cut and drilled, so the assembly takes half the minutes (PIOTR). */
@@ -1463,14 +1477,28 @@ export const MACHINE_PACE: Record<string, number> = {
  *  other family's class is its capacity, its air or its store, and never a speed. */
 export const PACED_FAMILIES: readonly string[] = Object.keys(MACHINE_PLACES);
 
-/** How many men of the crew one place at a machine of this family covers before the hall is short
- *  of them: one man, one place at a saw [PIOTR, 24.09: "me and two men is three; with four, too few
- *  saws for the men"]. A man past the places still works, somewhere else, and his minute goes at
- *  the by hand pace, `1 / BY_HAND_DURATION_FACTOR`, which is what the Output sheet's line for it
- *  prints (v53). A family that is not here is never short. The other families wait for Piotr's
- *  own figures. */
-export const MEN_PER_PLACE: Record<string, number> = {
-  tableSaw: 1,
+/** How long a man's turn at a machine holds before he moves on to the next of his job's: half an
+ *  hour, so the men move about the hall the way a shop's do and the figures do not flicker [TUNE]
+ *  (v55). */
+export const DRAW_BLOCK_MINUTES = 30;
+
+/** How many men one machine of a class keeps busy before the hall is short of that family: the
+ *  saw from one man to four up its ladder, the edgebander and the spindle moulder twice that
+ *  because the trade uses them less, a CNC from four to ten, so a hall with one needs no saw at
+ *  all, and the booth and the thicknesser like the saw [PIOTR, 24.09: "from one man to four for
+ *  the best saw, the same with the other machines; a CNC replaces four to ten men's saws"] (v55).
+ *  Only the men whose work goes through the family count against it (`crewAtFamily`), and a man
+ *  past the capacity still works, somewhere else, at the by hand pace,
+ *  `1 / BY_HAND_DURATION_FACTOR`, which is what the Output sheet's line for it prints (v53). A
+ *  family that is not here is never short: its quarter of the work is by hand already. The two
+ *  hand edgebanders live in a cabinet and have no capacity to be short of. */
+export const MACHINE_CAPACITY: Record<string, Record<string, number>> = {
+  tableSaw: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
+  edgebander: { used: 2, budget: 4, standard: 4, pro: 6, industrial: 8 },
+  spindleMoulder: { used: 2, budget: 4, standard: 4, pro: 6, industrial: 8 },
+  cnc: { used: 4, budget: 5, standard: 6, pro: 8, industrial: 10 },
+  sprayBooth: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
+  thicknesser: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
 };
 
 /** The five classes of workbench. Prices, places and footprints are Piotr's table; the endurance
@@ -2098,10 +2126,10 @@ export const AIR_DEMAND: Record<string, Record<string, { bar: number; litres: nu
   },
 };
 
-/** What one man at a bench draws for his nailer and his driver, and what one man doing pneumatic
- *  sanding at Finishing draws, a minute (PIOTR, CLAUDE.md T10 3.2). */
+/** What one man at a bench draws for his nailer and his driver, a minute (PIOTR, CLAUDE.md T10
+ *  3.2). The pneumatic sanding of a Finishing at a bench, 200 l/min, went with that stage in v55:
+ *  the sanding is in the Assembly now. */
 export const AIR_BENCH_DEMAND = { bar: 6, litres: 30 };
-export const AIR_SANDING_DEMAND = { bar: 6, litres: 200 };
 
 /** The trade's diversity factor: nothing on the line draws its full figure all the time, so the
  *  sum is worked at 0.6 of it (PIOTR: the trade's 0.5 to 0.6). And the pipe is worked to 0.85 of
@@ -3004,7 +3032,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     zoneDepth: 2,
     spriteKey: 'thicknesser',
     usedOn: 'solidWood',
-    effect: 'Planes and thicknesses timber. With it the workshop takes on solid wood.',
+    effect:
+      'Planes and thicknesses timber. With it the workshop takes on solid wood. Timber only: a ' +
+      'sheet job never touches it, and its own stage comes with the timber branch.',
   },
   {
     ...BASE_SPEC,
@@ -4114,6 +4144,7 @@ export const MACHINE_SHORT_WORDS: Record<string, string> = {
   cnc: 'CNC',
   sprayBooth: 'booth',
   spindleMoulder: 'moulder',
+  edgebander: 'edgebander',
   workbench: 'bench',
 };
 

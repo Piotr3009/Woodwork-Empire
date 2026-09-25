@@ -11,7 +11,6 @@ import {
   EQUIPMENT_SPECS,
   HIRING_SPECS,
   LOCKER_SLOT_LAYOUT,
-  PRODUCTION_STAGES,
   SOUND_VOLUME_DEFAULT,
   STATE_VERSION,
   UNIT_WIDTH_CELLS,
@@ -575,6 +574,15 @@ function liftToVersion20(state: Raw): void {
  *  into the stages in the plan's order, cutting first, until it runs out: exactly where the cursor
  *  said the job was. A job cut on a CNC put its minutes into the same first two shares, which is
  *  what the CNC's stage reads (`stageDone`), so the CNC plan lands in the same place. */
+/** The stages and their shares as v21 had them, frozen here: a lift pours by the table of its own
+ *  day, whatever the game's table is now (v55). */
+const STAGES_OF_V21: ReadonlyArray<{ id: string; share: number }> = [
+  { id: 'cutting', share: 0.25 },
+  { id: 'machining', share: 0.15 },
+  { id: 'assembly', share: 0.45 },
+  { id: 'finishing', share: 0.15 },
+];
+
 function liftToVersion21(state: Raw): void {
   for (const job of records(state.jobs)) {
     if (isRecord(job.stageLabour)) continue;
@@ -582,7 +590,7 @@ function liftToVersion21(state: Raw): void {
     const remaining = typeof job.labourRemaining === 'number' ? job.labourRemaining : value;
     let done = Math.max(0, value - remaining);
     const stageLabour: Record<string, number> = {};
-    for (const stage of PRODUCTION_STAGES) {
+    for (const stage of STAGES_OF_V21) {
       const need = stage.share * value;
       const put = Math.min(done, need);
       if (put > 0) stageLabour[stage.id] = put;
@@ -835,6 +843,21 @@ function takeTheTimberToolsBack(state: GameState): void {
   receive(state, 'equipment', 'Timber tool set taken back: it is no longer in the game', back);
 }
 
+/** Version 30 to 31: one stage a machine, a quarter each, and the booth's Finishing for lacquer
+ *  alone (PIOTR, 24.09; v55). The bag of the Machining that is gone, and of the Finishing of a job
+ *  that is not lacquered, is emptied: its labour stays in the job (`labourRemaining` is untouched)
+ *  and is poured into the new stages in order by `stageDone`, cutting first, which is where the
+ *  bar stood it. Nothing of the job is lost. */
+function liftToVersion31(state: Raw): void {
+  for (const job of records(state.jobs)) {
+    if (!isRecord(job.stageLabour)) continue;
+    const bags = job.stageLabour as Record<string, unknown>;
+    delete bags.machining;
+    if (job.finish !== 'lacquer') delete bags.finishing;
+  }
+  state.version = 31;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -854,6 +877,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   27: liftToVersion28,
   28: liftToVersion29,
   29: liftToVersion30,
+  30: liftToVersion31,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

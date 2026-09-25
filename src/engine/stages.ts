@@ -1,6 +1,8 @@
-// The stages of a job (CLAUDE.md T7 3.1): cut, machined, assembled and finished. From v53 they are
-// the bar the player reads and the pace the hall works a job at, and nothing more: nobody waits for
-// a stage, and every man on a job works it whatever stage the bar stands at [PIOTR, 24.09: "no
+// The stages of a job (CLAUDE.md T7 3.1): from v55 one stage a machine, Cutting, Edging, Moulding
+// and Assembly, a quarter of the work each whatever the job is made of, and the booth's Finishing
+// for a lacquered job [PIOTR, 24.09: "every machine has its own stage, split evenly"]. From v53 they
+// are the bar the player reads and the pace the hall works a job at, and nothing more: nobody waits
+// for a stage, and every man on a job works it whatever stage the bar stands at [PIOTR, 24.09: "no
 // stages, they just make the one project; the bar shows the stages, but really there are none"].
 //
 // The whole of a job's place in its own work is one number, `labourRemaining`, exactly as it was:
@@ -13,7 +15,9 @@ import {
   CNC_STAGE,
   CNC_STAGE_FACTOR,
   CNC_STAGE_FACTOR_WITH_HEAD,
+  FINISHING_STAGE,
   JOINER_SPRAY_RATE,
+  MACHINE_STAGES,
   OWNER_LABOUR_PER_MINUTE,
   PRODUCTION_STAGES,
   SPRAYER_BENCH_RATE,
@@ -38,8 +42,8 @@ export interface StagedJob {
   materialKind: MaterialKind;
   finish: Finish;
   byHand: boolean;
-  /** The machining is done on the spindle moulder: a handleless kitchen's J profile, a sprayed
-   *  kitchen's fronts (CLAUDE.md T13 3.13). */
+  /** Kept on the job since Turn 13 (a handleless kitchen's J profile, a sprayed kitchen's fronts):
+   *  from v55 every job has its Moulding on the spindle moulder and this changes nothing. */
   needsSpindle: boolean;
 }
 
@@ -79,7 +83,8 @@ export function stageLabel(id: StageId): string {
  *  (`hallLoops`, lacquer to the booth and the rest to the sander). */
 export function stageDoing(id: StageId, lacquer: boolean): string {
   if (id === 'cutting' || id === CNC_STAGE.id) return 'cutting';
-  if (id === 'machining') return 'machining';
+  if (id === 'edging') return 'edging';
+  if (id === 'moulding') return 'moulding';
   if (id === 'assembly') return 'assembling';
   if (id === 'finishing') return lacquer ? 'spraying' : 'sanding';
   return stageLabel(id).toLowerCase();
@@ -107,29 +112,25 @@ export function cncFactor(state: GameState): number {
   return has(state, 'cncHead') ? CNC_STAGE_FACTOR_WITH_HEAD : CNC_STAGE_FACTOR;
 }
 
-/** The families a job's Machining is done on. Timber goes half on the thicknesser and half on
- *  the spindle moulder [PIOTR, 24.09: "the thicknesser and the spindle moulder, half each"] (v54):
- *  the timber tool set is gone from the game (v53). A sheet job is banded, or moulded on the
- *  spindle when it wants a profile. */
-export function machiningFamilies(job: StagedJob): string[] {
-  if (job.materialKind !== 'sheet') return ['thicknesser', 'spindleMoulder'];
-  return [job.needsSpindle ? 'spindleMoulder' : 'edgebander'];
-}
-
-/** The family a stage is done on for a job of this material and finish, or null when it is done
- *  at the bench with nothing but hands (CLAUDE.md T7 3.1). */
+/** The family a stage is done on, the same for every job whatever it is made of [PIOTR, 24.09]
+ *  (v55): the saw, the edgebander, the spindle moulder, the bench, and the booth for a lacquered
+ *  job's Finishing. Null for nothing but hands. The thicknesser has no stage until the timber
+ *  branch: a job never sends a man to it. */
 export function familyForStage(job: StagedJob, stage: StageId): string | null {
   if (stage === 'cnc') return 'cnc';
   if (stage === 'cutting') return 'tableSaw';
-  if (stage === 'machining') return machiningFamilies(job)[0] ?? null;
+  if (stage === 'edging') return 'edgebander';
+  if (stage === 'moulding') return 'spindleMoulder';
   if (stage === 'assembly') return 'workbench';
   if (stage === 'finishing') return job.finish === 'lacquer' ? SPRAY_BOOTH : null;
   return null;
 }
 
-/** Only cutting and machining fall back to a pair of hands. A bench is not a speed: without one
- *  nothing is made at all, which the hall says for itself (CLAUDE.md T4 3.4). */
-const BY_HAND_STAGES: StageId[] = ['cutting', 'machining', 'cnc'];
+/** The machine stages fall back to a pair of hands: a quarter of the job the hall has no machine
+ *  for is done by hand at the by hand pace, which is what a machine is bought for [PIOTR, 24.09;
+ *  v55]. A bench is not a speed: without one nothing is made at all, which the hall says for
+ *  itself (CLAUDE.md T4 3.4). */
+const BY_HAND_STAGES: StageId[] = ['cutting', 'edging', 'moulding', 'cnc'];
 
 /** What the hall does to the minutes of one stage: the hall's pace for the family it is done on
  *  (CLAUDE.md T25 2.4), or the by hand penalty when the family is not in the hall or none of it
@@ -145,20 +146,6 @@ export function stageSpeed(
   if (job.byHand) return { speed: 1 / BY_HAND_DURATION_FACTOR, byHand: true };
   // The CNC's own head times the hall's pace at it, like every family (CLAUDE.md T25 2.4).
   if (stage === 'cnc') return { speed: cncFactor(state) * hallPace(state, 'cnc'), byHand: false };
-  // Timber's Machining is shared between two machines, half the work on each: the stage takes
-  // the minutes the two halves add up to, each at its own machine's pace or by hand (v54).
-  if (stage === 'machining' && machiningFamilies(job).length > 1) {
-    let minutes = 0;
-    let byHand = false;
-    const halves = machiningFamilies(job);
-    for (const half of halves) {
-      const runs = has(state, half) && familyRuns(state, half);
-      const speed = runs ? hallPace(state, half) : 1 / BY_HAND_DURATION_FACTOR;
-      if (!runs) byHand = true;
-      minutes += 1 / halves.length / speed;
-    }
-    return { speed: 1 / minutes, byHand };
-  }
   const family = familyForStage(job, stage);
   if (family === null) return { speed: 1, byHand: false };
   // Parts come off a CNC cut and drilled, so the bench takes half the minutes (CLAUDE.md T7 3.4).
@@ -170,11 +157,18 @@ export function stageSpeed(
   return { speed: cnc / BY_HAND_DURATION_FACTOR, byHand: true };
 }
 
-/** The stages of a job, in order, with the labour each one carries. A CNC does the cutting and
- *  the machining of a sheet job as one (CLAUDE.md T7 3.4). */
+/** The stages of a job, in order, with the share of the labour each one carries: the four machine
+ *  stages, a quarter each, and for a lacquered job the booth's Finishing at its 15% with the four
+ *  sharing the rest [PIOTR, 24.09] (v55). A CNC does the cutting instead of the saw
+ *  (CLAUDE.md T7 3.4). */
 export function stagesOf(state: GameState, job: StagedJob, options: StageOptions = {}): StageSpec[] {
-  if (!jobOnCnc(state, job, options)) return PRODUCTION_STAGES;
-  return [CNC_STAGE, ...PRODUCTION_STAGES.filter((stage) => stage.id === 'assembly' || stage.id === 'finishing')];
+  const lacquer = job.finish === 'lacquer';
+  const scale = lacquer ? 1 - FINISHING_STAGE.share : 1;
+  const machines = MACHINE_STAGES.map((stage) => {
+    const spec = stage.id === 'cutting' && jobOnCnc(state, job, options) ? CNC_STAGE : stage;
+    return { ...spec, share: stage.share * scale };
+  });
+  return lacquer ? [...machines, FINISHING_STAGE] : machines;
 }
 
 /** The plan for a job as the hall stands now. It is read every minute, so buying a machine speeds
@@ -233,22 +227,19 @@ export function labourDone(job: Job): number {
  *  the labour the job carries that no bag names, poured into the plan in order, cutting first,
  *  which is where the one cursor of Turns 1 to 23 would have stood it. The pour covers a save
  *  lifted from before the bags and a test that moves `labourRemaining` by hand, and costs a
- *  played job nothing, because every minute it works goes into a bag. A CNC does the cutting and
- *  the machining as one, so what went in on the saw and the edgebander counts for the CNC's stage
- *  and what went in on the CNC counts for the saw's and the edgebander's in their shares: a job
- *  half cut on the saw may finish on the CNC and the bag is one bag (CLAUDE.md T7 3.4; v37). */
+ *  played job nothing, because every minute it works goes into a bag. A CNC does the cutting
+ *  instead of the saw, so what went in on the saw counts for the CNC's stage and what went in on
+ *  the CNC counts for the saw's: a job half cut on the saw may finish on the CNC and the bag is
+ *  one bag (CLAUDE.md T7 3.4; v37, v55). */
 export function stageDone(job: Job, plan: readonly StagePlan[], stage: StagePlan): number {
   const put = (id: StageId): number => job.stageLabour[id] ?? 0;
   const bagged = (entry: StagePlan): number => {
-    if (entry.id === 'cnc') return put('cnc') + put('cutting') + put('machining');
-    if (entry.id === 'cutting' || entry.id === 'machining') {
-      const sheetShare = CNC_STAGE.share;
-      return put(entry.id) + (sheetShare > 0 ? put('cnc') * (entry.share / sheetShare) : 0);
-    }
+    if (entry.id === 'cnc') return put('cnc') + put('cutting');
+    if (entry.id === 'cutting') return put('cutting') + put('cnc');
     return put(entry.id);
   };
   let loose = labourDone(job);
-  for (const id of ['cutting', 'machining', 'cnc', 'assembly', 'finishing', 'delivery'] as StageId[]) {
+  for (const id of ['cutting', 'edging', 'moulding', 'cnc', 'assembly', 'finishing', 'delivery'] as StageId[]) {
     loose -= put(id);
   }
   let done = 0;

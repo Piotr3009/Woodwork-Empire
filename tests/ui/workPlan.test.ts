@@ -24,6 +24,7 @@ import {
   hireNow,
   newGame,
   placeEnquiry,
+  placeEquipment,
 } from '../helpers';
 
 function parse(html: string): HTMLElement {
@@ -158,10 +159,13 @@ describe('a job nobody has started', () => {
 describe('a job somebody has started', () => {
   it('shows the minutes done of the minutes it takes, and fills the bar that far', () => {
     // A small job, so three quarters of its work fits inside one morning and the test can put the
-    // clock where that morning ends.
+    // clock where that morning ends. A budget spindle moulder beside the saw, so every quarter of
+    // the job runs at 1.00 and its minutes are a whole number (v55).
     const state = act(boardWith({ price: 400 }), { type: 'WORK_HERE', jobId: null });
+    placeEquipment(state, 'spindleMoulder', { variantId: 'budget', x: 14, y: 1, id: 'kit-spindle' });
     const job = firstJob(state);
     const whole = minutesRemainingFor(state, job, 1);
+    expect(whole).toBe(240);
     expect(whole * 0.75).toBeLessThan(BREAK_START_MINUTE);
     // Three quarters of the work done, and three quarters of the work's minutes gone by: the way
     // a real morning at the bench leaves it (CLAUDE.md T11 3.3).

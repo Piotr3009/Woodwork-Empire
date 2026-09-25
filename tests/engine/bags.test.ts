@@ -179,15 +179,16 @@ describe('emptying the bags', () => {
   it('stops every machine that makes dust while the bags are full, and the job goes on by hand', () => {
     let state = fillBags(ownerCutting());
     // The saw and the hand edgebander both make dust, so neither runs: the cutting's quarter and
-    // the machining's fifteen per cent go at the by hand 1 / 1.5, the rest at 1.00.
-    expect(jobPace(state, firstJob(state))).toBeCloseTo(1 / (0.4 * 1.5 + 0.6), 10);
+    // the edging's go at the by hand 1 / 1.5, and so does the moulding's, the hall having no
+    // spindle moulder; the assembly's at 1.00 (v55).
+    expect(jobPace(state, firstJob(state))).toBeCloseTo(1 / (0.75 * 1.5 + 0.25), 10);
     const before = firstJob(state).labourRemaining;
     state = tick(state, 30);
     // Until v53 the job stood with `bags full` on it and not a minute went in. Now it is not
-    // stopped: the owner works it at a bench, 16.67 of labour in the half hour, and the saw has
-    // nobody at it (PIOTR, 24.09; v53).
+    // stopped: the owner works it at a bench, 14.55 of labour in the half hour (16.67 on v53,
+    // with the old shares), and the saw has nobody at it (PIOTR, 24.09; v53).
     expect(firstJob(state).blockedBy).toBe('');
-    expect(before - firstJob(state).labourRemaining).toBeCloseTo(30 * OWNER_LABOUR_PER_MINUTE / 1.2, 6);
+    expect(before - firstJob(state).labourRemaining).toBeCloseTo(30 * OWNER_LABOUR_PER_MINUTE / 1.375, 6);
     expect(state.owner.station).toBe('machine:workbench');
     expect(menAtMachine(state, machineOf(state, 'tableSaw'))).toEqual([]);
     // Nothing asks on its own while they stand stopped; the extractor asks when it is clicked.
@@ -200,9 +201,10 @@ describe('emptying the bags', () => {
     const emptied = firstJob(state).labourRemaining;
     const running = tick(state, 30);
     expect(firstJob(running).blockedBy).toBe('');
-    // The saw runs again and he is back at it, the job at its pace with the used saw: 0.9870.
+    // The saw runs again and he is back at it, the job at its pace with the used saw: 0.8786
+    // (0.9870 on v53, with the old shares).
     expect(emptied - firstJob(running).labourRemaining).toBeCloseTo(
-      (30 * OWNER_LABOUR_PER_MINUTE) / (0.25 / 0.95 + 0.75),
+      (30 * OWNER_LABOUR_PER_MINUTE) / (0.25 / 0.95 + 0.25 + 0.25 * 1.5 + 0.25),
       6,
     );
     expect(menAtMachine(running, machineOf(running, 'tableSaw'))).toEqual(['owner']);
@@ -224,7 +226,7 @@ describe('emptying the bags', () => {
     expect(state.activeEvent).toBeNull();
     expect(firstJob(state).blockedBy).toBe('');
     expect(menAtMachine(state, machineOf(state, 'tableSaw'))).toEqual([]);
-    expect(before - firstJob(state).labourRemaining).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE / 1.2, 6);
+    expect(before - firstJob(state).labourRemaining).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE / 1.375, 6);
   });
 
   it('is the helper s the minute they fill, for nothing, and nobody stops', () => {

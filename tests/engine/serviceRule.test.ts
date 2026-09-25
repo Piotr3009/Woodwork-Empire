@@ -221,14 +221,15 @@ describe('what the day costs when the machine goes out (CLAUDE.md T20 2.9.3; v53
     // Until v53 the work did not happen: the stage the saw makes stood, the job read `table saw is
     // in for a service` and its progress stayed at 0. Now nothing stops the job: its cutting goes
     // at the by hand 1 / 1.5 while the saw is away, and the day's output falls by that and no more
-    // (PIOTR, 24.09; v53). The morning's 157.92 of labour with the used saw, at the job's pace of
-    // 0.9870, is 142.22 with it away, at 0.8889: 0.0395 of the job against 0.0356.
+    // (PIOTR, 24.09; v53). The morning's 140.58 of labour with the used saw, at the job's pace
+    // of 0.8786 on a hall whose moulding is by hand (v55), is 128.00 with it away, at 0.8000:
+    // 0.0351 of the job against 0.0320 (157.92 and 142.22 on v53, with the old shares).
     expect(hallBlock(stopped, firstJob(stopped))).toBe('');
     const done = (state: GameState): number => firstJob(state).labourValue - firstJob(state).labourRemaining;
-    expect(done(worked)).toBeCloseTo((240 * OWNER_LABOUR_PER_MINUTE) / (0.25 / 0.95 + 0.75), 6);
-    expect(done(stopped)).toBeCloseTo((240 * OWNER_LABOUR_PER_MINUTE) / (0.25 * 1.5 + 0.75), 6);
-    expect(jobProgress(firstJob(worked))).toBeCloseTo(0.0395, 4);
-    expect(jobProgress(firstJob(stopped))).toBeCloseTo(0.0356, 4);
+    expect(done(worked)).toBeCloseTo((240 * OWNER_LABOUR_PER_MINUTE) / (0.25 / 0.95 + 0.25 + 0.25 * 1.5 + 0.25), 6);
+    expect(done(stopped)).toBeCloseTo((240 * OWNER_LABOUR_PER_MINUTE) / (0.25 * 1.5 + 0.25 + 0.25 * 1.5 + 0.25), 6);
+    expect(jobProgress(firstJob(worked))).toBeCloseTo(0.0351, 4);
+    expect(jobProgress(firstJob(stopped))).toBeCloseTo(0.032, 4);
   });
 });
 
@@ -331,10 +332,12 @@ describe('the extractor is serviced like a machine (CLAUDE.md T23 2.8)', () => {
   }
 
   it('books an hour of its own for every hour the extraction runs', () => {
-    // One man at the saw for an hour is an hour of the duct being open, and a fan pulls for the
-    // hall and not for one man: it books that hour whoever is at what.
+    // One man at the saw for half an hour is half an hour of the duct being open, and a fan pulls
+    // for the hall and not for one man: it books that half hour whoever is at what. The owner's
+    // turn at the saw is the first half hour and a bench the second (v55), so the hour's cutting
+    // is thirty minutes of the duct.
     const state = tick(cutting(), 60);
-    expect(theFan(state).hoursUsed).toBeCloseTo(1, 4);
+    expect(theFan(state).hoursUsed).toBeCloseTo(0.5, 4);
     // Those hours are its life running down, against the endurance its class has; since v51 the
     // service itself is on the calendar and the hours say nothing about it.
     expect(theFan(state).enduranceHours).toBeGreaterThan(theFan(state).hoursUsed);

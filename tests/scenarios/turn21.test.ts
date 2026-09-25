@@ -157,11 +157,13 @@ function fourMenTwoJobs(benchWork: boolean): FourMen {
   state = act(state, { type: 'ASSIGN_JOB', jobId: benchId, workerId: crew[2] ?? null });
   state = act(state, { type: 'ADD_TO_JOB', jobId: benchId, workerId: crew[3] ?? '' });
   // `labourRemaining` counts what is left, so a twentieth of the way through its making is the
-  // cutting stage and fifty five per cent of the way through is the assembly one, which is the
-  // reading tests/engine/nobodyMoved.test.ts takes of the same two stages.
+  // cutting stage and four fifths of the way through is the assembly one, which is the reading
+  // tests/engine/nobodyMoved.test.ts takes of the same two stages. Fifty five per cent of the way
+  // through until v55, when every job became four even quarters (PIOTR, 24.09) and fifty five per
+  // cent became the moulding quarter.
   jobOn(state, cuttingId).labourRemaining = jobOn(state, cuttingId).labourValue * 0.95;
   jobOn(state, benchId).labourRemaining =
-    jobOn(state, benchId).labourValue * (benchWork ? 0.45 : 0.95);
+    jobOn(state, benchId).labourValue * (benchWork ? 0.2 : 0.95);
   // The bag of work (v37) would send the second man of a cutting job to its machining, and from
   // v43 to its assembly, while the saw is taken; this scene is about the saw, so a job at its
   // cutting has nothing else left and the saw is its one open station. The bench job keeps its
@@ -288,8 +290,10 @@ describe('(gg) four men, one saw and two jobs, on Very easy', () => {
     // (PIOTR, 24.09: "me and two men is three"). v53 counted five, the owner among them though he
     // spends the day on his own list and never at a bench (below); from v54 the crew is the men at
     // work (v54).
+    // From v55 the line counts the men whose job goes through a saw against what the saw keeps
+    // busy, a used saw one man: both jobs have a cutting quarter, so all four count.
     for (const man of GG.men) expect(GG.said.get(man.name), man.name).toBeUndefined();
-    expect(shortageLine(GG.opening, 'tableSaw')).toBe('Too few saws for the crew: 4 men, 1 place, 3 work at 67%');
+    expect(shortageLine(GG.opening, 'tableSaw')).toBe('Too few saws for the crew: 4 men, capacity 1, 3 work at 67%');
     console.log(
       '(gg) FOUR MEN, ONE SAW, TWO JOBS\n' +
         `the hall on day ${GG.opening.clock.day}: ${GG.men.length} joiners, ` +

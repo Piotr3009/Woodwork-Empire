@@ -50,7 +50,7 @@ describe('the day 128 save (PIOTR, 22.09; v46)', () => {
     expect(hallHasABench(state)).toBe(true);
   });
 
-  it('has the owner cut at the saw s one place and the three joiners work the job at its other machines', () => {
+  it('spreads the four men over the kitchen s four machines, one each, and nobody stands', () => {
     let state = day128();
     const job = state.jobs.find((entry) => entry.stage === 'inProduction');
     if (!job) throw new Error('the job is wanted');
@@ -59,31 +59,34 @@ describe('the day 128 save (PIOTR, 22.09; v46)', () => {
     state = runClock(state, 30);
     const after = state.jobs.find((entry) => entry.id === job.id);
     expect(after?.blockedBy).toBe('');
-    // The four men's half hour on the job, 63.56 of labour, all of it written on the cutting where
-    // the bar stands. Until v53 it was the owner's half hour alone (PIOTR, 24.09; v53).
-    expect(before - (after?.labourRemaining ?? before)).toBeCloseTo(63.558, 3);
-    // The cutting wants the saw and the saw is a budget one, one place: the owner, first in the
-    // day plan's order, has it (CLAUDE.md T25 2.3).
+    // The four men's half hour on the job, 70.75 of labour, all of it written on the cutting
+    // where the bar stands. Until v53 it was the owner's half hour alone (PIOTR, 24.09; v53);
+    // 63.56 on v54, with the old shares and a saw place for one man.
+    expect(before - (after?.labourRemaining ?? before)).toBeCloseTo(70.754, 3);
+    // The kitchen's round is its four machines, the saw, the edgebander, the spindle moulder and
+    // the bench, and the four men go round them one each, moving on every half hour: at 9:53,
+    // the second half hour of the day, the owner is at the edgebander and Pete at the saw's one
+    // place (v55).
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('the saw is wanted');
     expect(hallPlaces(state, 'tableSaw')).toBe(1);
-    expect(menAtMachine(state, saw)).toEqual([OWNER]);
-    expect(state.owner.station).toBe('machine:tableSaw');
-    // The three joiners take free places at the job's other machines, in the order they were
-    // hired: the edgebander's one place, then the industrial bench's. Nobody stands and nobody
-    // has a mark over his head; each of them worked the whole half hour.
+    expect(state.clock.minute).toBe(53);
+    expect(state.owner.station).toBe('machine:edgebander');
+    // Nobody stands and nobody has a mark over his head; each of them worked the whole half hour.
     const joiners = state.workers.filter((entry) => entry.role === 'joiner');
     expect(joiners.map((worker) => `${worker.name} ${worker.station}`)).toEqual([
-      'Eddie machine:edgebander',
-      'Pete machine:workbench',
-      'Callum machine:workbench',
+      'Eddie machine:workbench',
+      'Pete machine:tableSaw',
+      'Callum machine:spindleMoulder',
     ]);
+    expect(menAtMachine(state, saw)).toEqual([joiners[1]?.id]);
     for (const worker of joiners) {
       expect(bubbleFor(state, worker.id), worker.name).toBeNull();
       expect(worker.productionMinutes - (minutesBefore.get(worker.id) ?? 0), worker.name).toBe(30);
     }
+    // Four men whose work goes through the saw and a budget saw that keeps two busy (v55).
     const hall = outputBreakdown(state).lines.filter((line) => line.hall);
-    expect(hall.map((line) => `${line.label} ${line.points}`)).toContain('Too few saws: 1 place, 4 men -0.25');
+    expect(hall.map((line) => `${line.label} ${line.points}`)).toContain('Too few saws: capacity 2, 4 men -0.1667');
   });
 
   it('has the helper start on the bags at 80%, before they are full', () => {
@@ -113,7 +116,7 @@ function day149(): GameState {
 }
 
 describe('the day 149 save (PIOTR, 22.09; v47)', () => {
-  it('has the owner at a saw s place within a minute, and the kitchen moves', () => {
+  it('has the owner at one of the kitchen s machines within a minute, and the kitchen moves', () => {
     let state = day149();
     const kitchen = state.jobs.find((job) => job.name.startsWith('Small kitchen') && job.stage === 'inProduction');
     if (!kitchen) throw new Error('the kitchen is wanted');
@@ -126,7 +129,9 @@ describe('the day 149 save (PIOTR, 22.09; v47)', () => {
     const after = state.jobs.find((job) => job.id === kitchen.id);
     expect(after?.labourRemaining ?? before).toBeLessThan(before);
     expect(after?.blockedBy).toBe('');
-    expect(state.owner.station).toBe('machine:tableSaw');
+    // At 15:09 his turn round the kitchen's four machines is the spindle moulder (v55); until v55
+    // the bar's saw put him at a saw.
+    expect(state.owner.station).toBe('machine:spindleMoulder');
     expect(bubbleFor(state, OWNER)).toBe(null);
     // The three at the bench carry on assembling the oak table, every one of them working.
     for (const worker of state.workers) {
@@ -134,14 +139,13 @@ describe('the day 149 save (PIOTR, 22.09; v47)', () => {
     }
   });
 
-  it('gives the owner a place at the bench first, and the last man in has every place taken', () => {
-    // The same hall with the kitchen's cutting and machining done: the kitchen's bar stands at the
-    // assembly, so the owner goes to a bench first. The industrial bench has three places and the
-    // oak table's three joiners were at them; the owner is first in the day plan's order, so he has
-    // one. The oak table is made by hand, so the bench is the one family it is made on, and with
-    // its three places taken the last joiner hired has nowhere to go: every place he could take is
-    // taken, the one thing that stands a man (CLAUDE.md T25 2.3; v53). Until v52 it was the owner
-    // who stood, with "no bench" over him; until v53 the joiner's words named the bench.
+  it('leaves the bench s three places to the oak table s men while the owner s turn is a machine', () => {
+    // The same hall with the kitchen's cutting, edging and moulding done: its bar stands at the
+    // assembly, and the owner goes round its machines all the same, the spindle moulder this half
+    // hour (v55). The industrial bench has three places and the oak table's three joiners keep
+    // them: nobody stands. Until v55 the bar sent the owner to the bench first, the last joiner
+    // hired had every place taken and stood (v53); until v52 it was the owner who stood, with
+    // "no bench" over him.
     const state = day149();
     const kitchen = state.jobs.find((job) => job.name.startsWith('Small kitchen') && job.stage === 'inProduction');
     if (!kitchen) throw new Error('the kitchen is wanted');
@@ -152,14 +156,13 @@ describe('the day 149 save (PIOTR, 22.09; v47)', () => {
     kitchen.labourRemaining =
       kitchen.labourValue - Object.values(done).reduce<number>((sum, value) => sum + (value ?? 0), 0);
     const worked = runClock(state, 2);
-    expect(worked.owner.station).toBe('machine:workbench');
+    expect(worked.owner.station).toBe('machine:spindleMoulder');
     expect(bubbleFor(worked, OWNER)).toBe(null);
-    const standing = worked.workers.filter((worker) => worker.noPlaceFor !== '');
-    expect(standing).toHaveLength(1);
-    const last = worked.workers.filter((worker) => worker.role === 'joiner').pop();
-    expect(standing[0]?.id).toBe(last?.id);
-    expect(standing[0]?.noPlaceFor).toBe('workbench');
-    expect(bubbleFor(worked, standing[0]?.id ?? '')?.text).toBe('no free machines');
+    expect(worked.workers.filter((worker) => worker.noPlaceFor !== '')).toHaveLength(0);
+    for (const worker of worked.workers.filter((entry) => entry.role === 'joiner')) {
+      expect(worker.station, worker.id).toBe('machine:workbench');
+      expect(bubbleFor(worked, worker.id), worker.id).toBeNull();
+    }
     expect(worked.jobs.find((job) => job.id === kitchen.id)?.blockedBy).toBe('');
   });
 });

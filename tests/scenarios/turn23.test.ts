@@ -21,6 +21,7 @@ import { type Policy, bossRound, playDay, playUntilDay } from './autopilot';
 import { acceptNow, act, newGame, placeEnquiry } from '../helpers';
 import {
   CANTEEN_LOCKERS,
+  DAY_END_MINUTE,
   HIRE_START_DELAY_DAYS,
   PRODUCTION_MANAGER_CARRIES,
   PRODUCTION_MANAGER_PACE,
@@ -31,7 +32,8 @@ import { currentStage } from '../../src/engine/stages';
 import { bubbleFor } from '../../src/engine/bubbles';
 import { benchHasAir } from '../../src/engine/media';
 import { canHire, hasManager, managerPaceFor, menCarried, waitsForTheBoss } from '../../src/engine/staff';
-import type { GameState } from '../../src/engine/index';
+import { machineStation } from '../../src/engine/stations';
+import type { GameState, Worker } from '../../src/engine/index';
 
 const SEED = 20260911;
 
@@ -224,7 +226,14 @@ describe('(ll) three men, no manager, and the boss assigns each morning', () => 
     // not one: three men at three places, no saw line, and the figure is the
     // 4,418.84 of nobody waiting alone. The same ten days with v53's count read 3,918.39 [both
     // measured].
-    expect(NO_MANAGER.done).toBeCloseTo(4418.84, 2);
+    //
+    // 3,546.34 from v55, 354.26 a working day [measured on this build]. Two things moved it, both
+    // measured over the ten days: every job is four even quarters from v55 and this hall has no
+    // spindle moulder, so the moulding quarter goes by hand at 67% and the job's pace is 0.879;
+    // and the men go round the saw and the bench a half hour at a time (PIOTR, 24.09), so a saw is
+    // running in every working half hour, the fan with it, and three ungated saws draw 2,400
+    // against the used extractor's 830 usable: the hall works at 0.7 through every one of them.
+    expect(NO_MANAGER.done).toBeCloseTo(3546.34, 2);
     expect(NO_MANAGER.state.jobs.every((job) => job.stage === 'inProduction')).toBe(true);
   });
 });
@@ -276,8 +285,12 @@ describe('(mm) the same crew with a novice manager over them', () => {
     // calendar (PIOTR, 22.09; v51) nothing is overdue inside six months, nothing rolls, and the
     // month reads what the grade puts in it. Measured on this build: no repair line in either
     // month, every saw whole.
+    //
+    // 4,589.83 on v54; 3,656.89 from v55, for the two reasons (ll) gives: the quarters with the
+    // moulding by hand, and the saws running in every working half hour of the round with the fan
+    // short of them [measured].
     expect(NOVICE.done).toBeGreaterThan(NO_MANAGER.done);
-    expect(NOVICE.done).toBeCloseTo(4589.83, 2);
+    expect(NOVICE.done).toBeCloseTo(3656.89, 2);
   });
 
   it('never sends the owner to the Work Plan', () => {
@@ -303,6 +316,11 @@ describe('(mm) the same crew with a novice manager over them', () => {
  *  owner's list. */
 const FULL_BOOKS = (() => {
   let state = clone(TWO_MONTHS.withManager);
+  // An office admin's card wants a standing of 5. The three jobs reached it inside the forty days
+  // until v55; with the moulding's quarter by hand, this hall having no spindle moulder, they no
+  // longer do, so the standing is written, and what is measured is the canteen's eight lockers
+  // and not the standing (v55).
+  state.reputation = Math.max(state.reputation, 5);
   let guard = 0;
   while (state.workers.length < CANTEEN_LOCKERS && guard < 40) {
     guard += 1;
@@ -401,25 +419,41 @@ const BENCH_HALL = (() => {
   return state;
 })();
 
-const BENCH_WEEK = (() => {
+/** One day of the hall above, watched every half hour: where the man stood as the half hour
+ *  opened, what was left of the job then, and his mark. From v55 a man goes round the machines
+ *  of his job's plan a half hour at a time, so his day here is eight half hours at the bench and
+ *  eight at the saw (PIOTR, 24.09; v55). */
+interface HalfHour {
+  minute: number;
+  station: string;
+  left: number;
+  mark: string | null;
+}
+
+const BENCH_DAY = (() => {
   let state = clone(BENCH_HALL);
   const job = state.jobs[0];
   if (job === undefined) throw new Error('a job is wanted here');
   const before = job.labourRemaining;
-  const marks: string[] = [];
-  for (let day = 0; day < 5; day += 1) {
-    state = playDay(state, NO_COMPRESSOR, [], {
-      watch: (seen) => {
-        for (const worker of seen.workers) {
-          const mark = bubbleFor(seen, worker.id);
-          if (mark !== null) marks.push(`${mark.key}:${mark.text}`);
-        }
-      },
-    });
-  }
+  const halfHours: HalfHour[] = [];
+  let meter: Worker | null = null;
+  state = playDay(state, NO_COMPRESSOR, [], {
+    watch: (seen) => {
+      const man = seen.workers[0];
+      if (man === undefined) throw new Error('a man is wanted here');
+      const mark = bubbleFor(seen, man.id);
+      halfHours.push({
+        minute: seen.clock.minute,
+        station: man.station,
+        left: seen.jobs[0]?.labourRemaining ?? -1,
+        mark: mark === null ? null : `${mark.key}:${mark.text}`,
+      });
+      // The day meter as the day ends, before the next morning wipes it (runStaffDayStart).
+      if (seen.clock.minute >= DAY_END_MINUTE) meter = { ...man, idleByReason: { ...man.idleByReason } };
+    },
+  });
   const after = state.jobs[0]?.labourRemaining ?? -1;
-  const man = state.workers[0];
-  return { state, before, after, marks: [...new Set(marks)], man };
+  return { state, before, after, halfHours, meter: meter as Worker | null };
 })();
 
 describe('(oo) a bench and no compressor', () => {
@@ -432,30 +466,56 @@ describe('(oo) a bench and no compressor', () => {
     expect(job.assignees).toEqual([BENCH_HALL.workers[0]?.id]);
   });
 
-  it('puts no bench minutes into the job at all, for a whole week', () => {
-    // Not a decimal place of it: five working days of a man standing at his bench with the job in
-    // front of him. Today's rule, where the bench drew what air there was and worked anyway, is
-    // gone (CLAUDE.md T23 2.7).
-    expect(BENCH_WEEK.after).toBe(BENCH_WEEK.before);
+  it('puts no bench minutes into the job at all: only the saw half hours go in', () => {
+    // Not a decimal place of a bench half hour: the man stands at his bench with the job in front
+    // of him and nothing in the hose, and the job is where it was when the half hour ends
+    // (CLAUDE.md T23 2.7). The half hours of his round at the saw (v55) are worked, on the stage the
+    // bar stands at, so the job moves on those and on nothing else. Until v55 he stood at the bench
+    // all day and a whole week put nothing in; from v55 the round gives him eight half hours at
+    // the saw a day, which is why the day's total falls: 232.88 to 148.53 on this hall.
+    const day = BENCH_DAY.halfHours.filter((entry) => entry.minute < DAY_END_MINUTE);
+    const bench = day.filter((entry) => entry.station === machineStation('workbench'));
+    const saw = day.filter((entry) => entry.station === machineStation('tableSaw'));
+    expect(bench.length).toBe(8);
+    expect(saw.length).toBe(8);
+    const leftAfter = (entry: HalfHour): number => {
+      const index = BENCH_DAY.halfHours.indexOf(entry);
+      const next = BENCH_DAY.halfHours[index + 1];
+      if (next === undefined) throw new Error('a next half hour is wanted here');
+      return next.left;
+    };
+    for (const entry of bench) expect(leftAfter(entry)).toBe(entry.left);
+    for (const entry of saw) expect(leftAfter(entry)).toBeLessThan(entry.left);
+    expect(BENCH_DAY.after).toBeLessThan(BENCH_DAY.before);
+    expect(BENCH_DAY.after).toBeCloseTo(148.53, 2);
   });
 
-  it('says why over his head, and nowhere else', () => {
-    expect(BENCH_WEEK.marks).toEqual(['noCompressor:no compressor']);
+  it('says why over his head at the bench, and nothing at the saw', () => {
+    const day = BENCH_DAY.halfHours.filter((entry) => entry.minute < DAY_END_MINUTE);
+    for (const entry of day) {
+      if (entry.station === machineStation('workbench')) expect(entry.mark).toBe('noCompressor:no compressor');
+      if (entry.station === machineStation('tableSaw')) expect(entry.mark).toBeNull();
+    }
+    const marks = new Set(day.map((entry) => entry.mark).filter((mark) => mark !== null));
+    expect([...marks]).toEqual(['noCompressor:no compressor']);
   });
 
   it('books every minute he stood onto his day meter', () => {
-    const man = BENCH_WEEK.man;
-    if (man === undefined) throw new Error('a man is wanted here');
+    const man = BENCH_DAY.meter;
+    if (man === null) throw new Error('a man is wanted here');
     // Nobody is waiting for the boss in this hall: he has his job and he is standing at it. Until
     // v52 his minutes went to the queue's `noMachine`; the day meter of a man on the books has the
     // owner's `noCompressor` from v52, because `noPlace` means one thing only (CLAUDE.md T25 2.3).
+    // The eight bench half hours are his idle minutes and the eight at the saw his worked ones.
     expect(man.idleByReason.waitingForBoss).toBe(0);
-    expect(man.idleByReason.noCompressor).toBeGreaterThan(0);
+    expect(man.idleByReason.noCompressor).toBeGreaterThanOrEqual(240);
     expect(man.idleMinutes).toBe(man.idleByReason.noCompressor);
+    const worked = BENCH_HALL.workers[0]?.productionMinutes ?? -1;
+    expect(man.productionMinutes - worked).toBe(240);
   });
 
   it('works the very next minute once a used compressor stands in the hall', () => {
-    let state = act(clone(BENCH_WEEK.state), {
+    let state = act(clone(BENCH_HALL), {
       type: 'BUY_EQUIPMENT',
       specId: 'compressor',
       variantId: 'used',

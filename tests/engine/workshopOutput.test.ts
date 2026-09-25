@@ -58,15 +58,16 @@ describe('the workshop\'s average output today (v40)', () => {
     // Sixty minutes of the job at its one pace, the owner at 1.0, the hall clean: the average is
     // the pace itself, and the sum behind it is sixty of it. Until v53 it was sixty minutes at the
     // standard saw's 1.05, 63.00, because the owner was at the cutting; from v53 the saw's 1.05 is
-    // on the cutting's quarter of the job only, 1 / (0.25 / 1.05 + 0.75) = 1.0120, and the sum is
-    // 60.72 (PIOTR, 24.09; v53).
-    expect(jobPace(worked, job)).toBeCloseTo(1 / (0.25 / 1.05 + 0.75), 10);
+    // on the cutting's quarter of the job only, 1 / (0.25 / 1.05 + 0.75) = 1.0120, and the sum was
+    // 60.72 (PIOTR, 24.09; v53). From v55 the moulding's quarter is by hand on this hall, which has
+    // no spindle moulder: 1 / (0.25 / 1.05 + 0.25 + 0.375 + 0.25) = 0.8984, and the sum is 53.90.
+    expect(jobPace(worked, job)).toBeCloseTo(1 / (0.25 / 1.05 + 0.25 + 0.25 * 1.5 + 0.25), 10);
     expect(hallProductivityFactor(worked)).toBe(1);
-    // The sum is booked to four places a minute (`bookOutputMinute`), so each minute adds 1.0120
-    // of the pace's 1.012048: sixty of them are 60.72.
+    // The sum is booked to four places a minute (`bookOutputMinute`), so each minute adds 0.8984
+    // of the pace's 0.898396: sixty of them are 53.90.
     const booked = Math.round(jobPace(worked, job) * hallProductivityFactor(worked) * 10000) / 10000;
     expect(worked.dayStats.outputWorth).toBeCloseTo(60 * booked, 6);
-    expect(worked.dayStats.outputWorth).toBeCloseTo(60.72, 6);
+    expect(worked.dayStats.outputWorth).toBeCloseTo(53.904, 6);
     expect(workshopOutputToday(worked)).toBe(Math.round(jobPace(worked, job) * hallProductivityFactor(worked) * 100) / 100);
   });
 

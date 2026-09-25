@@ -26,8 +26,8 @@ import {
   MACHINE_HOURS_PER_MONTH,
   TIER_WORDS,
   MACHINE_PACE,
+  MACHINE_CAPACITY,
   MACHINE_PLACES,
-  MEN_PER_PLACE,
   PACED_FAMILIES,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
@@ -84,7 +84,8 @@ import {
 import { lockReasonFor, template } from './catalog';
 import { jobHeldBy } from './jobs';
 import { stageOfMan } from './production';
-import { jobPace, stageDoing, tradeFactor } from './stages';
+import { contractOfWorker, contractPiece, contractStageFamilyOf } from './contracts';
+import { jobPace, stageDoing, stagePlanFor, tradeFactor } from './stages';
 import { isWorkingToday, nightCrew } from './staff';
 import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
@@ -455,21 +456,10 @@ export function machinesAtWork(state: GameState): Set<string> {
   return new Set(menAtPlaces(state).map((entry) => entry.item.id));
 }
 
-/** The crew of a shift this minute, for the question whether the hall has places enough for it:
- *  the men at work in production, the owner among them while he is, off the day plan [PIOTR,
- *  24.09: "me and two men is three"]; the men put on the second shift at night, who work without
- *  the owner (v53). A man standing for want of sheets, at his desk or gone home wants no saw:
- *  until v54 he was counted all the same and cut the hall for nothing [PIOTR, 24.09: "nobody
- *  worked and it still cuts"]. */
-export function crewOnTheFloor(state: GameState, shift: 'day' | 'night' = 'day'): number {
-  if (shift === 'night') return nightCrew(state).length;
-  return [state.owner, ...state.workers].filter((man) => man.working).length;
-}
-
 /** The whole day crew on the books: the owner and every man who produces and is in today, at work
  *  this minute or not. What a contract's line reckons with, because it says what the hall makes
  *  "at full crew" (CLAUDE.md T25 2.7), where the hall's own minute reckons with the men at work in
- *  it (`crewOnTheFloor`; v54). */
+ *  it (`crewAtFamily`; v54, v55). */
 export function fullCrew(state: GameState): number {
   const men = state.workers.filter(
     (worker) => PRODUCING_ROLES.includes(worker.role) && isWorkingToday(state, worker, 'day'),
@@ -477,37 +467,80 @@ export function fullCrew(state: GameState): number {
   return men + 1;
 }
 
-/** One family the hall has too few places at for its crew. */
+/** How many men this one machine keeps busy: its class's figure in `MACHINE_CAPACITY`, or nought
+ *  for a family with no capacity rule (v55). */
+export function capacityOf(item: { specId: string; variantId: string }): number {
+  return MACHINE_CAPACITY[item.specId]?.[item.variantId] ?? 0;
+}
+
+/** The men the hall's running machines of this family keep busy between them: two budget saws
+ *  are four men (v55). */
+export function hallCapacity(state: GameState, family: string): number {
+  return placedMachines(state, family).reduce((total, item) => total + capacityOf(item), 0);
+}
+
+/** The men at work this minute whose work goes through a machine of this family: a man on a job
+ *  with a stage of the family in its plan, and a man on a standing contract whose piece is done on
+ *  it [PIOTR, 24.09: "only the men whose work goes through the machine"] (v55). A job cut on a
+ *  CNC has no stage at the saw, so its men are the CNC's and not the saw's; a job that is not
+ *  lacquered never counts against the booth. By day the men the plan has working, the owner among
+ *  them; by night the second shift. */
+export function crewAtFamily(state: GameState, family: string, shift: 'day' | 'night' = 'day'): number {
+  const men: Array<{ id: string; working: boolean }> =
+    shift === 'night'
+      ? nightCrew(state).map((worker) => ({ id: worker.id, working: true }))
+      : [{ id: OWNER, working: state.owner.working }, ...state.workers];
+  let count = 0;
+  for (const man of men) {
+    if (!man.working) continue;
+    const job = jobHeldBy(state, man.id);
+    if (job !== null) {
+      // A job made by hand wants no machine at all (CLAUDE.md 9.5).
+      if (!job.byHand && stagePlanFor(state, job).some((stage) => stage.family === family)) count += 1;
+      continue;
+    }
+    const contract = man.id === OWNER ? null : contractOfWorker(state, man.id);
+    if (contract === null) continue;
+    if (contractStageFamilyOf(state, contractPiece(contract), true) === family) count += 1;
+  }
+  return count;
+}
+
+/** One family the hall has too few machines of for the men whose work goes through it. */
 export interface PlaceShortage {
   family: string;
-  places: number;
+  /** The men the hall's machines of the family keep busy between them. */
+  capacity: number;
+  /** The men whose work goes through the family this minute. */
   men: number;
-  /** The men past the places. */
+  /** The men past the capacity. */
   over: number;
-  /** What every minute of production in the hall is multiplied by for it: the men past the places
-   *  work at the by hand pace and the rest at their own, averaged over the crew. */
+  /** What every minute of production in the hall is multiplied by for it: the men past the
+   *  capacity work at the by hand pace and the rest at their own, averaged over the men. */
   factor: number;
 }
 
-/** Every family of `MEN_PER_PLACE` the hall has fewer places at than its crew wants [PIOTR, 24.09:
- *  "with three places at the saw and four men, too few saws for the men"]. Nobody waits for the
- *  saw: the men past its places work elsewhere, slower, at the by hand pace, and the hall's
- *  output falls by what they lose (v53). A family the hall has no running machine of is not on it:
- *  its share of the work is by hand already, through the job's own pace. */
+/** Every family of `MACHINE_CAPACITY` whose machines keep fewer men busy than want them [PIOTR,
+ *  24.09: "with three places at the saw and four men, too few saws for the men"]. Nobody waits for
+ *  the saw: the men past its capacity work elsewhere, slower, at the by hand pace, and the hall's
+ *  output falls by what they lose (v53). Only the men whose work goes through the family count
+ *  (`crewAtFamily`; v55), or the count the caller gives, which is how a contract's line reckons
+ *  the whole crew at its piece's family. A family the hall has no running machine of is not on it:
+ *  its quarter of the work is by hand already, through the job's own pace. */
 export function placeShortages(
   state: GameState,
   shift: 'day' | 'night' = 'day',
-  men: number = crewOnTheFloor(state, shift),
+  count: (family: string) => number = (family) => crewAtFamily(state, family, shift),
 ): PlaceShortage[] {
   const found: PlaceShortage[] = [];
-  for (const [family, perPlace] of Object.entries(MEN_PER_PLACE)) {
-    const places = hallPlaces(state, family);
-    if (places <= 0) continue;
-    const covered = places * perPlace;
-    if (men <= covered) continue;
-    const over = men - covered;
-    const factor = (covered + over / BY_HAND_DURATION_FACTOR) / men;
-    found.push({ family, places, men, over, factor });
+  for (const family of Object.keys(MACHINE_CAPACITY)) {
+    const capacity = hallCapacity(state, family);
+    if (capacity <= 0) continue;
+    const men = count(family);
+    if (men <= capacity) continue;
+    const over = men - capacity;
+    const factor = (capacity + over / BY_HAND_DURATION_FACTOR) / men;
+    found.push({ family, capacity, men, over, factor });
   }
   return found;
 }
@@ -517,9 +550,10 @@ export function machinesWord(family: string): string {
   return `${machineShortWord(family)}s`;
 }
 
-/** The line a machine's card and its hover carry while its family is short of places for the
- *  crew, and the words of the mark drawn over it in the hall: `Too few saws for the crew: 4 men, 3
- *  places, 1 works at 67%` (PIOTR, 24.09; v53). Empty while the family has places enough. */
+/** The line a machine's card and its hover carry while its family is short for the men whose work
+ *  goes through it, and the words of the mark drawn over it in the hall: `Too few saws for the
+ *  crew: 4 men, capacity 3, 1 works at 67%` (PIOTR, 24.09; v53, v55). Empty while the family
+ *  keeps up. */
 export function shortageLine(state: GameState, family: string): string {
   const short = placeShortages(state).find((entry) => entry.family === family);
   if (short === undefined) return '';
@@ -527,7 +561,7 @@ export function shortageLine(state: GameState, family: string): string {
   const who = short.over === 1 ? '1 works' : `${short.over} work`;
   return (
     `Too few ${machinesWord(family)} for the crew: ${short.men} men, ` +
-    `${short.places} ${short.places === 1 ? 'place' : 'places'}, ${who} at ${pace}%`
+    `capacity ${short.capacity}, ${who} at ${pace}%`
   );
 }
 
@@ -866,11 +900,7 @@ export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'
   // pace, and the sheet says what that costs the whole hall (PIOTR, 24.09: "it has to be shown
   // clearly what the penalty is and how many percent the saw slows the whole production"; v53).
   for (const short of placeShortages(state, shift)) {
-    hallLine(
-      `Too few ${machinesWord(short.family)}: ${short.places} ${short.places === 1 ? 'place' : 'places'}, ` +
-        `${short.men} men`,
-      short.factor,
-    );
+    hallLine(`Too few ${machinesWord(short.family)}: capacity ${short.capacity}, ${short.men} men`, short.factor);
   }
   const total = running;
   let plus = 0;

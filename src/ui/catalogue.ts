@@ -57,15 +57,15 @@ import {
 } from '../engine/index';
 import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/index';
 import {
-  crewOnTheFloor,
-  hallPlaces,
+  crewAtFamily,
+  hallCapacity,
   machineShortWord,
   placeShortages,
   serviceCallCheck,
   serviceDueIn,
   toolSlotsLine,
 } from '../engine/machines';
-import { BY_HAND_DURATION_FACTOR, MEN_PER_PLACE, VAN_CLASSES } from '../engine/constants';
+import { BY_HAND_DURATION_FACTOR, MACHINE_CAPACITY, VAN_CLASSES } from '../engine/constants';
 import { slotsInUseIn } from '../engine/staff';
 import { nextSpriteOrientation } from '../render/sprites';
 import { orderName, orderProgress } from '../engine/orders';
@@ -568,16 +568,15 @@ function specBlock(state: GameState, item: Equipment): string {
   );
 }
 
-/** What the hall's machines of this family hold against the crew, on the machine's own card: green
- *  while every man has a place at one, red with the crew beside it while they have not, and a
- *  line saying how many men work at what [PIOTR, 24.09: "capacity 6 men green, capacity 6 and 7
- *  men red, and the words one man works at 67 per cent"] (v54). A family with no crew rule says
- *  nothing. */
+/** What the hall's machines of this family keep busy against the men whose work goes through it,
+ *  on the machine's own card: green while they keep up, red with the crew beside it while they do
+ *  not, and a line saying how many men work at what [PIOTR, 24.09: "capacity 6 men green, capacity
+ *  6 and 7 men red, and the words one man works at 67 per cent"] (v54, v55). A family with no
+ *  capacity rule says nothing. */
 function capacityBlock(state: GameState, item: Equipment): string {
-  const perPlace = MEN_PER_PLACE[item.specId];
-  if (perPlace === undefined) return '';
-  const capacity = hallPlaces(state, item.specId) * perPlace;
-  const crew = crewOnTheFloor(state);
+  if (MACHINE_CAPACITY[item.specId] === undefined) return '';
+  const capacity = hallCapacity(state, item.specId);
+  const crew = crewAtFamily(state, item.specId);
   const word = machineShortWord(item.specId);
   const title = `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
   const short = placeShortages(state).find((entry) => entry.family === item.specId);

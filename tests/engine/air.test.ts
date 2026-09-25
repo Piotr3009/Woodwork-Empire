@@ -8,7 +8,6 @@ import {
   AIR_DEMAND,
   AIR_DIVERSITY,
   AIR_HEADROOM,
-  AIR_SANDING_DEMAND,
   COMPRESSOR_AIR,
   LOW_AIR_FACTOR,
   OWNER_LABOUR_PER_MINUTE,
@@ -87,7 +86,6 @@ describe('what the air tables say', () => {
     expect(airDemandOf({ specId: 'edgebander', variantId: 'budget' })).toBeNull();
     expect(airDemandOf({ specId: 'tableSaw', variantId: 'standard' })).toBeNull();
     expect(AIR_BENCH_DEMAND).toEqual({ bar: 6, litres: 30 });
-    expect(AIR_SANDING_DEMAND).toEqual({ bar: 6, litres: 200 });
     expect(AIR_DIVERSITY).toBe(0.6);
     expect(AIR_HEADROOM).toBe(0.85);
   });
@@ -124,8 +122,8 @@ describe('rule 1, the bar', () => {
     let next = acceptNow(state, enquiry.id, false);
     const job = firstJob(next);
     job.stage = 'ready';
-    // Past the cutting and into the machining, which is the bander's stage: cutting is the first
-    // quarter of the labour and machining the fifteen per cent after it (CLAUDE.md T7 3.1).
+    // Past the cutting and into the edging, which is the bander's stage: cutting is the first
+    // quarter of the labour and edging the quarter after it (CLAUDE.md T7 3.1; v55).
     job.labourRemaining = job.labourValue * 0.68;
     next = act(next, { type: 'WORK_HERE', jobId: job.id });
     // The bar still decides whether a machine runs at all, and this one does not: it has no
@@ -136,14 +134,18 @@ describe('rule 1, the bar', () => {
     expect(familyRuns(next, 'edgebander')).toBe(false);
     expect(hallPlaces(next, 'edgebander')).toBe(0);
     expect(hallBlock(next, firstJob(next))).toBe('');
-    expect(stageSpeed(next, firstJob(next), 'machining')).toEqual({ speed: 1 / 1.5, byHand: true });
+    expect(stageSpeed(next, firstJob(next), 'edging')).toEqual({ speed: 1 / 1.5, byHand: true });
     const before = firstJob(next).labourRemaining;
     const worked = tick(next, 1);
     expect(firstJob(worked).blockedBy).toBe('');
-    expect(worked.owner.station).toBe('machine:workbench');
+    // At the saw, whose turn it is for him in the first half hour, or at a bench: never at the
+    // bander, which has no place (v55).
+    expect(['machine:tableSaw', 'machine:workbench']).toContain(worked.owner.station);
+    expect(worked.owner.working).toBe(true);
     // His minute at the job's one pace: the used saw's 0.95 on the cutting's quarter, the by hand
-    // 1 / 1.5 on the machining's fifteen per cent and 1.00 on the rest.
-    const pace = 1 / (0.25 / 0.95 + 0.15 * 1.5 + 0.6);
+    // 1 / 1.5 on the edging's quarter and on the moulding's, the hall having no spindle moulder,
+    // and 1.00 on the assembly's (v55).
+    const pace = 1 / (0.25 / 0.95 + 0.25 * 1.5 + 0.25 * 1.5 + 0.25);
     expect(jobPace(worked, firstJob(worked))).toBeCloseTo(pace, 10);
     expect(before - firstJob(worked).labourRemaining).toBeCloseTo(OWNER_LABOUR_PER_MINUTE * pace, 10);
   });
@@ -153,7 +155,7 @@ describe('rule 2, the litres', () => {
   it('works the sum at the trade’s diversity and the pipe at its headroom', () => {
     const state = hallWithAir('used');
     // Four men at their benches: 4 x 30 l/min, worked at 0.6, against 150 x 0.85.
-    const check = airCheck(state, { bench: 4, sanding: 0 });
+    const check = airCheck(state, { bench: 4 });
     const line = check.compressors[0];
     expect(line?.drawn).toBe(120);
     expect(line?.demand).toBeCloseTo(72, 6);
@@ -161,15 +163,18 @@ describe('rule 2, the litres', () => {
     expect(line?.low).toBe(false);
   });
 
-  it('is short the moment a man starts sanding beside them', () => {
+  it('is short the moment there are more nailers than the pipe carries', () => {
+    // Eight men at their benches: 8 x 30 l/min, worked at 0.6, is 144 against the 127.5 a used
+    // compressor's pipe carries. Until v55 the ninth draw was a man sanding at 200 l/min; the
+    // sanding is in the Assembly now and draws the bench's 30 (PIOTR, 24.09).
     const state = hallWithAir('used');
-    const check = airCheck(state, { bench: 4, sanding: 1 });
+    const check = airCheck(state, { bench: 8 });
     const line = check.compressors[0];
-    expect(line?.drawn).toBe(320);
-    expect(line?.demand).toBeCloseTo(192, 6);
+    expect(line?.drawn).toBe(240);
+    expect(line?.demand).toBeCloseTo(144, 6);
     expect(line?.low).toBe(true);
     expect(check.lowAir).toEqual([line?.id]);
-    expect(check.lines).toEqual(['Low air on compressor 1: 192 of 128 l/min']);
+    expect(check.lines).toEqual(['Low air on compressor 1: 144 of 128 l/min']);
   });
 
   it('runs every pneumatic consumer on that compressor at 0.7 for the minute', () => {
@@ -196,9 +201,14 @@ describe('rule 2, the litres', () => {
       for (const job of next.jobs) {
         job.stage = 'inProduction';
         job.assignees = ['owner'];
-        // Into the assembly, which is the stage a man does with a nailer in his hand.
-        job.labourRemaining = job.labourValue * 0.5;
+        // Into the assembly, the last quarter, which is the stage a man does with a nailer in
+        // his hand (v55).
+        job.labourRemaining = job.labourValue * 0.2;
       }
+      // The saw was there for the board to take sheet work at all; now it goes, so the benches
+      // are the one place the owner has and he is at one with his nailer whichever half hour it
+      // is (v55).
+      next.equipment = next.equipment.filter((item) => item.specId !== 'tableSaw');
       const before = firstJob(next).labourRemaining;
       const worked = runClock(next, 20);
       // Unrounded: the figures moved in v53 with the job's one pace, and a figure rounded to five
@@ -206,10 +216,12 @@ describe('rule 2, the litres', () => {
       return before - firstJob(worked).labourRemaining;
     }
     // One man at a bench draws 30 l/min, which a used compressor holds without noticing. His
-    // twenty minutes are 12.2531 of labour from v53, at the job's one pace with the used saw's
-    // 0.95 on its cutting's quarter.
+    // twenty minutes are 9.6970 of labour, at the job's one pace on a hall with no machine but
+    // the benches: three quarters by hand at 1 / 1.5 and the assembly's at 1.00 (v55; 12.2531
+    // on v53, with a used saw and the old shares).
     const fine = assembled('used', 0);
-    expect(fine).toBeCloseTo(12.2531, 4);
+    expect(fine).toBeCloseTo(20 * OWNER_LABOUR_PER_MINUTE / (0.75 * 1.5 + 0.25), 4);
+    expect(fine).toBeCloseTo(9.697, 3);
     // Eight of them draw 240, worked at 0.6 that is 144 against the 128 the pipe carries.
     const low = assembled('used', 7);
     expect(low).toBeCloseTo(fine * LOW_AIR_FACTOR, 10);
@@ -239,8 +251,11 @@ describe('rule 2, the litres', () => {
     for (const job of state.jobs) {
       job.stage = 'inProduction';
       job.assignees = ['owner'];
-      job.labourRemaining = job.labourValue * 0.5;
+      job.labourRemaining = job.labourValue * 0.2;
     }
+    // The saw goes once the jobs are on the books, so the benches are the one place the owner
+    // has (v55).
+    state.equipment = state.equipment.filter((item) => item.specId !== 'tableSaw');
     expect(hallAirCheck(state).lowAir).toHaveLength(1);
     const page = renderHall(state);
     expect(
@@ -260,11 +275,16 @@ describe('rule 3, the hours', () => {
     let next = acceptNow(state, enquiry.id, false);
     const job = firstJob(next);
     job.stage = 'ready';
-    // Cutting is done on the saw with no air in it at all.
+    // Cutting is done on the saw with no air in it at all: the saw is the owner's turn in the
+    // first half hour (v55).
     const idle = runClock(act(next, { type: 'WORK_HERE', jobId: job.id }), 20);
+    expect(idle.owner.station).toBe('machine:tableSaw');
     expect(firstCompressor(idle).hoursUsed).toBe(0);
-    // The assembly is done with a nailer, and the compressor's clock runs for it.
-    firstJob(next).labourRemaining = firstJob(next).labourValue * 0.5;
+    // The assembly is done with a nailer, and the compressor's clock runs for it: the job in its
+    // last quarter and the saw gone, so the bench is his one place for the hour. One clock hour,
+    // however many men draw on it (v55).
+    firstJob(next).labourRemaining = firstJob(next).labourValue * 0.2;
+    next.equipment = next.equipment.filter((item) => item.specId !== 'tableSaw');
     next = runClock(act(next, { type: 'WORK_HERE', jobId: job.id }), 60);
     expect(firstCompressor(next).hoursUsed).toBeCloseTo(1, 2);
   });

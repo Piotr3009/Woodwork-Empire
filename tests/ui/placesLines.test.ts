@@ -78,13 +78,13 @@ describe('the Work Plan s one line (CLAUDE.md T25 2.8)', () => {
   });
 
   it('says only who is working when every man has a place, spread over the saw and the benches, and nought when nobody is on anything', () => {
-    // One used saw and the six benches: nobody waits for the saw. The first man cuts and the
-    // other three each take a bench of his own, so nobody is on another man's place
-    // (PIOTR, 24.09; v53).
+    // One used saw and the six benches: nobody waits for the saw. The second man, whose turn it
+    // is this half hour, cuts and the other three each take a bench of his own, so nobody is on
+    // another man's place (PIOTR, 24.09; v53, v55).
     const state = fourAtOneSaw('used');
     const plan = planPlaces(state);
     expect(plan.map((entry) => entry.working)).toEqual([true, true, true, true]);
-    expect(plan.map((entry) => entry.family)).toEqual(['tableSaw', 'workbench', 'workbench', 'workbench']);
+    expect(plan.map((entry) => entry.family)).toEqual(['workbench', 'tableSaw', 'workbench', 'workbench']);
     const places = plan.map((entry) => `${entry.machine?.id ?? ''}:${entry.place}`);
     expect(new Set(places).size).toBe(4);
     expect(placesSummary(state)).toBe('4 men working');
@@ -128,21 +128,22 @@ describe('the efficiency plate s pace lines (CLAUDE.md T25 2.4)', () => {
 
 describe('the saws too few for the crew (PIOTR, 24.09; v53)', () => {
   it('puts a hall line on the Output sheet and the capacity on the saw s own card, and says what it costs', () => {
-    // Three men on the books at work, one used saw of one place: three men for one place. Nobody
-    // waits for it; the two past its place work elsewhere at the by hand pace, and the whole hall
-    // is multiplied by (1 + 2 / 1.5) / 3 = 0.78 [PIOTR, 24.09: "me and two men is three; with
-    // four, too few saws for the men"]. The owner is on nothing here, and from v54 the crew is the
-    // men at work, so he is not counted (PIOTR, 24.09: "nobody worked and it still cuts").
+    // Three men on the books at work, one used saw, which keeps one man busy (v55): three men for
+    // one. Nobody waits for it; the two past its capacity work elsewhere at the by hand pace, and
+    // the whole hall is multiplied by (1 + 2 / 1.5) / 3 = 0.78 [PIOTR, 24.09: "me and two men is
+    // three; with four, too few saws for the men"]. The owner is on nothing here, and from v54
+    // the crew is the men whose work goes through the saw, so he is not counted (PIOTR, 24.09:
+    // "nobody worked and it still cuts").
     const state = fourAtOneSaw('used');
     state.workers = state.workers.slice(0, 3);
     planPlaces(state);
     expect(placeShortages(state)).toEqual([
-      { family: 'tableSaw', places: 1, men: 3, over: 2, factor: (1 + 2 / 1.5) / 3 },
+      { family: 'tableSaw', capacity: 1, men: 3, over: 2, factor: (1 + 2 / 1.5) / 3 },
     ]);
     expect(hallProductivityFactor(state)).toBeCloseTo((1 + 2 / 1.5) / 3, 10);
     const row = Array.from(
       parse(renderCompany(state)).querySelectorAll('[data-sheet="output"] [data-line="hall"]'),
-    ).find((node) => node.querySelector('.ledger-main')?.textContent === 'Too few saws: 1 place, 3 men');
+    ).find((node) => node.querySelector('.ledger-main')?.textContent === 'Too few saws: capacity 1, 3 men');
     expect(row?.querySelector('.ledger-points')?.textContent).toBe('\u22120.22');
     expect(row?.querySelector('.ledger-points')?.classList.contains('bad')).toBe(true);
     // The saw's hover says it in a sentence, and its own card says the capacity against the crew
@@ -150,17 +151,17 @@ describe('the saws too few for the crew (PIOTR, 24.09; v53)', () => {
     // and 7 men red, and one man works at 67 per cent"] (v54).
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (saw === undefined) throw new Error('the saw is wanted');
-    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 3 men, 1 place, 2 work at 67%');
+    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 3 men, capacity 1, 2 work at 67%');
     const card = parse(renderMachineCard(state, saw.id, null));
     const capacity = card.querySelector('[data-capacity="tableSaw"]');
     expect(capacity?.textContent).toBe('Saw capacity: 1 man, crew 3');
     expect(capacity?.classList.contains('bad')).toBe(true);
     expect(card.querySelector('[data-capacity-over]')?.textContent).toBe('2 men work at 67% efficiency');
-    // A second used saw is a place for one more man, and the line moves with it: (2 + 1 / 1.5) / 3.
+    // A second used saw keeps one more man busy, and the line moves with it: (2 + 1 / 1.5) / 3.
     placeEquipment(state, 'tableSaw', { variantId: 'used', x: 14, y: 1, id: 'kit-saw-second' });
-    expect(outputBreakdown(state).lines.map((line) => line.label)).toContain('Too few saws: 2 places, 3 men');
+    expect(outputBreakdown(state).lines.map((line) => line.label)).toContain('Too few saws: capacity 2, 3 men');
     expect(hallProductivityFactor(state)).toBeCloseTo((2 + 1 / 1.5) / 3, 10);
-    // Three saws are a place for every man, and the sheet says nothing of it; the card says the
+    // Three used saws keep the three busy, and the sheet says nothing of it; the card says the
     // capacity in green.
     placeEquipment(state, 'tableSaw', { variantId: 'used', x: 14, y: 3, id: 'kit-saw-3' });
     expect(placeShortages(state)).toEqual([]);

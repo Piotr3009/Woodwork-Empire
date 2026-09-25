@@ -140,8 +140,12 @@ describe('(y) two men on one job, on Very easy', () => {
     // crew is the men at work, the man on the piece and the man on the contract, two against three
     // places, and the hall is short of no saw. The same month with v53's count reads 22 and 13
     // [both measured].
-    expect(daysAlone).toBe(26);
-    expect(daysTogether).toBe(13);
+    //
+    // Re-measured on v55: 28 days alone and 14 together, 0.50. Every job is four even quarters
+    // from v55 (PIOTR, 24.09) and this hall has no spindle moulder, so the piece's moulding quarter
+    // goes by hand at 67% and the piece takes longer either way.
+    expect(daysAlone).toBe(28);
+    expect(daysTogether).toBe(14);
     expect(daysAlone).toBeGreaterThan(15);
     expect(daysTogether).toBeLessThan(daysAlone);
     expect(daysTogether / daysAlone).toBeGreaterThan(0.4);
@@ -267,7 +271,11 @@ describe('(z) a week that proves the workshop rate', () => {
     // piece all five days and the bar stands at its cutting all week: from v53 his minute goes at
     // the job's one pace, 0.99, where it went at the used saw's own 0.95, and for most of the
     // Friday at 0.95 of that again, with the hall gone messy (PIOTR, 24.09; v53).
-    expect(rate.rate).toBe(39.15);
+    //
+    // Measured on v55: 34.85. The job's one pace is 0.8786 where it was 0.9870 on v54: every job is
+    // four even quarters from v55 (PIOTR, 24.09) and the day 1 hall has no spindle moulder, so the
+    // moulding quarter goes by hand at 67%. 39.15 times 0.8786 over 0.9870 is 34.85.
+    expect(rate.rate).toBe(34.85);
     expect(rate.rate).toBeLessThan(40);
   });
 
@@ -292,8 +300,9 @@ describe('(z) a week that proves the workshop rate', () => {
     // week is not five identical days, so the fall lands about there and not exactly on it.
     // Measured on v53: 23.69 against 39.15, 0.61; v52 read 22.80 against 37.68, the same 0.61,
     // because the job's one pace lifts the three days that worked in both weeks alike
-    // (PIOTR, 24.09; v53).
-    expect(stood.rate).toBe(23.69);
+    // (PIOTR, 24.09; v53). Measured on v55: 21.09 against 34.85, the same 0.61, the job's one pace
+    // of v55 lowering the three days that worked in both weeks alike.
+    expect(stood.rate).toBe(21.09);
     expect(stood.rate / worked.rate).toBeGreaterThan(0.5);
     expect(stood.rate / worked.rate).toBeLessThan(0.7);
     expect(renderCompany(STOOD)).toContain(`Workshop earns ${formatMoney(stood.rate)} an hour`);

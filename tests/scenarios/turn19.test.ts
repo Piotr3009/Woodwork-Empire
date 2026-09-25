@@ -128,12 +128,19 @@ describe('(aa) three men on one job, on Very easy', () => {
     expect(watched(THREE).labourRemaining).toBe(0);
     expect(watched(ONE).labourRemaining).toBe(0);
     // Measured in Turn 20: 7,677 minutes with the three of them against 7,727 with the one, which
-    // is six parts in a thousand. The last minute of a stage is shared out and a machine stage
-    // hands its cell over between men, so the two runs do not land on the same minute; they land
-    // on the same work.
+    // was six parts in a thousand, and 10,233 against 10,243 on v54.
+    //
+    // From v55 the three take more minutes than the one: 14,838 against 12,249, 21% more
+    // [measured]. Not more work: the hall. Each man goes round the saw and the bench a half hour
+    // at a time (PIOTR, 24.09), and with three of them on the round somebody is at a saw in nearly
+    // every half hour, the fan runs, and the three ungated saws draw 2,400 against the used
+    // extractor's 830 usable: the fan is short in 164 of the 167 half hours the piece was made in
+    // and the hall works at 0.69 on average. One man's round has him at his bench half the day,
+    // when the fan is off, so his hall averages 0.84 (short in 203 of his 409 half hours).
     const shared = watched(THREE).productionMinutes;
     const alone = watched(ONE).productionMinutes;
-    expect(Math.abs(shared - alone) / alone).toBeLessThan(0.01);
+    expect(shared).toBe(14838);
+    expect(alone).toBe(12249);
   });
 
   it('never goes more than three times faster with three men on it', () => {
@@ -147,8 +154,9 @@ describe('(aa) three men on one job, on Very easy', () => {
     const oneTook = finishedOn(ONE) - opened;
     const threeTook = finishedOn(THREE) - opened;
     expect(threeTook).toBeGreaterThan(0);
-    // To the day, which is the unit this month measures in: 22 days with one man and 7 with the
-    // three, where a third of 22 is 7.33. A finished day is a whole day, so the ceiling is
+    // To the day, which is the unit this month measures in: 35 days with one man and 14 with the
+    // three, where a third of 35 is 11.67 [measured on v55; 29 and 11 on v54, and the three are
+    // slower from v55 for the fan above]. A finished day is a whole day, so the ceiling is
     // asserted with a day's grace and the arithmetic itself is asserted to four places in
     // tests/engine/assignees.test.ts.
     expect(threeTook + 1).toBeGreaterThanOrEqual(oneTook / 3);
@@ -284,11 +292,21 @@ describe('(bb) a lacquered kitchen, by a joiner and by a sprayer', () => {
     // below are four fifths of what they read, and the assertion is a ratio between two men on the
     // same ladder, which is why it holds whatever rung they are on. Three days would see the
     // sprayer finish the stage and the reading
-    // hit a ceiling instead of a rate: the joiner gets through 425.60 of the 900 the stage
-    // carries and the sprayer 608.00, which is 1.4286 to one, and 1 / JOINER_SPRAY_RATE is
-    // 1.4285714. The month and the constant are one number, so neither can drift from the other
-    // unnoticed.
-    expect(sprayerDid / joinerDid).toBeCloseTo(SPRAYER_SPRAY_RATE / JOINER_SPRAY_RATE, 3);
+    // hit a ceiling instead of a rate.
+    //
+    // Until v55 the joiner stood at the booth the whole two days and the ratio was the constant's:
+    // 348.32 of the 900 the stage carries against the sprayer's 497.60 on v54, 1.4286 to one. From
+    // v55 a man goes round the machines of his job a half hour at a time (PIOTR, 24.09) and the
+    // minute is written on the stage the bar stands at wherever he is: the joiner's round is the
+    // saw, the spindle moulder, the bench and the booth, eight half hours at each, and only the
+    // booth's are at JOINER_SPRAY_RATE. The sprayer is at the booth every half hour, his trade
+    // (CLAUDE.md T19 2.6). So the joiner gets through 459.69 and the sprayer 496.96 [measured],
+    // which is 1.0811 to one: the sprayer's rate against a quarter of the joiner's day at 0.7 and
+    // three quarters at his own. The month and the constants are one number still.
+    const joinersBooth = (3 + JOINER_SPRAY_RATE) / 4;
+    expect(sprayerDid / joinerDid).toBeCloseTo(SPRAYER_SPRAY_RATE / joinersBooth, 3);
+    expect(joinerDid).toBeCloseTo(459.69, 2);
+    expect(sprayerDid).toBeCloseTo(496.96, 2);
   });
 });
 

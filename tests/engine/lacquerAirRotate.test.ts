@@ -176,9 +176,13 @@ function assembledMinutes(compressorClass: string | null): number {
   for (const job of next.jobs) {
     job.stage = 'inProduction';
     job.assignees = ['owner'];
-    // Into the assembly, which is the stage a man does with a nailer in his hand.
-    job.labourRemaining = job.labourValue * 0.5;
+    // Into the assembly, the last quarter, which is the stage a man does with a nailer in his
+    // hand (v55).
+    job.labourRemaining = job.labourValue * 0.2;
   }
+  // The saw was there for the board to take sheet work; now it goes, so the benches are the one
+  // place the owner has whichever half hour it is (v55).
+  next.equipment = next.equipment.filter((item) => item.specId !== 'tableSaw');
   const before = firstJob(next).labourRemaining;
   const worked = runClock(next, 20);
   return Math.round((before - firstJob(worked).labourRemaining) * 100000) / 100000;
@@ -211,7 +215,8 @@ describe('air for every bench', () => {
     const job = firstJob(next);
     job.stage = 'inProduction';
     job.assignees = ['owner'];
-    job.labourRemaining = job.labourValue * 0.5;
+    // The last quarter, the assembly (v55).
+    job.labourRemaining = job.labourValue * 0.2;
     expect(hallAirCheck(next).lines).toContain(NO_AIR_LINE);
   });
 
@@ -238,7 +243,10 @@ function benchHall(compressorClass: string | null): GameState {
   const job = firstJob(next);
   job.stage = 'inProduction';
   job.assignees = ['owner'];
-  job.labourRemaining = job.labourValue * 0.5;
+  // The last quarter, the assembly, and the saw gone once the job is on the books, so the bench
+  // is the owner's one place whichever half hour it is (v55).
+  job.labourRemaining = job.labourValue * 0.2;
+  next.equipment = next.equipment.filter((item) => item.specId !== 'tableSaw');
   return next;
 }
 
@@ -274,9 +282,9 @@ describe('no bench work without air', () => {
     // and what the brief's own "a used compressor bought: work resumes" asks for (T23 2.7).
     const hall = benchHall('used');
     expect(benchHasAir(hall)).toBe(true);
-    // Eight men at benches and one sanding is far past what a used compressor will carry, and it
-    // is still not a hall with no air in it.
-    expect(airCheck(hall, { bench: 8, sanding: 1 }).lowAir).toHaveLength(1);
+    // Eight men at benches is past what a used compressor will carry, and it is still not a hall
+    // with no air in it.
+    expect(airCheck(hall, { bench: 8 }).lowAir).toHaveLength(1);
     expect(benchHasAir(hall)).toBe(true);
   });
 });

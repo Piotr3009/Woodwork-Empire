@@ -58,6 +58,7 @@ import {
   newGame,
   nextDay,
   placeEnquiry,
+  placeEquipment,
   runToDay,
   runToStage,
   softwareNow,
@@ -274,6 +275,9 @@ describe('production', () => {
 
   it('takes 240 minutes of the owner for a 400 job', () => {
     let state = accept(ready());
+    // A budget spindle moulder beside the saw, so every quarter of the job runs at 1.00: on the
+    // day one hall the moulding's quarter is by hand and the same job is 270 minutes (v55).
+    placeEquipment(state, 'spindleMoulder', { variantId: 'budget', x: 14, y: 1, id: 'kit-spindle' });
 
     firstJob(state).stage = 'ready';
     expect(minutesRemainingFor(state, firstJob(state), 1)).toBeCloseTo(240, 6);

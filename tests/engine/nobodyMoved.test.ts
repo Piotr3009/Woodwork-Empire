@@ -3,10 +3,13 @@
 // work"] (CLAUDE.md T25 2.2, 2.3), and from v53 nobody waits for a machine either [PIOTR, 24.09:
 // "they never wait for the saw, they go from machine to machine and work"]. A machine is a number
 // of places. A man on a job takes a free place at one of the families his job is made on, the
-// family its bar stands at first and a bench after it, and he stands at his own home cell with
-// `no free machines` over his head only when every one of them is taken. Every minute of work is
-// written on the stage the job's bar stands at, so the bar fills in order. Nobody is sent to
-// another job.
+// one whose turn it is for him this half hour first (the men go round their job's machines, each
+// starting one further on than the man hired before him; v55) and a bench last, and he stands at
+// his own home cell with `no free machines` over his head only when every one of them is taken.
+// Every minute of work is written on the stage the job's bar stands at, so the bar fills in
+// order. Nobody is sent to another job. On this hall, a budget saw and the hand bander out of the
+// cabinet, a job's round is the saw and a bench: in the first half hour the second man hired has
+// the saw and the other three are at the benches.
 //
 // This file was the queue's own test until Turn 25 and the places' test until v53: the same four
 // men and the same one saw, flipped to the rule of the day, and nothing of the old one kept beside
@@ -61,10 +64,10 @@ function fourMenTwoJobs(): { state: GameState; cutting: Job; bench: Job } {
       worker.jobId = null;
     }
   }
-  // The cutting job is a fifth through its cutting with its machining and its assembly done; the
-  // bench job is past its cutting and its machining and a quarter into its assembly.
-  bagged(state, cutting, { cutting: 0.2, machining: 1, assembly: 1 });
-  bagged(state, bench, { cutting: 1, machining: 1, assembly: 0.25 });
+  // The cutting job is a fifth through its cutting with its other three quarters done; the bench
+  // job is past its cutting, its edging and its moulding and a quarter into its assembly (v55).
+  bagged(state, cutting, { cutting: 0.2, edging: 1, moulding: 1, assembly: 1 });
+  bagged(state, bench, { cutting: 1, edging: 1, moulding: 1, assembly: 0.25 });
   return { state, cutting, bench };
 }
 
@@ -85,13 +88,14 @@ describe('four men, one saw of one place, two jobs (CLAUDE.md T22 2.6, T25 2.3; 
     const report = workMinute(state, hands(state));
     // Four of the four minutes are worked: the man at the saw's one place and three at the
     // benches. Until v53 the second man of the cutting job stood with `noPlace`; now he works his
-    // job at a bench (PIOTR, 24.09; v53).
+    // job at a bench (PIOTR, 24.09; v53). The saw is the second man's turn this half hour, though
+    // his job's bar stands at the assembly: the bar is the bar and the round is the round (v55).
     expect(report.worked).toBe(4);
     expect(report.lost.noPlace).toBeUndefined();
     expect(report.lost.noMaterial).toBeUndefined();
     expect(menAtPlaces(state).map((entry) => `${entry.who} ${entry.item.specId}`)).toEqual([
-      'staff-1 tableSaw',
-      'staff-2 workbench',
+      'staff-1 workbench',
+      'staff-2 tableSaw',
       'staff-3 workbench',
       'staff-4 workbench',
     ]);
@@ -123,7 +127,7 @@ describe('four men, one saw of one place, two jobs (CLAUDE.md T22 2.6, T25 2.3; 
 
   it('works all four when both jobs bars stand at the saw: one at its place, three at the benches', () => {
     const { state, cutting, bench } = fourMenTwoJobs();
-    bagged(state, bench, { cutting: 0.2, machining: 1, assembly: 1 });
+    bagged(state, bench, { cutting: 0.2, edging: 1, moulding: 1, assembly: 1 });
     const report = workMinute(state, hands(state));
     // Until v53 one minute was worked and three were `noPlace`; now nobody stands.
     expect(report.worked).toBe(4);
@@ -131,12 +135,12 @@ describe('four men, one saw of one place, two jobs (CLAUDE.md T22 2.6, T25 2.3; 
     expect(cutting.assignees).toEqual(['staff-1', 'staff-3']);
     expect(bench.assignees).toEqual(['staff-2', 'staff-4']);
     expect(['staff-1', 'staff-2', 'staff-3', 'staff-4'].map((who) => stationOf(state, who))).toEqual([
+      AT_A_BENCH,
       AT_THE_SAW,
       AT_A_BENCH,
       AT_A_BENCH,
-      AT_A_BENCH,
     ]);
-    for (const who of ['staff-2', 'staff-3', 'staff-4']) {
+    for (const who of ['staff-1', 'staff-3', 'staff-4']) {
       expect(state.workers.find((worker) => worker.id === who)?.noPlaceFor, who).toBe('');
     }
   });
@@ -148,27 +152,30 @@ describe('four men, one saw of one place, two jobs (CLAUDE.md T22 2.6, T25 2.3; 
     const plan = planPlaces(state);
     expect(plan.map((entry) => entry.who)).toEqual(['owner', 'staff-1', 'staff-2', 'staff-3', 'staff-4']);
     expect(state.owner.working).toBe(true);
+    // The owner's turn is the saw, being first in the order, and he has its one place; the second
+    // man, whose turn it is too, finds it taken and goes to a bench and works (v53, v55).
     expect(state.owner.station).toBe(AT_THE_SAW);
     expect(state.owner.noPlaceFor).toBe('');
-    // The man who had the saw's place goes to a bench and works (v53).
-    const first = state.workers.find((worker) => worker.id === 'staff-1');
-    expect(first?.station).toBe(AT_A_BENCH);
-    expect(first?.working).toBe(true);
-    expect(first?.noPlaceFor).toBe('');
+    const second = state.workers.find((worker) => worker.id === 'staff-2');
+    expect(second?.station).toBe(AT_A_BENCH);
+    expect(second?.working).toBe(true);
+    expect(second?.noPlaceFor).toBe('');
     // And the owner is still on the job he put himself on (CLAUDE.md T4 3.2).
     expect(ownerJob(state)?.id).toBe(cutting.id);
   });
 
   it('gives the saw s place to the next man the minute a man is taken off his job', () => {
-    const { state, cutting } = fourMenTwoJobs();
+    const { state, bench } = fourMenTwoJobs();
     workMinute(state, hands(state));
-    expect(stationOf(state, 'staff-3')).toBe(AT_A_BENCH);
-    const off = act(state, { type: 'REMOVE_FROM_JOB', jobId: cutting.id, workerId: 'staff-1' });
-    const next = off.jobs.find((job) => job.id === cutting.id);
+    // The saw is the second man's this half hour and the fourth, whose turn it is too, is at a
+    // bench; the second man off his job, and the fourth has the saw the next minute (v55).
+    expect(stationOf(state, 'staff-4')).toBe(AT_A_BENCH);
+    const off = act(state, { type: 'REMOVE_FROM_JOB', jobId: bench.id, workerId: 'staff-2' });
+    const next = off.jobs.find((job) => job.id === bench.id);
     if (!next) throw new Error('the job went missing');
     const before = next.labourRemaining;
     workMinute(off, hands(off));
-    const man = off.workers.find((worker) => worker.id === 'staff-3');
+    const man = off.workers.find((worker) => worker.id === 'staff-4');
     expect(man?.working).toBe(true);
     expect(man?.station).toBe(AT_THE_SAW);
     expect(next.labourRemaining).toBeLessThan(before);
@@ -183,12 +190,13 @@ describe('every man on a job works it, and the bar fills in order (PIOTR, 24.09;
     for (let at = 1; at < plan.length; at += 1) {
       expect(plan[at]?.from).toBe(plan[at - 1]?.to);
     }
-    // Half way through its cutting with the machining done. Until v53 both men were at the
-    // cutting, one at the saw's place and one with none; now the second works the job at a bench,
-    // where the stage of it to do is the assembly, and that is what his mark reads.
-    bagged(state, cutting, { cutting: 0.5, machining: 1 });
+    // Half way through its cutting with the edging and the moulding done. Until v53 both men were
+    // at the cutting, one at the saw's place and one with none; now both work the job at a bench
+    // this half hour, the saw being the second man's turn, and the stage of it to do at a bench is
+    // the assembly, which is what their marks read (v53, v55).
+    bagged(state, cutting, { cutting: 0.5, edging: 1, moulding: 1 });
     planPlaces(state);
-    expect(stageOfMan(state, 'staff-1', cutting)?.id).toBe('cutting');
+    expect(stageOfMan(state, 'staff-1', cutting)?.id).toBe('assembly');
     expect(stageOfMan(state, 'staff-3', cutting)?.id).toBe('assembly');
     expect(state.workers.find((worker) => worker.id === 'staff-3')?.noPlaceFor).toBe('');
     const bags = { ...cutting.stageLabour };

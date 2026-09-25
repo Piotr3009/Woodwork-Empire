@@ -12,6 +12,7 @@ import {
   airDemandOf,
   bagsOf,
   classPaceOf,
+  capacityOf,
   placesOf,
   compressorAirOf,
   compressors,
@@ -132,14 +133,14 @@ function powerLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   return `Power ${money(variant.powerPerDay)} a day`;
 }
 
-/** How many men can work at one machine of this class at once, its places (CLAUDE.md T25 2.1),
- *  said on every class card of a family that has them [PIOTR, 24.09: "add the most men at one
- *  machine"] (v54). The bench says it in its own line with its pace. */
+/** How many men one machine of this class keeps busy, its capacity (`MACHINE_CAPACITY`), said on
+ *  every class card of a family that has one [PIOTR, 24.09: "add the most men at one machine"]
+ *  (v54, v55). Past it the men work on at the by hand pace, which the owned card says. The bench
+ *  says its places in its own line with its pace. */
 function atOnceLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
-  if (spec.id === 'workbench') return '';
-  const places = placesOf({ specId: spec.id, variantId: variant.id });
-  if (places <= 0) return '';
-  return `Up to ${places} ${places === 1 ? 'man' : 'men'} at once`;
+  const men = capacityOf({ specId: spec.id, variantId: variant.id });
+  if (men <= 0) return '';
+  return `Keeps up to ${men} ${men === 1 ? 'man' : 'men'} busy`;
 }
 
 /** What this class adds to the property premium a year, off the one rate the cover is written at

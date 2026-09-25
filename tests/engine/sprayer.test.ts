@@ -75,6 +75,11 @@ function atTheBooth(role: 'joiner' | 'sprayer', tier: WorkerTier = 'experienced'
   expect(addToJob(state, job.id, man.id)).toBe(true);
   // The whole of the piece but its finishing is done, so the next minute is a minute of spraying.
   job.labourRemaining = job.labourValue * 0.1;
+  // The second half hour of the day: a sprayer goes to the booth whatever the hour, it being his
+  // trade, and a joiner goes round the job's machines, the saw, a bench and the booth on this hall,
+  // and the booth is his turn in the second half hour, so the two are measured at the same place
+  // (v55).
+  state.clock.minute = 30;
   return state;
 }
 

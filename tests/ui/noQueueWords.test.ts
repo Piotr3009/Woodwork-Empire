@@ -109,17 +109,20 @@ describe('the queue s words are gone from every screen (CLAUDE.md T25 2.2)', () 
     const texts = everyScreen(state);
     noOldWords(texts);
     // What the player reads instead is the saw's own line, on its hover and its card: the six men
-    // at work and the one place (v54; seven on v53, the owner counted though he is at no job).
-    expect(texts.join('\n')).toContain('Too few saws for the crew: 6 men, 1 place, 5 work at 67%');
+    // whose work goes through the saw and the one man a used saw keeps busy (v54, v55; seven men
+    // on v53, the owner counted though he is at no job).
+    expect(texts.join('\n')).toContain('Too few saws for the crew: 6 men, capacity 1, 5 work at 67%');
     expect(texts.join('\n')).not.toContain('with no free machines');
   });
 
   it('says none of them over a crowded bench, and says no free machines instead', () => {
     const state = crowdedBench();
     // The saw and the bench are taken, and the men past them stand. The family a man could have
-    // used first is his job's own, the bench of its assembly.
+    // used first is the one whose turn it was for him this half hour, the saw or the bench (v55).
     expect(state.workers.filter((worker) => worker.working)).toHaveLength(2);
-    expect(state.workers.filter((worker) => worker.noPlaceFor === 'workbench')).toHaveLength(4);
+    expect(state.workers.filter((worker) => worker.noPlaceFor !== '')).toHaveLength(4);
+    expect(state.workers.filter((worker) => worker.noPlaceFor === 'workbench')).toHaveLength(2);
+    expect(state.workers.filter((worker) => worker.noPlaceFor === 'tableSaw')).toHaveLength(2);
     const texts = everyScreen(state);
     noOldWords(texts);
     // The Work Plan's line counts them, and the mark over each of the four says the same words.

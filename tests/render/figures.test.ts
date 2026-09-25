@@ -43,7 +43,9 @@ function atWork(): GameState {
 }
 
 describe('the figure of a man at work', () => {
-  it('stands at the saw for the cutting and walks to his bench for the assembly', () => {
+  it('stands at the saw for his half hour there and walks to his bench for the next', () => {
+    // From v55 the men go round their job's machines a half hour at a time, the saw and a bench on
+    // this hall, whatever the bar says [PIOTR, 24.09]. The first half hour is the saw.
     const cutting = tick(atWork(), 1);
     expect(cutting.owner.station).toBe(machineStation('tableSaw'));
     const saw = cutting.equipment.find((item) => item.specId === 'tableSaw');
@@ -61,10 +63,10 @@ describe('the figure of a man at work', () => {
     });
     expect(atSaw.y).toBeGreaterThan(saw.anchorY);
     expect(['ne', 'nw']).toContain(atSaw.facing);
-    const job = firstJob(cutting);
-    job.labourRemaining = job.labourValue * 0.5;
-    const assembling = tick(cutting, 1);
-    // At his place at the bench, which is a family with places like any other (CLAUDE.md T25 2.2).
+    // The second half hour: at his place at the bench, which is a family with places like any
+    // other (CLAUDE.md T25 2.2).
+    const assembling = tick(cutting, 30);
+    expect(assembling.clock.minute).toBe(31);
     expect(assembling.owner.station).toBe(machineStation('workbench'));
     // And the hall draws him there, with what he is doing under his name.
     expect(renderHall(assembling)).toContain('workbench');
@@ -104,10 +106,14 @@ describe('the figure of a man at work', () => {
   });
 
   it('stands two men at a standard saw s two places, side by side and neither on it', () => {
+    // Two men and a standard saw of two places. Their turns at the saw fall in different half
+    // hours (v55), so to stand them at it together the joiner is put at the saw by hand for the
+    // cells the test is about: the second place is a cell of its own.
     const state = tick(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'standard' })), 1);
     const joiner = state.workers[0];
     if (!joiner) throw new Error('no joiner');
-    expect(joiner.station).toBe(machineStation('tableSaw'));
+    expect(state.owner.station).toBe(machineStation('tableSaw'));
+    joiner.station = machineStation('tableSaw');
     const first = stationCell(state, machineStation('tableSaw'), { x: 0, y: 0 }, OWNER);
     const second = stationCell(state, machineStation('tableSaw'), { x: 0, y: 0 }, joiner.id);
     expect({ x: second.x, y: second.y }).not.toEqual({ x: first.x, y: first.y });
@@ -118,31 +124,35 @@ describe('the figure of a man at work', () => {
     expect(second.y).toBeGreaterThanOrEqual(Math.floor(stands.y + stands.depth));
   });
 
-  it('has no cycle of minutes left in it at all', () => {
+  it('goes round the saw and the bench on the half hour, and works every minute of it', () => {
     const state = atWork();
-    // Two hours at the same stage is two hours at the same station: nothing walks him back and
-    // forth on a timer any more (CLAUDE.md T7 3.1).
-    const stations = new Set<string>();
+    // Two hours at the same stage: half an hour at the saw, half at the bench, and round again,
+    // never a minute idle. Until v55 two hours at a stage were two hours at one station (T7 3.1);
+    // from v55 the men move about the way a shop's do [PIOTR, 24.09].
+    const stations: string[] = [];
     let next = state;
     for (let minute = 0; minute < 120; minute += 1) {
       next = tick(next, 1);
-      stations.add(next.owner.station);
+      if (minute % 30 === 0) stations.push(next.owner.station);
     }
-    expect(Array.from(stations)).toEqual([machineStation('tableSaw')]);
+    expect(stations).toEqual([
+      machineStation('tableSaw'),
+      machineStation('workbench'),
+      machineStation('tableSaw'),
+      machineStation('workbench'),
+    ]);
     expect(next.owner.productionMinutes).toBe(120);
   });
 
-  it('puts the owner at his bench when the stage wants no machine', () => {
+  it('puts the owner at his bench when the job wants no machine at all', () => {
     const state = atWork();
-    const job = firstJob(state);
-    // The finishing of a laminate job is done at the bench with nothing but hands (T7 3.1).
-    job.labourRemaining = job.labourValue * 0.05;
-    const finishing = tick(state, 1);
-    // A stage with nothing but hands is bench work, and bench work wants a place at a bench
-    // (CLAUDE.md T25 2.3).
-    expect(finishing.owner.station).toBe(machineStation('workbench'));
+    // A job made by hand uses no machine at any stage (CLAUDE.md 9.5), so the bench is the one
+    // place its man has, whatever the half hour.
+    firstJob(state).byHand = true;
+    const byHand = tick(state, 1);
+    expect(byHand.owner.station).toBe(machineStation('workbench'));
     // Nothing but his bench, so the cell he is given is the bench cell he was handed.
-    const cell = stationCell(finishing, STATION_BENCH, { x: 7, y: 7 });
+    const cell = stationCell(byHand, STATION_BENCH, { x: 7, y: 7 });
     expect({ x: cell.x, y: cell.y }).toEqual({ x: 7, y: 7 });
   });
 });

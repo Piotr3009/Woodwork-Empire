@@ -247,7 +247,25 @@ const control = play('veryEasy');
  *  material 7,600 against 12,550; the script takes an experienced manager on day 65 where it took
  *  a novice on day 73, and month 3 closes at -10,414, 5,137 better, inside the limit. The bank
  *  does not pull the overdraft on day 91 and the run ends trading, with thirteen weeks of the
- *  term made. Nothing is tuned. */
+ *  term made. Nothing is tuned.
+ *
+ *  **Re-measured for v55 (PIOTR, 24.09): every job in four even quarters, and the men round the
+ *  machines.** This hall has no spindle moulder, so the moulding quarter of every job goes by hand
+ *  at 67% and a job takes longer; the first that comes out of the hall later than on v54 is the
+ *  bookcase taken on day 18 (finished on day 22 against 19), and from there the two runs part.
+ *  Off the month reports: month 1 closes at 4,093, 10 worse, revenue 9,740 against 9,750, a pair
+ *  of garage shelves agreed at 530 on day 22 where v54 agreed 540. Month 2 closes at 48, 2,068
+ *  worse: revenue 13,322 against 13,767 and material 8,000 against 7,600, and the line is read at
+ *  the first minute of day 61, when v54 had the balances of a TV unit and a pair of garage shelves
+ *  in, 1,250, and v55 delivers nothing that morning (its TV unit goes out on day 68). At 48 the
+ *  account carries no production manager's month of pay: a novice's 2,400 is there on day 68 and
+ *  an experienced man's 3,400 not before it, so the script takes a novice, who starts on day 71
+ *  (v54: the experienced man, 3,630 in the account on day 64, on day 65), and the owner's five
+ *  days away follow him, days 71 to 75. Month 3 closes at -11,700, 1,286 worse: revenue 7,426
+ *  against 8,672, the contract 8,712 against 8,910, material 8,060 against 7,830 and transport
+ *  1,200 against 840, less 1,000 of wages for the novice from day 71 in place of the experienced
+ *  man from day 65 and no repair. The bank does not pull the overdraft and the run ends trading.
+ *  Nothing is tuned. */
 describe('the three month playthrough of 10.4, on Easy as the brief scripts it', () => {
   it('has the crew, the kit and the paper the brief asked for, in the order it asked', () => {
     // It traded all three months and is still trading on day 91 (v53, the note above; on v52 the
@@ -259,10 +277,14 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // The estimator on day 32, as ever. The production manager of 10.4 is back on the books from
     // v52: month 2 closed in the black, and the gate that refuses a hire the account cannot carry
     // a month of lets him through (CLAUDE.md T17 2.11, T23 2.12). On v52 a novice on day 73; from
-    // v53 an experienced man on day 65, the month closing 1,168 better (the note above).
+    // v53 an experienced man on day 65, the month closing 1,168 better (the note above); from v55
+    // a novice on day 71, month 2 closing at 48 and the account reaching a novice's month of pay
+    // on day 68 and an experienced man's not before it (the note above).
     expect(state.workers.some((worker) => worker.role === 'estimator' && worker.startDay <= 35)).toBe(true);
     expect(
-      state.workers.some((worker) => worker.role === 'productionManager' && worker.startDay === 65),
+      state.workers.some(
+        (worker) => worker.role === 'productionManager' && worker.tier === 'novice' && worker.startDay === 71,
+      ),
     ).toBe(true);
     expect(state.equipment.some((item) => item.specId === 'tableSaw' && item.variantId === 'standard')).toBe(true);
     expect(state.equipment.some((item) => item.specId === 'extractor' && item.variantId === 'standard')).toBe(true);
@@ -335,9 +357,14 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // 8,870; month 2 closes 1,168 better, material 7,600 against 12,550 and revenue 13,766
     // against 15,826; month 3 is 5,137 better, revenue 8,672 against 6,125 and material 7,830
     // against 11,700, less 1,000 more of wages for the experienced manager and a 150 repair.
-    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(4103);
-    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(2116);
-    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-10414);
+    // Re-measured for v55: 4,093, 48 and -11,700 (the note above the describe), off the month
+    // reports: month 1 is 10 worse, one pair of garage shelves 10 cheaper; month 2 is 2,068
+    // worse, revenue 13,322 against 13,767, material 8,000 against 7,600 and no delivery on the
+    // morning the line is read; month 3 is 1,286 worse, revenue 7,426 against 8,672 and a novice
+    // manager's wages in place of an experienced man's.
+    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(4093);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(48);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-11700);
     // Two charges in three months: 7 on day 31 for the few days month 1 ran under, and 72 on day
     // 91 for month 3. Month 2 never went under and pays nothing on day 61 (CLAUDE.md T23 2.12).
     const overdraft = state.ledger.filter((entry) => entry.category === 'overdraftInterest');
@@ -370,8 +397,11 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // six months, and the third restock keeps the rack fed to the end.
     // Ninety from v52: nobody stands at the saw, the queue's 3,505 minutes are gone, and the five
     // days the owner was away are not seats the day counts (CLAUDE.md T25 2.3).
+    // Ninety one from v55, 90.86 against 90.00 off the day records: the run parts from v54's on
+    // day 18 and month 3's days fall differently, the owner away on days 71 to 75 and not 65 to 71
+    // (the note above the describe).
     expect(months[1]?.efficiencyMean ?? 0).toBeGreaterThan(55);
-    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(90);
+    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(91);
   });
 
   it('took the first contract its crew could keep up with and made every week of it in full', () => {

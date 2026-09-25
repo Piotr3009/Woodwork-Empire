@@ -1,12 +1,18 @@
 // @vitest-environment jsdom
 // The hall's places decide where a man works, and nobody waits for a machine (PIOTR, 21.09 and
 // 24.09; CLAUDE.md T25 2.3; v53). Every man on a job takes a free place at one of the families
-// his job is made on: the family of the stage its bar stands at first, then the other families of
-// its plan, then a bench. The places are given out in the order the men were hired, the owner
-// first. A man stands only when every place he could take is taken: he stands at his home cell
-// with the red mark, says `no free machines`, his card says the same, and his minutes are idle
-// with `noPlace`. A family that does not run has no places and its share of the job goes at the by
-// hand pace; nothing stops the job but the whole hall.
+// his job is made on: from v55 the one whose turn it is for him this half hour first (the men go
+// round their job's machines, each starting one further on than the man hired before him), then
+// the other families of its plan, then a bench. The places are given out in the order the men were
+// hired, the owner first. A man stands only when every place he could take is taken: he stands at
+// his home cell with the red mark, says `no free machines`, his card says the same, and his
+// minutes are idle with `noPlace`. A family that does not run has no places and its share of the
+// job goes at the by hand pace; nothing stops the job but the whole hall.
+//
+// The six joiner hall these tests stand four men in has a saw, the day one hand bander out of the
+// cabinet and no spindle moulder, so a job's round is the saw and a bench: in the first half hour
+// the first man hired goes to a bench, the second to the saw, the third to a bench, the fourth to
+// the saw (v55).
 
 import { describe, expect, it } from 'vitest';
 import { dayPlan, hands, planPlaces, workMinute } from '../../src/engine/production';
@@ -110,14 +116,15 @@ const AT_THE_SAW = machineStation('tableSaw');
 const AT_A_BENCH = machineStation('workbench');
 
 describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
-  it('gives the saw s places out in the order the men were hired, and the rest work at a bench', () => {
+  it('gives the saw s places to the men whose turn it is, and the rest work at a bench', () => {
     const state = fourAtOneSaw('standard');
     const plan = planPlaces(state);
     expect(plan.map((entry) => entry.who)).toEqual(['staff-1', 'staff-2', 'staff-3', 'staff-4']);
-    // A standard saw has two places: the first two men hired have them, and the other two work
-    // the same jobs at a bench and do not stand (PIOTR, 24.09; v53).
+    // A standard saw has two places: the second and the fourth man hired, whose turn the saw is
+    // in the first half hour, have them, and the other two work the same jobs at a bench and do
+    // not stand (PIOTR, 24.09; v53, v55).
     expect(workingMen(state)).toEqual(['staff-1', 'staff-2', 'staff-3', 'staff-4']);
-    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_THE_SAW]);
     for (const worker of state.workers.slice(0, 4)) expect(worker.noPlaceFor, worker.id).toBe('');
   });
 
@@ -145,40 +152,44 @@ describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
   it('hands the saw s place to the next man the minute a man is taken off his job', () => {
     let state = fourAtOneSaw('budget');
     state = tick(state, 1);
-    // One place at a budget saw: the first man hired has it, and the other three work at a bench.
+    // One place at a budget saw: the second man hired has it, the fourth, whose turn it is too,
+    // finds it taken and works at a bench, and so do the other two (v55).
     expect(workingMen(state)).toEqual(['staff-1', 'staff-2', 'staff-3', 'staff-4']);
-    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_A_BENCH, AT_A_BENCH, AT_A_BENCH]);
-    const job = state.jobs.find((entry) => entry.assignees.includes('staff-1'));
-    if (!job) throw new Error('the first man s job is wanted');
-    state = act(state, { type: 'REMOVE_FROM_JOB', jobId: job.id, workerId: 'staff-1' });
-    // The click re plans the hall, and the next man hired goes from his bench to the saw.
-    expect(workingMen(state)).toEqual(['staff-2', 'staff-3', 'staff-4']);
-    expect(stationsOf(state, 4).slice(1)).toEqual([AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
-    const before = state.workers.find((worker) => worker.id === 'staff-2')?.productionMinutes ?? 0;
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
+    const job = state.jobs.find((entry) => entry.assignees.includes('staff-2'));
+    if (!job) throw new Error('the second man s job is wanted');
+    state = act(state, { type: 'REMOVE_FROM_JOB', jobId: job.id, workerId: 'staff-2' });
+    // The click re plans the hall, and the fourth man goes from his bench to the saw.
+    expect(workingMen(state)).toEqual(['staff-1', 'staff-3', 'staff-4']);
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, 'bench', AT_A_BENCH, AT_THE_SAW]);
+    const before = state.workers.find((worker) => worker.id === 'staff-4')?.productionMinutes ?? 0;
     state = tick(state, 1);
-    expect(state.workers.find((worker) => worker.id === 'staff-2')?.productionMinutes).toBe(before + 1);
+    expect(state.workers.find((worker) => worker.id === 'staff-4')?.productionMinutes).toBe(before + 1);
   });
 
   it('gives a second saw s places out the minute it stands in the hall', () => {
     let state = fourAtOneSaw('budget');
     state = tick(state, 1);
-    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_A_BENCH, AT_A_BENCH, AT_A_BENCH]);
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
     placeEquipment(state, 'tableSaw', { variantId: 'budget', x: 14, y: 1, id: 'kit-saw-second' });
     state = tick(state, 1);
-    // The second man hired goes from his bench to the second saw's one place.
-    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
-    expect(menAtPlaces(state).find((entry) => entry.who === 'staff-2')?.item.id).toBe('kit-saw-second');
+    // The fourth man hired, whose turn the saw is, goes from his bench to the second saw's one
+    // place.
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_THE_SAW]);
+    expect(menAtPlaces(state).find((entry) => entry.who === 'staff-4')?.item.id).toBe('kit-saw-second');
     expect(hallPlaces(state, 'tableSaw')).toBe(2);
   });
 
   it('stops no job for a broken saw: the men work at a bench, and the cutting goes at the by hand pace', () => {
     let state = fourAtOneSaw('standard');
     state = tick(state, 1);
-    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_THE_SAW]);
     const job = state.jobs[0];
     if (!job) throw new Error('a job is wanted');
-    // The job's one pace with the standard saw: the cutting's quarter at 1.05 and the rest at 1.00.
-    expect(jobPace(state, job)).toBeCloseTo(1 / (0.25 / 1.05 + 0.75), 10);
+    // The job's one pace with the standard saw: the cutting's quarter at 1.05, the edging's on the
+    // hand bander at 1.00, the moulding's by hand, the hall having no spindle moulder, and the
+    // assembly's at 1.00 (v55).
+    expect(jobPace(state, job)).toBeCloseTo(1 / (0.25 / 1.05 + 0.25 + 0.25 * 1.5 + 0.25), 10);
     saw(state).broken = true;
     const before = state.jobs.map((entry) => entry.labourRemaining);
     state = tick(state, 1);
@@ -191,27 +202,36 @@ describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
       expect(entry.blockedBy, entry.name).toBe('');
       expect(entry.labourRemaining, entry.name).toBeLessThan(before[index] ?? 0);
     });
-    // The job is slower, not stopped: its cutting's quarter goes at 1 / 1.5 by hand, 0.8889 in all.
+    // The job is slower, not stopped: its cutting's quarter goes at 1 / 1.5 by hand too, 0.80 in
+    // all.
     const slowed = state.jobs[0];
     if (!slowed) throw new Error('a job is wanted');
-    expect(jobPace(state, slowed)).toBeCloseTo(1 / (0.25 * 1.5 + 0.75), 10);
+    expect(jobPace(state, slowed)).toBeCloseTo(1 / (0.25 * 1.5 + 0.25 + 0.25 * 1.5 + 0.25), 10);
     saw(state).broken = false;
     state = tick(state, 1);
-    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_THE_SAW]);
   });
 
-  it('sends a man first to the family his job s bar stands at, and asks again when the bar moves on', () => {
-    const state = fourAtOneSaw('budget');
+  it('sends the men round their job s machines a half hour at a time, whatever the bar says', () => {
+    let state = fourAtOneSaw('standard');
     planPlaces(state);
-    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_A_BENCH, AT_A_BENCH, AT_A_BENCH]);
-    // The first man's job past its cutting and its machining: its bar stands at the assembly now,
-    // so he goes to a bench first, and the saw's one place is free for the next man hired.
+    // The first half hour: the second and the fourth man at the saw.
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_THE_SAW]);
+    // The second half hour: everybody one machine on, so the first and the third are at the saw
+    // and the other two at the benches (v55).
+    state = tick(state, 30);
+    expect(state.clock.minute).toBe(30);
+    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_A_BENCH, AT_THE_SAW, AT_A_BENCH]);
+    // The bar of a job says where its work has got to and nothing about where its men stand: the
+    // first man's job past its cutting, and he is at the saw all the same, the round being the
+    // job's machines and not its bar (PIOTR, 24.09: "the stages are only on the bar"; v55).
     const job = state.jobs.find((entry) => entry.assignees.includes('staff-1'));
     if (!job) throw new Error('the first man s job is wanted');
     job.stageLabour = {};
     job.labourRemaining = job.labourValue * 0.5;
     planPlaces(state);
-    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
+    expect(currentStage(state, job)?.id).toBe('moulding');
+    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_A_BENCH, AT_THE_SAW, AT_A_BENCH]);
     expect(workingMen(state)).toEqual(['staff-1', 'staff-2', 'staff-3', 'staff-4']);
   });
 
@@ -228,7 +248,8 @@ describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
     expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_A_BENCH, AT_A_BENCH, AT_A_BENCH]);
     const job = state.jobs[0];
     if (!job) throw new Error('a job is wanted');
-    expect(jobPace(state, job)).toBeCloseTo(1 / (0.25 * 1.5 + 0.75), 10);
+    // The cutting's quarter by hand, and the moulding's, the hall having no spindle moulder (v55).
+    expect(jobPace(state, job)).toBeCloseTo(1 / (0.25 * 1.5 + 0.25 + 0.25 * 1.5 + 0.25), 10);
   });
 
   it('gives a man on a standing contract a place of his piece s family or a bench, in the same order', () => {
@@ -242,11 +263,12 @@ describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
     const plan = dayPlan(state);
     const him = plan.find((entry) => entry.who === 'staff-5');
     expect(him?.contract?.id).toBe(contract.id);
-    // The saw's two places are the first two men's, so he works his piece at a bench (v53).
+    // The saw's two places are the second and the fourth man's, whose turn it is, so he works his
+    // piece at a bench (v53, v55).
     expect(him?.family).toBe('workbench');
     expect(him?.working).toBe(true);
-    // The first man off his job, and the contract man is not first in line for his place: the
-    // next man hired is (CLAUDE.md T25 2.3).
+    // The first man off his job, and the contract man is not first in line for a place at the
+    // saw: the men whose turn it is are (CLAUDE.md T25 2.3; v55).
     const first = state.jobs.find((entry) => entry.assignees.includes('staff-1'));
     if (!first) throw new Error('a job is wanted');
     first.assignees = [];
@@ -255,7 +277,7 @@ describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
     const again = planPlaces(state);
     expect(again.filter((entry) => entry.family === 'tableSaw').map((entry) => entry.who)).toEqual([
       'staff-2',
-      'staff-3',
+      'staff-4',
     ]);
     expect(again.find((entry) => entry.who === 'staff-5')?.family).toBe('workbench');
   });
@@ -286,11 +308,12 @@ describe('four men on one job and one saw of one place (PIOTR, 24.09; v53)', () 
   it('says on the Output sheet what the one saw costs the hall: a quarter off every minute', () => {
     const state = tick(fourOnOneJob(), 1);
     const hall = outputBreakdown(state).lines.filter((line) => line.hall);
-    // Four men and one place: three work at 1 / 1.5, so (1 + 3 / 1.5) / 4 = 0.75.
+    // Four men and a used saw that keeps one busy: three work at 1 / 1.5, so (1 + 3 / 1.5) / 4 =
+    // 0.75. The standard bander keeps four, so it is not short (v55).
     expect(hall.map((line) => `${line.label} ${line.points}`)).toEqual([
       'Hall clean 0',
       'Extraction working 0',
-      'Too few saws: 1 place, 4 men -0.25',
+      'Too few saws: capacity 1, 4 men -0.25',
     ]);
     expect(hallProductivityFactor(state)).toBeCloseTo(0.75, 10);
   });
@@ -309,18 +332,20 @@ describe('a man with every place taken (CLAUDE.md T25 2.3; v53)', () => {
   it('stands only when every place he could take is taken, and works the minute one frees', () => {
     const state = twoPlacesForFour();
     planPlaces(state);
-    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_A_BENCH, STATION_HOME, STATION_HOME]);
-    // The first family he could have used is the one his bar stands at.
+    // The first man's turn is the bench and the second's the saw; the third and the fourth find
+    // both taken and stand (v55).
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, STATION_HOME, STATION_HOME]);
+    // The first family he could have used is the one whose turn it was.
     expect(state.workers.slice(0, 4).map((worker) => worker.noPlaceFor)).toEqual([
       '',
       '',
-      'tableSaw',
+      'workbench',
       'tableSaw',
     ]);
     // One more bench place, and the third man hired takes it; the fourth still has none.
     placeEquipment(state, 'workbench', { variantId: 'budget', x: 16, y: 8, id: 'kit-bench-more' });
     planPlaces(state);
-    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_A_BENCH, AT_A_BENCH, STATION_HOME]);
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, STATION_HOME]);
   });
 
   it('stands at his home cell with the mark, says why on his card, and books his minute to noPlace', () => {
@@ -365,9 +390,10 @@ describe('a whole morning of four men and one saw (v53)', () => {
     const before = state.workers.slice(0, 4).map((worker) => worker.productionMinutes);
     state = tick(state, 60);
     const worked = state.workers.slice(0, 4).map((worker, index) => worker.productionMinutes - (before[index] ?? 0));
-    // Until v53 two of the four worked; now all four do, a full hour each.
+    // Until v53 two of the four worked; now all four do, a full hour each. At the top of the third
+    // half hour the round is where it started: the second and the fourth at the saw (v55).
     expect(worked).toEqual([60, 60, 60, 60]);
-    expect(stationsOf(state, 4)).toEqual([AT_THE_SAW, AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_THE_SAW]);
   });
 });
 
@@ -387,8 +413,11 @@ describe('the CNC and the booth in the day plan (v53)', () => {
         expect(job.blockedBy, job.name).toBe('');
       }
     }
-    // Both men on the standard saw's two places: the owner first, then the joiner.
-    expect(menAtMachine(state, saw(state))).toEqual([OWNER, 'staff-1']);
+    // At minute 30 the round has moved one on: the joiner's turn is the saw and the owner's the
+    // bench, so the saw's two places hold the one man whose turn it is (v55).
+    expect(state.clock.minute).toBe(30);
+    expect(menAtMachine(state, saw(state))).toEqual(['staff-1']);
+    expect(state.owner.station).toBe(machineStation('workbench'));
   });
 
   it('sends a sprayer on a lacquered job to the booth first, while the saw still has a place', () => {

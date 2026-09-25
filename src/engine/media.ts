@@ -14,7 +14,6 @@ import {
   AIR_DIVERSITY,
   AIR_DRYER,
   AIR_HEADROOM,
-  AIR_SANDING_DEMAND,
   COMPRESSOR,
   COMPRESSOR_AIR,
   COMPRESSOR_WITH_DRYER,
@@ -256,12 +255,11 @@ export function airConsumers(state: GameState, compressor: Equipment): Equipment
   });
 }
 
-/** How many men are at a bench this minute, and how many of them are at the Finishing stage: the
- *  two per person draws of Piotr's table (CLAUDE.md T10 3.2). The caller counts them, because the
- *  people side of the hall belongs to production and not to this module. */
+/** How many men are at a bench this minute, the per person draw of Piotr's table (CLAUDE.md T10
+ *  3.2). The caller counts them, because the people side of the hall belongs to production and
+ *  not to this module. */
 export interface AirHands {
   bench: number;
-  sanding: number;
 }
 
 export interface CompressorLine {
@@ -318,7 +316,7 @@ export function needsDryAir(specId: string): boolean {
 }
 
 /** The whole air side of the hall this minute (CLAUDE.md T10 3.2, 3.3). */
-export function airCheck(state: GameState, hands: AirHands = { bench: 0, sanding: 0 }): AirCheck {
+export function airCheck(state: GameState, hands: AirHands = { bench: 0 }): AirCheck {
   const list = compressors(state);
   const first = list[0] ?? null;
   const lines: CompressorLine[] = [];
@@ -338,7 +336,6 @@ export function airCheck(state: GameState, hands: AirHands = { bench: 0, sanding
     // the player assigns machines and not hands (CLAUDE.md T10 3.2).
     if (first !== null && first.id === compressor.id) {
       drawn += hands.bench * AIR_BENCH_DEMAND.litres;
-      drawn += hands.sanding * AIR_SANDING_DEMAND.litres;
     }
     const demand = Math.round(drawn * AIR_DIVERSITY * 100) / 100;
     const allowed = Math.round(gives.litres * AIR_HEADROOM * 100) / 100;
@@ -363,7 +360,7 @@ export function airCheck(state: GameState, hands: AirHands = { bench: 0, sanding
         `${mediaFigure(line.allowed)} l/min`,
     );
   // Nobody to draw on at all, and men at the benches: the hall says so (CLAUDE.md T11 3.8).
-  if (list.length === 0 && hands.bench + hands.sanding > 0) said.push(NO_AIR_LINE);
+  if (list.length === 0 && hands.bench > 0) said.push(NO_AIR_LINE);
   return { compressors: lines, stopped, lowAir, lines: said };
 }
 
@@ -444,10 +441,9 @@ export function airFactorFor(
 }
 
 /** True while a stage is worked at a bench with air in the hose: the nailer and the driver of
- *  every assembly, and the pneumatic sanding of a Finishing that is not done in a booth
- *  (CLAUDE.md T10 3.2). */
-export function benchDrawsAir(stage: { id: string; family: string | null }): 'bench' | 'sanding' | null {
-  if (stage.id === 'finishing' && stage.family === null) return 'sanding';
+ *  every assembly (CLAUDE.md T10 3.2). The pneumatic sanding of a Finishing done at a bench went
+ *  with that stage in v55: the sanding is in the Assembly now and draws the bench's air. */
+export function benchDrawsAir(stage: { id: string; family: string | null }): 'bench' | null {
   return stage.family === BENCH ? 'bench' : null;
 }
 
@@ -484,19 +480,16 @@ export function standsForAir(
 }
 
 /** The men drawing air at a bench this minute: one for every joiner at an assembly with a nailer
- *  and a driver in his hands, and one for every joiner doing pneumatic sanding at a Finishing
- *  that is not done in a booth (PIOTR, CLAUDE.md T10 3.2). Read off the jobs in production, so
- *  the hall, the company board and the bench count the same men. */
+ *  and a driver in his hands (PIOTR, CLAUDE.md T10 3.2). Read off the jobs in production, so the
+ *  hall, the company board and the bench count the same men. */
 export function airHands(state: GameState): AirHands {
-  const hands: AirHands = { bench: 0, sanding: 0 };
+  const hands: AirHands = { bench: 0 };
   for (const job of state.jobs) {
     const lead = job.assignees[0] ?? null;
     if (job.stage !== 'inProduction' || lead === null) continue;
     const stage = currentStage(state, job);
     if (stage === null) continue;
-    const draw = benchDrawsAir(stage);
-    if (draw === 'bench') hands.bench += 1;
-    if (draw === 'sanding') hands.sanding += 1;
+    if (benchDrawsAir(stage) === 'bench') hands.bench += 1;
   }
   return hands;
 }

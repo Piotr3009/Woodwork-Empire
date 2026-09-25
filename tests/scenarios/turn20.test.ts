@@ -743,21 +743,24 @@ describe('(ff) three services on one saw', () => {
       // saw was back (PIOTR, 24.09: "they never wait for the saw"; v53).
       expect(round.blocked, `service ${index + 1}`).toBe('');
       // The saw's share of the piece goes at the by hand pace while it is away, so the whole piece
-      // goes at 0.89 of the owner's minute, and at 0.99 with the saw back.
-      expect(round.paceAway, `service ${index + 1}`).toBeCloseTo(0.8889, 4);
-      expect(round.paceBack, `service ${index + 1}`).toBeCloseTo(0.9870, 4);
+      // goes at 0.8 of the owner's minute, and at 0.88 with the saw back. 0.89 and 0.99 until v55:
+      // from v55 the piece is four even quarters and this hall has no spindle moulder, so its
+      // moulding quarter goes by hand whether the saw is in or out (PIOTR, 24.09).
+      expect(round.paceAway, `service ${index + 1}`).toBeCloseTo(0.8, 4);
+      expect(round.paceBack, `service ${index + 1}`).toBeCloseTo(0.8786, 4);
       // So the day the saw is away moves the piece on, by less than the day it is back.
       const away = round.leftAtTheCall - round.leftThatEvening;
       const back = round.leftThatEvening - round.leftTheNextEvening;
       expect(away, `service ${index + 1}`).toBeGreaterThan(0);
       expect(away, `service ${index + 1}`).toBeLessThan(back);
     }
-    // The first of them in figures: 284.44 of the piece's labour the day the saw was away, 315.84
-    // the day it was back, which is 0.89 against 0.99. v52 made 0 and then 304.
+    // The first of them in figures: 256.00 of the piece's labour the day the saw was away, 281.16
+    // the day it was back, which is 0.8 against 0.88 (284.44 and 315.84 until v55, the paces
+    // above). v52 made 0 and then 304.
     const first = FF.rounds[0];
     if (first === undefined) throw new Error('three services are wanted');
-    expect(first.leftAtTheCall - first.leftThatEvening).toBeCloseTo(284.44, 2);
-    expect(first.leftThatEvening - first.leftTheNextEvening).toBeCloseTo(315.84, 2);
+    expect(first.leftAtTheCall - first.leftThatEvening).toBeCloseTo(256.0, 2);
+    expect(first.leftThatEvening - first.leftTheNextEvening).toBeCloseTo(281.16, 2);
     expect(machinesInService(FF.state)).toEqual([]);
     console.log(
       '(ff) THREE SERVICES ON ONE SAW\n' +

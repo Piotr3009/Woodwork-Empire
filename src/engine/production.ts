@@ -4,13 +4,15 @@
 // A machine is a number of places to work, and the day plan here gives them out: the men in the
 // order they were hired, the owner first. Nobody waits for a machine and no job waits for a stage
 // [PIOTR, 24.09: "they never wait for the saw, they go from machine to machine and work"]: a man
-// takes a free place at a machine his job is made on, the one its bar stands at first, then any
-// other, then a bench, and he stands only when every one of them is taken. `workMinute` is the
+// takes a free place at a machine his job is made on, the one whose turn it is for him this half
+// hour first (`turnFamily`: the men go round their job's machines, each starting one further on),
+// then any other, then a bench, and he stands only when every one of them is taken. `workMinute`
+// is the
 // minute of work: the men at their places, the hall's factors, the labour into the job at its one
 // pace, the hours onto the machine and the dust into the store. The night shift runs on it; the
 // day's production minute in game.ts does the same arithmetic (the note in REPORT-T13-B2.md).
 
-import { BUBBLES, WET_AIR_FINISH_FACTOR } from './constants';
+import { BUBBLES, DRAW_BLOCK_MINUTES, WET_AIR_FINISH_FACTOR } from './constants';
 import { isBreak, workedMinutesOfDay } from './clock';
 import {
   addLabour,
@@ -89,7 +91,6 @@ import {
   type StagePlan,
   currentStage,
   jobPace,
-  machiningFamilies,
   labourPerMinute,
   stageLeft,
   stagePlanFor,
@@ -212,26 +213,59 @@ function sharedTool(state: GameState, family: string | null): Equipment | null {
   return cabinetTools(state, family)[0] ?? null;
 }
 
-/** The families a man on this job may take a place at, in the order he is sent to them: the family
- *  of the stage the job's bar stands at, then every other family of its plan in the plan's order,
- *  and a bench last of all, because every job has a bench in it somewhere (PIOTR, 24.09; v53).
- *  Only families that have places: a family the hall has not got, or keeps in a cabinet, is worked
- *  by hand or with the tool and wants none. Empty for a job that wants no place at all. */
-export function familiesFor(state: GameState, job: Job): string[] {
-  const plan = stagePlanFor(state, job);
-  const cursor = currentStage(state, job);
-  const at = cursor === null ? 0 : Math.max(0, plan.findIndex((stage) => stage.id === cursor.id));
-  const order = [...plan.slice(at), ...plan.slice(0, at)];
+/** The half hour of the day this minute falls in: the block a man's turn holds for (v55). */
+function turnBlock(state: GameState): number {
+  return Math.floor(state.clock.minute / DRAW_BLOCK_MINUTES);
+}
+
+/** The man's place in the hiring order: the owner first, then the men as they were hired, which
+ *  is the order the plan gives places out in. */
+function manIndex(state: GameState, who: string): number {
+  if (who === OWNER) return 0;
+  const at = state.workers.findIndex((worker) => worker.id === who);
+  return at < 0 ? 0 : at + 1;
+}
+
+/** The families of this job's plan that have places in the hall, in the plan's order, the bench
+ *  among them: the round a man on the job goes. A family the hall has not got, or keeps in a
+ *  cabinet, is worked by hand or with the tool and is not on it. */
+function roundFor(state: GameState, job: Job): string[] {
   const families: string[] = [];
-  for (const stage of order) {
-    // Timber's Machining is shared by the thicknesser and the spindle moulder (v54).
-    const done = stage.id === 'machining' ? machiningFamilies(job).map((family) => ({ family })) : [stage];
-    for (const at of done) {
-      const family = placeFamilyOf(state, at, job.byHand);
-      if (family !== null && !families.includes(family)) families.push(family);
-    }
+  for (const stage of stagePlanFor(state, job)) {
+    const family = placeFamilyOf(state, stage, job.byHand);
+    if (family !== null && !families.includes(family)) families.push(family);
   }
-  if (families.length > 0 && !families.includes(BENCH)) families.push(BENCH);
+  return families;
+}
+
+/** The machine this man goes to first this half hour: the men on a job go round its machines,
+ *  one a half hour, each man starting one machine further on than the man hired before him, so a
+ *  quarter of a man's day is at the saw, a quarter at the edgebander and so on, every machine in
+ *  the hall is used evenly and the men are never in a heap at one of them [PIOTR, 24.09: "either
+ *  at random or every machine evenly; they stand at the benches all day"] (v55). It is read off
+ *  the clock and the hiring order, never the game's own cursor, so a replay is the same replay
+ *  and it moves nothing else. Null while the job wants no place at all. */
+export function turnFamily(state: GameState, who: string, job: Job): string | null {
+  const round = roundFor(state, job);
+  if (round.length === 0) return null;
+  return round[(turnBlock(state) + manIndex(state, who)) % round.length] ?? null;
+}
+
+/** The families a man on this job may take a place at, in the order he is sent to them: the one
+ *  whose turn it is for him this half hour (`turnFamily`), then every other family of its plan in
+ *  the plan's order, and a bench last of all, because every job has a bench in it somewhere
+ *  (PIOTR, 24.09; v53, v55). Only families that have places: a family the hall has not got, or
+ *  keeps in a cabinet, is worked by hand or with the tool and wants none. Empty for a job that
+ *  wants no place at all. */
+export function familiesFor(state: GameState, job: Job, who: string): string[] {
+  const round = roundFor(state, job);
+  if (round.length === 0) return [];
+  const turn = turnFamily(state, who, job);
+  const families: string[] = turn === null ? [] : [turn];
+  for (const family of round) {
+    if (family !== BENCH && !families.includes(family)) families.push(family);
+  }
+  if (!families.includes(BENCH)) families.push(BENCH);
   return families;
 }
 
@@ -342,7 +376,7 @@ export function dayPlan(
       // A job the hall has stopped, or the rack cannot feed, has nothing for him to do this
       // minute: he wants no place, and the minute says why (`placeHand`).
       if (hallStops(state, job) !== '' || !rackCanSupply(state, job, jobProgress(job))) continue;
-      families = familiesFor(state, job);
+      families = familiesFor(state, job, candidate.who);
     } else if (candidate.contract !== null) {
       const piece = contractPiece(candidate.contract);
       tool = sharedTool(state, contractStageFamilyOf(state, piece, true));
@@ -776,9 +810,11 @@ export function workMinute(
       speed /= WET_AIR_FINISH_FACTOR;
       hand.job.wetFinish = true;
     }
-    // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3).
+    // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3): one
+    // minute of the clock a minute, however many men draw on it. Until v55 it booked a minute for
+    // every man, and wore out four times as fast as the clock in a hall of four (v55).
     const compressor = drawingOn(state, machine, atTheBench);
-    if (compressor !== null) used.set(compressor.id, (used.get(compressor.id) ?? 0) + 1);
+    if (compressor !== null) used.set(compressor.id, 1);
     const minute = labourPerMinute(hand.rate, speed) * hall;
     // The minute's own multiplier, for the workshop's average output (v40): the same things the
     // labour is made of, and nothing else, booked against the man who worked it (v50).

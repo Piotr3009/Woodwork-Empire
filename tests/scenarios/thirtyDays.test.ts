@@ -55,6 +55,7 @@ import {
 import {
   BREAK_MINUTES,
   BREAK_SKIP_FACTOR,
+  BY_HAND_DURATION_FACTOR,
   BREAK_START_MINUTE,
   DAY_END_MINUTE,
   LABOUR_FACTOR_FLOOR,
@@ -309,8 +310,10 @@ describe('30 days on Easy, working the board', () => {
     expect(finished.length).toBeGreaterThanOrEqual(3);
     for (const job of finished) {
       const stages = job.stageRuns.map((run) => run.stage);
-      // Sheet work with a laminate finish: four of the five, and delivery carries no labour.
-      expect(stages, job.name).toEqual(['cutting', 'machining', 'assembly', 'finishing']);
+      // Sheet work with a laminate finish: the four quarters of v55, cutting, edging, moulding and
+      // assembly (PIOTR, 24.09). The finishing is the lacquer's stage alone from v55, and delivery
+      // carries no labour.
+      expect(stages, job.name).toEqual(['cutting', 'edging', 'moulding', 'assembly']);
       for (const run of job.stageRuns) {
         expect(run.endDay, job.name).not.toBeNull();
       }
@@ -474,14 +477,18 @@ describe('30 days on Very easy behind the best saw money can buy', () => {
     expect(stageSpeed(state, job, 'assembly').speed).toBeCloseTo(1, 10);
     const minutes = minutesRemainingFor(state, job, 1);
     // The same hall with a saw of standard speed in it: only the cutting quarter moves, so the
-    // whole job is 3% quicker and not 12% (CLAUDE.md T7 3.1).
+    // whole job is 2.4% quicker and not 12% (CLAUDE.md T7 3.1). 3% until v55: from v55 the job is
+    // four even quarters, and this hall has no spindle moulder, so the moulding quarter goes by
+    // hand at 67% and is a bigger share of the minutes the saw does not touch; the edging and the
+    // assembly go at 1 (PIOTR, 24.09).
     const budget = {
       ...state,
       equipment: state.equipment.map((item) =>
         item.specId === 'tableSaw' ? { ...item, variantId: 'budget' } : item,
       ),
     };
-    expect(minutesRemainingFor(budget, job, 1) / minutes).toBeCloseTo(1 / (0.25 / 1.12 + 0.75), 6);
+    const others = 0.25 + 0.25 * BY_HAND_DURATION_FACTOR + 0.25;
+    expect(minutesRemainingFor(budget, job, 1) / minutes).toBeCloseTo((0.25 + others) / (0.25 / 1.12 + others), 6);
   });
 
   it('has twice the hours in it and draws more off the meter', () => {
@@ -557,7 +564,16 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // less on couriers, 275 more in deposits and 230 more on material. The lowest point is the
     // owner's draw on the morning of day 32 in both. The same month with v53's count reads -185
     // exactly [both measured].
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-934);
+    //
+    // -71 from v55. Every job is four even quarters (PIOTR, 24.09) and this hall has no spindle
+    // moulder, so the moulding quarter goes by hand at 67%: the bookcase taken on day 10 comes off
+    // the bench on day 15 where v54 finished it on day 12. The enquiries after that land on other
+    // minutes and are other jobs: seventeen out by the month's end against fourteen, where v54
+    // had taken three bookcases of 1,530 to 1,950 between days 22 and 25 and got two of them out,
+    // with 5,472 of balances paid against 4,168, 275 less in deposits, 230 less on material and
+    // 360 more on couriers. The lowest point is the owner's draw on the morning of day 32 in both
+    // [both measured].
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-71);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
@@ -974,11 +990,14 @@ describe('a month of six joiners behind two saws', () => {
     expect(two.longest).toBe(0);
   });
 
-  it('gets the whole book out on two saws and half of it on one: the second saw buys jobs (v53)', () => {
+  it('gets four of the book out on two saws and three on one: the second saw buys jobs (v53, v55)', () => {
     const done = (month: CrewMonth): number =>
       month.state.jobs.filter((job) => job.stage === 'completed').length;
-    const lastDay = (month: CrewMonth): number =>
-      month.state.jobs.reduce((latest, job) => Math.max(latest, job.finishedDay ?? 99), 0);
+    /** How far through its making each job still on the books is, to a tenth of a per cent. */
+    const unfinished = (month: CrewMonth): number[] =>
+      month.state.jobs
+        .filter((job) => job.stage !== 'completed')
+        .map((job) => Number((1 - job.labourRemaining / job.labourValue).toFixed(3)));
     // Re-measured for v53 (PIOTR, 24.09). Nobody waits for the saw any more, and a saw with fewer
     // places than the crew costs the whole hall its pace instead: the man past the places works at
     // 67%. Six men at one standard saw's two places is `Too few saws: 2 places, 6 men` on the
@@ -993,11 +1012,19 @@ describe('a month of six joiners behind two saws', () => {
     // he is at no job all month, so the line was 0.76 and 0.86. From v54 the crew is the men at
     // work (PIOTR, 24.09: "nobody worked and it still cuts"); the same month with v53's count
     // reads v53's three figures exactly [both measured].
-    expect(done(two)).toBe(6);
-    expect(done(one)).toBe(4);
-    expect(lastDay(two)).toBe(26);
-    expect(lastDay(two)).toBeLessThan(lastDay(one));
-    expect(Math.round(two.state.cash - one.state.cash)).toBe(5976);
+    //
+    // Re-measured for v55: four of the six out on two saws, the other two at 99.7% of their
+    // making, and three on one saw, the other three at 84.9%, 87.4% and 94%; the second saw ends
+    // the month 3,792 ahead, having cost 1,800. On v54 it was six by day 26, four, and 5,976. The
+    // saws' figures are v54's (a standard saw keeps two men busy, so 0.78 and 0.89 as above); what
+    // moved is the job's one pace in this hall, 0.898 where it was 1.012: every job is four even
+    // quarters from v55 (PIOTR, 24.09) and the hall has no spindle moulder, so the moulding
+    // quarter goes by hand at 67% [all measured]. The second saw still buys jobs.
+    expect(done(two)).toBe(4);
+    expect(done(one)).toBe(3);
+    expect(unfinished(two)).toEqual([0.997, 0.997]);
+    expect(unfinished(one)).toEqual([0.849, 0.874, 0.94]);
+    expect(Math.round(two.state.cash - one.state.cash)).toBe(3792);
   });
 
   it('has no longest stand at all on one saw either, the one saw having the places the crew wants', () => {
@@ -1536,23 +1563,27 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
     expect(tables.some((job) => job.assignees[0] === 'owner' || job.stage === 'completed')).toBe(true);
   });
 
-  it('stands a man at the thicknesser, and the helper empties its one bag before it fills', () => {
-    // The blocker at the top of REPORT-T12.md is gone with v53: the timber tool set has left the
-    // game and the machining of timber is done on the thicknesser (PIOTR, 24.09: "the spindle
-    // moulder and the thicknesser are all a furniture shop needs"). So the month stands a man at
-    // it, 30 of its hours [measured], and its dust reaches the one bag. On v52 it had no hours at
-    // all and the store held the saw's and the bander's dust alone. The helper takes the bag at
-    // 80% (v46), nine times in the month [measured], so it is never full and no machine stops.
+  it('stands nobody at the thicknesser until the timber branch, and the helper empties the one bag before it fills', () => {
+    // The blocker at the top of REPORT-T12.md went with v53: the timber tool set left the game
+    // and timber was machined on the thicknesser, 30 of its hours in the month. From v55 every
+    // job goes through the same four machines, the saw, the edgebander, the spindle moulder and
+    // the bench, and the thicknesser has no stage until the timber branch [PIOTR, 24.09], so it
+    // stands with no hours; the oak table's moulding is the spindle moulder's, and its dust
+    // reaches the one bag with the saw's and the bander's. The helper takes the bag at 80% (v46),
+    // seven times in the month [measured], so it is never full and no machine stops. Nine on v54,
+    // when the thicknesser ran 30.55 hours at 0.25 m3 an hour; from v55 the spindle moulder does
+    // the moulding at 0.12 m3 an hour, 44.58 of its hours in the month, and the bag fills slower.
     const table = state.jobs.find((job) => job.templateId === 'oakDiningTable');
     if (table === undefined) throw new Error('no oak table on the books');
-    expect(familyForStage(table, 'machining')).toBe('thicknesser');
-    expect(machineOf(state, 'thicknesser').hoursUsed).toBeGreaterThan(30);
+    expect(familyForStage(table, 'moulding')).toBe('spindleMoulder');
+    expect(machineOf(state, 'thicknesser').hoursUsed).toBe(0);
+    expect(machineOf(state, 'spindleMoulder').hoursUsed).toBeGreaterThan(0);
     expect(DUST_OUTPUT_M3_PER_HOUR.thicknesser).toBe(0.25);
     const store = bagStore(state);
     expect(store.full).toBe(false);
     expect(seen.filter((event) => event.kind === 'bagsFull')).toHaveLength(0);
     const empties = state.tasks.filter((task) => task.kind === 'emptyBags');
-    expect(empties).toHaveLength(9);
+    expect(empties).toHaveLength(7);
     expect(empties.every((task) => task.done)).toBe(true);
   });
 });

@@ -2083,11 +2083,10 @@ export function hallLoops(state: GameState): Set<HallLoopName> {
   // The booth hisses while somebody is standing at one, and not merely while a lacquered job is at
   // its finishing stage: a workshop with no booth cannot spray, and it must not be heard to.
   if (familyInUse(state, 'sprayBooth')) on.add('sprayBooth');
-  // The sander is hands and paper at a bench, which no machine is taken for: it is the stage that
-  // says so. Lacquer is the booth's above and never the sander's.
-  for (const at of benchStagesNow(state)) {
-    if (at.stage === 'finishing' && at.finish !== 'lacquer') on.add('sander');
-  }
+  // The sander was hands and paper at a bench finishing something that is not lacquered, which
+  // no machine is taken for. From v55 the sanding is in the Assembly and a job that is not
+  // lacquered has no Finishing, so nothing in the hall asks for the loop any more; the recording
+  // keeps its slot in the sound table (PIOTR, 24.09).
   return on;
 }
 

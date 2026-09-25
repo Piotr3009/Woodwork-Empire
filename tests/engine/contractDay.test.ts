@@ -235,20 +235,24 @@ describe("a man on a contract is the contract's all day (PIOTR, 21.09; v42)", ()
     expect(contractWaitingForMaterial(state, theContract(state))).toBe(true);
     state = act(state, { type: 'WORK_HERE', jobId: job.id });
     state = runClock(state, 30);
-    expect(saw()).toBe('owner');
+    // The owner works his job every minute of the half hour, at the saw or at a bench by the
+    // turn of the half hour (v55); the contract man is still waiting.
     expect(theJob(state).productionMinutes).toBe(30);
-    // A delivery lands and the contract has him back. The saw's one place is the owner's, first in
-    // the day plan's order, so he takes a free bench and works there: nobody waits for the saw.
-    // v52 stood him at his home cell with no place at the saw (PIOTR, 24.09; v53).
+    expect(saw()).not.toBe('staff-1');
+    // A delivery lands and the contract has him back. The saw's one place is his when the owner's
+    // turn is a bench and a bench's when it is not, and either way he works: nobody waits for the
+    // saw. v52 stood him at his home cell with no place at the saw (PIOTR, 24.09; v53, v55).
     state.stock.sheets += 20;
     expect(contractWaitingForMaterial(state, theContract(state))).toBe(false);
     const him = dayPlan(state).find((entry) => entry.who === 'staff-1');
-    expect(him?.family).toBe('workbench');
+    expect(['workbench', 'tableSaw']).toContain(him?.family);
     expect(him?.working).toBe(true);
     const before = theContract(state).piecesMade;
     state = runClock(state, 120);
-    expect(saw()).toBe('owner');
-    expect(state.workers.find((worker) => worker.id === 'staff-1')?.station).toBe('machine:workbench');
+    expect(['owner', 'staff-1']).toContain(saw());
+    expect(['machine:workbench', 'machine:tableSaw']).toContain(
+      state.workers.find((worker) => worker.id === 'staff-1')?.station,
+    );
     expect(theContract(state).piecesMade).toBeGreaterThan(before);
   });
 

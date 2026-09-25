@@ -4,19 +4,22 @@
 //
 // (qq) Four men and one used saw: from v53 all four work, one at the saw and three wherever the
 //      hall has a free place, nobody is marked, and the one saw costs the hall its pace instead:
-//      `Too few saws: 1 place, 4 men` on the Output sheet (PIOTR, 24.09). On v52 one worked and
-//      three stood with `no place at the saw`.
-// (rr) The same four with an industrial saw: three at the saw at 1.12, the fourth elsewhere, and
-//      the saw one place short of the crew of four.
+//      `Too few saws: capacity 1, 4 men` on the Output sheet (PIOTR, 24.09; v55). On v52 one worked
+//      and three stood with `no place at the saw`.
+// (rr) The same four with an industrial saw: the men whose half hour at the saw it is work at it at
+//      1.12, the others at their benches, and from v55 an industrial saw keeps four men busy, so
+//      the crew of four is not short of saws at all.
 // (ss) A contract the hall cannot keep up with is red on its card before it is signed.
 //
 // The hall is the one the engine tests stand four men in (`sixJoinersOnSheetWork` less two men),
 // every job put back to the start of its cutting and made big enough that it outlasts the month,
-// so that what the month measures is the saw's places and nothing else. The crew the places are
-// counted against is the men at work (`crewOnTheFloor`: "me and two men is three"), which is the
-// four: the owner has no job here. v53 counted him as well, a crew of five, at work or not (v54). The
-// days are played through with every event answered by its first choice (`runDays`), as a player
-// who clicks OK.
+// so that what the month measures is the saw and nothing else. The crew the saw's capacity is
+// counted against is the men at work whose job goes through a saw (`crewAtFamily`, v55), which is
+// the four: the owner has no job here. v53 counted him as well, a crew of five, at work or not
+// (v54). From v55 a man goes round his job's machines a half hour at a time, one machine further
+// on than the man hired before him (PIOTR, 24.09), so which of the four stand at the saw in a
+// given half hour is the round's. The days are played through with every event answered by its
+// first choice (`runDays`), as a player who clicks OK.
 
 import { describe, expect, it } from 'vitest';
 import type { Contract, GameState } from '../../src/engine/index';
@@ -85,18 +88,21 @@ function playMonth(sawVariant: string): Month {
 const used = playMonth('used');
 const industrial = playMonth('industrial');
 
-/** What the hall's minutes are multiplied by for a saw with this many places and the crew of four
- *  at work: the men past the places work at the by hand pace (PIOTR, 24.09; v53). A crew of five
- *  until v54, the owner counted with no job. */
-function sawFactor(places: number): number {
-  return (places + (4 - places) / BY_HAND_DURATION_FACTOR) / 4;
+/** What the hall's minutes are multiplied by for a saw that keeps this many men busy and the crew
+ *  of four at work: the men past its capacity work at the by hand pace (PIOTR, 24.09; v53, v55). A
+ *  crew of five until v54, the owner counted with no job. */
+function sawFactor(capacity: number): number {
+  return (capacity + (4 - capacity) / BY_HAND_DURATION_FACTOR) / 4;
 }
 
 describe('(qq) four men and one used saw (CLAUDE.md T25 section 3; v53)', () => {
   it('works all four, one at the saw and three elsewhere, and marks nobody', () => {
     const state = used.start;
     const saw = state.equipment.find((item) => item.specId === 'tableSaw') ?? { id: '' };
-    expect(menAtMachine(state, saw)).toEqual(['staff-1']);
+    // The round's first half hour: the second and the fourth man's turn is the saw and the first
+    // and the third man's the bench (v55). The used saw has one place, so the second man, hired
+    // first of the two, has it and the fourth goes on to his bench. staff-1 until v55.
+    expect(menAtMachine(state, saw)).toEqual(['staff-2']);
     for (const worker of state.workers) {
       expect(worker.working, worker.id).toBe(true);
       expect(worker.noPlaceFor, worker.id).toBe('');
@@ -106,10 +112,11 @@ describe('(qq) four men and one used saw (CLAUDE.md T25 section 3; v53)', () => 
 
   it('says what the one saw costs, on the saw and on the Output sheet', () => {
     const state = used.start;
-    // Four men at work and one place: three past it (v54; five men and four past it on v53).
-    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 4 men, 1 place, 3 work at 67%');
+    // Four men at work and a used saw that keeps one busy: three past it (v54, v55; five men and
+    // four past it on v53).
+    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 4 men, capacity 1, 3 work at 67%');
     const short = placeShortages(state).find((entry) => entry.family === 'tableSaw');
-    expect(short?.places).toBe(1);
+    expect(short?.capacity).toBe(1);
     expect(short?.men).toBe(4);
     expect(short?.factor).toBeCloseTo(sawFactor(1), 10);
   });
@@ -129,25 +136,30 @@ describe('(qq) four men and one used saw (CLAUDE.md T25 section 3; v53)', () => 
 });
 
 describe('(rr) the same four with an industrial saw (CLAUDE.md T25 section 3; v53)', () => {
-  it('works three at the saw at 1.12 and the fourth elsewhere, and marks nobody', () => {
+  it('works the men of the saw s half hour at it at 1.12 and the others at their benches, and marks nobody', () => {
     const state = industrial.start;
     expect(hallPace(state, 'tableSaw')).toBe(MACHINE_PACE.industrial);
     expect(MACHINE_PACE.industrial).toBe(1.12);
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(menAtMachine(state, saw ?? { id: '' })).toEqual(['staff-1', 'staff-2', 'staff-3']);
+    // Both men whose half hour it is at the saw are at it, the industrial saw having the places
+    // for them; the other two are at their benches (v55). staff-1 to staff-3 until v55, when the
+    // first three hired filled its three places.
+    expect(menAtMachine(state, saw ?? { id: '' })).toEqual(['staff-2', 'staff-4']);
     for (const worker of state.workers) {
       expect(worker.working, worker.id).toBe(true);
       expect(bubbleFor(state, worker.id), worker.id).toBeNull();
     }
-    // One past the three places (v54; two on v53, with the owner counted).
-    expect(shortageLine(state, 'tableSaw')).toBe('Too few saws for the crew: 4 men, 3 places, 1 works at 67%');
-    expect(placeShortages(state)[0]?.factor).toBeCloseTo(sawFactor(3), 10);
+    // An industrial saw keeps four men busy from v55 [PIOTR, 24.09: "one man to four, the best
+    // saw"], so the four are not short of saws: no line and no factor. One man past three places
+    // on v54, two on v53 with the owner counted.
+    expect(shortageLine(state, 'tableSaw')).toBe('');
+    expect(placeShortages(state).some((entry) => entry.family === 'tableSaw')).toBe(false);
   });
 
   it('makes four men s month, the same minutes as the used saw s hall and a better pace', () => {
     // The minutes are the same at either saw from v53, 10,560 a man; what the industrial saw buys
-    // is its pace, 1.12, and one man past its places instead of three (asserted above). On v52 it
-    // was three men's months and the fourth's all no place.
+    // is its pace, 1.12, and nobody past its capacity instead of three (asserted above; one on v54).
+    // On v52 it was three men's months and the fourth's all no place.
     expect(industrial.worked).toEqual([industrial.oneMan, industrial.oneMan, industrial.oneMan, industrial.oneMan]);
     expect(industrial.oneMan).toBe(used.oneMan);
     expect(industrial.noPlace).toBe(0);

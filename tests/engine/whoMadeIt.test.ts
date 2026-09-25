@@ -123,13 +123,15 @@ describe('who made it today', () => {
     // An industrial saw bought beside the day one saw: the owner may stand at either, and the hall
     // cuts at 1.12 because the shop cuts on the good saw (CLAUDE.md T25 2.4). The figure after
     // `times` was the cutting's 1.12 until v53; it is the job's one pace now, the 1.12 on the
-    // cutting's quarter of it and 1.00 on the rest: 1 / (0.25 / 1.12 + 0.75) = 1.03 (v53).
+    // cutting's quarter of it, the hand bander's 1.00 on the edging's, the by hand 1 / 1.5 on the
+    // moulding's, the hall having no spindle moulder, and 1.00 on the assembly's:
+    // 1 / (0.25 / 1.12 + 0.25 + 0.375 + 0.25) = 0.91 (v55; 1.03 on v53, with the old shares).
     const state = sawHall();
     placeEquipment(state, 'tableSaw', { variantId: 'industrial', x: 12, y: 1, id: 'kit-saw-good' });
     const made = workshopBreakdownToday(runClock(state, 5));
     // From v54 the row says what the hall did to the minutes as well, so it multiplies out
     // (PIOTR, 24.09: "something does not add up").
-    expect(made.men[0]?.words).toMatch(/^saw, industrial, \d+ min: your [\d.]+ times 1\.03( times the hall's [\d.]+)?$/);
+    expect(made.men[0]?.words).toMatch(/^saw, industrial, \d+ min: your [\d.]+ times 0\.91( times the hall's [\d.]+)?$/);
   });
 
   it('says what the hall was, in the words the sheet already has for it', () => {
@@ -193,11 +195,13 @@ describe('the day fixtures Piotr sent, one minute in', () => {
     // every one of them has a row (PIOTR, 24.09; v53).
     const state = runClock(load('tests/fixtures/day128-v25.woodwork.json'), 1);
     const made = workshopBreakdownToday(state);
+    // In the first half hour the four go one each to the kitchen's four machines, the owner to the
+    // saw and the men hired after him one machine further on each (v55).
     expect(made.men.map((row) => row.main)).toEqual([
       'Piotr, cutting Small kitchen (6 units), commercial',
-      'Eddie, experienced joiner, machining Small kitchen (6 units), commercial',
+      'Eddie, experienced joiner, moulding Small kitchen (6 units), commercial',
       'Pete, very experienced joiner, assembling Small kitchen (6 units), commercial',
-      'Callum, excellent joiner, assembling Small kitchen (6 units), commercial',
+      'Callum, excellent joiner, edging Small kitchen (6 units), commercial',
     ]);
     // The why is the family and the class that sets the hall's pace for it, in place of the
     // machine he stood at (CLAUDE.md T25 2.4). The figure after it was the cutting's own pace
@@ -205,37 +209,38 @@ describe('the day fixtures Piotr sent, one minute in', () => {
     // It is the kitchen's one pace now, every stage at the hall's pace for its family: 1.07.
     expect(made.men.map((row) => row.words.replace(/: .*$/, ''))).toEqual([
       'saw, budget, 1 min',
+      'moulder, standard, 1 min',
+      'at the bench, 1 min',
       'edgebander, standard, 1 min',
-      'at the bench, 1 min',
-      'at the bench, 1 min',
     ]);
-    // And the hall's 0.75 after it from v54, so the row multiplies out to its figure (PIOTR, 24.09).
-    for (const row of made.men) expect(row.words, row.main).toMatch(/ times 1\.07 times the hall's 0\.75$/);
+    // And the hall's 0.83 after it from v54, so the row multiplies out to its figure (PIOTR, 24.09).
+    for (const row of made.men) expect(row.words, row.main).toMatch(/ times 1\.07 times the hall's 0\.83$/);
     expect(made.total).toBe(workshopOutputToday(state));
-    // The hall was clean with its extraction working and said nothing until v53. Four men and the
-    // saw's one place is the hall's own line now, (1 + 3 / 1.5) / 4 = 0.75, and the sentence under
-    // the block says it.
-    expect(made.hall?.words).toBe('clean, extraction working, too few saws: 1 place, 4 men');
-    expect(made.hall?.figure).toBe(0.75);
-    expect(made.note).toBe('The hall ran at 0.75 today: clean, extraction working, too few saws: 1 place, 4 men.');
+    // The hall was clean with its extraction working and said nothing until v53. Four men and a
+    // budget saw that keeps two busy is the hall's own line now, (2 + 2 / 1.5) / 4 = 0.83 (v55;
+    // 0.75 on v53 and v54, one place), and the sentence under the block says it.
+    expect(made.hall?.words).toBe('clean, extraction working, too few saws: capacity 2, 4 men');
+    expect(made.hall?.figure).toBe(0.83);
+    expect(made.note).toBe('The hall ran at 0.83 today: clean, extraction working, too few saws: capacity 2, 4 men.');
   });
 
   it('gives the day 149 hall its by hand sentence and every row its own arithmetic', () => {
     const state = runClock(load('tests/fixtures/day149-v25.woodwork.json'), 1);
     const made = workshopBreakdownToday(state);
     expect(made.men).toHaveLength(4);
-    // Three saw places and four men: the hall's line for it, (3 + 1 / 1.5) / 4 = 0.9167, is on
-    // every minute from v53. From v54 every row says the hall's part itself, so its three figures
-    // multiply out to the one beside it (PIOTR, 24.09).
+    // The three on the oak table make it by hand and want no saw, so the one man whose work goes
+    // through the saws, the owner on the kitchen, is well inside what three saws keep busy: the
+    // hall is short of nothing and its part is 1.00, which a row leaves out (v55; on v53 the four
+    // were counted against three saw places, 0.9167). Every row's figures multiply out to the one
+    // beside it (PIOTR, 24.09).
     const hall = hallProductivityFactor(state);
-    expect(hall).toBeCloseTo((3 + 1 / 1.5) / 4, 10);
+    expect(hall).toBe(1);
     for (const row of made.men) {
-      const figures = row.words.match(/([\d.]+) times ([\d.]+) times the hall's ([\d.]+)$/);
+      const figures = row.words.match(/([\d.]+) times ([\d.]+)$/);
       if (figures === null) throw new Error(`no arithmetic in ${row.words}`);
       // Every figure is printed to two places, so the product can sit a penny or two off.
-      const product = Number(figures[1]) * Number(figures[2]) * Number(figures[3]);
+      const product = Number(figures[1]) * Number(figures[2]);
       expect(Math.abs(product - row.figure), row.main).toBeLessThan(0.02);
-      expect(Number(figures[3]), row.main).toBeCloseTo(hall, 2);
     }
     expect(made.total).toBe(workshopOutputToday(state));
     // The table's lock is `Needs a thicknesser` from v53, the timber tool set being gone from the

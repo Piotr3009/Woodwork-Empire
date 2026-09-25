@@ -374,10 +374,13 @@ describe('the loops follow the hall', () => {
     expect(played['drill']).toBe(1);
   });
 
-  it('sands a bench that is finishing, and sprays only when somebody is at a booth', () => {
-    expect(hallLoops(jobAt('finishing')).has('sander')).toBe(true);
-    expect(hallLoops(jobAt('finishing')).has('sprayBooth')).toBe(false);
-    // A lacquered job is not a sander: lacquer goes to the booth and hands and paper do not.
+  it('sands nothing since the sanding went into the assembly, and sprays only when somebody is at a booth', () => {
+    // Until v55 a bench finishing something that was not lacquered ran the sander. A job that is
+    // not lacquered has no Finishing stage from v55, its sanding being in the Assembly, so the
+    // hall never asks for the loop (PIOTR, 24.09); the recording keeps its slot.
+    expect(hallLoops(jobAt('assembly')).has('sander')).toBe(false);
+    expect(hallLoops(jobAt('assembly')).has('sprayBooth')).toBe(false);
+    // A lacquered job is not a sander either: lacquer goes to the booth and hands and paper do not.
     const lacquered = jobAt('finishing', 'lacquer');
     expect(hallLoops(lacquered).has('sander')).toBe(false);
     // And it is not a booth either, until there is a booth with somebody standing at it. A
