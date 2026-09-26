@@ -3,7 +3,7 @@
 // 2.1, T14-05): each opens from its tile, the back arrow returns to home, and the content and the
 // controls are as Turn 13 left them, the stock page's Restock and Order for this job included.
 
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { LAPTOP_BOOT_MINUTES, LOW_STOCK_SHEETS } from '../../src/engine/constants';
 import {
   canQueueTask,
@@ -97,10 +97,18 @@ function queueable(): string | null {
   return button?.getAttribute('data-id') ?? null;
 }
 
+/** The clock reading the start screen seeds this game with. The start screen seeds itself off the
+ *  clock, so the day's draw was a new one every run, and on some readings the page offered no job
+ *  of work with a Start on it and the drawing and queue tests below had nothing to click; one
+ *  reading pinned, and the day is the same every run (v58). */
+const SEEDED_AT = 1758844800000;
+
 beforeAll(() => {
   document.body.innerHTML = '<div id="app"></div>';
   mount(root());
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(SEEDED_AT);
   click('[data-do="startGame"]');
+  clock.mockRestore();
   click('[data-do="setSpeed"][data-speed="1"]');
   dismissEvents();
   const state = currentState();

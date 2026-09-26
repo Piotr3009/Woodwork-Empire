@@ -38,8 +38,8 @@ describe('the version in the corner', () => {
     // v55 is one stage a machine, a quarter each, and the men drawing their machines (PIOTR, 24.09).
     // v56 stands the spray booths at their pictures' size and bolts the CNC's tool changer head to
     // the CNC (PIOTR, 25.09). v57 takes the timber offers off the board until the timber branch
-    // (PIOTR, 25.09).
-    expect(APP_VERSION).toBe('v57');
+    // (PIOTR, 25.09). v58 puts the machines' capacities of 24.09 back (PIOTR, 25.09).
+    expect(APP_VERSION).toBe('v58');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -55,7 +55,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v57'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v58'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

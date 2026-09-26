@@ -151,7 +151,7 @@ export const STATE_VERSION = 33;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v57';
+export const APP_VERSION = 'v58';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1491,24 +1491,25 @@ export const PACED_FAMILIES: readonly string[] = Object.keys(MACHINE_PLACES);
  *  (v55). */
 export const DRAW_BLOCK_MINUTES = 30;
 
-/** How many men one machine of a class keeps busy before the hall is short of that family: the
- *  saw from one man to four up its ladder, a CNC from four to ten, so a hall with one needs no saw
- *  at all [PIOTR, 24.09: "from one man to four for the best saw; a CNC replaces four to ten men's
- *  saws"] (v55); the edgebander, the spindle moulder and the thicknesser from six men to sixteen,
- *  and the booth from eight to forty [PIOTR, 25.09: "the rest of the machines apart from the CNC at
- *  least 6, 8, 8, 12, 16; the booth starts at 8, 12, 12, 20, 40"] (v57). Only the men whose work
- *  goes through the family count against it, and of those only the owner and the joiners
- *  (`crewAtFamily`, `CAPACITY_ROLES`); a man past the capacity still works, somewhere else, at the
- *  by hand pace, `1 / BY_HAND_DURATION_FACTOR`, which is what the Output sheet's line for it prints
- *  (v53). A family that is not here is never short: its quarter of the work is by hand already.
- *  The two hand edgebanders live in a cabinet and have no capacity to be short of. */
+/** How many men one machine of a class keeps busy before the hall is short of that family, which is
+ *  how many machines a crew of so many men wants [PIOTR, 25.09: "how many machines there must be for
+ *  how many people"]: the saw from one man to four up its ladder, the edgebander and the spindle
+ *  moulder twice that because the trade uses them less, a CNC from four to ten, so a hall with one
+ *  needs no saw at all, and the booth and the thicknesser like the saw [PIOTR, 24.09] (v55). v57 had
+ *  the edgebander, the spindle moulder and the thicknesser at six to sixteen and the booth at eight
+ *  to forty; Piotr put the table of 24.09 back the same evening (v58). Only the men whose work goes
+ *  through the family count against it, and of those only the owner and the joiners
+ *  (`crewAtFamily`, `CAPACITY_ROLES`; v57); a man past the capacity still works, somewhere else, at
+ *  the by hand pace, `1 / BY_HAND_DURATION_FACTOR`, which is what the Output sheet's line for it
+ *  prints (v53). A family that is not here is never short: its quarter of the work is by hand
+ *  already. The two hand edgebanders live in a cabinet and have no capacity to be short of. */
 export const MACHINE_CAPACITY: Record<string, Record<string, number>> = {
   tableSaw: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
-  edgebander: { used: 6, budget: 8, standard: 8, pro: 12, industrial: 16 },
-  spindleMoulder: { used: 6, budget: 8, standard: 8, pro: 12, industrial: 16 },
+  edgebander: { used: 2, budget: 4, standard: 4, pro: 6, industrial: 8 },
+  spindleMoulder: { used: 2, budget: 4, standard: 4, pro: 6, industrial: 8 },
   cnc: { used: 4, budget: 5, standard: 6, pro: 8, industrial: 10 },
-  sprayBooth: { used: 8, budget: 12, standard: 12, pro: 20, industrial: 40 },
-  thicknesser: { used: 6, budget: 8, standard: 8, pro: 12, industrial: 16 },
+  sprayBooth: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
+  thicknesser: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
 };
 
 /** Who a machine's capacity is counted against, beside the owner: the joiners [PIOTR, 25.09: "we do

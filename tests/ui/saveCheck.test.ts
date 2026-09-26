@@ -123,8 +123,9 @@ describe('a fresh game in this build', () => {
     // v55 is state 31: one stage a machine and the bags of the old Machining emptied (PIOTR, 24.09).
     // v56 is state 32: the booths at their pictures' size, and the CNC's tool changer bolted to it
     // (PIOTR, 25.09). v57 is state 33: no timber offers on the board until the timber branch
-    // (PIOTR, 25.09).
-    expect(APP_VERSION).toBe('v57');
+    // (PIOTR, 25.09). v58 is state 33 as well: the machines' capacities of 24.09 back, which is no
+    // change to the save (PIOTR, 25.09).
+    expect(APP_VERSION).toBe('v58');
     expect(STATE_VERSION).toBe(33);
   });
 
