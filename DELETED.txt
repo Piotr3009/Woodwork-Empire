@@ -1,6 +1,2 @@
-public/sprites/dustSystem.ducts.png
-public/sprites/flexiSystem.ducts.png
-public/sprites/gate.collar.png
-src/render/pipes.ts
-tests/render/pipesOnTheHall.test.ts
-tests/render/ports.test.ts
+public/sprites/palletTruck.standard.png
+public/sprites/palletTruck.standard.r.png

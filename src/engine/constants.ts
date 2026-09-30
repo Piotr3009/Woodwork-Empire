@@ -151,7 +151,7 @@ export const STATE_VERSION = 33;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v58';
+export const APP_VERSION = 'v59';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -3773,6 +3773,21 @@ export const NO_HELPER_DUST_MULTIPLIER = 2;
 /** [TUNE] and productivity drops. */
 export const NO_HELPER_PRODUCTIVITY_FACTOR = 0.9;
 /** [TUNE] names for generated staff. */
+/** The two men who were there at the start of Piotr's own shop, and are there at the start of
+ *  every game: the first two joiners taken on, and the first two production managers, are Jack T
+ *  and then Jack B, in that order, whatever the dice say; every man after them comes off
+ *  `WORKER_NAMES`. Jack B is the red haired one, which is what `SIGNATURE_LOOKS` tells the
+ *  figure (PIOTR, 30.09; v59). */
+export const SIGNATURE_NAMES: Partial<Record<WorkerRole, readonly string[]>> = {
+  joiner: ['Jack T', 'Jack B'],
+  productionManager: ['Jack T', 'Jack B'],
+};
+/** A man's look by his name: the suffix of the character sheet his figure and his portrait draw
+ *  from, when the art side has delivered it (`character.joinerRed.*`); with no such sheet he is
+ *  drawn from his role's plain one, so nothing depends on the file being there. */
+export const SIGNATURE_LOOKS: Record<string, string> = {
+  'Jack B': 'Red',
+};
 export const WORKER_NAMES = [
   'Adam',
   'Ben',

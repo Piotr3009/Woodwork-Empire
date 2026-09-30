@@ -228,7 +228,6 @@ import {
 } from './media';
 import { cubicMetres, metresBy, plural } from './text';
 import {
-  STATION_BENCH,
   STATION_DOOR,
   STATION_HOME,
   STATION_IDLE,
@@ -267,7 +266,6 @@ import {
   runStaffDayStart,
   staffMinutesLeft,
   startMonthMeters,
-  waitsForTheBoss,
 } from './staff';
 import {
   AD_HOC_TASK_MINUTES,
@@ -1447,15 +1445,11 @@ function updateStations(state: GameState): void {
       worker.station = STATION_DOOR;
       continue;
     }
-    // A man nobody has put on anything waits **at his home cell**, which is his own bench, and not
-    // at the canteen door where a man with nowhere to work stands: the two are different men and
-    // the player has to be able to tell them apart at a glance. The mark over his head says which
-    // (PIOTR, 20.09; CLAUDE.md T23 2.1, T4 3.4). A man with no bench of his own has no home cell
-    // to wait at, so he stands where he always did.
-    worker.station =
-      waitsForTheBoss(state, worker) && benchOf(state, worker.id) !== null
-        ? STATION_BENCH
-        : STATION_IDLE;
+    // A man nobody has put on anything waits at the canteen door with everybody else who has
+    // nothing to do, and not at his bench: a bench is where a man works, and a man standing at one
+    // reads as working (PIOTR, 30.09; v59, reversing T23 2.1). The mark over his head still says
+    // why he stands.
+    worker.station = STATION_IDLE;
   }
 }
 

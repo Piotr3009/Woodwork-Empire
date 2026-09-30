@@ -161,7 +161,8 @@ describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
     state = act(state, { type: 'REMOVE_FROM_JOB', jobId: job.id, workerId: 'staff-2' });
     // The click re plans the hall, and the fourth man goes from his bench to the saw.
     expect(workingMen(state)).toEqual(['staff-1', 'staff-3', 'staff-4']);
-    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, 'bench', AT_A_BENCH, AT_THE_SAW]);
+    // The man taken off his job waits for the boss at the canteen door, not at his bench (v59).
+    expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, 'idle', AT_A_BENCH, AT_THE_SAW]);
     const before = state.workers.find((worker) => worker.id === 'staff-4')?.productionMinutes ?? 0;
     state = tick(state, 1);
     expect(state.workers.find((worker) => worker.id === 'staff-4')?.productionMinutes).toBe(before + 1);

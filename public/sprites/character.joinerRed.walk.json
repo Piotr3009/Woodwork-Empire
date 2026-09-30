@@ -1,0 +1,42 @@
+{
+  "cellWidth": 112,
+  "cellHeight": 151,
+  "anchorX": 56.0,
+  "anchorY": 143,
+  "frames": 8,
+  "fps": 3.4286,
+  "rows": {
+    "sw": 0,
+    "se": 1,
+    "nw": 2,
+    "ne": 3
+  },
+  "spriteKey": "character.joinerRed",
+  "animation": "walk",
+  "loop": true,
+  "directions": [
+    "sw",
+    "se",
+    "nw",
+    "ne"
+  ],
+  "padding": 8,
+  "metresPerCell": {
+    "width": 1,
+    "depth": 1,
+    "height": 1.8
+  },
+  "scaleFromSource": 0.1957,
+  "source": {
+    "file": "Woodwork-Empire-joiner-animation-pack.zip",
+    "canvas": {
+      "width": 480,
+      "height": 660
+    },
+    "anchorPixels": {
+      "x": 240,
+      "y": 545
+    }
+  },
+  "note": "The joiner sheet with the hair recoloured ginger by scripts in v59 (PIOTR, 30.09): Jack B. Same cells, anchors, rows and frames as character.joiner."
+}

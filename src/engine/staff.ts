@@ -5,6 +5,7 @@
 // the day, at the night rate, with the owner gone home (CLAUDE.md T13 3.9).
 
 import {
+  SIGNATURE_NAMES,
   ACCIDENT_CHANCE_PER_DAY,
   ACCIDENT_DAYS_OFF,
   CANTEEN_LOCKERS,
@@ -572,11 +573,17 @@ export function canHire(
   return { ok: option.available, reason: option.blockReason };
 }
 
-function nameFor(state: GameState): string {
+function nameFor(state: GameState, role: WorkerRole): string {
   const taken = new Set(state.workers.map((worker) => worker.name));
   const free = WORKER_NAMES.filter((name) => !taken.has(name));
   const pool = free.length > 0 ? free : WORKER_NAMES;
-  return pool[int(state, 0, pool.length - 1)] ?? 'Sam';
+  // The dice are thrown for every hire, named by them or not, so the stream every later throw of
+  // the game reads (the burglary, the breakdowns, the enquiries) is the same stream it was.
+  const drawn = pool[int(state, 0, pool.length - 1)] ?? 'Sam';
+  // The signature men of this role first, in their order, until both are on the books; a name a
+  // man of another role already carries is skipped, so there is one Jack B in a shop (v59).
+  const signature = (SIGNATURE_NAMES[role] ?? []).find((name) => !taken.has(name));
+  return signature ?? drawn;
 }
 
 function benchAnchor(state: GameState, role: WorkerRole): { x: number; y: number } {
@@ -610,7 +617,7 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
   const anchor = benchAnchor(state, role);
   const worker: Worker = {
     id: makeId(state, 'staff'),
-    name: nameFor(state),
+    name: nameFor(state, role),
     role,
     tier,
     rate: tier ? WORKER_RATES[tier] : 0,

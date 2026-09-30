@@ -12,6 +12,7 @@
 // point. A direction the sheet has no row for is mirrored from its opposite with a horizontal
 // flip. No sheet, or no animation, and the game draws the capsule it has always drawn.
 
+import { SIGNATURE_LOOKS } from '../engine/constants';
 import sheets from '../../public/sprites/characters.json';
 import { WALK_CELLS_PER_SECOND, WALK_CELLS_PER_SECOND_FAST, WALK_STRIDE_METRES } from '../engine/constants';
 import {
@@ -79,6 +80,17 @@ const DELIVERED = sheets as Record<string, CharacterSheet>;
 /** The key a role and an animation are delivered under. */
 export function characterKey(role: string, animation: Animation): string {
   return `character.${role}.${animation}`;
+}
+
+/** The sheet role a man is drawn from: his role's, or his role's with his look's suffix when his
+ *  name has one and the art side has delivered that idle sheet (`character.joinerRed.idle`), so a
+ *  named man keeps his hair across every screen and a missing file costs nothing but the hair
+ *  (PIOTR, 30.09; v59). */
+export function sheetRoleFor(role: string, name: string, options: CharacterOptions = {}): string {
+  const look = SIGNATURE_LOOKS[name];
+  if (look === undefined) return role;
+  const styled = `${role}${look}`;
+  return characterSheet(styled, 'idle', options) !== null ? styled : role;
 }
 
 /** The sheet for this role and animation, with the URL of its picture, or null while the art side

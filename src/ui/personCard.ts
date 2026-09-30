@@ -36,7 +36,7 @@ import {
 } from '../engine/staff';
 import type { DayMeter, WeekHolder } from '../engine/staff';
 import { bubbleFor } from '../engine/bubbles';
-import { characterSheet, cellBox, rowFor } from '../render/characters';
+import { characterSheet, cellBox, rowFor, sheetRoleFor } from '../render/characters';
 import { button, escapeHtml, minutes, money, plural, reasonLabel } from './modal';
 import { ownerDayLine } from './topbar';
 
@@ -104,7 +104,7 @@ function personOf(state: GameState, who: string): Person | null {
     id: worker.id,
     name: worker.name,
     role: ROLE_WORDS[worker.role],
-    sheetRole: worker.role,
+    sheetRole: sheetRoleFor(worker.role, worker.name),
     tier: worker.tier === null ? null : { words: TIER_WORDS[worker.tier], rate: worker.rate },
     startDay: worker.startDay,
     monthlyWage: worker.monthlyWage,

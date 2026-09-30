@@ -103,6 +103,7 @@ import {
 import { formatCalendarDay, formatTime, isBreak } from '../engine/clock';
 import { compressorIsLow, extractionCheck, hallAirCheck } from '../engine/media';
 import {
+  sheetRoleFor,
   type CharacterOptions,
   animationForStation,
   characterArt,
@@ -1701,7 +1702,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `data-worker="${worker.id}"`,
         // Joiners have a sheet tonight; everybody else falls back to the capsule until his own
         // one is delivered (CLAUDE.md T9 3.13).
-        { role: worker.role, station, options: characterOptions },
+        { role: sheetRoleFor(worker.role, worker.name, characterOptions), station, options: characterOptions },
         onTheMachineLoop(worker.taskId) || onTheLoop(station),
         bubble,
         bubble === null ? 0 : markShiftAt(cell),
