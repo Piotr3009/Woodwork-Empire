@@ -1,3 +1,0 @@
-public/sprites/palletTruck.standard.png
-public/sprites/palletTruck.standard.r.png
-tests/engine/v60.test.ts
