@@ -12,6 +12,7 @@ import {
   MACHINE_REPAIR_COST_FRACTION,
   OVERDUE_BREAKDOWN_CHANCE,
   OWNER_LABOUR_PER_MINUTE,
+  PACE_FLOOR,
   SERVICE_COST_FRACTION,
   SERVICE_INTERVAL_DAYS,
   EXTRACTOR_REPAIR_COST,
@@ -222,7 +223,9 @@ describe('dust', () => {
     const clean = atTheBench();
     const cleanDone =
       firstJob(clean).labourRemaining - firstJob(tick(clean, 60)).labourRemaining;
-    expect(before - after).toBeCloseTo(cleanDone * 0.85, 4);
+    // The dirty hall's 0.85 is 0.15 off every minute's points, not a multiplier on them (v60;
+    // PIOTR, 30.09): sixty minutes are 0.15 of the owner's minute each short of the clean hour.
+    expect(before - after).toBeCloseTo(cleanDone - 60 * OWNER_LABOUR_PER_MINUTE * (1 - 0.85), 4);
   });
 
   it('is doubled when the crew is too big to have no helper', () => {
@@ -413,10 +416,15 @@ describe('the extractor', () => {
     state = tick(state, REPAIR_MINUTES);
     expect(state.equipment.find((item) => item.specId === 'extractor')?.broken).toBe(false);
     expect(cash - state.cash).toBe(EXTRACTOR_REPAIR_COST);
-    // Mended, and the same half hour now does four times the work (CLAUDE.md T2 3.9).
+    // Mended, the same half hour does the work of the owner's own pace again. Broken, the
+    // extraction took 0.75 off every minute's points, which a minute by hand at the bench has not
+    // got to give, so the hall stood at the floor, 0.25 (v60; PIOTR, 30.09). Until v60 the quarter
+    // was a multiplier and the mended half hour did four times the work exactly.
+    expect(doneBroken).toBeCloseTo(30 * OWNER_LABOUR_PER_MINUTE * PACE_FLOOR, 6);
     const running = tick(state, 30);
     const doneMended = firstJob(state).labourRemaining - firstJob(running).labourRemaining;
-    expect(doneMended / doneBroken).toBeCloseTo(1 / EXTRACTOR_BROKEN_OUTPUT_FACTOR, 6);
+    expect(doneMended / doneBroken).toBeGreaterThan(3);
+    expect(doneMended / doneBroken).toBeLessThan(1 / EXTRACTOR_BROKEN_OUTPUT_FACTOR);
   });
 
   it('cannot break down when the central system is in', () => {

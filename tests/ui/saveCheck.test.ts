@@ -124,8 +124,9 @@ describe('a fresh game in this build', () => {
     // v56 is state 32: the booths at their pictures' size, and the CNC's tool changer bolted to it
     // (PIOTR, 25.09). v57 is state 33: no timber offers on the board until the timber branch
     // (PIOTR, 25.09). v58 is state 33 as well: the machines' capacities of 24.09 back, which is no
-    // change to the save (PIOTR, 25.09).
-    expect(APP_VERSION).toBe('v59');
+    // change to the save (PIOTR, 25.09). v59 and v60 are state 33 too: the canteen door, the two
+    // Jacks, the pace as a sum and the admin's take off touch no field of the save (PIOTR, 30.09).
+    expect(APP_VERSION).toBe('v60');
     expect(STATE_VERSION).toBe(33);
   });
 

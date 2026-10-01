@@ -85,12 +85,13 @@ describe('the workshop\'s average output today (v40)', () => {
     expect(worked.dayStats.outputWorth / worked.dayStats.workMinutes).toBeCloseTo(average, 2);
   });
 
-  it('is the one Output on the top bar, and the board says it beside the hall\'s own', () => {
+  it('is the one Pace on the top bar, and the board says it beside the hall\'s own', () => {
     const worked = tick(twoMenOnSheetWork({ sawVariant: 'standard' }), 60);
     const average = workshopOutputToday(worked);
     const bar = parse(renderTopbar(worked, 'hall'));
     const chip = bar.querySelector('[data-output="today"]');
-    expect(chip?.textContent).toBe(`Output ${average.toFixed(2)}`);
+    // The chip says Pace from v60, the word the sheet uses for it (PIOTR, 30.09).
+    expect(chip?.textContent).toBe(`Pace ${average.toFixed(2)}`);
     expect(bar.querySelectorAll('.output')).toHaveLength(1);
     const board = parse(renderCompany(worked));
     const note = board.querySelector('[data-figure="workshopToday"]');

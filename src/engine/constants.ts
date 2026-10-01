@@ -151,7 +151,7 @@ export const STATE_VERSION = 33;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v59';
+export const APP_VERSION = 'v60';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1474,6 +1474,13 @@ export const MACHINE_PLACES: Record<string, Record<string, number>> = {
  *  machine's class should add to the efficiency, that is easy to count"; TUNE, Piotr's figures]
  *  (CLAUDE.md T25 2.4). One ladder for every family, the bench's included: a class stops being a
  *  factor on whoever holds the machine and becomes the hall's. */
+/** The pace of a minute is a SUM of points from v60 and never a product: one, plus what every
+ *  factor adds or takes (a novice −0.40, an industrial saw +0.12, a dirty hall −0.15), so the
+ *  Pace sheet reads as a list of things to buy or put right and the figure at the top is what the
+ *  lines add up to (PIOTR, 30.09: "it should be an efficiency coefficient, a sum"). The floor is
+ *  the quarter speed a broken extractor has always left the hall at (T2 3.9): nothing runs
+ *  slower than a quarter, whatever the points come to [TUNE]. */
+export const PACE_FLOOR = 0.25;
 export const MACHINE_PACE: Record<string, number> = {
   used: 0.95,
   budget: 1,
@@ -3692,8 +3699,9 @@ export const HIRING_SPECS: HiringSpec[] = [
     monthlyWage: 1900,
     minReputation: 5,
     duties:
-      'Emails, bookkeeping, the consumables and materials chore, and every specialist’s work ' +
-      'at double time until he is taken on.',
+      'Emails, bookkeeping, the consumables and materials chore, the material take off at your ' +
+      'own speed until an estimator is taken on, and the client calls at double time until a ' +
+      'salesman is.',
   },
   {
     role: 'purchasingClerk',

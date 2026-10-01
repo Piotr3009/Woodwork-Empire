@@ -22,6 +22,7 @@ import {
   jobMinutesFor,
   jobOnCnc,
   jobPace,
+  paceSum,
   stagePlanFor,
   stageSpeed,
 } from '../../src/engine/stages';
@@ -162,7 +163,8 @@ describe('the CNC s places', () => {
       expect(currentStage(state, job)?.id, job.name).toBe('cnc');
     }
     // Both put work in at the job's one pace, so the two hours stand as the two men's rates: the
-    // owner's 1.00 against the novice's 0.6.
+    // owner's 1.00 against the novice's 0.6, the novice's 0.40 coming off the pace's points and
+    // not multiplying them (v60; PIOTR, 30.09).
     const done = state.jobs.map((job, index) => (before[index] ?? 0) - job.labourRemaining);
     const first = state.jobs[0];
     if (!first) throw new Error('a job is wanted');
@@ -172,7 +174,7 @@ describe('the CNC s places', () => {
     expect(done[0]).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * jobPace(state, first), 6);
     expect(jobPace(state, first)).toBeCloseTo(1 / (0.25 / 1.9 + 0.25 + 0.25 * 1.5 + 0.125), 10);
     expect(done[0]).toBeCloseTo(45.3731, 4);
-    expect((done[1] ?? 0) / (done[0] ?? 1)).toBeCloseTo(WORKER_RATES.novice, 6);
+    expect(done[1]).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * paceSum(WORKER_RATES.novice, jobPace(state, first)), 6);
   });
 
   it('holds no job for the CNC: the man its one place cannot take works his job on at a bench', () => {

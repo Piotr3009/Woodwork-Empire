@@ -12,7 +12,7 @@
 // pace, the hours onto the machine and the dust into the store. The night shift runs on it; the
 // day's production minute in game.ts does the same arithmetic (the note in REPORT-T13-B2.md).
 
-import { BUBBLES, DRAW_BLOCK_MINUTES, WET_AIR_FINISH_FACTOR } from './constants';
+import { BUBBLES, DRAW_BLOCK_MINUTES, OWNER_LABOUR_PER_MINUTE, WET_AIR_FINISH_FACTOR } from './constants';
 import { isBreak, workedMinutesOfDay } from './clock';
 import {
   addLabour,
@@ -91,7 +91,7 @@ import {
   type StagePlan,
   currentStage,
   jobPace,
-  labourPerMinute,
+  paceSum,
   stageLeft,
   stagePlanFor,
   tradeFactor,
@@ -154,7 +154,7 @@ export function hands(
     // His own rate, what the owner's absence takes off it, and what the manager over him adds:
     // the manager's pace multiplies the minute exactly the way a tier's rate does, on this one
     // path and nowhere else (PIOTR, 20.09; CLAUDE.md T23 2.4).
-    list.push({ who: worker.id, job, rate: worker.rate * away * managerPaceFor(state, worker) });
+    list.push({ who: worker.id, job, rate: paceSum(worker.rate, away, managerPaceFor(state, worker)) });
   }
   return list;
 }
@@ -562,7 +562,7 @@ export function placeHand(state: GameState, hand: Hand, entry: PlaceEntry | unde
   // sprayer's, and he is a pair of hands anywhere else; a joiner is slower at the booth
   // (CLAUDE.md T19 2.6; v53).
   const role = hand.who === OWNER ? null : (state.workers.find((worker) => worker.id === hand.who)?.role ?? null);
-  const pace = jobPace(state, hand.job) * tradeFactor(role, entry.family);
+  const pace = paceSum(jobPace(state, hand.job), tradeFactor(role, entry.family));
   return { work: { stage, book, pace, machine: entry.machine }, lost: null, noMaterial: false };
 }
 
@@ -803,11 +803,11 @@ export function workMinute(
     let speed = pace;
     // A compressor that is short of litres runs every pneumatic consumer on it at 0.7 for the
     // minute, and a booth on wet air takes half as long again over the finish and marks the
-    // piece (PIOTR, CLAUDE.md T10 3.2, 3.3).
+    // piece (PIOTR, CLAUDE.md T10 3.2, 3.3). Points, not factors, from v60.
     const atTheBench = benchDrawsAir(stage) !== null;
-    speed *= airFactorFor(state, air, machine, atTheBench);
+    speed = paceSum(speed, airFactorFor(state, air, machine, atTheBench));
     if (finishOnWetAir(state, book)) {
-      speed /= WET_AIR_FINISH_FACTOR;
+      speed = paceSum(speed, 1 / WET_AIR_FINISH_FACTOR);
       hand.job.wetFinish = true;
     }
     // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3): one
@@ -815,10 +815,13 @@ export function workMinute(
     // every man, and wore out four times as fast as the clock in a hall of four (v55).
     const compressor = drawingOn(state, machine, atTheBench);
     if (compressor !== null) used.set(compressor.id, 1);
-    const minute = labourPerMinute(hand.rate, speed) * hall;
+    // One sum: his own rate, the pace of his stage and what the hall takes, added as points and
+    // never multiplied (PIOTR, 30.09; v60).
+    const worth = paceSum(hand.rate, speed, hall);
+    const minute = OWNER_LABOUR_PER_MINUTE * worth;
     // The minute's own multiplier, for the workshop's average output (v40): the same things the
     // labour is made of, and nothing else, booked against the man who worked it (v50).
-    bookOutputMinute(state, hand.who, hand.rate * speed * hall);
+    bookOutputMinute(state, hand.who, worth);
     // Written on the stage the bar stands at, so the bar fills in order (v53).
     if (addLabour(state, hand.job, minute, book.id)) report.finished.push(hand.job);
   }

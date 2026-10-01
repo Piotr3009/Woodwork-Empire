@@ -34,7 +34,7 @@ import {
   WORKING_DAYS_PER_WEEK,
   ANSWER_SKEW_NEUTRAL_TIER,
 } from './constants';
-import { findSpec } from './machines';
+import { findSpec, has } from './machines';
 import {
   availableFinishes,
   findTemplate,
@@ -45,7 +45,6 @@ import {
 } from './catalog';
 import { deadlineDaysFrom, drawDeadline, labourValueFor, ownerDaysFor, stagedJob } from './jobs';
 import { jobMinutesFor } from './stages';
-import { hasOrOnOrder } from './orders';
 import { workshopRate } from './plan';
 import { effectiveReputation, reputationTier } from './reputation';
 import { chance, float, int, makeId, pickWeighted } from './rng';
@@ -298,17 +297,16 @@ export function kitBlockFor(state: GameState, entry: ProductTemplate): BoardBloc
     return { reason: `reputation too low (needs ${entry.minReputation})`, where: '' };
   }
 
-  if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => hasOrOnOrder(state, id))) {
+  if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => has(state, id))) {
     return { reason: 'no timber machines', where: 'catalogue' };
   }
-  // Bought and on the road counts, the way it does for every other thing on this list: a company
-  // that has ordered a booth is a company that can take sprayed work, and the job is days of
-  // drawing and material before anybody sprays anything (CLAUDE.md T8 3.2, T10 3.7). Otherwise
-  // the same product could stand on the board takeable and greyed at once.
-  if (entry.allowedFinishes.includes('lacquer') && !hasOrOnOrder(state, 'sprayBooth')) {
+  // Standing in the hall and nothing less: a machine on the lorry takes no work until it has
+  // landed [PIOTR, 30.09: "after delivery, not after ordering"] (v60, reversing T8 3.2). The
+  // catalogue asks the same question, so a product is takeable and greyed by one rule.
+  if (entry.allowedFinishes.includes('lacquer') && !has(state, 'sprayBooth')) {
     return { reason: 'needs a spray booth', where: 'catalogue' };
   }
-  const missing = entry.requiredEquipment.filter((specId) => !hasOrOnOrder(state, specId));
+  const missing = entry.requiredEquipment.filter((specId) => !has(state, specId));
   if (missing.length > 0) {
     const names = missing.map((specId) => findSpec(specId)?.name ?? specId);
     return { reason: `no ${names.join(', ').toLowerCase()}`, where: 'catalogue' };

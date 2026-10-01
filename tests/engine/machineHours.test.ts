@@ -5,10 +5,16 @@
 // half of every hour on the saw and half at his bench.
 
 import { describe, expect, it } from 'vitest';
-import { MINUTES_PER_WORKING_DAY, SERVICE_INTERVAL_DAYS } from '../../src/engine/constants';
+import {
+  MINUTES_PER_WORKING_DAY,
+  OWNER_LABOUR_PER_MINUTE,
+  SERVICE_INTERVAL_DAYS,
+  WORKER_RATES,
+} from '../../src/engine/constants';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { OWNER, menAtMachine, serviceIsDue } from '../../src/engine/machines';
 import { machineStation } from '../../src/engine/stations';
+import { paceSum } from '../../src/engine/stages';
 import type { Equipment, GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
 import {
@@ -126,11 +132,14 @@ describe('the places at a machine', () => {
     expect(joiner.productionMinutes).toBe(60);
     expect(joiner.idleByReason.noPlace).toBe(0);
     const his = state.jobs.find((job) => job.assignees[0] === joiner.id);
-    // Nothing went into his job until v53; now his hour: a novice's 24.00 of labour an hour at
-    // the job's pace of 0.8889, the moulding's quarter by hand on this hall (v55). The budget saw
-    // keeps two busy, so the hall is short of nothing (20.00 on v54, one saw place for the two).
-    expect((his?.labourValue ?? 0) - (his?.labourRemaining ?? 0)).toBeCloseTo(24 / (0.75 + 0.25 * 1.5), 6);
-    expect((his?.labourValue ?? 0) - (his?.labourRemaining ?? 0)).toBeCloseTo(21.3333, 4);
+    // Nothing went into his job until v53; now his hour: a novice's 0.60 less the 0.11 the job's
+    // pace of 0.8889 takes off it, the moulding's quarter by hand on this hall (v55), added as
+    // points from v60 (PIOTR, 30.09): 19.56 of labour, 21.33 until v60 when the two multiplied.
+    // The budget saw keeps two busy, so the hall is short of nothing (20.00 on v54, one saw place
+    // for the two).
+    const worth = paceSum(WORKER_RATES.novice, 1 / (0.75 + 0.25 * 1.5));
+    expect((his?.labourValue ?? 0) - (his?.labourRemaining ?? 0)).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * worth, 6);
+    expect((his?.labourValue ?? 0) - (his?.labourRemaining ?? 0)).toBeCloseTo(19.5556, 4);
   });
 
   it('has two places at a standard saw, and the two men take them in turn, one at a time', () => {

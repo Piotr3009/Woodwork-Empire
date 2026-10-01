@@ -2,6 +2,7 @@
 // ownership and power side that the economy needs.
 
 import {
+  PACE_FLOOR,
   CAPACITY_ROLES,
   CENTRAL_EXTRACTION_SPECS,
   DUST_BANDS,
@@ -63,7 +64,7 @@ import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
 // The manager's grade, off owner.ts, which is the module every layer can reach: staff.ts reads
 // this module, so the manager cannot be asked for from there (CLAUDE.md T23 2.4).
-import { managerTier, ownerEfficiency } from './owner';
+import { managerTier, ownerEfficiency, staffOutputFactor } from './owner';
 import {
   airBlockFor,
   airCheck,
@@ -86,8 +87,8 @@ import { lockReasonFor, template } from './catalog';
 import { jobHeldBy } from './jobs';
 import { stageOfMan } from './production';
 import { contractOfWorker, contractPiece, contractStageFamilyOf } from './contracts';
-import { jobPace, stageDoing, stagePlanFor, tradeFactor } from './stages';
-import { isWorkingToday, nightCrew } from './staff';
+import { jobPace, paceSum, stageDoing, stagePlanFor, tradeFactor } from './stages';
+import { isWorkingToday, managerPaceFor, nightCrew } from './staff';
 import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
 import { andList, cubicMetres, trimmed } from './text';
@@ -891,13 +892,13 @@ function manWords(worker: { name: string; tier: WorkerTier | null; role: string 
  *  disagree about the state of the hall (CLAUDE.md T9 3.10). */
 export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'): OutputBreakdown {
   const lines: OutputLine[] = [];
+  // Points, added and never multiplied: a line is worth what its factor takes off one, and the
+  // hall's number is one plus the lot, floored (PIOTR, 30.09; v60). Until v60 the lines were the
+  // steps of a running product, so a second thing wrong cost less than the first.
   let running = 1;
-  // Each line is worth what it takes off the running total, so the lines add up to the product
-  // exactly: a second thing wrong with the hall costs less than the first one did.
   const hallLine = (label: string, factor: number): void => {
-    const next = running * factor;
-    lines.push({ label, points: next - running, hall: true, where: '' });
-    running = next;
+    lines.push({ label, points: factor - 1, hall: true, where: '' });
+    running += factor - 1;
   };
   const band = dustBand(state.dust);
   hallLine(band.label === 'clean' ? 'Hall clean' : `Hall ${band.label}`, band.factor);
@@ -922,7 +923,7 @@ export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'
   for (const short of placeShortages(state, shift)) {
     hallLine(`Too few ${machinesWord(short.family)}: capacity ${short.capacity}, ${short.men} men`, short.factor);
   }
-  const total = running;
+  const total = Math.max(PACE_FLOOR, running);
   let plus = 0;
   let minus = 0;
   for (const line of lines) {
@@ -1044,7 +1045,8 @@ export interface WorkshopBreakdownRow {
   who: string;
   /** `<Name>, <tier> <role>, <doing> <job>`, in the words the person card uses; `Hall`. */
   main: string;
-  /** `<why>, <his minutes> min: <his rate> times <his stage's speed>`; the hall's state. */
+  /** `<why>, <his minutes> min: 1.00 − 0.20 grade + 0.05 machines − 0.15 hall`, the points his
+   *  minute adds up from (v60); the hall's state on the hall's row. */
   words: string;
   /** His minutes today; nought on the hall's row, which is a factor and not a man. */
   minutes: number;
@@ -1126,22 +1128,33 @@ function manRow(
   const machine = job === null ? null : (menAtPlaces(state).find((entry) => entry.who === who)?.item ?? null);
   const doing =
     job === null || stage === null ? '' : `${stageDoing(stage.id, job.finish === 'lacquer')} ${job.name}`;
-  const mine = who === OWNER ? `your ${twoPlaceText(rate)}` : twoPlaceText(rate);
   // The job's one pace, the figure `runProductionMinute` reads before the air factor (v53).
-  const role = who === OWNER ? null : (state.workers.find((worker) => worker.id === who)?.role ?? null);
-  const pace = job === null ? 1 : jobPace(state, job) * tradeFactor(role, machine?.specId ?? null);
+  const worker = who === OWNER ? null : (state.workers.find((entry) => entry.id === who) ?? null);
+  const role = worker?.role ?? null;
+  const pace = job === null ? 1 : paceSum(jobPace(state, job), tradeFactor(role, machine?.specId ?? null));
   const figure = booked.minutes <= 0 ? 0 : Math.round((booked.worth / booked.minutes) * 100) / 100;
-  // What the hall did to his minutes, off what they were really booked at: the saws too few for
-  // the crew, the dust, the air. Without it the row said "0.97 times 1.05" beside 0.79, which does
-  // not multiply out [PIOTR, 24.09: "something does not add up"] (v54).
-  const hall = booked.minutes <= 0 || rate * pace <= 0 ? 1 : booked.worth / booked.minutes / (rate * pace);
-  const hallWords = Math.abs(hall - 1) < 0.005 ? '' : ` times the hall's ${twoPlaceText(hall)}`;
+  // His minute as the engine adds it up, point by point, and the hall as the remainder off what
+  // his minutes were really booked at: the saws too few for the crew, the dust, the air. A sum
+  // and not a product from v60 (PIOTR, 30.09: "it should be a sum"), so the row's own words add
+  // up to its figure: "1.00 − 0.20 grade + 0.05 machines − 0.15 hall".
+  const manager = worker === null ? 1 : managerPaceFor(state, worker);
+  const away = worker === null ? 1 : staffOutputFactor(state);
+  const parts: Array<[number, string]> = [
+    [rate - 1, who === OWNER ? 'you' : 'grade'],
+    [pace - 1, 'machines'],
+    [manager - 1, 'manager'],
+    [away - 1, 'boss away'],
+  ];
+  const named = parts.reduce((sum, [points]) => sum + points, 0);
+  const hall = booked.minutes <= 0 ? 0 : booked.worth / booked.minutes - 1 - named;
+  parts.push([hall, 'hall']);
+  const terms = parts
+    .filter(([points]) => Math.abs(points) >= 0.005)
+    .map(([points, label]) => `${points < 0 ? '−' : '+'} ${twoPlaceText(Math.abs(points))} ${label}`);
   return {
     who,
     main: [name, trade, doing].filter((part) => part !== '').join(', '),
-    words:
-      `${whyWords(state, stage, machine)}, ${booked.minutes} min: ` +
-      `${mine} times ${twoPlaceText(pace)}${hallWords}`,
+    words: `${whyWords(state, stage, machine)}, ${booked.minutes} min: 1.00 ${terms.join(' ')}`.trimEnd(),
     minutes: booked.minutes,
     figure,
   };

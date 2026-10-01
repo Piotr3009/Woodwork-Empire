@@ -36,6 +36,7 @@ import { createTask, estimatorCapacity } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { monthlyWageBill } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
+import { paceSum } from '../../src/engine/stages';
 import type { GameState, Worker, WorkerTier } from '../../src/engine/index';
 import {
   acceptNow,
@@ -369,10 +370,12 @@ describe('joiners at the bench', () => {
     state = act(state, { type: 'SKIP_DAY' });
     const before = firstJob(state).labourRemaining;
     const after = firstJob(tick(state, 60)).labourRemaining;
-    // 16.80, the 0.7 of the owner's absence and nothing else: v53 read 14.00, the saw's line for
-    // a crew of two on top of it, with the owner counted in the crew on the day he was away (v54).
-    expect(before - after).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice * 0.7, 6);
-    expect(before - after).toBeCloseTo(16.8, 6);
+    // 12.00: the owner's absence is 0.30 off the novice's own 0.60, added as points and not
+    // multiplied (v60; PIOTR, 30.09), and nothing else. 16.80 until v60, the product of the two;
+    // v53 read 14.00, the saw's line for a crew of two on top of it, with the owner counted in the
+    // crew on the day he was away (v54).
+    expect(before - after).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * paceSum(WORKER_RATES.novice, 0.7), 6);
+    expect(before - after).toBeCloseTo(12, 6);
   });
 });
 
@@ -412,12 +415,14 @@ describe('the places at the saw', () => {
     // every job gets the same hour (PIOTR, 24.09; v53). The hall's line for the four men at work
     // and a budget saw that keeps two busy, (2 + 2 / 1.5) / 4 = 0.8333, is on every minute, and
     // the moulding's quarter is by hand on this hall, the job's pace 0.8889 (v55): 32.00 at the
-    // saw and 0 for the other three until v53, 23.70 on each of the four now (24.00 on v54, one
-    // saw place and the old shares; 23.47 on v53, the owner counted as a fifth man).
-    const full = 60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced;
+    // saw and 0 for the other three until v53, 20.89 on each of the four now, the three points
+    // added, 0.20 for the grade, 0.11 for the pace and 0.17 for the hall (v60; PIOTR, 30.09);
+    // 23.70 until v60, the product of the same three (24.00 on v54, one saw place and the old
+    // shares; 23.47 on v53, the owner counted as a fifth man).
     const pace = 1 / (0.75 + 0.25 * 1.5);
-    for (const value of done) expect(value).toBeCloseTo(full * pace * ((2 + 2 / 1.5) / 4), 6);
-    expect(done[0]).toBeCloseTo(23.7037, 4);
+    const worth = paceSum(WORKER_RATES.experienced, pace, (2 + 2 / 1.5) / 4);
+    for (const value of done) expect(value).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * worth, 6);
+    expect(done[0]).toBeCloseTo(20.8889, 4);
     expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(1);
     expect(worked.workers.filter((worker) => worker.station === 'machine:workbench')).toHaveLength(3);
     expect(worked.workers.filter((worker) => worker.station === STATION_HOME)).toHaveLength(0);

@@ -67,7 +67,7 @@ import { chance, float, int, pick } from './rng';
 import type { RngCarrier } from './rng';
 import { crewHasGoneHome, isWorkingToday, joiners } from './staff';
 import { STATION_DOOR, STATION_HOME } from './stations';
-import { familyForStage, jobOnCnc, stageSpeed } from './stages';
+import { familyForStage, jobOnCnc, paceSum, stageSpeed } from './stages';
 import type { Contract, ContractWeek, Equipment, GameState, StageId, Worker } from './types';
 
 /** What a man on a contract carries in `jobId`, so the jobs leave him alone: not available for
@@ -238,6 +238,10 @@ export function contractReferenceFor(piece: ContractPieceSpec): ContractReferenc
   const spec = family === null ? undefined : findSpec(family);
   const standard = spec?.variants.find((variant) => variant.id === CONTRACT_REFERENCE_CLASS);
   const speed = standard === undefined || family === null ? 1 : classPaceOf({ specId: family, variantId: standard.id });
+  // The entry point is a price convention and it keeps the product: a rate times a pace, as it was
+  // set (v40), so no contract price moved with v60. The card and the minute add the same two as
+  // points from v60, so the entry man on the entry machine now keeps a little less than the day's
+  // margin the price was set to leave him [PIOTR to rule: the v60 report].
   const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
   const labourCost = pence(minutes * workerMinuteCost(middling?.monthlyWage ?? 0));
   const wear = pence(minutes * (standard === undefined ? 0 : wearPerMinuteOf(standard.price)));
@@ -414,8 +418,10 @@ function resultAtSpeed(
 ): ContractResult {
   const piece = contractPiece(contract);
   const rate = worker === null ? OWNER_RATE : worker.rate > 0 ? worker.rate : 1;
-  // His minutes over a piece, which is what the day is counted in: never less than one.
-  const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
+  // His minutes over a piece, which is what the day is counted in: never less than one. His rate
+  // and the piece's speed are points of one sum from v60, as they are on the minute itself
+  // (`runContractMinute`; PIOTR, 30.09).
+  const minutes = Math.max(1, Math.round(piece.minutes / paceSum(rate, speed > 0 ? speed : 1)));
   const labourCost = pence(minutes * contractMinuteCost(state, worker));
   const machine = candidate === null ? pieceMachine(state, piece) : null;
   const wearPerMinute =
@@ -501,13 +507,15 @@ export function contractHallCapacity(state: GameState, contract: Contract): Hall
   // minute (v54), and nobody at any other family, whose machines this piece never touches (v55).
   const own = pieceStage(state, piece).family;
   const shortages = placeShortages(state, 'day', (family) => (family === own ? fullCrew(state) : 0));
-  const speed = contractPieceSpeed(state, piece) * shortages.reduce((all, short) => all * short.factor, 1);
+  // The piece's speed and what the saws too few for the crew take off the hall, as points of one
+  // sum (v60), the way the minute adds them.
+  const speed = paceSum(contractPieceSpeed(state, piece), ...shortages.map((short) => short.factor));
   const week = MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK;
   let perWeek = 0;
   for (const worker of joiners(state)) {
     const rate = worker.rate > 0 ? worker.rate : 1;
     // His minutes over a piece, rounded the way his card rounds them (`resultAtSpeed`).
-    const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
+    const minutes = Math.max(1, Math.round(piece.minutes / paceSum(rate, speed > 0 ? speed : 1)));
     perWeek += Math.floor(week / minutes);
   }
   const wanted = contract.quantityPerWeek;
@@ -966,7 +974,8 @@ export function runContractMinute(
       const { stage } = pieceStage(state, piece);
       const speed = stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
       hall ??= hallProductivityFactor(state);
-      const worth = worker.rate * away * speed * hall;
+      // One sum, as the job minute is (v60).
+      const worth = paceSum(worker.rate, away, speed, hall);
       contract.pieceMinutes = Math.round((contract.pieceMinutes + worth) * 10000) / 10000;
       contract.labourMinutes += 1;
       worker.productionMinutes += 1;

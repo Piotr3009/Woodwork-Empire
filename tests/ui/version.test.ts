@@ -38,8 +38,12 @@ describe('the version in the corner', () => {
     // v55 is one stage a machine, a quarter each, and the men drawing their machines (PIOTR, 24.09).
     // v56 stands the spray booths at their pictures' size and bolts the CNC's tool changer head to
     // the CNC (PIOTR, 25.09). v57 takes the timber offers off the board until the timber branch
-    // (PIOTR, 25.09). v58 puts the machines' capacities of 24.09 back (PIOTR, 25.09).
-    expect(APP_VERSION).toBe('v59');
+    // (PIOTR, 25.09). v58 puts the machines' capacities of 24.09 back (PIOTR, 25.09). v59 stands
+    // the man waiting for the boss at the canteen door and names the first two joiners Jack T and
+    // Jack B (PIOTR, 30.09). v60 adds the pace up from points and calls it Pace, keeps the desk
+    // staff off the hall, locks the board on machines still on order and hands the take off to the
+    // admin (PIOTR, 30.09).
+    expect(APP_VERSION).toBe('v60');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -55,7 +59,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v59'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v60'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

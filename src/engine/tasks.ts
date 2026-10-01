@@ -110,9 +110,16 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   // The draftsman takes the drawings off the owner, in laptop order, and the owner may still
   // draw beside him (PIOTR, CLAUDE.md T10 3.6).
   design: { category: 'design', eligibleRoles: ['draftsman'], autoRoles: ['draftsman'] },
-  // The take off is the owner's until an estimator is taken on, and then his, so many a day
-  // (CLAUDE.md T13 3.8).
-  materialTakeOff: { category: 'admin', eligibleRoles: ['estimator'], autoRoles: ['estimator'] },
+  // The take off is the owner's until somebody in the office is taken on: the estimator's first,
+  // at his tier's speed (CLAUDE.md T13 3.8), and the office admin's behind him at the owner's own
+  // speed when there is no estimator on the books (PIOTR, 30.09: "create list of materials should
+  // go under the admin; the admin does it normally"). The order of this list is that order,
+  // because `bestTakerOf` reads it as a ranking.
+  materialTakeOff: {
+    category: 'admin',
+    eligibleRoles: ['estimator', 'officeAdmin'],
+    autoRoles: ['estimator', 'officeAdmin'],
+  },
   // The site measure is a day out with a tape. It was the owner's alone; Turn 20 let the estimator
   // go, with the day's travel minutes coming off his own 480 and not the owner's (PIOTR;
   // CLAUDE.md T20 2.3). From tonight nobody waits for the owner to have time for it: the estimator
@@ -620,10 +627,11 @@ function canTakeOn(state: GameState, worker: Worker, task: TaskInstance): boolea
   // out of (CLAUDE.md T17 2.3).
   if (worker.taskId !== null) return false;
   if (hasWorkingDay(worker.role) && staffMinutesLeft(worker) <= 0) return false;
-  if (task.kind === 'materialTakeOff' && worker.role === 'estimator') {
-    // As many as his minutes allow, and none before the drawing it reads. The count of jobs a day
-    // is gone: his 480 minutes above are the whole of the cap now, so a quicker man and a laptop
-    // with Joinery Core on it both show in the pile he gets through (PIOTR; CLAUDE.md T20 2.3).
+  if (task.kind === 'materialTakeOff') {
+    // As many as his minutes allow, and none before the drawing it reads, whoever he is. The count
+    // of jobs a day is gone: his 480 minutes above are the whole of the cap now, so a quicker man
+    // and a laptop with Joinery Core on it both show in the pile he gets through (PIOTR;
+    // CLAUDE.md T20 2.3).
     return !designOutstandingFor(state, task.jobId);
   }
   return true;

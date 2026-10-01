@@ -43,7 +43,7 @@ describe('who made it today, on the Output sheet', () => {
     expect(heads[0]).toBe(
       `Who made it today, ${worked().dayStats.workMinutes} min worked` + 'a minute',
     );
-    expect(heads[1]).toBe('What moves itpoints');
+    expect(heads[1]).toBe('What moves it, for everybody in the hallpoints');
     // The head the mockup writes, word for word.
     expect(MOCKUP).toContain('<span>Who made it today,');
     expect(MOCKUP).toContain('<span>a minute</span>');
@@ -101,7 +101,7 @@ describe('who made it today, on the Output sheet', () => {
     expect(sheet.querySelector('.ledger-list[data-figure="workshopBreakdown"]')).toBeNull();
     expect(sheet.textContent).not.toContain('Who made it today');
     // And the sheet below it is untouched.
-    expect(sheet.querySelector('.ledger-head')?.textContent).toBe('What moves itpoints');
+    expect(sheet.querySelector('.ledger-head')?.textContent).toBe('What moves it, for everybody in the hallpoints');
   });
 
   it('adds no token and no class of its own to the stylesheet', () => {

@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { changeReputation, companyTotals, effectiveReputation, formatReputation } from '../../src/engine/reputation';
 import { outputBreakdown } from '../../src/engine/machines';
+import { PACE_FLOOR } from '../../src/engine/constants';
 import { COMPANY_BOARD_BOX, OFFICE_TEXTS } from '../../src/render/office';
 import { machineSavings } from '../../src/engine/machines';
 import { plural } from '../../src/engine/text';
@@ -357,16 +358,20 @@ describe('the Reputation sheet', () => {
   });
 });
 
-describe('the Output sheet', () => {
+describe('the Pace sheet', () => {
   it('prints the engine\'s breakdown: the hall\'s lines with their balance, base first and dim', () => {
     const state = traded();
     state.dust = 80;
     const breakdown = outputBreakdown(state);
     const sheet = parse(renderCompany(state)).querySelector('[data-sheet="output"]');
-    expect(sheet?.querySelector('h3')?.textContent).toBe('Output');
+    // Pace, not Output, from v60: what a worked minute is worth, added up from points and never
+    // multiplied, with the line that says so beside Efficiency (PIOTR, 30.09).
+    expect(sheet?.querySelector('h3')?.textContent).toBe('Pace');
     expect(sheet?.querySelector('.ledger-total-label')?.textContent).toBe(
-      'every minute of production is multiplied by it',
+      'every worked minute in this hall is worth',
     );
+    expect(sheet?.textContent).toContain('Efficiency says how much of the day was worked. Pace says how fast a worked minute goes');
+    expect(sheet?.textContent).toContain(`nothing runs slower than ${PACE_FLOOR.toFixed(2)}`);
     expect(sheet?.querySelector('[data-figure="output"]')?.textContent).toBe(breakdown.total.toFixed(2));
     const base = sheet?.querySelector('.ledger-row[data-line="base"]');
     expect(base?.querySelector('.ledger-main')?.textContent).toBe('Base');
@@ -404,7 +409,7 @@ describe('the Output sheet', () => {
     const list = Array.from(sheet?.querySelectorAll('.ledger-list > *') ?? []);
     const rule = list.findIndex((node) => node.classList.contains('ledger-rule'));
     const heading = list[rule + 1];
-    expect(heading?.textContent).toBe('Act where they are, not in the number above');
+    expect(heading?.textContent).toBe('Act on their own man or stage, not in the number above');
     expect(heading?.className).toContain('ledger-head');
     const rows = list.slice(rule + 2);
     expect(rows.every((row) => row.getAttribute('data-line') === 'elsewhere')).toBe(true);

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MOVE_MINUTES_PER_ITEM,
   NO_AIR_LINE,
+  OWNER_LABOUR_PER_MINUTE,
   PRODUCT_TEMPLATES,
   WET_AIR_FINISH_FACTOR,
   WET_AIR_FINISH_RATING,
@@ -68,15 +69,26 @@ describe('the two sprayed products', () => {
     expect(kitBlockFor(state, template('lacqueredWardrobe'))).toBeNull();
   });
 
-  it('counts a booth on the road, so the same product is never takeable and greyed at once', () => {
+  it('counts no booth on the road: the product stays greyed until the lorry has been', () => {
     const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     state.reputation = 40;
     const ordered = act(state, { type: 'BUY_EQUIPMENT', specId: 'sprayBooth' });
     expect(ordered.onOrder.some((item) => item.specId === 'sprayBooth')).toBe(true);
     expect(ordered.equipment.some((item) => item.specId === 'sprayBooth')).toBe(false);
-    // The board and the tile agree: on the road counts, as it does for a saw (CLAUDE.md T8 3.2).
-    expect(kitBlockFor(ordered, template('lacqueredWardrobe'))).toBeNull();
-    expect(lockReasonFor(ordered, template('lacqueredWardrobe'))).toBeNull();
+    // The board and the tile agree, and from v60 they agree on the hall as it stands: a booth on
+    // order is no booth, so the sprayed work is locked until it is delivered, as it is for a saw
+    // (PIOTR, 30.09: "you cannot let the orders and the jobs through on machines that are
+    // ordered, it has to be after the delivery"). Until v60 on the road counted (CLAUDE.md T8 3.2).
+    expect(kitBlockFor(ordered, template('lacqueredWardrobe'))?.reason).toBe('needs a spray booth');
+    expect(lockReasonFor(ordered, template('lacqueredWardrobe'))).toBe('Needs spray booth');
+    // Delivered, the lock is off.
+    const landed = act(ordered, { type: 'SET_SPEED', speed: 1 });
+    const order = landed.onOrder.find((item) => item.specId === 'sprayBooth');
+    if (!order) throw new Error('a booth on order is wanted');
+    placeEquipment(landed, 'sprayBooth', { x: 7, y: 6 });
+    landed.onOrder = landed.onOrder.filter((item) => item.id !== order.id);
+    expect(kitBlockFor(landed, template('lacqueredWardrobe'))).toBeNull();
+    expect(lockReasonFor(landed, template('lacqueredWardrobe'))).toBeNull();
   });
 
   it('does its Finishing at the booth, and nothing else does', () => {
@@ -92,7 +104,10 @@ describe('the two sprayed products', () => {
     const wet = sprayedMinutes(false);
     const dry = sprayedMinutes(true);
     expect(dry).toBeGreaterThan(0);
-    expect(wet).toBeCloseTo(dry / WET_AIR_FINISH_FACTOR, 4);
+    // Half as long again is 0.33 off every minute's points from v60 (PIOTR, 30.09), so twenty wet
+    // minutes are twenty thirds of the owner's minute short of the dry ones; until v60 the wet
+    // minutes were the dry ones divided by 1.5.
+    expect(wet).toBeCloseTo(dry - 20 * OWNER_LABOUR_PER_MINUTE * (1 - 1 / WET_AIR_FINISH_FACTOR), 4);
     expect(wet).toBeLessThan(dry);
   });
 

@@ -233,7 +233,14 @@ describe('(ll) three men, no manager, and the boss assigns each morning', () => 
     // and the men go round the saw and the bench a half hour at a time (PIOTR, 24.09), so a saw is
     // running in every working half hour, the fan with it, and three ungated saws draw 2,400
     // against the used extractor's 830 usable: the hall works at 0.7 through every one of them.
-    expect(NO_MANAGER.done).toBeCloseTo(3546.34, 2);
+    //
+    // 2,404.33 from v60, 240.43 a working day [measured on this build]. Every minute is a sum of
+    // points (PIOTR, 30.09): three novices at 0.60, the fan short of the saws at 0.30 off and the
+    // job's pace 0.879 at 0.12 off, is 0.18 a minute, which is under the floor, so every one of the
+    // 14,400 hand minutes of the stretch is booked at the floor, 0.25, where the product read
+    // 0.37: 14,400 times two thirds of a pound times 0.25 is 2,400, and the four pounds over it
+    // are the half hours a saw did not run. What this says about the sum is in the v60 report.
+    expect(NO_MANAGER.done).toBeCloseTo(2404.33, 2);
     expect(NO_MANAGER.state.jobs.every((job) => job.stage === 'inProduction')).toBe(true);
   });
 });
@@ -289,8 +296,15 @@ describe('(mm) the same crew with a novice manager over them', () => {
     // 4,589.83 on v54; 3,656.89 from v55, for the two reasons (ll) gives: the quarters with the
     // moulding by hand, and the saws running in every working half hour of the round with the fan
     // short of them [measured].
+    //
+    // 2,406.01 from v60, and the manager's three per cent has all but gone: 1.68 over (ll) where
+    // it was 110.55 [measured]. Under the sum of points (PIOTR, 30.09) his 0.03 lands on men who
+    // are under the floor by 0.07 (the note under (ll)), 0.18 plus 0.03 is 0.21 and the floor
+    // still holds them at 0.25, so the grade shows only in the few half hours a saw is not running
+    // and the fan's 0.30 is off the minute. The assertion that he puts more in than (ll) holds by
+    // that margin and no other; what this says about the sum is in the v60 report.
     expect(NOVICE.done).toBeGreaterThan(NO_MANAGER.done);
-    expect(NOVICE.done).toBeCloseTo(3656.89, 2);
+    expect(NOVICE.done).toBeCloseTo(2406.01, 2);
   });
 
   it('never sends the owner to the Work Plan', () => {
@@ -472,7 +486,11 @@ describe('(oo) a bench and no compressor', () => {
     // (CLAUDE.md T23 2.7). The half hours of his round at the saw (v55) are worked, on the stage the
     // bar stands at, so the job moves on those and on nothing else. Until v55 he stood at the bench
     // all day and a whole week put nothing in; from v55 the round gives him eight half hours at
-    // the saw a day, which is why the day's total falls: 232.88 to 148.53 on this hall.
+    // the saw a day, which is why the day's total falls: 232.88 to 148.53 on this hall. From v60
+    // the day reads 249.43 to 172.86, 76.58 of work in the eight saw half hours where it was
+    // 84.35: what the hall takes off the owner's minute at the saw, the fan short of it first, is
+    // points off the job's pace and not a share of it (PIOTR, 30.09), and the days before this one
+    // ran on the same arithmetic, which is where the 249.43 comes from [measured].
     const day = BENCH_DAY.halfHours.filter((entry) => entry.minute < DAY_END_MINUTE);
     const bench = day.filter((entry) => entry.station === machineStation('workbench'));
     const saw = day.filter((entry) => entry.station === machineStation('tableSaw'));
@@ -487,7 +505,7 @@ describe('(oo) a bench and no compressor', () => {
     for (const entry of bench) expect(leftAfter(entry)).toBe(entry.left);
     for (const entry of saw) expect(leftAfter(entry)).toBeLessThan(entry.left);
     expect(BENCH_DAY.after).toBeLessThan(BENCH_DAY.before);
-    expect(BENCH_DAY.after).toBeCloseTo(148.53, 2);
+    expect(BENCH_DAY.after).toBeCloseTo(172.86, 2);
   });
 
   it('says why over his head at the bench, and nothing at the saw', () => {

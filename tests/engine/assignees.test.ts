@@ -13,6 +13,7 @@ import {
   isOnJob,
   jobMen,
   jobRate,
+  jobRates,
   leadAssignee,
   minutesRemainingFor,
   takeOffJob,
@@ -24,7 +25,7 @@ import { animationForStation } from '../../src/render/characters';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState, Job } from '../../src/engine/index';
 import { migrateState } from '../../src/engine/migrate';
-import { STATE_VERSION } from '../../src/engine/constants';
+import { OWNER_LABOUR_PER_MINUTE, STATE_VERSION, WORKER_RATES } from '../../src/engine/constants';
 import { CREW, act, clearEvents, runClock, sixJoinersOnSheetWork } from '../helpers';
 
 function parse(html: string): HTMLElement {
@@ -118,8 +119,14 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     const two = menOnOne(2);
     const both = jobOfFirst(two);
     expect(jobRate(two, both)).toBeCloseTo(jobRate(alone, one) * 2, 4);
-    const left = minutesRemainingFor(two, both, jobRate(two, both));
-    expect(left).toBeCloseTo(minutesRemainingFor(alone, one, jobRate(alone, one)) / 2, 4);
+    // The minutes left are worked out a man at a time from v60, each man's own sum of points and
+    // the men added up (`jobRates`, `crewPace`; PIOTR, 30.09): two novices at 0.60 on a job at
+    // 0.89 are 0.49 a minute each, 0.98 together, where one rate of 1.20 would have read 1.09
+    // and promised the job sooner than the hall makes it.
+    expect(jobRates(two, both)).toEqual([WORKER_RATES.novice, WORKER_RATES.novice]);
+    const left = minutesRemainingFor(two, both, jobRates(two, both));
+    expect(left).toBeCloseTo(minutesRemainingFor(alone, one, jobRates(alone, one)) / 2, 4);
+    expect(left).toBeLessThan(minutesRemainingFor(two, both, jobRate(two, both)) * 2);
   });
 
   it('puts twice the labour into it in the same hour, with a machine each', () => {
@@ -136,15 +143,19 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     // than the man at it. Now the other two work the job at the other machines and the benches,
     // and all three put their minutes in (PIOTR, 24.09; v53). The line counts the men whose work
     // goes through the saw (v54, v55): the man alone is short of nothing, and a budget saw keeps
-    // two busy, so of the three one is past it and works at the by hand pace, (2 + 1 / 1.5) / 3
-    // of three men: 6.40 and 17.07. v54 read 16.80, a place for one man; v53 21.60.
+    // two busy, so of the three one is past it and works at the by hand pace, (2 + 1 / 1.5) / 3,
+    // which from v60 is 0.11 off each of the three men's points and not a multiplier on the lot
+    // (PIOTR, 30.09): 5.19 and 11.11. Until v60 the line multiplied, 6.40 and 17.07 (v54 read
+    // 16.80, a place for one man; v53 21.60).
     const one = menOnOne(1, 1, 'budget');
     const three = menOnOne(3, 1, 'budget');
     const alone = labourIn(one, jobOfFirst(one).id, 'cutting', 20);
     const crowd = labourIn(three, jobOfFirst(three).id, 'cutting', 20);
     expect(alone).toBeGreaterThan(0);
-    expect(crowd).toBeCloseTo(alone * 3 * ((2 + 1 / 1.5) / 3), 4);
-    expect(crowd).toBeCloseTo(17.0667, 4);
+    const line = 1 - (2 + 1 / 1.5) / 3;
+    expect(crowd).toBeCloseTo(3 * (alone - 20 * OWNER_LABOUR_PER_MINUTE * line), 4);
+    expect(alone).toBeCloseTo(5.1852, 4);
+    expect(crowd).toBeCloseTo(11.1111, 4);
   });
 
   it('runs the same three men faster behind a saw of two places, by the saw s class and its hall line', () => {
@@ -155,11 +166,15 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     // Until v53 the standard saw's second place was a second man working, twice the one place
     // saw. Now all three work behind either saw. A budget saw and a standard one both keep two
     // busy (v55), so the hall's line is the same behind either and what the standard saw buys is
-    // its pace alone: 1.05 on the cutting's quarter, the moulding's quarter by hand on this hall.
-    // 1.1566 on v54, when a budget saw covered one man and a standard saw two.
-    const pace = (0.25 + 0.25 + 0.25 * 1.5 + 0.25) / (0.25 / 1.05 + 0.25 + 0.25 * 1.5 + 0.25);
-    expect(fast / slow).toBeCloseTo(pace, 6);
-    expect(fast / slow).toBeCloseTo(1.0107, 4);
+    // its pace alone: 1.05 on the cutting's quarter, the moulding's quarter by hand on this hall,
+    // the job's pace 0.8984 against 0.8889. From v60 that is 0.0095 on each of the three men's
+    // points, 0.38 of labour over the twenty minutes (PIOTR, 30.09); until v60 the two paces
+    // stood in the ratio 1.0107 (1.1566 on v54, when a budget saw covered one man and a standard
+    // saw two).
+    const budgetPace = 1 / (0.25 + 0.25 + 0.25 * 1.5 + 0.25);
+    const standardPace = 1 / (0.25 / 1.05 + 0.25 + 0.25 * 1.5 + 0.25);
+    expect(fast - slow).toBeCloseTo(3 * 20 * OWNER_LABOUR_PER_MINUTE * (standardPace - budgetPace), 6);
+    expect(fast / slow).toBeCloseTo(1.0342, 4);
   });
 
   it('runs the assembly stage at three men’s speed with the same three men', () => {
@@ -168,7 +183,12 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     const alone = labourIn(one, jobOfFirst(one).id, 'assembly', 20);
     const crowd = labourIn(three, jobOfFirst(three).id, 'assembly', 20);
     expect(alone).toBeGreaterThan(0);
-    expect(crowd).toBeGreaterThan(alone * 2.5);
+    // Three men are three times the minutes less the hall's line for the crew, which from v60 is
+    // points off each man and not a multiplier on the lot (PIOTR, 30.09): a novice has 0.60 of
+    // points to lose the line from, so the three of them come to a little over twice the one
+    // (2.67 times until v60, when the line multiplied).
+    expect(crowd).toBeGreaterThan(alone * 2);
+    expect(crowd).toBeLessThan(alone * 3);
   });
 
   it('spreads the men a one place saw has no place for over the benches, and nobody stands', () => {

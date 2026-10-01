@@ -12,13 +12,14 @@ import { OWNER } from './machines';
 import {
   designOutstanding,
   jobMen,
-  jobRate,
+  jobRates,
   jobStage,
   meetingOutstanding,
   minutesRemainingFor,
 } from './jobs';
 import { ownerIsAvailable } from './owner';
 import { isWorkingToday, joiners, shiftOf } from './staff';
+import type { Rates } from './stages';
 import type { GameState, Job } from './types';
 
 /** Days past the deadline the board still draws, so a late job has somewhere to run to
@@ -75,12 +76,13 @@ export function namesText(names: readonly string[]): string {
   return names.length === 1 ? names[0] ?? '' : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] ?? ''}`;
 }
 
-/** The rate this job's bar is drawn at, and what the board calls it. Two men on it is both their
- *  rates, because both stand at it in the same minute (CLAUDE.md T17 2.10). */
-export function rateFor(state: GameState, job: Job): { rate: number; label: string } {
-  const rate = jobRate(state, job);
-  if (rate <= 0) return { rate: workshopRate(state), label: 'at workshop average' };
-  return { rate, label: `for ${namesText(menOnJob(state, job))}` };
+/** The rates this job's bar is drawn at, and what the board calls them. Two men on it is both
+ *  their rates, because both stand at it in the same minute (CLAUDE.md T17 2.10), each his own
+ *  sum of points and the two added up (v60). */
+export function rateFor(state: GameState, job: Job): { rate: Rates; label: string } {
+  const rates = jobRates(state, job);
+  if (rates.length === 0) return { rate: workshopRate(state), label: 'at workshop average' };
+  return { rate: rates, label: `for ${namesText(menOnJob(state, job))}` };
 }
 
 /** Where the job is standing, in the words the board says it in. No stage colours and no five

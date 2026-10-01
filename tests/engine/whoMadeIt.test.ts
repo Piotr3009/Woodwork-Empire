@@ -96,10 +96,12 @@ describe('who made it today', () => {
     expect(made.men).toHaveLength(4);
     // The owner first, then the crew in the order of state.workers.
     expect(made.men.map((row) => row.who)).toEqual([OWNER, ...state.workers.map((man) => man.id)]);
+    // The by hand pace is a point of the sum from v60, 0.33 off the one every minute starts at
+    // (PIOTR, 30.09: "it should be a sum"); until v60 the row said `times 0.67`.
     for (const row of made.men) {
       expect(row.minutes, row.main).toBe(14);
       expect(row.words, row.main).toContain('by hand');
-      expect(row.words, row.main).toContain(`times ${(1 / BY_HAND_DURATION_FACTOR).toFixed(2)}`);
+      expect(row.words, row.main).toContain(`− ${(1 - 1 / BY_HAND_DURATION_FACTOR).toFixed(2)} machines`);
     }
     // The head counts the day's own minutes, and the sum is the figure the top bar shows.
     expect(made.minutes).toBe(state.dayStats.workMinutes);
@@ -129,9 +131,10 @@ describe('who made it today', () => {
     const state = sawHall();
     placeEquipment(state, 'tableSaw', { variantId: 'industrial', x: 12, y: 1, id: 'kit-saw-good' });
     const made = workshopBreakdownToday(runClock(state, 5));
-    // From v54 the row says what the hall did to the minutes as well, so it multiplies out
-    // (PIOTR, 24.09: "something does not add up").
-    expect(made.men[0]?.words).toMatch(/^saw, industrial, \d+ min: your [\d.]+ times 0\.91( times the hall's [\d.]+)?$/);
+    // From v54 the row says what the hall did to the minutes as well, so it adds up
+    // (PIOTR, 24.09: "something does not add up"); from v60 it is a sum of points, the pace's
+    // 0.91 printed as the 0.09 it takes off, and the owner's own 1.00 left out as nought.
+    expect(made.men[0]?.words).toMatch(/^saw, industrial, \d+ min: 1\.00 − 0\.09 machines( − [\d.]+ hall)?$/);
   });
 
   it('says what the hall was, in the words the sheet already has for it', () => {
@@ -213,8 +216,9 @@ describe('the day fixtures Piotr sent, one minute in', () => {
       'at the bench, 1 min',
       'edgebander, standard, 1 min',
     ]);
-    // And the hall's 0.83 after it from v54, so the row multiplies out to its figure (PIOTR, 24.09).
-    for (const row of made.men) expect(row.words, row.main).toMatch(/ times 1\.07 times the hall's 0\.83$/);
+    // And the hall's 0.83 after it from v54, so the row adds up to its figure (PIOTR, 24.09): the
+    // pace's 0.07 on and the hall's 0.17 off, as points from v60.
+    for (const row of made.men) expect(row.words, row.main).toMatch(/ \+ 0\.07 machines − 0\.17 hall$/);
     expect(made.total).toBe(workshopOutputToday(state));
     // The hall was clean with its extraction working and said nothing until v53. Four men and a
     // budget saw that keeps two busy is the hall's own line now, (2 + 2 / 1.5) / 4 = 0.83 (v55;
@@ -236,11 +240,15 @@ describe('the day fixtures Piotr sent, one minute in', () => {
     const hall = hallProductivityFactor(state);
     expect(hall).toBe(1);
     for (const row of made.men) {
-      const figures = row.words.match(/([\d.]+) times ([\d.]+)$/);
-      if (figures === null) throw new Error(`no arithmetic in ${row.words}`);
-      // Every figure is printed to two places, so the product can sit a penny or two off.
-      const product = Number(figures[1]) * Number(figures[2]);
-      expect(Math.abs(product - row.figure), row.main).toBeLessThan(0.02);
+      const arithmetic = row.words.match(/: 1\.00((?: [−+] [\d.]+ [a-z ]+?)*)$/);
+      if (arithmetic === null) throw new Error(`no arithmetic in ${row.words}`);
+      // The sum of the points after the one, each printed to two places, so it can sit a penny
+      // or two off the figure (v60).
+      let sum = 1;
+      for (const term of (arithmetic[1] ?? '').matchAll(/([−+]) ([\d.]+)/g)) {
+        sum += (term[1] === '−' ? -1 : 1) * Number(term[2]);
+      }
+      expect(Math.abs(sum - row.figure), row.main).toBeLessThan(0.03);
     }
     expect(made.total).toBe(workshopOutputToday(state));
     // The table's lock is `Needs a thicknesser` from v53, the timber tool set being gone from the

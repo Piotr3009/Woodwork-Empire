@@ -25,7 +25,7 @@ import {
   withDryAir,
   withExtraction,
 } from '../helpers';
-import { JOINER_SPRAY_RATE, SPRAYER_SPRAY_RATE } from '../../src/engine/constants';
+import { JOINER_SPRAY_RATE, OWNER_LABOUR_PER_MINUTE, SPRAYER_SPRAY_RATE } from '../../src/engine/constants';
 import { dustBand, familyForStage, joiners, stagePlanFor } from '../../src/engine/index';
 import { cleanerAtWork } from '../../src/engine/tasks';
 import type { GameEvent, GameState, Job } from '../../src/engine/index';
@@ -137,10 +137,15 @@ describe('(aa) three men on one job, on Very easy', () => {
     // extractor's 830 usable: the fan is short in 164 of the 167 half hours the piece was made in
     // and the hall works at 0.69 on average. One man's round has him at his bench half the day,
     // when the fan is off, so his hall averages 0.84 (short in 203 of his 409 half hours).
+    //
+    // From v60, 21,552 against 15,201, 42% more [measured]. Every minute is a sum of points
+    // (PIOTR, 30.09): a novice's 0.60 less the fan's 0.30 less the moulding by hand is at the
+    // floor, 0.25, through nearly every half hour the three are on the round, where the product
+    // read 0.37; alone he is at the floor while a saw runs and at 0.49 at his bench.
     const shared = watched(THREE).productionMinutes;
     const alone = watched(ONE).productionMinutes;
-    expect(shared).toBe(14838);
-    expect(alone).toBe(12249);
+    expect(shared).toBe(21552);
+    expect(alone).toBe(15201);
   });
 
   it('never goes more than three times faster with three men on it', () => {
@@ -303,10 +308,15 @@ describe('(bb) a lacquered kitchen, by a joiner and by a sprayer', () => {
     // (CLAUDE.md T19 2.6). So the joiner gets through 459.69 and the sprayer 496.96 [measured],
     // which is 1.0811 to one: the sprayer's rate against a quarter of the joiner's day at 0.7 and
     // three quarters at his own. The month and the constants are one number still.
-    const joinersBooth = (3 + JOINER_SPRAY_RATE) / 4;
-    expect(sprayerDid / joinerDid).toBeCloseTo(SPRAYER_SPRAY_RATE / joinersBooth, 3);
-    expect(joinerDid).toBeCloseTo(459.69, 2);
-    expect(sprayerDid).toBeCloseTo(496.96, 2);
+    //
+    // From v60 the two rates are points of the minute's sum and not factors on it (PIOTR, 30.09):
+    // the joiner's 0.70 at the booth is 0.30 off every one of his booth minutes, eight half hours
+    // over the two days, 240 minutes, which is 48.00 of labour between the two men, and nothing
+    // else about the two days differs. 445.20 and 493.20 [measured]; the ratio, 1.1078, is no
+    // longer a constant's, because a difference of points is not a ratio of rates.
+    expect(sprayerDid - joinerDid).toBeCloseTo(240 * OWNER_LABOUR_PER_MINUTE * (SPRAYER_SPRAY_RATE - JOINER_SPRAY_RATE), 2);
+    expect(joinerDid).toBeCloseTo(445.2, 2);
+    expect(sprayerDid).toBeCloseTo(493.2, 2);
   });
 });
 

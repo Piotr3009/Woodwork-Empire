@@ -199,18 +199,26 @@ describe('the office admin covering for a specialist', () => {
     expect(done.workers[1]?.minutesWorked).toBe(CLIENT_CALL_ANSWER_MINUTES);
   });
 
-  it('leaves the material take off to the owner: it is not office work she covers', () => {
-    // The take off is the estimator's job, and the owner's until one is hired (CLAUDE.md T13 3.8).
+  it('takes the material take off off the owner, at his own speed, when there is no estimator', () => {
+    // The take off was the estimator's job and the owner's until one was hired (CLAUDE.md T13
+    // 3.8); from v60 the admin does it as well, behind the estimator and at the owner's own speed,
+    // a minute a minute (PIOTR, 30.09: "create list of materials should go under the admin; the
+    // admin does it normally"). Until v60 she left it on the owner's desk.
     let state = onlyJobOf(4000);
     state.workers.push(staff('officeAdmin', 'admin-1'));
     state = doTask(state, 'design');
     const takeOff = state.tasks.find((task) => task.kind === 'materialTakeOff');
     expect(takeOff?.minutesTotal).toBe(MATERIAL_ORDER_MINUTES_LOW);
-    const worked = run(state, 60);
-    const later = worked.tasks.find((task) => task.kind === 'materialTakeOff');
-    expect(later?.doneBy).toBeNull();
-    expect(later?.done).toBe(false);
-    expect(startTaskCheck(worked, later?.id ?? '').ok).toBe(true);
+    const worked = run(state, 2);
+    const held = worked.tasks.find((task) => task.kind === 'materialTakeOff');
+    expect(held?.doneBy).toBe('admin-1');
+    expect(held?.done).toBe(false);
+    const done = run(state, MATERIAL_ORDER_MINUTES_LOW + 1);
+    const later = done.tasks.find((task) => task.kind === 'materialTakeOff');
+    expect(later?.done).toBe(true);
+    expect(later?.doneBy).toBe('admin-1');
+    expect(done.workers[0]?.minutesWorked).toBe(MATERIAL_ORDER_MINUTES_LOW);
+    expect(done.owner.minutesByCategory.admin).toBe(0);
   });
 
   it('gives the take off to the estimator the day he is taken on', () => {

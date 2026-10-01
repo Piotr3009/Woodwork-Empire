@@ -8,6 +8,7 @@ import {
   FINISHING_STAGE,
   MACHINE_STAGES,
   OWNER_LABOUR_PER_MINUTE,
+  PACE_FLOOR,
   PRODUCTION_STAGES,
 } from '../../src/engine/constants';
 import {
@@ -131,12 +132,17 @@ describe('what a machine does to the minutes', () => {
     expect(jobMinutesFor(used, job, 1)).toBeCloseTo(480 * (0.25 / 0.95 + 0.25 + 0.25 * 1.5 + 0.25), 6);
   });
 
-  it('halves the minutes for a man of half the speed, stage by stage', () => {
+  it('doubles the minutes for a man of half the speed at the machines, and floors his by hand stage', () => {
     const state = hallWithSaw('budget');
     const job = jobOfMinutes(480);
     // The moulding's quarter by hand on the day one hall: 480 at 1.00 would want a spindle moulder.
     expect(jobMinutesFor(state, job, 1)).toBeCloseTo(480 * (0.75 + 0.25 * 1.5), 6);
-    expect(jobMinutesFor(state, job, 0.5)).toBeCloseTo(960 * (0.75 + 0.25 * 1.5), 6);
+    // His 0.50 is 0.50 off every stage's points from v60 (PIOTR, 30.09): the three machine
+    // quarters at 1.00 go to 0.50 and take twice the minutes, and the by hand quarter, 0.67 less
+    // his 0.50, is under the floor, so it runs at 0.25 and takes four times its 120. Until v60
+    // the rate multiplied the speed and half the man was twice the minutes everywhere.
+    expect(jobMinutesFor(state, job, 0.5)).toBeCloseTo(3 * 240 + 120 / PACE_FLOOR, 6);
+    expect(jobMinutesFor(state, job, 0.5)).toBeCloseTo(1200, 6);
   });
 
   it('falls back to the bench at half again as long where the family is not in the hall', () => {

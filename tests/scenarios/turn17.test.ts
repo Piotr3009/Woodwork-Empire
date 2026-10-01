@@ -144,8 +144,16 @@ describe('(y) two men on one job, on Very easy', () => {
     // Re-measured on v55: 28 days alone and 14 together, 0.50. Every job is four even quarters
     // from v55 (PIOTR, 24.09) and this hall has no spindle moulder, so the piece's moulding quarter
     // goes by hand at 67% and the piece takes longer either way.
-    expect(daysAlone).toBe(28);
-    expect(daysTogether).toBe(14);
+    //
+    // Re-measured on v60: 33 days alone and 20 together, 0.61. Every minute is a sum of points
+    // from v60 (PIOTR, 30.09), so the novice's 0.60 loses the whole of every penalty and not six
+    // tenths of it: the by hand moulding is 0.33 off his minute where it was 0.20, and the fan
+    // short of the saws is 0.30 off where it was 0.18, and at that his minute stands at the
+    // floor, 0.25, for most of the days a saw runs. Two men at the floor are twice one man at the
+    // floor, but the days the piece takes are the days at the floor, so the halving is further
+    // off than it was [measured].
+    expect(daysAlone).toBe(33);
+    expect(daysTogether).toBe(20);
     expect(daysAlone).toBeGreaterThan(15);
     expect(daysTogether).toBeLessThan(daysAlone);
     expect(daysTogether / daysAlone).toBeGreaterThan(0.4);
@@ -169,19 +177,28 @@ describe('(y) a contract whose material comes off the rack', () => {
     // the contract's alike (CLAUDE.md T17 2.22).
     expect(reservedSheets(MIDMONTH)).toBeGreaterThanOrEqual(contract?.sheetsReserved ?? 0);
     expect(freeSheets(MIDMONTH)).toBe(Math.max(0, MIDMONTH.stock.sheets - reservedSheets(MIDMONTH)));
-    // And the term runs on to the month's end holding 3, as it did on v52. v53 lost it to the client
-    // on day 15 with nothing held, to a saw line that counted two men who were not at work (v54).
+    // The term ran on to the month's end holding 3 from v54 to v59, as it did on v52; v53 lost it
+    // to the client on day 15 with nothing held, to a saw line that counted two men who were not
+    // at work (v54). From v60 the client ends it on day 15 again, and this time to the man: his
+    // minute is a sum of points (PIOTR, 30.09), and a novice's 0.60 less the fan short of the saws,
+    // 0.30, less the used saw's 0.05 is at the floor, 0.25, where the product read 0.40. Five
+    // packs of the part week's eight and thirteen of the twenty are two short weeks in a row, and
+    // that ends a contract (CLAUDE.md T20 2.1.6) [measured].
     const running = contractOf(TOGETHER);
-    expect(running?.status).toBe('active');
-    expect(running?.sheetsReserved).toBe(3);
+    expect(running?.status).toBe('ended');
+    expect(running?.endedBy).toBe('client');
+    expect(running?.endDay).toBe(15);
+    expect(running?.sheetsReserved).toBe(0);
   });
 
   it('draws them as the pieces are made, and never buys them as money on the contract line', () => {
     const contract = contractOf(TOGETHER);
-    // 112 packs and 17 sheets over the month with the term running on, v52's figures again; v53
-    // made 26 and drew 4 over the two weeks it ran before the client ended it (v54).
-    expect(contract?.piecesMade).toBe(112);
-    expect(contract?.sheetsUsed).toBe(17);
+    // 112 packs and 17 sheets over the month with the term running on, v52's figures again, from
+    // v54 to v59; v53 made 26 and drew 4 over the two weeks it ran before the client ended it
+    // (v54). From v60 the client ends it on day 15 (above) and the two weeks made 18 and drew 3
+    // [measured].
+    expect(contract?.piecesMade).toBe(18);
+    expect(contract?.sheetsUsed).toBe(3);
     // The rack is lower than the day it was filled by what the job cut and the contract drew.
     expect(TOGETHER.stock.sheets).toBeLessThan(OPENING.state.stock.sheets);
     // The one thing 2.22 forbids: a material charge on the contract.
@@ -191,23 +208,23 @@ describe('(y) a contract whose material comes off the rack', () => {
     expect(lines.every((entry) => entry.amount > 0)).toBe(true);
   });
 
-  it('keeps every week in full and never stands for the rack, the same whether one man or two are on the other job', () => {
+  it('makes what the floor lets him and never stands for the rack, the same whether one man or two are on the other job', () => {
     for (const state of [ALONE, TOGETHER]) {
       const contract = contractOf(state);
       // A novice at 0.6, the used saw's 0.95 and the extraction short at 0.7, and no saw line:
       // two men at work against three places. The part week's eight of eight, then 21, 21, 21, 20
-      // and 21 of twenty, and the term runs on, as on v52. v53 counted four men against the three
-      // places, `Too few saws: 3 places, 4 men`, and made seven and nineteen: two short weeks, and
-      // the client ended it on day 15 (CLAUDE.md T20 2.1.6; v54) [both measured].
+      // and 21 of twenty, and the term ran on, as on v52, from v54 to v59. v53 counted four men
+      // against the three places, `Too few saws: 3 places, 4 men`, and made seven and nineteen:
+      // two short weeks, and the client ended it on day 15 (CLAUDE.md T20 2.1.6; v54) [both
+      // measured]. From v60 the three are points and not factors (PIOTR, 30.09): 0.60 less 0.30
+      // less 0.05 is under the floor, so he makes at 0.25 where he made at 0.40, five of the eight
+      // and thirteen of the twenty, and the client ends it on day 15 again [measured]. What
+      // this says about the sum is in the v60 report.
       expect(contract?.weeks).toEqual([
-        { week: 1, wanted: 8, made: 8 },
-        { week: 2, wanted: 20, made: 21 },
-        { week: 3, wanted: 20, made: 21 },
-        { week: 4, wanted: 20, made: 21 },
-        { week: 5, wanted: 20, made: 20 },
-        { week: 6, wanted: 20, made: 21 },
+        { week: 1, wanted: 8, made: 5 },
+        { week: 2, wanted: 20, made: 13 },
       ]);
-      expect(contract?.status).toBe('active');
+      expect(contract?.status).toBe('ended');
       // The rack never ran dry under him: not one of his minutes stood for want of sheets.
       const man = state.workers.find((worker) => worker.id === OPENING.men[2]);
       expect(man?.idleByReason.noMaterial).toBe(0);
@@ -275,7 +292,11 @@ describe('(z) a week that proves the workshop rate', () => {
     // Measured on v55: 34.85. The job's one pace is 0.8786 where it was 0.9870 on v54: every job is
     // four even quarters from v55 (PIOTR, 24.09) and the day 1 hall has no spindle moulder, so the
     // moulding quarter goes by hand at 67%. 39.15 times 0.8786 over 0.9870 is 34.85.
-    expect(rate.rate).toBe(34.85);
+    //
+    // Measured on v60: 34.81. The owner alone at 1.00 loses nothing to the sum of points (PIOTR,
+    // 30.09) while the hall is whole, so his week is the same week to within the Friday's messy
+    // hall: 0.05 off every minute of it where the product took 0.05 of 0.8786, which is 0.044.
+    expect(rate.rate).toBe(34.81);
     expect(rate.rate).toBeLessThan(40);
   });
 

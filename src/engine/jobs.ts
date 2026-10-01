@@ -71,6 +71,7 @@ import { ownerIsAvailable } from './owner';
 import {
   stagePlanFor,
   stageLeft,
+  type Rates,
   type StageOptions,
   type StagePlan,
   type StagedJob,
@@ -256,25 +257,33 @@ export function removeAssignee(job: Job, who: string): boolean {
  *  his, added up, because the two of them stand at it in the same minute (CLAUDE.md T17 2.10).
  *  Zero when nobody is on it, which is the board's cue to draw it at the workshop average. */
 export function jobRate(state: GameState, job: Job): number {
-  let rate = 0;
+  const rate = jobRates(state, job).reduce((sum, own) => sum + own, 0);
+  return Math.round(rate * 10000) / 10000;
+}
+
+/** The rate of every man on the job, one entry a man, the owner's 1 among them: what the minutes
+ *  left are worked out from since v60, because a crew's minute is each man's own sum of points
+ *  added up and not one rate for the lot (`crewPace`; PIOTR, 30.09). Empty when nobody is on it. */
+export function jobRates(state: GameState, job: Job): number[] {
+  const rates: number[] = [];
   for (const who of jobMen(job)) {
     if (who === OWNER) {
-      rate += 1;
+      rates.push(1);
       continue;
     }
     const worker = state.workers.find((entry) => entry.id === who);
-    if (worker && worker.rate > 0) rate += worker.rate;
+    if (worker && worker.rate > 0) rates.push(worker.rate);
   }
-  return Math.round(rate * 10000) / 10000;
+  return rates;
 }
 
 /** What the rest of a job costs in wages if the men on it finish it, for the job card only
  *  (CLAUDE.md 8.5). The owner costs nothing: his time is not a wage. Two men take half the
  *  minutes and cost both their rates for every one of them (CLAUDE.md T17 2.10). */
 export function jobLabourCost(state: GameState, job: Job): { minutes: number; cost: number } {
-  const rate = jobRate(state, job);
-  if (rate <= 0) return { minutes: minutesRemainingFor(state, job, 1), cost: 0 };
-  const minutes = minutesRemainingFor(state, job, rate);
+  const rates = jobRates(state, job);
+  if (rates.length === 0) return { minutes: minutesRemainingFor(state, job, 1), cost: 0 };
+  const minutes = minutesRemainingFor(state, job, rates);
   let perMinute = 0;
   for (const who of jobMen(job)) {
     const worker = state.workers.find((entry) => entry.id === who);
@@ -303,10 +312,11 @@ export function jobStage(
 }
 
 
-/** Minutes this job still needs from a worker of the given rate (1 is the owner). Every stage
- *  still ahead of him at its own machine's speed (CLAUDE.md T7 3.1). */
-export function minutesRemainingFor(state: GameState, job: Job, rate: number): number {
-  if (rate <= 0) return Infinity;
+/** Minutes this job still needs from a worker of the given rate (1 is the owner), or from the
+ *  crew whose rates are given, each man's own sum of points added up (v60). Every stage still
+ *  ahead of them at its own machine's speed (CLAUDE.md T7 3.1). */
+export function minutesRemainingFor(state: GameState, job: Job, rate: Rates): number {
+  if (typeof rate === 'number' ? rate <= 0 : rate.length === 0) return Infinity;
   return minutesLeftFor(state, job, rate);
 }
 

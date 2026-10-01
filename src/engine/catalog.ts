@@ -8,7 +8,6 @@ import {
   SOLID_WOOD_EQUIPMENT,
 } from './constants';
 import { findSpec, has } from './machines';
-import { hasOrOnOrder } from './orders';
 import type { Finish, GameState, ProductTemplate } from './types';
 
 export function findTemplate(templateId: string): ProductTemplate | null {
@@ -26,21 +25,20 @@ export function templatesForReputation(reputation: number): ProductTemplate[] {
   return PRODUCT_TEMPLATES.filter((entry) => entry.minReputation <= reputation);
 }
 
-/** Tools the workshop is short of for this template. Kit that is bought and on its way counts:
- *  the company is equipped, and the drawing and the material take days of their own
- *  (CLAUDE.md T8 3.2). */
+/** Tools the workshop is short of for this template. Only kit standing in the hall counts: a
+ *  machine on the lorry takes no work until it has landed [PIOTR, 30.09] (v60, reversing T8 3.2). */
 export function missingEquipment(state: GameState, entry: ProductTemplate): string[] {
-  return entry.requiredEquipment.filter((specId) => !hasOrOnOrder(state, specId));
+  return entry.requiredEquipment.filter((specId) => !has(state, specId));
 }
 
 /** The greyed out reason on the board, or null when the job can be taken as it stands. */
 export function lockReasonFor(state: GameState, entry: ProductTemplate): string | null {
   const missing = missingEquipment(state, entry);
   if (missing.length === 0) return null;
-  if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => hasOrOnOrder(state, id))) {
+  if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => has(state, id))) {
     // Timber needs the thicknesser and the spindle moulder; the lock names the ones missing
     // (PIOTR, 24.09; v54).
-    const gone = SOLID_WOOD_EQUIPMENT.filter((id) => !hasOrOnOrder(state, id)).map(
+    const gone = SOLID_WOOD_EQUIPMENT.filter((id) => !has(state, id)).map(
       (id) => `a ${(findSpec(id)?.name ?? id).toLowerCase()}`,
     );
     return `Needs ${gone.join(' and ')}`;

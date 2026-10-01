@@ -52,8 +52,9 @@ describe('the labour factor', () => {
     expect(labourFactorFor(0, true)).toBe(BREAK_SKIP_FACTOR);
     expect(labourFactorFor(OVERTIME_DEBT_PER_DAY, false)).toBe(0.9);
     expect(labourFactorFor(3 * OVERTIME_DEBT_PER_DAY, false)).toBe(0.7);
-    // Both at once multiply: the debt first, then the 3%.
-    expect(labourFactorFor(OVERTIME_DEBT_PER_DAY, true)).toBe(0.873);
+    // Both at once add up: the tenth and the 3% off the one, 0.87, where until v60 they
+    // multiplied to 0.873 (PIOTR, 30.09: "it should be a sum"; v60).
+    expect(labourFactorFor(OVERTIME_DEBT_PER_DAY, true)).toBe(0.87);
   });
 
   it('never falls through the floor', () => {

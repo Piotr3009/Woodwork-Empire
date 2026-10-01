@@ -146,7 +146,7 @@ const BEHIND_THE_ADMIN: WorkerRole[] = ['purchasingClerk', 'salesman', 'draftsma
  *  (CLAUDE.md T13 3.10). The office is in the office block. The production manager stands on the
  *  floor, because the floor is what he runs, and so does the sprayer, who is at the booth
  *  (CLAUDE.md T19 2.6). */
-const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager', 'sprayer'];
+export const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager', 'sprayer'];
 
 /** The crew on the floor, the owner among them (CLAUDE.md T13 3.10). */
 export function crewCount(state: GameState): number {

@@ -47,7 +47,8 @@ function round4(value: number): number {
  *  worked through costs 3% and a day with any overtime in it costs 10%, cumulative, floored
  *  (CLAUDE.md T6 3.4). */
 export function labourFactorFor(overtimeDebt: number, breakSkipped: boolean): number {
-  const factor = (1 - overtimeDebt) * (breakSkipped ? BREAK_SKIP_FACTOR : 1);
+  // Points and not a product from v60: the overtime's debt and the dinner's three hundredths add.
+  const factor = 1 - overtimeDebt + (breakSkipped ? BREAK_SKIP_FACTOR - 1 : 0);
   return Math.max(LABOUR_FACTOR_FLOOR, round4(factor));
 }
 

@@ -13,7 +13,7 @@
 // Nothing here is computed but the fold of the log into weeks: every figure is a rating's points
 // or a field of the engine's breakdown.
 
-import { DAY_CATEGORY_LABELS } from '../engine/constants';
+import { DAY_CATEGORY_LABELS, PACE_FLOOR } from '../engine/constants';
 import {
   companyTotals,
   dayPercentages,
@@ -292,22 +292,28 @@ function outputSheet(breakdown: OutputBreakdown, workshopToday: number, made: Wo
   return (
     '<section class="sheet" data-sheet="output">' +
     pin() +
-    '<h3>Output</h3>' +
-    totalLine('every minute of production is multiplied by it', breakdown.total.toFixed(2), 'output') +
+    '<h3>Pace</h3>' +
+    // The hall's own pace for a man at 1.00: one plus the points of the lines under it (v60).
+    totalLine('every worked minute in this hall is worth', breakdown.total.toFixed(2), 'output') +
     // The one number the top bar shows, said here beside the hall's own: the average over the
     // minutes worked today, everybody and every machine in it (PIOTR, 21.09; v40).
     `<div class="ledger-note" data-figure="workshopToday"><span>Workshop today, everybody and every machine, ` +
     `over the minutes worked</span><strong class="${signClass(workshopToday - 1)}">${workshopToday.toFixed(2)}</strong></div>` +
+    // What the number is, in one line: Efficiency is how much of the day was worked, Pace is how
+    // fast a worked minute goes, and the two are never one number (PIOTR, 30.09; v60).
+    '<div class="ledger-note"><span>Efficiency says how much of the day was worked. Pace says how fast a ' +
+    'worked minute goes: a job of 100 minutes takes 100 divided by it. Points add up and never ' +
+    `multiply; nothing runs slower than ${PACE_FLOOR.toFixed(2)}.</span></div>` +
     // Who made that number, before the lines that say what the hall does to every minute of it
     // (PIOTR, 22.09: "the player has no way of knowing what to fix"; CLAUDE.md T24 2.1).
     madeTodayBlock(made) +
-    '<div class="ledger-head"><span>What moves it</span><span>points</span></div>' +
+    '<div class="ledger-head"><span>What moves it, for everybody in the hall</span><span>points</span></div>' +
     '<div class="ledger-list">' +
     base +
     hall.map(outputRow).join('') +
     sumLine(outputPoints(breakdown.plus), outputPoints(breakdown.minus), breakdown.total.toFixed(2)) +
     '<hr class="ledger-rule" />' +
-    '<div class="ledger-head ledger-elsewhere">Act where they are, not in the number above</div>' +
+    '<div class="ledger-head ledger-elsewhere">Act on their own man or stage, not in the number above</div>' +
     (elsewhere.length === 0
       ? emptyLine('Nobody on the books and no machines in the hall.')
       : elsewhere.map(outputRow).join('')) +

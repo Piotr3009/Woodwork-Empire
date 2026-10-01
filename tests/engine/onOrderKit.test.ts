@@ -1,8 +1,9 @@
 // A machine on order is a drawing on the floor and nothing more (CLAUDE.md T10 1, 3.10). It cuts
-// nothing, it has no places and it answers no question about what is in the hall. The one
-// question it may answer is the board's lock, and the board asked it days before anybody cut
-// anything. Until v53 the stage that wanted it stood and waited for the lorry; from v53 nothing
-// stops a job but the whole hall, so its share goes by hand until the lorry comes (PIOTR, 24.09).
+// nothing, it has no places and it answers no question about what is in the hall, the board's
+// lock among them from v60: a job that wants a saw is locked until the saw is delivered, however
+// long ago it was ordered (PIOTR, 30.09). Until v53 the stage that wanted it stood and waited for
+// the lorry; from v53 nothing stops a job but the whole hall, so its share goes by hand until the
+// lorry comes (PIOTR, 24.09).
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -62,10 +63,15 @@ describe('kit that is bought and still on the road', () => {
     expect(countOf(state, 'tableSaw')).toBe(0);
     expect(hallPlaces(state, 'tableSaw')).toBe(0);
     expect(machineIsShared(state, 'tableSaw')).toBe(true);
-    // What it does answer is the board's lock: a company that has ordered a saw can take sheet
-    // work, because the drawing and the material take days of their own (CLAUDE.md T8 3.2), so
-    // the saw is off the list of what is missing and the job is not locked at all.
-    expect(lockReasonFor(state, template('garageShelves'))).toBeNull();
+    // Nor the board's lock, from v60: a company that has ordered a saw and has none in the hall
+    // cannot take sheet work until the lorry has been (PIOTR, 30.09: "you cannot let the orders
+    // and the jobs through on machines that are ordered, it has to be after the delivery").
+    // Until v60 the saw on the road was off the list of what was missing, because the drawing and
+    // the material took days of their own (CLAUDE.md T8 3.2).
+    expect(lockReasonFor(state, template('garageShelves'))).toBe('Needs table saw');
+    const landed = { ...state, onOrder: [] };
+    placeEquipment(landed, 'tableSaw', { variantId: 'budget', x: 2, y: 1 });
+    expect(lockReasonFor(landed, template('garageShelves'))).toBeNull();
   });
 
   it('cannot extract either: an extractor on order leaves the hall with no extraction', () => {

@@ -7,6 +7,7 @@ import {
   BREAK_SKIP_FACTOR,
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
   GATE_CROWD_FACTOR,
+  PACE_FLOOR,
   RATING_ON_TIME,
   UNDER_EXTRACTION_OUTPUT_PENALTY,
 } from '../../src/engine/constants';
@@ -109,9 +110,12 @@ describe('the company output breakdown', () => {
     const labels = breakdown.lines.filter((line) => line.hall).map((line) => line.label);
     expect(labels).toContain('Extraction down');
     expect(labels.some((label) => label.startsWith('Hall '))).toBe(true);
-    // Every hall line is worth what it takes off the running total, so they add up exactly.
+    // Every hall line is its own points, added and never multiplied (v60; PIOTR, 30.09): the
+    // dirty hall's 0.15 and the extraction's 0.75 come to 0.10, and the floor holds the hall at
+    // 0.25, because nothing runs slower than that. Until v60 the two multiplied to 0.2125.
     const sum = breakdown.base + breakdown.plus + breakdown.minus;
-    expect(Number(sum.toFixed(4))).toBe(Number(breakdown.total.toFixed(4)));
+    expect(Number(sum.toFixed(4))).toBe(0.1);
+    expect(breakdown.total).toBe(PACE_FLOOR);
     expect(breakdown.total).toBeLessThan(EXTRACTOR_BROKEN_OUTPUT_FACTOR + 0.001);
     expect(hallProductivityFactor(state)).toBe(breakdown.total);
   });

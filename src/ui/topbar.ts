@@ -70,8 +70,8 @@ function outputChip(state: GameState): string {
   const tone = output < 1 ? ' warn' : output > 1 ? ' good' : '';
   return (
     `<span class="output${tone}" data-output="today" ` +
-    'title="Workshop output today: what a minute of production has been worth on average, everybody and every machine in it">' +
-    `Output ${output.toFixed(2)}</span>`
+    'title="Pace today: what a worked minute has been worth on average, everybody and every machine in it. Efficiency is how much of the day was worked; Pace is how fast a worked minute goes">' +
+    `Pace ${output.toFixed(2)}</span>`
   );
 }
 
@@ -85,7 +85,7 @@ function ownerFactorRow(state: GameState): string {
     '<span class="tip-row" data-own-factor="1">' +
     '<span class="tip-key seg-idle"></span>' +
     '<span class="tip-name">Your own minutes, overtime and dinner</span>' +
-    `<span class="tip-min warn">×${factor.toFixed(2)}</span></span>`
+    `<span class="tip-min warn">${factor - 1 < 0 ? '−' : '+'}${Math.abs(factor - 1).toFixed(2)}</span></span>`
   );
 }
 

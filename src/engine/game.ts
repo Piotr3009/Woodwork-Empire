@@ -2,6 +2,7 @@
 // callers never see their input mutated. Every other engine module mutates the state it is given.
 
 import {
+  OWNER_LABOUR_PER_MINUTE,
   WET_AIR_FINISH_FACTOR,
   ACCIDENT_CHANCE_PER_DAY,
   ADMIN_COVER_RATE,
@@ -213,7 +214,7 @@ import {
 } from './owner';
 import { paidHoursToday } from './rate';
 import { chance, int, makeId } from './rng';
-import { labourPerMinute } from './stages';
+import { paceSum } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -228,6 +229,7 @@ import {
 } from './media';
 import { cubicMetres, metresBy, plural } from './text';
 import {
+  STATION_OFFICE,
   STATION_DOOR,
   STATION_HOME,
   STATION_IDLE,
@@ -243,6 +245,7 @@ import {
   ownerTakesAJob,
 } from './production';
 import {
+  FLOOR_ROLES,
   autoAssignJobs,
   availableJoiners,
   managerReplans,
@@ -1413,13 +1416,22 @@ function updateStations(state: GameState): void {
     owner.station = ownerJob(state) !== null ? STATION_HOME : STATION_IDLE;
   }
   for (const worker of state.workers) {
+    // A desk man is behind the office door whether he has a task in hand or not: the admin, the
+    // clerk, the draftsman, the salesman and the estimator work at desks, and one with nothing to
+    // do waits at his desk and not at the canteen door with the crew [PIOTR, 30.09] (v60). The
+    // dinner hour and a day off are the canteen's, as they are for everybody.
+    const desk = !FLOOR_ROLES.includes(worker.role);
     if (dinner || !isWorkingToday(state, worker)) {
       worker.station = STATION_IDLE;
       continue;
     }
     if (worker.taskId !== null) {
       const task = findTask(state, worker.taskId);
-      worker.station = task ? stationForTask(state, task) : STATION_IDLE;
+      worker.station = task ? stationForTask(state, task) : desk ? STATION_OFFICE : STATION_IDLE;
+      continue;
+    }
+    if (desk) {
+      worker.station = STATION_OFFICE;
       continue;
     }
     // The plan stood him already, at his place or at his home cell (CLAUDE.md T25 2.3).
@@ -1590,7 +1602,7 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
     // breakdown printed `Manager: +3%` over a hall that was not getting it. The same
     // `managerPaceFor` answers both, which is the one path 2.4 asks for
     // (PIOTR, 20.09; CLAUDE.md T23 2.4).
-    list.push({ who: worker.id, job, rate: worker.rate * staffFactor * managerPaceFor(state, worker) });
+    list.push({ who: worker.id, job, rate: paceSum(worker.rate, staffFactor, managerPaceFor(state, worker)) });
   }
   return list;
 }
@@ -1715,11 +1727,11 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     let speed = pace;
     // A compressor that is short of litres runs every pneumatic consumer on it at 0.7 for the
     // minute, and a booth on wet air takes half as long again over the finish and marks the
-    // piece (PIOTR, CLAUDE.md T10 3.2, 3.3).
+    // piece (PIOTR, CLAUDE.md T10 3.2, 3.3). Points, not factors, from v60.
     const atTheBench = benchDrawsAir(stage) !== null;
-    speed *= airFactorFor(state, air, machine, atTheBench);
+    speed = paceSum(speed, airFactorFor(state, air, machine, atTheBench));
     if (finishOnWetAir(state, book)) {
-      speed /= WET_AIR_FINISH_FACTOR;
+      speed = paceSum(speed, 1 / WET_AIR_FINISH_FACTOR);
       hand.job.wetFinish = true;
     }
     // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3): one
@@ -1727,11 +1739,14 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     // every man, and wore out four times as fast as the clock in a hall of four (v55).
     const compressor = drawingOn(state, machine, atTheBench);
     if (compressor !== null) used.set(compressor.id, 1);
-    const minute = labourPerMinute(hand.rate, speed) * hall;
+    // One sum: his own rate, the pace of his stage and what the hall takes, added as points and
+    // never multiplied (PIOTR, 30.09; v60).
+    const worth = paceSum(hand.rate, speed, hall);
+    const minute = OWNER_LABOUR_PER_MINUTE * worth;
     // The minute's own multiplier, for the workshop's average output (v40): the same things the
-    // labour is made of, and nothing else, booked against the man who worked it so the Output
+    // labour is made of, and nothing else, booked against the man who worked it so the Pace
     // sheet can say who made the number (v50). The night's minutes book theirs in `workMinute`.
-    bookOutputMinute(state, hand.who, hand.rate * speed * hall);
+    bookOutputMinute(state, hand.who, worth);
     // Written on the stage the bar stands at, so the bar fills in order (v53).
     if (addLabour(state, hand.job, minute, book.id)) raiseJobAtGate(state, hand.job);
   }

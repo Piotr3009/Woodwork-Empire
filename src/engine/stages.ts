@@ -10,6 +10,7 @@
 // is at. Nothing here is a second copy of how far through a job is.
 
 import {
+  PACE_FLOOR,
   BY_HAND_DURATION_FACTOR,
   CNC_ASSEMBLY_FACTOR,
   CNC_STAGE,
@@ -199,17 +200,32 @@ export function stagePlanFor(
 }
 
 /** The minutes a man of this rate needs to work this much labour off at this speed. */
-export function stageMinutes(labour: number, rate: number, speed: number): number {
+export function stageMinutes(labour: number, rate: Rates, speed: number): number {
   if (labour <= 0) return 0;
-  if (rate <= 0 || speed <= 0) return Infinity;
-  return labour / (OWNER_LABOUR_PER_MINUTE * rate * speed);
+  const worth = crewPace(rate, speed);
+  if (worth <= 0) return Infinity;
+  return labour / (OWNER_LABOUR_PER_MINUTE * worth);
+}
+
+/** One man's rate, or the rates of every man on a job. */
+export type Rates = number | readonly number[];
+
+/** What a man, or a crew, is worth a minute at this speed: each man's own sum of points, and
+ *  the men added up, because they stand at the job in the same minute (CLAUDE.md T17 2.10).
+ *  From v60 the two cannot be folded into one rate first: a novice at 0.60 and a stage at 0.90
+ *  are 0.50 a minute each, so two of them are 1.00, where one man at their summed 1.20 would
+ *  read 1.10 (PIOTR, 30.09). The one place a crew's minute is added up, for the plan, the
+ *  deadline and the card; the engine's own minute is `paceSum` a man at a time. */
+export function crewPace(rate: Rates, speed: number): number {
+  if (typeof rate === 'number') return rate <= 0 ? 0 : paceSum(rate, speed);
+  return rate.reduce((sum, own) => sum + (own <= 0 ? 0 : paceSum(own, speed)), 0);
 }
 
 /** The whole job, start to finish, for a man of this rate with the machines the hall has now. */
 export function jobMinutesFor(
   state: GameState,
   job: StagedJob,
-  rate: number,
+  rate: Rates,
   options: StageOptions = {},
 ): number {
   return stagePlanFor(state, job, options).reduce(
@@ -283,7 +299,7 @@ export function jobPace(state: GameState, job: StagedJob, options: StageOptions 
 export function minutesLeftFor(
   state: GameState,
   job: Job,
-  rate: number,
+  rate: Rates,
   options: StageOptions = {},
 ): number {
   const plan = stagePlanFor(state, job, options);
@@ -307,10 +323,21 @@ export function currentStage(
   return plan.length > 0 ? (plan[plan.length - 1] ?? null) : null;
 }
 
+/** The pace a minute runs at, out of the factors that used to be multiplied together: one plus
+ *  the points of each (a factor of 0.8 is −0.20, of 1.12 is +0.12), floored at `PACE_FLOOR`. The
+ *  one place the sum is done, so the minute, the plan, the contract and the Pace sheet cannot
+ *  disagree (PIOTR, 30.09; v60). A nought among the factors is a stop, not a point: it stays a
+ *  nought, which is what a stage that cannot be worked at all has always been. */
+export function paceSum(...factors: number[]): number {
+  if (factors.some((factor) => factor <= 0)) return 0;
+  const points = factors.reduce((sum, factor) => sum + (factor - 1), 0);
+  return Math.max(PACE_FLOOR, 1 + points);
+}
+
 /** Labour per minute for a man of this rate working this stage at this speed. The one place a
  *  minute of somebody's time is turned into work in a job. */
 export function labourPerMinute(rate: number, speed: number): number {
-  return OWNER_LABOUR_PER_MINUTE * rate * speed;
+  return OWNER_LABOUR_PER_MINUTE * paceSum(rate, speed);
 }
 
 /** What this man's minute is worth at the stage he is standing at, against his own rate: the one

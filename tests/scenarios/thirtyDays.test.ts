@@ -193,12 +193,20 @@ describe('30 days on Easy, working the board', () => {
     // beside the band are drawn from day 1 with the oak table among them, and from the first one the
     // post brings other enquiries and the month other jobs: a TV unit taken on day 30 has its
     // material bought and is not made yet [measured].
+    //
+    // 2,746 from v60, the last line of the month again. Every minute is a sum of points from v60
+    // (PIOTR, 30.09) and the owner alone at 1.00 loses nothing to it while the hall is whole, so
+    // his own days are the same days; what moved is the month behind them: the same seven jobs
+    // out, the eighth taken later and other enquiries answered, 4,130 of deposits against 3,480,
+    // 3,335 of balances paid against 2,775, 140 more on material, and no extractor breakdown and
+    // no 150 repair inside the month, the random stream having moved with the days [measured, off
+    // the ledger by category].
     for (const entry of state.ledger) {
       expect(entry.balance, `${entry.day} ${entry.label}`).toBeGreaterThan(
         state.finance.overdraftLimit,
       );
     }
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(1879);
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(2746);
     expect(state.finance.daysBelowOverdraft).toBe(0);
   });
 
@@ -586,7 +594,17 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // seventeen, with 4,793 of balances paid against 5,472, 850 less in deposits, 200 less on
     // material and 240 less on couriers. The lowest point is the owner's draw on the morning of day
     // 32 in both [measured].
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-435);
+    //
+    // -1,202 from v60. Every minute is a sum of points (PIOTR, 30.09), so the novice's 0.60 loses
+    // the whole of every penalty and not six tenths of it: the by hand moulding is 0.33 off his
+    // minute where it was 0.20, and a hall short of extraction takes 0.30 off him where it took
+    // 0.18. His jobs run late and the standing falls to 19 where it stood at 37: seventeen jobs out
+    // against fifteen, but 4,292 of balances paid against 4,793 with the late ones paying less,
+    // 6,895 of deposits against 5,495 and 1,030 more on material for the two more taken, 240 more
+    // on couriers, and an extractor breakdown and its 150 repair that this stream has and v57's
+    // had not. The lowest point is the owner's draw on the morning of day 32 in both [measured,
+    // off the ledger by category].
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-1202);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
@@ -776,9 +794,14 @@ describe('a day with a break, played by the script', () => {
       (state) => state.clock.minute === BREAK_START_MINUTE + BREAK_MINUTES,
     );
     expect(after?.owner.minutesWorked).toBe(before?.owner.minutesWorked);
-    expect(after?.jobs.map((job) => job.labourRemaining)).toEqual(
-      before?.jobs.map((job) => job.labourRemaining),
-    );
+    // The one job of the day is taken at the laptop after dinner from v60 (the note under the
+    // minutes below), so a job that is on the books at both readings is compared and a job taken
+    // between them is not: it was not worked, it was accepted.
+    const onBoth = (state: GameState | undefined): number[] =>
+      (state?.jobs ?? [])
+        .filter((job) => before?.jobs.some((held) => held.id === job.id))
+        .map((job) => job.labourRemaining);
+    expect(onBoth(after)).toEqual(onBoth(before));
   });
 
   it('ends the day at 17:00 with all but seven of his 480 minutes behind him', () => {
@@ -793,7 +816,12 @@ describe('a day with a break, played by the script', () => {
     // off the product and its size; from Turn 19 it is read off the value of the job and this
     // day's small piece is drawn in the half hour the floor sets instead of the hours the
     // template asked for (CLAUDE.md T19 2.11). Measured, not tuned.
-    expect(last?.owner.minutesWorked).toBe(300);
+    //
+    // 310 from v60. Day 1 runs differently under the sum of points (PIOTR, 30.09): the owner
+    // finishes day 1's garage shelves inside day 1, so day 2 opens with an empty book, the morning
+    // is the gate, the bookcase the post brings is taken at the laptop after dinner, drawn and its
+    // material ordered, and the day ends at 310 of his 480 [measured].
+    expect(last?.owner.minutesWorked).toBe(310);
     expect(last?.owner.minutesWorked).toBeLessThanOrEqual(MINUTES_PER_WORKING_DAY);
     expect(last?.owner.overtimeMinutes).toBe(0);
     const idle = states.filter(
@@ -837,14 +865,15 @@ describe('a month on Easy that works through its dinner and stays late', () => {
   const seen = mornings();
 
   it('takes 3% for the dinner and a tenth for the evening, and both at once', () => {
-    // Day 1: dinner worked through and an hour of overtime. Day 2 starts at 0.9 times 0.97.
+    // Day 1: dinner worked through and an hour of overtime. Day 2 starts at 1 less the tenth and
+    // the 3%, 0.87, added as points from v60 (PIOTR, 30.09); until v60 it was 0.9 times 0.97.
     expect(seen[0]?.day).toBe(2);
     expect(seen[0]?.debt).toBe(OVERTIME_DEBT_PER_DAY);
-    expect(seen[0]?.factor).toBeCloseTo((1 - OVERTIME_DEBT_PER_DAY) * BREAK_SKIP_FACTOR, 6);
+    expect(seen[0]?.factor).toBeCloseTo(1 - OVERTIME_DEBT_PER_DAY - (1 - BREAK_SKIP_FACTOR), 6);
     // Day 2 the same again: the debt is cumulative and the 3% is not.
     expect(seen[1]?.day).toBe(3);
     expect(seen[1]?.debt).toBeCloseTo(2 * OVERTIME_DEBT_PER_DAY, 6);
-    expect(seen[1]?.factor).toBeCloseTo((1 - 2 * OVERTIME_DEBT_PER_DAY) * BREAK_SKIP_FACTOR, 6);
+    expect(seen[1]?.factor).toBeCloseTo(1 - 2 * OVERTIME_DEBT_PER_DAY - (1 - BREAK_SKIP_FACTOR), 6);
     // Day 3 he takes his dinner and still stays on: the 3% goes, the tenth stays.
     expect(seen[2]?.day).toBe(4);
     expect(seen[2]?.debt).toBeCloseTo(3 * OVERTIME_DEBT_PER_DAY, 6);
@@ -1003,7 +1032,7 @@ describe('a month of six joiners behind two saws', () => {
     expect(two.longest).toBe(0);
   });
 
-  it('gets four of the book out on two saws and three on one: the second saw buys jobs (v53, v55)', () => {
+  it('gets two of the book out on two saws and two on one: at the floor the second saw buys nothing (v60)', () => {
     const done = (month: CrewMonth): number =>
       month.state.jobs.filter((job) => job.stage === 'completed').length;
     /** How far through its making each job still on the books is, to a tenth of a per cent. */
@@ -1033,11 +1062,24 @@ describe('a month of six joiners behind two saws', () => {
     // moved is the job's one pace in this hall, 0.898 where it was 1.012: every job is four even
     // quarters from v55 (PIOTR, 24.09) and the hall has no spindle moulder, so the moulding
     // quarter goes by hand at 67% [all measured]. The second saw still buys jobs.
-    expect(done(two)).toBe(4);
-    expect(done(one)).toBe(3);
-    expect(unfinished(two)).toEqual([0.997, 0.997]);
-    expect(unfinished(one)).toEqual([0.849, 0.874, 0.94]);
-    expect(Math.round(two.state.cash - one.state.cash)).toBe(3792);
+    //
+    // Re-measured for v60, and the picture turns over (PIOTR, 30.09: every minute a sum of points).
+    // Six novices are 0.60 each, five joiners and no helper is 0.10 off every minute, the moulding
+    // by hand is 0.11 off, and the saws too few for the crew are 0.22 off on one saw and 0.11 on
+    // two: a man's minute comes to 0.17 on one saw and 0.28 on two, and the floor, 0.25, holds
+    // the one saw month up to 0.25. So the two months are all but the same month: two of the six
+    // out on either, the other four at 74.4%, 78.6%, 86.5% and 96.5% on two saws and 73.3%, 77.8%,
+    // 85.7% and 95.8% on one, 10,716 of balances paid on both, and the second saw ends the month
+    // 120 behind, having cost 1,800 and bought 120 of power. Until v60 the same two months read
+    // four and three, 0.997 and 0.997 against 0.849, 0.874 and 0.94, and 3,792 ahead: the line
+    // multiplied, so it cost the crew a share of what they had and never the same 0.22 off a man
+    // who had 0.60 to give [all measured, off the ledger by category]. What this month says about
+    // the sum is in the v60 report: at the floor nothing the player buys shows.
+    expect(done(two)).toBe(2);
+    expect(done(one)).toBe(2);
+    expect(unfinished(two)).toEqual([0.744, 0.786, 0.865, 0.965]);
+    expect(unfinished(one)).toEqual([0.733, 0.778, 0.857, 0.958]);
+    expect(Math.round(two.state.cash - one.state.cash)).toBe(-120);
   });
 
   it('has no longest stand at all on one saw either, the one saw having the places the crew wants', () => {
@@ -1508,8 +1550,10 @@ describe('a month that sprays a wardrobe on wet air', () => {
       'needs a spray booth',
     );
     expect(never.jobs.some((job) => job.templateId === 'lacqueredWardrobe')).toBe(false);
-    // A booth on the road is enough for the board, as a saw on the road is: the job is days of
-    // drawing and material before anybody sprays anything (CLAUDE.md T8 3.2, T10 3.7).
+    // A booth on the road is no booth to the board from v60, as a saw on the road is none: the
+    // sprayed work stays greyed until the lorry has been (PIOTR, 30.09: "it has to be after the
+    // delivery, not after the order"). Until v60 the order was enough, the job being days of
+    // drawing and material before anybody sprayed anything (CLAUDE.md T8 3.2, T10 3.7).
     const early = playUntilDay(
       newGame({ seed: SEED, difficulty: 'veryEasy' }),
       5,
@@ -1518,7 +1562,7 @@ describe('a month that sprays a wardrobe on wet air', () => {
     );
     expect(early.equipment.some((item) => item.specId === 'sprayBooth')).toBe(false);
     expect(early.onOrder.some((item) => item.specId === 'sprayBooth')).toBe(true);
-    expect(kitBlockFor(early, templateOf('lacqueredWardrobe'))).toBeNull();
+    expect(kitBlockFor(early, templateOf('lacqueredWardrobe'))?.reason).toBe('needs a spray booth');
   });
 
   it('takes the sprayed work once the booth stands in the hall', () => {
@@ -1589,7 +1633,11 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
     // v54, when the thicknesser ran 30.55 hours at 0.25 m3 an hour; seven on v55 and v56, the
     // spindle moulder doing the moulding at 0.12 m3 an hour, 44.58 of its hours in the month with
     // the oak table among the jobs. From v57 the board offers no timber (above) and the month's
-    // sheet jobs keep it 38.47 hours.
+    // sheet jobs keep it 38.47 hours. Five from v60, the spindle moulder at 34.90 hours: the same
+    // ten jobs out, but the owner's month runs on other days under the sum of points (PIOTR,
+    // 30.09), with 7,705 of deposits taken against 6,235 and an eleventh job on the books at the
+    // end, and the bag is taken on days 11, 16, 18, 23 and 26 where it was 11, 15, 18, 22, 25 and
+    // 29 [measured].
     expect(familyForStage(stagedJob(1000, 'solidWood', false), 'moulding')).toBe('spindleMoulder');
     expect(machineOf(state, 'thicknesser').hoursUsed).toBe(0);
     expect(machineOf(state, 'spindleMoulder').hoursUsed).toBeGreaterThan(0);
@@ -1598,7 +1646,7 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
     expect(store.full).toBe(false);
     expect(seen.filter((event) => event.kind === 'bagsFull')).toHaveLength(0);
     const empties = state.tasks.filter((task) => task.kind === 'emptyBags');
-    expect(empties).toHaveLength(6);
+    expect(empties).toHaveLength(5);
     expect(empties.every((task) => task.done)).toBe(true);
   });
 });

@@ -166,9 +166,13 @@ describe('On offer, costed for the man who would do it (CLAUDE.md T20 2.1.1)', (
     );
     expect(day?.querySelectorAll('.contract-day-block.is-lunch')).toHaveLength(1);
     expect(day?.textContent).toContain(`${result.freeMinutes} min into the next`);
-    // The blocks are laid across the working day and the last of them ends at 17:00.
+    // The blocks are laid across the working day and the last of them ends at 17:00. An
+    // experienced man's piece is a whole hour on the used saw from v60 (0.80 and 0.95 as points,
+    // 0.75), so his eight pieces fill the day exactly and there is no free block to draw; a day
+    // that does not divide draws one.
     const free = day?.querySelector('.contract-day-block.is-free');
-    expect(free?.getAttribute('style')).toContain('width:');
+    if (result.freeMinutes > 0) expect(free?.getAttribute('style')).toContain('width:');
+    else expect(free).toBeNull();
     expect(day?.querySelector('.contract-day-ticks')?.textContent).toBe('08:0010:0012:0014:0017:00');
     // The lunch is a whole hour of the day.
     const lunch = day?.querySelector('.contract-day-block.is-lunch')?.getAttribute('style') ?? '';

@@ -67,6 +67,7 @@ import { workerMinuteCost } from '../../src/engine/jobs';
 import { freeSheets, reservedSheets } from '../../src/engine/materials';
 import { hallPace, hallProductivityFactor, machineWearPerMinute, menAtMachine, menAtPlaces } from '../../src/engine/machines';
 import { planPlaces } from '../../src/engine/production';
+import { paceSum } from '../../src/engine/stages';
 import { STATION_DOOR, STATION_HOME } from '../../src/engine/stations';
 import { staffOutputFactor } from '../../src/engine/owner';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
@@ -456,12 +457,19 @@ describe('the piece work', () => {
     saw.broken = true;
     expect(contractPieceSpeed(state, piece)).toBeCloseTo(1 / BY_HAND_DURATION_FACTOR, 10);
     minutes(state, 100);
-    const worth =
-      WORKER_RATES.novice * staffOutputFactor(state) * (1 / BY_HAND_DURATION_FACTOR) * hallProductivityFactor(state);
+    // His minute is a sum of points from v60 (PIOTR, 30.09): one, less 0.40 for his grade, less
+    // 0.33 for the by hand pace, is 0.27 a minute where the product was 0.40.
+    const worth = paceSum(
+      WORKER_RATES.novice,
+      staffOutputFactor(state),
+      1 / BY_HAND_DURATION_FACTOR,
+      hallProductivityFactor(state),
+    );
     expect(contract.labourMinutes).toBe(100);
-    // A hundred of his minutes at 0.6 and 1 / 1.5 are 40 of the piece's: not one whole piece yet.
-    expect(contract.pieceMinutes).toBeCloseTo(100 * worth, 4);
-    expect(contract.pieceMinutes).toBeCloseTo(40, 4);
+    // A hundred of his minutes at 0.6 and 1 / 1.5 are 26.67 of the piece's, the minute booked to
+    // four places: not one whole piece yet.
+    expect(contract.pieceMinutes).toBeCloseTo(100 * worth, 2);
+    expect(contract.pieceMinutes).toBeCloseTo(26.67, 2);
     expect(contract.piecesMade).toBe(0);
     const ben = state.workers[0] as Worker;
     expect(ben.working).toBe(true);
@@ -505,14 +513,18 @@ describe('the piece work', () => {
     const full = state.bagFillM3;
     // Nothing that makes dust runs with the bags full (CLAUDE.md T12 2.3), so the saw has no places
     // this minute; nobody waits for the bags either, he works at a bench and his piece goes at the
-    // by hand pace. Twenty of his minutes are 8 of the piece's where v52 made none
-    // (PIOTR, 24.09; v53).
+    // by hand pace. Twenty of his minutes are 5.33 of the piece's where v52 made none
+    // (PIOTR, 24.09; v53), 8 until v60 added the points instead of multiplying them.
     minutes(state, 20);
     expect(contract.labourMinutes).toBe(20);
-    const worth =
-      WORKER_RATES.novice * staffOutputFactor(state) * (1 / BY_HAND_DURATION_FACTOR) * hallProductivityFactor(state);
-    expect(contract.pieceMinutes).toBeCloseTo(20 * worth, 4);
-    expect(contract.pieceMinutes).toBeCloseTo(8, 4);
+    const worth = paceSum(
+      WORKER_RATES.novice,
+      staffOutputFactor(state),
+      1 / BY_HAND_DURATION_FACTOR,
+      hallProductivityFactor(state),
+    );
+    expect(contract.pieceMinutes).toBeCloseTo(20 * worth, 2);
+    expect(contract.pieceMinutes).toBeCloseTo(5.33, 2);
     expect(state.workers[0]?.station).toBe('machine:workbench');
     // A bench makes no dust, so the bags are no fuller for it.
     expect(state.bagFillM3).toBe(full);
@@ -758,13 +770,16 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
     const middlingResult = contractResultFor(state, contract, middling);
     const bestResult = contractResultFor(state, contract, best);
     // His minutes are at his rate and on the machines the hall has: the used saw of the day 1 kit
-    // is 0.95 of the owner's own speed (CLAUDE.md T20 2.1.1). A joiner with no experience does 45
-    // minutes of the owner's work in 79 of his own on it, a very experienced one in 47
-    // (CLAUDE.md T21 2.9).
+    // is 0.95 of the owner's own speed (CLAUDE.md T20 2.1.1), and from v60 the two are points of
+    // one sum, as they are on the minute itself (PIOTR, 30.09). A joiner with no experience does
+    // 45 minutes of the owner's work in 82 of his own on it (79 until v60), a very experienced one
+    // in 47 (CLAUDE.md T21 2.9).
     const saw = contractPieceSpeed(state, piece);
     expect(saw).toBe(0.95);
-    expect(greenResult.minutes).toBe(Math.round(45 / (WORKER_RATES.novice * saw)));
-    expect(bestResult.minutes).toBe(Math.round(45 / (WORKER_RATES.senior * saw)));
+    expect(greenResult.minutes).toBe(Math.round(45 / paceSum(WORKER_RATES.novice, saw)));
+    expect(greenResult.minutes).toBe(82);
+    expect(bestResult.minutes).toBe(Math.round(45 / paceSum(WORKER_RATES.senior, saw)));
+    expect(bestResult.minutes).toBe(47);
     expect(greenResult.labourCost).toBe(
       Math.round(greenResult.minutes * workerMinuteCost(green.monthlyWage) * 100) / 100,
     );

@@ -222,9 +222,11 @@ describe('rule 2, the litres', () => {
     const fine = assembled('used', 0);
     expect(fine).toBeCloseTo(20 * OWNER_LABOUR_PER_MINUTE / (0.75 * 1.5 + 0.25), 4);
     expect(fine).toBeCloseTo(9.697, 3);
-    // Eight of them draw 240, worked at 0.6 that is 144 against the 128 the pipe carries.
+    // Eight of them draw 240, worked at 0.6 that is 144 against the 128 the pipe carries. The
+    // short compressor is 0.30 off every minute's points from v60 (PIOTR, 30.09), six of the
+    // owner's minutes over the twenty; until v60 it multiplied them by 0.7.
     const low = assembled('used', 7);
-    expect(low).toBeCloseTo(fine * LOW_AIR_FACTOR, 10);
+    expect(low).toBeCloseTo(fine - 20 * OWNER_LABOUR_PER_MINUTE * (1 - LOW_AIR_FACTOR), 10);
     // The same eight on a compressor that holds them are back at full speed.
     expect(assembled('pro', 7)).toBeCloseTo(fine, 10);
   });
