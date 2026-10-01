@@ -18,6 +18,7 @@ import {
 } from '../../src/engine/index';
 import type { DayCategory, GameState } from '../../src/engine/index';
 import { renderTopbar } from '../../src/ui/topbar';
+import { workshopOutputToday } from '../../src/engine/machines';
 import { renderDaySummary } from '../../src/ui/dayEnd';
 import { signedMoney } from '../../src/ui/modal';
 import { currentState, mount } from '../../src/ui/app';
@@ -249,14 +250,19 @@ function onePlaceForTwo(): GameState {
   return state;
 }
 
-describe('the efficiency number next to the clock', () => {
-  it('is one live number, worked over possible, in the clock block', () => {
+describe('the one number next to the clock', () => {
+  it('is Pace, the workshop s average today, with Efficiency the first line of its plate (v61)', () => {
     const state = runClock(onePlaceForTwo(), 200);
     const html = renderTopbar(state, 'hall');
     const clock = parse(html).querySelector('.clock-block');
     const number = clock?.querySelector('details.efficiency > summary');
-    expect(number?.textContent).toBe('Efficiency 50%');
+    // One number on the bar, so the player sees it rise as he hires better men and buys machines
+    // (PIOTR, 01.10): Pace at the clock, where Efficiency was, and the chip in the day meter gone.
+    expect(number?.textContent).toBe(`Pace ${workshopOutputToday(state).toFixed(2)}`);
+    expect(parse(html).querySelectorAll('[data-output="today"]')).toHaveLength(1);
+    expect(parse(html).querySelector('.day-meter [data-output="today"]')).toBeNull();
     expect(clock?.querySelector('details.efficiency')?.getAttribute('data-efficiency')).toBe('50');
+    expect(clock?.querySelector('[data-efficiency-line]')?.textContent).toContain('Efficiency 50%');
     // The number is the engine's, not the bar's own arithmetic.
     expect(workshopEfficiency(state).percent).toBe(50);
   });
@@ -279,16 +285,17 @@ describe('the efficiency number next to the clock', () => {
     // all of it, in the plate's new words (CLAUDE.md T25 2.3; PIOTR, 24.09; v53).
     const waiting = lines.find((line) => line.getAttribute('data-cause') === 'noPlace');
     expect(waiting?.textContent).toBe('No free machines100%');
-    expect(plate?.textContent).toContain('200 min worked of 400 min, 200 min lost');
+    expect(plate?.textContent).toContain('Efficiency 50%: 200 min worked of 400 min, 200 min lost');
     // A summary click toggles a details element in the browser itself; here in jsdom too.
     details?.querySelector('summary')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(details?.hasAttribute('open')).toBe(true);
   });
 
-  it('reads 100 before the first production minute, and erodes from there', () => {
+  it('reads Pace 1.00 and Efficiency 100 before the first production minute, and erodes from there', () => {
     const fresh = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    expect(parse(renderTopbar(fresh, 'hall')).querySelector('details.efficiency > summary')?.textContent)
-      .toBe('Efficiency 100%');
+    const page = parse(renderTopbar(fresh, 'hall'));
+    expect(page.querySelector('details.efficiency > summary')?.textContent).toBe('Pace 1.00');
+    expect(page.querySelector('[data-efficiency-line]')?.textContent).toContain('Efficiency 100%');
   });
 });
 

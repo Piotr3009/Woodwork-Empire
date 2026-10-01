@@ -67,13 +67,13 @@ describe('the keyboard (CLAUDE.md T18 2.8)', () => {
   it('maps 1 to 5 to the five running speeds of SPEEDS, in order', () => {
     // SPEEDS[0] is Pause and has its own key; the five after it are the running speeds.
     expect(SPEEDS.length).toBe(6);
-    expect([...SPEEDS]).toEqual([0, 1, 2, 4, 10, 30]);
+    expect([...SPEEDS]).toEqual([0, 1, 4, 10, 30, 100]);
     for (let knob = 1; knob <= 5; knob += 1) {
       press(String(knob));
       expect(speed(), `key ${knob}`).toBe(SPEEDS[knob]);
     }
     // And the knob on the top bar says the same thing the key did: one dispatch, one code path.
-    expect(root().querySelector('[data-do="setSpeed"][data-speed="30"]')?.className).toContain(
+    expect(root().querySelector('[data-do="setSpeed"][data-speed="100"]')?.className).toContain(
       'is-on',
     );
   });
@@ -94,14 +94,14 @@ describe('the keyboard (CLAUDE.md T18 2.8)', () => {
 
   it('does nothing while an input has the caret', () => {
     press('2');
-    expect(speed()).toBe(2);
+    expect(speed()).toBe(4);
     const field = document.createElement('input');
     field.type = 'text';
     root().appendChild(field);
     field.focus();
     expect(document.activeElement).toBe(field);
     for (const key of ['1', '3', '4', '5', 'p', 'P']) press(key);
-    expect(speed()).toBe(2);
+    expect(speed()).toBe(4);
     field.blur();
     field.remove();
     press('1');

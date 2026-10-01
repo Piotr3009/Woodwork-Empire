@@ -22,7 +22,7 @@ import {
   jobMinutesFor,
   jobOnCnc,
   jobPace,
-  paceSum,
+  manPace,
   stagePlanFor,
   stageSpeed,
 } from '../../src/engine/stages';
@@ -174,7 +174,7 @@ describe('the CNC s places', () => {
     expect(done[0]).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * jobPace(state, first), 6);
     expect(jobPace(state, first)).toBeCloseTo(1 / (0.25 / 1.9 + 0.25 + 0.25 * 1.5 + 0.125), 10);
     expect(done[0]).toBeCloseTo(45.3731, 4);
-    expect(done[1]).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * paceSum(WORKER_RATES.novice, jobPace(state, first)), 6);
+    expect(done[1]).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * manPace(WORKER_RATES.novice, jobPace(state, first)), 6);
   });
 
   it('holds no job for the CNC: the man its one place cannot take works his job on at a bench', () => {

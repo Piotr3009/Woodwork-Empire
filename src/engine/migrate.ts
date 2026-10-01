@@ -13,6 +13,7 @@ import {
   LOCKER_SLOT_LAYOUT,
   PRODUCT_TEMPLATES,
   SOUND_VOLUME_DEFAULT,
+  SPEEDS,
   STATE_VERSION,
   UNIT_WIDTH_CELLS,
   WEBSITE_START_LEVEL,
@@ -984,5 +985,8 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       // Not a whole hall: nothing to plan.
     }
   }
+  // A save stopped on a speed the bar no longer has (the 2x went in v61) opens at 1x, so the
+  // chips can show what the clock is doing.
+  if (!(SPEEDS as readonly number[]).includes(lifted.speed)) lifted.speed = 1;
   return lifted;
 }

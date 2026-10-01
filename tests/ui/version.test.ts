@@ -43,7 +43,7 @@ describe('the version in the corner', () => {
     // Jack B (PIOTR, 30.09). v60 adds the pace up from points and calls it Pace, keeps the desk
     // staff off the hall, locks the board on machines still on order and hands the take off to the
     // admin (PIOTR, 30.09).
-    expect(APP_VERSION).toBe('v60');
+    expect(APP_VERSION).toBe('v61');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -59,7 +59,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v60'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v61'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

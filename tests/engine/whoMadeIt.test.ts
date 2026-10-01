@@ -96,12 +96,13 @@ describe('who made it today', () => {
     expect(made.men).toHaveLength(4);
     // The owner first, then the crew in the order of state.workers.
     expect(made.men.map((row) => row.who)).toEqual([OWNER, ...state.workers.map((man) => man.id)]);
-    // The by hand pace is a point of the sum from v60, 0.33 off the one every minute starts at
-    // (PIOTR, 30.09: "it should be a sum"); until v60 the row said `times 0.67`.
+    // The by hand pace is a point of the hall's bracket from v60, 0.33 off the one every minute
+    // starts at, and the man's grade multiplies the bracket from v61 (PIOTR, 30.09 and 01.10);
+    // until v60 the row said `times 0.67`.
     for (const row of made.men) {
       expect(row.minutes, row.main).toBe(14);
       expect(row.words, row.main).toContain('by hand');
-      expect(row.words, row.main).toContain(`− ${(1 - 1 / BY_HAND_DURATION_FACTOR).toFixed(2)} machines`);
+      expect(row.words, row.main).toContain(`× (1.00 − ${(1 - 1 / BY_HAND_DURATION_FACTOR).toFixed(2)} machines`);
     }
     // The head counts the day's own minutes, and the sum is the figure the top bar shows.
     expect(made.minutes).toBe(state.dayStats.workMinutes);
@@ -132,9 +133,9 @@ describe('who made it today', () => {
     placeEquipment(state, 'tableSaw', { variantId: 'industrial', x: 12, y: 1, id: 'kit-saw-good' });
     const made = workshopBreakdownToday(runClock(state, 5));
     // From v54 the row says what the hall did to the minutes as well, so it adds up
-    // (PIOTR, 24.09: "something does not add up"); from v60 it is a sum of points, the pace's
-    // 0.91 printed as the 0.09 it takes off, and the owner's own 1.00 left out as nought.
-    expect(made.men[0]?.words).toMatch(/^saw, industrial, \d+ min: 1\.00 − 0\.09 machines( − [\d.]+ hall)?$/);
+    // (PIOTR, 24.09: "something does not add up"); from v61 it is his grade times the bracket of
+    // points, the pace's 0.91 printed as the 0.09 it takes off.
+    expect(made.men[0]?.words).toMatch(/^saw, industrial, \d+ min: your 1\.00 × \(1\.00 − 0\.09 machines( − [\d.]+ hall)?\)$/);
   });
 
   it('says what the hall was, in the words the sheet already has for it', () => {
@@ -216,9 +217,10 @@ describe('the day fixtures Piotr sent, one minute in', () => {
       'at the bench, 1 min',
       'edgebander, standard, 1 min',
     ]);
-    // And the hall's 0.83 after it from v54, so the row adds up to its figure (PIOTR, 24.09): the
-    // pace's 0.07 on and the hall's 0.17 off, as points from v60.
-    for (const row of made.men) expect(row.words, row.main).toMatch(/ \+ 0\.07 machines − 0\.17 hall$/);
+    // And the hall's 0.83 after it from v54, so the row works out to its figure (PIOTR, 24.09):
+    // the pace's 0.07 on and the hall's 0.17 off, as points in the bracket the grade multiplies
+    // (v61).
+    for (const row of made.men) expect(row.words, row.main).toMatch(/ × \(1\.00 \+ 0\.07 machines − 0\.17 hall\)$/);
     expect(made.total).toBe(workshopOutputToday(state));
     // The hall was clean with its extraction working and said nothing until v53. Four men and a
     // budget saw that keeps two busy is the hall's own line now, (2 + 2 / 1.5) / 4 = 0.83 (v55;
@@ -240,15 +242,15 @@ describe('the day fixtures Piotr sent, one minute in', () => {
     const hall = hallProductivityFactor(state);
     expect(hall).toBe(1);
     for (const row of made.men) {
-      const arithmetic = row.words.match(/: 1\.00((?: [−+] [\d.]+ [a-z ]+?)*)$/);
+      const arithmetic = row.words.match(/: (?:your )?([\d.]+) × \(1\.00((?: [−+] [\d.]+ [a-z ]+?)*)\)$/);
       if (arithmetic === null) throw new Error(`no arithmetic in ${row.words}`);
-      // The sum of the points after the one, each printed to two places, so it can sit a penny
-      // or two off the figure (v60).
+      // His grade times one plus the points, each printed to two places, so it can sit a penny
+      // or two off the figure (v61).
       let sum = 1;
-      for (const term of (arithmetic[1] ?? '').matchAll(/([−+]) ([\d.]+)/g)) {
+      for (const term of (arithmetic[2] ?? '').matchAll(/([−+]) ([\d.]+)/g)) {
         sum += (term[1] === '−' ? -1 : 1) * Number(term[2]);
       }
-      expect(Math.abs(sum - row.figure), row.main).toBeLessThan(0.03);
+      expect(Math.abs(Number(arithmetic[1]) * sum - row.figure), row.main).toBeLessThan(0.03);
     }
     expect(made.total).toBe(workshopOutputToday(state));
     // The table's lock is `Needs a thicknesser` from v53, the timber tool set being gone from the

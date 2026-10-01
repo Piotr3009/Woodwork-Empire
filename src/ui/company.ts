@@ -302,8 +302,8 @@ function outputSheet(breakdown: OutputBreakdown, workshopToday: number, made: Wo
     // What the number is, in one line: Efficiency is how much of the day was worked, Pace is how
     // fast a worked minute goes, and the two are never one number (PIOTR, 30.09; v60).
     '<div class="ledger-note"><span>Efficiency says how much of the day was worked. Pace says how fast a ' +
-    'worked minute goes: a job of 100 minutes takes 100 divided by it. Points add up and never ' +
-    `multiply; nothing runs slower than ${PACE_FLOOR.toFixed(2)}.</span></div>` +
+    'worked minute goes: a job of 100 minutes takes 100 divided by it. A man is his grade times ' +
+    `these points; nothing runs slower than ${PACE_FLOOR.toFixed(2)}.</span></div>` +
     // Who made that number, before the lines that say what the hall does to every minute of it
     // (PIOTR, 22.09: "the player has no way of knowing what to fix"; CLAUDE.md T24 2.1).
     madeTodayBlock(made) +

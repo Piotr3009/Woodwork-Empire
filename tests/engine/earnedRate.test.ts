@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { WORKER_RATES } from '../../src/engine/constants';
 import { earnedRate } from '../../src/engine/economy';
-import { paceSum } from '../../src/engine/stages';
+import { manPace } from '../../src/engine/stages';
 import { formatCalendarDay, tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
@@ -107,19 +107,19 @@ describe('the owner on his own', () => {
 });
 
 describe('a joiner with no experience', () => {
-  it('earns 19.94 an hour on the standard saw, his 0.40 off the owner s own points', () => {
+  it('earns 21.56 an hour on the standard saw, which is 0.6 of the owner', () => {
     let state = withJoiner(atTheBench('standard'));
     // The job goes to the joiner, so the owner is in the workshop but not at a bench.
     state = act(state, { type: 'ASSIGN_JOB', jobId: firstJob(state).id, workerId: 'staff-1' });
     const worked = tick(state, 60);
     expect(worked.dayStats.workMinutes).toBe(60);
-    // His tier is 0.6 of the owner (CLAUDE.md T21 2.9): from v60 that is 0.40 off the points of
-    // every minute and not a multiplier on them (PIOTR, 30.09), so his hour is 40 an hour times
-    // 0.8984 less 0.40, 19.94; 21.56 until v60, 0.6 of the owner's 35.93 (25.20 of 42.00 until
-    // v53, 24.29 of 40.48 on v53 and v54). He is the one man whose work goes through the saw,
-    // which keeps two busy, so the hall has no saw line.
-    expect(earnedRate(worked, 'day')).toBe(Math.round(40 * paceSum(WORKER_RATES.novice, paceWithSaw(1.05)) * 100) / 100);
-    expect(earnedRate(worked, 'day')).toBe(19.94);
+    // His tier is 0.6 of the owner (CLAUDE.md T21 2.9), and it multiplies the hall's points
+    // (v61; PIOTR, 01.10), so the hour he earns is 0.6 of the owner's: 25.20 of 42.00 until v53,
+    // 24.29 of 40.48 on v53 and v54, 21.56 of 35.93 from v55 (19.94 on v60, when the grade was a
+    // point off the sum). He is the one man whose work goes through the saw, which keeps two
+    // busy, so the hall has no saw line.
+    expect(earnedRate(worked, 'day')).toBe(Math.round(40 * manPace(WORKER_RATES.novice, paceWithSaw(1.05)) * 100) / 100);
+    expect(earnedRate(worked, 'day')).toBe(21.56);
   });
 });
 
@@ -132,9 +132,9 @@ describe('the two of them together', () => {
     expect(worked.workers[0]?.productionMinutes).toBe(60);
     expect(worked.dayStats.workMinutes).toBe(120);
     // (42.00 + 25.20) / 2 = 33.60 until v53; (40.48 + 24.29) / 2 = 32.39 on v53 and v54, the
-    // job's one pace on both of them; (35.93 + 21.56) / 2 = 28.75 on v55 to v59, the moulding by
-    // hand; (35.93 + 19.94) / 2 = 27.94 now, the novice's 0.40 a point of the sum (v60).
-    expect(earnedRate(worked, 'day')).toBe(27.94);
+    // job's one pace on both of them; (35.93 + 21.56) / 2 = 28.75 from v55, the moulding by hand
+    // (27.94 on v60, when the novice's 0.40 was a point of the sum).
+    expect(earnedRate(worked, 'day')).toBe(28.75);
   });
 
   it('weights by the hours each of them worked, four of the owner against eight of the joiner', () => {

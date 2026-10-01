@@ -144,18 +144,19 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     // and all three put their minutes in (PIOTR, 24.09; v53). The line counts the men whose work
     // goes through the saw (v54, v55): the man alone is short of nothing, and a budget saw keeps
     // two busy, so of the three one is past it and works at the by hand pace, (2 + 1 / 1.5) / 3,
-    // which from v60 is 0.11 off each of the three men's points and not a multiplier on the lot
-    // (PIOTR, 30.09): 5.19 and 11.11. Until v60 the line multiplied, 6.40 and 17.07 (v54 read
-    // 16.80, a place for one man; v53 21.60).
+    // which is 0.11 off the hall's points, with the 0.10 of five joiners and no helper beside it,
+    // and the man's 0.60 times them (v61; PIOTR, 01.10): 6.31 and 16.27. On v60 the grade was a
+    // point too, 5.19 and 11.11; until v60 the lines multiplied, 6.40 and 17.07 (v54 read 16.80, a
+    // place for one man; v53 21.60).
     const one = menOnOne(1, 1, 'budget');
     const three = menOnOne(3, 1, 'budget');
     const alone = labourIn(one, jobOfFirst(one).id, 'cutting', 20);
     const crowd = labourIn(three, jobOfFirst(three).id, 'cutting', 20);
     expect(alone).toBeGreaterThan(0);
     const line = 1 - (2 + 1 / 1.5) / 3;
-    expect(crowd).toBeCloseTo(3 * (alone - 20 * OWNER_LABOUR_PER_MINUTE * line), 4);
-    expect(alone).toBeCloseTo(5.1852, 4);
-    expect(crowd).toBeCloseTo(11.1111, 4);
+    expect(crowd).toBeCloseTo(3 * (alone - 20 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice * line), 4);
+    expect(alone).toBeCloseTo(6.3111, 4);
+    expect(crowd).toBeCloseTo(16.2667, 4);
   });
 
   it('runs the same three men faster behind a saw of two places, by the saw s class and its hall line', () => {
@@ -167,14 +168,15 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     // saw. Now all three work behind either saw. A budget saw and a standard one both keep two
     // busy (v55), so the hall's line is the same behind either and what the standard saw buys is
     // its pace alone: 1.05 on the cutting's quarter, the moulding's quarter by hand on this hall,
-    // the job's pace 0.8984 against 0.8889. From v60 that is 0.0095 on each of the three men's
-    // points, 0.38 of labour over the twenty minutes (PIOTR, 30.09); until v60 the two paces
-    // stood in the ratio 1.0107 (1.1566 on v54, when a budget saw covered one man and a standard
-    // saw two).
+    // the job's pace 0.8984 against 0.8889. That is 0.0095 on the hall's points, times each of
+    // the three men's 0.60, 0.23 of labour over the twenty minutes (v61; PIOTR, 01.10; 0.38 on
+    // v60, when the grade was a point); the ratio is 1.0140 with the hall's other points in the
+    // bracket, where the two paces alone stood in the ratio 1.0107 until v60 (1.1566 on v54, when
+    // a budget saw covered one man and a standard saw two).
     const budgetPace = 1 / (0.25 + 0.25 + 0.25 * 1.5 + 0.25);
     const standardPace = 1 / (0.25 / 1.05 + 0.25 + 0.25 * 1.5 + 0.25);
-    expect(fast - slow).toBeCloseTo(3 * 20 * OWNER_LABOUR_PER_MINUTE * (standardPace - budgetPace), 6);
-    expect(fast / slow).toBeCloseTo(1.0342, 4);
+    expect(fast - slow).toBeCloseTo(3 * 20 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice * (standardPace - budgetPace), 6);
+    expect(fast / slow).toBeCloseTo(1.014, 4);
   });
 
   it('runs the assembly stage at three men’s speed with the same three men', () => {
@@ -183,11 +185,9 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     const alone = labourIn(one, jobOfFirst(one).id, 'assembly', 20);
     const crowd = labourIn(three, jobOfFirst(three).id, 'assembly', 20);
     expect(alone).toBeGreaterThan(0);
-    // Three men are three times the minutes less the hall's line for the crew, which from v60 is
-    // points off each man and not a multiplier on the lot (PIOTR, 30.09): a novice has 0.60 of
-    // points to lose the line from, so the three of them come to a little over twice the one
-    // (2.67 times until v60, when the line multiplied).
-    expect(crowd).toBeGreaterThan(alone * 2);
+    // Three men are three times the minutes less the hall's line for the crew, points off the
+    // bracket each man's grade multiplies (v61): a little over two and a half times the one.
+    expect(crowd).toBeGreaterThan(alone * 2.5);
     expect(crowd).toBeLessThan(alone * 3);
   });
 

@@ -104,13 +104,10 @@ describe('the price a piece (v40)', () => {
     const entry = hallWith(CONTRACT_REFERENCE_CLASS);
     const entryMan = joinerOf(CONTRACT_REFERENCE_TIER);
     const entryResult = contractResultFor(entry.state, entry.contract, entryMan);
-    // To the pound a piece the price was rounded once, over the pieces of the day, until v60. The
-    // price keeps the product it was set with (`contractReferenceFor`) and the card adds the rate
-    // and the pace as points from v60 (PIOTR, 30.09): 0.85 against 0.84, a piece more in the entry
-    // man's day, so his day reads over the margin by about a piece's worth [measured: 24.82 over
-    // on 9 pieces]. What to do about the entry point is Piotr's call (the v60 report).
-    expect(entryResult.dayResult).toBeGreaterThan(CONTRACT_MARGIN_PER_DAY);
-    expect(entryResult.dayResult - CONTRACT_MARGIN_PER_DAY).toBeLessThanOrEqual(CONTRACT_MARGIN_PER_DAY / 6);
+    // To the pound a piece: the price is rounded once, over the pieces of the day. The entry
+    // point and the card are one arithmetic again from v61, the man's grade times the machine's
+    // pace (v60 added the two and read a piece over).
+    expect(Math.abs(entryResult.dayResult - CONTRACT_MARGIN_PER_DAY)).toBeLessThanOrEqual(entryResult.piecesPerDay);
     expect(entryResult.wear).toBeGreaterThan(0);
     expect(entryResult.machineName.toLowerCase()).toContain('standard');
     const ladder: Array<[Exclude<Worker['tier'], null>, string]> = [

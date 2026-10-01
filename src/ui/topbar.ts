@@ -60,18 +60,20 @@ function speedButtons(state: GameState, pulse: boolean): string {
   return dinner + speedChips(state, pulse);
 }
 
-/** The workshop's average output today, always on the bar: what a minute of production has been
- *  worth on average, the hall, every man, his manager and the class of machine at his stage in
- *  it (PIOTR, 21.09: one Output number, not one for the boss and one for the hall; v40). Red
- *  under 1, green over it, as every signed figure is. The boss's own multiplier, the overtime and
- *  the dinner he worked through, is his own minutes' and lives in the day meter's tip. */
-function outputChip(state: GameState): string {
+/** The one number of the bar: the workshop's Pace today, what a worked minute has been worth on
+ *  average, the hall, every man, his grade, his manager and the class of machine at his stage in
+ *  it (PIOTR, 21.09: one Output number, not one for the boss and one for the hall; v40. PIOTR,
+ *  01.10: one number, so the player sees it rise as he hires better men and buys machines; v61).
+ *  It is the summary of the plate next to the clock, in Efficiency's old place; the chip it used
+ *  to be in the day meter is gone. The boss's own multiplier, the overtime and the dinner he
+ *  worked through, is his own minutes' and lives in the day meter's tip. */
+function paceNumber(state: GameState): string {
   const output = workshopOutputToday(state);
   const tone = output < 1 ? ' warn' : output > 1 ? ' good' : '';
   return (
-    `<span class="output${tone}" data-output="today" ` +
-    'title="Pace today: what a worked minute has been worth on average, everybody and every machine in it. Efficiency is how much of the day was worked; Pace is how fast a worked minute goes">' +
-    `Pace ${output.toFixed(2)}</span>`
+    `<summary class="efficiency-number output${tone}" data-output="today" ` +
+    'title="Pace today: what a worked minute has been worth on average, everybody and every machine in it. Click for what moves it">' +
+    `Pace ${output.toFixed(2)}</summary>`
   );
 }
 
@@ -131,13 +133,14 @@ function efficiencyBlock(state: GameState): string {
         `<span class="tip-min">${signedFigure(`${line.percent > 0 ? '+' : ''}${line.percent}%`, line.percent)}</span></span>`,
     )
     .join('');
+  // The number at the top is Pace from v61, and Efficiency is the first line of the plate behind
+  // it: how much of the day was worked, with what took the rest (PIOTR, 01.10).
   return (
     `<details class="efficiency" data-efficiency="${efficiency.percent}">` +
-    '<summary class="efficiency-number" ' +
-    'title="Production minutes worked, of the minutes the workshop could have worked">' +
-    `Efficiency ${efficiency.percent}%</summary>` +
+    paceNumber(state) +
     '<div class="efficiency-plate">' +
-    `<p class="hint">${minutes(efficiency.worked)} worked of ${minutes(efficiency.possible)}, ` +
+    `<p class="hint" data-efficiency-line="1">Efficiency ${efficiency.percent}%: ` +
+    `${minutes(efficiency.worked)} worked of ${minutes(efficiency.possible)}, ` +
     `${minutes(efficiency.lost)} lost</p>` +
     lines +
     paces +
@@ -276,7 +279,6 @@ function dayMeter(state: GameState): string {
     `<span class="lamp ${ownerLamp(state)}"></span>` +
     `<span class="day-line">${escapeHtml(state.playerName)}'s day · ` +
     `${escapeHtml(ownerDayLine(state))}</span>` +
-    outputChip(state) +
     `<span class="day-count">${state.owner.minutesWorked} worked \u00b7 ` +
     `${state.owner.idleMinutes} idle \u00b7 ${available}</span>` +
     '</div>' +

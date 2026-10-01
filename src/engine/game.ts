@@ -214,7 +214,7 @@ import {
 } from './owner';
 import { paidHoursToday } from './rate';
 import { chance, int, makeId } from './rng';
-import { paceSum } from './stages';
+import { manPace, pacePoints } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -1575,7 +1575,7 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
   const atTheBench =
     !ownerOnTask && !moving && state.owner.currentTaskId === null ? jobOf(state, OWNER) : null;
   if (atTheBench && ownerIsAvailable(state)) {
-    list.push({ who: OWNER, job: atTheBench, rate: ownerEfficiency(state) });
+    list.push({ who: OWNER, job: atTheBench, rate: ownerEfficiency(state), boost: 1 });
   }
   // The crew always take their dinner, even on a day the owner works through his (T6 3.4).
   if (isBreak(state.clock.minute)) return list;
@@ -1602,7 +1602,7 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
     // breakdown printed `Manager: +3%` over a hall that was not getting it. The same
     // `managerPaceFor` answers both, which is the one path 2.4 asks for
     // (PIOTR, 20.09; CLAUDE.md T23 2.4).
-    list.push({ who: worker.id, job, rate: paceSum(worker.rate, staffFactor, managerPaceFor(state, worker)) });
+    list.push({ who: worker.id, job, rate: worker.rate, boost: pacePoints(staffFactor, managerPaceFor(state, worker)) });
   }
   return list;
 }
@@ -1729,9 +1729,9 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     // minute, and a booth on wet air takes half as long again over the finish and marks the
     // piece (PIOTR, CLAUDE.md T10 3.2, 3.3). Points, not factors, from v60.
     const atTheBench = benchDrawsAir(stage) !== null;
-    speed = paceSum(speed, airFactorFor(state, air, machine, atTheBench));
+    speed = pacePoints(speed, airFactorFor(state, air, machine, atTheBench));
     if (finishOnWetAir(state, book)) {
-      speed = paceSum(speed, 1 / WET_AIR_FINISH_FACTOR);
+      speed = pacePoints(speed, 1 / WET_AIR_FINISH_FACTOR);
       hand.job.wetFinish = true;
     }
     // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3): one
@@ -1739,9 +1739,9 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     // every man, and wore out four times as fast as the clock in a hall of four (v55).
     const compressor = drawingOn(state, machine, atTheBench);
     if (compressor !== null) used.set(compressor.id, 1);
-    // One sum: his own rate, the pace of his stage and what the hall takes, added as points and
-    // never multiplied (PIOTR, 30.09; v60).
-    const worth = paceSum(hand.rate, speed, hall);
+    // His grade times the points of the hall, his stage, his manager and the boss's absence
+    // (PIOTR, 01.10; v61).
+    const worth = manPace(hand.rate, hand.boost, speed, hall);
     const minute = OWNER_LABOUR_PER_MINUTE * worth;
     // The minute's own multiplier, for the workshop's average output (v40): the same things the
     // labour is made of, and nothing else, booked against the man who worked it so the Pace

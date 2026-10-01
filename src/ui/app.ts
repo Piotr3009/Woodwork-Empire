@@ -2342,8 +2342,8 @@ function onKeyUp(event: KeyboardEvent): void {
   if (event.key === ' ') spaceHeld = false;
 }
 
-/** The five running speeds under the hand, `1` to `5` in the order `SPEEDS` has them: x1, x2, x4,
- *  x10, x30. `SPEEDS[0]` is Pause, which has its own key (CLAUDE.md T18 2.8). */
+/** The five running speeds under the hand, `1` to `5` in the order `SPEEDS` has them: x1, x4,
+ *  x10, x30, x100 (v61). `SPEEDS[0]` is Pause, which has its own key (CLAUDE.md T18 2.8). */
 const SPEED_KEYS = ['1', '2', '3', '4', '5'] as const;
 
 /** True while the caret is in a field. A key does nothing at all then: a "1" typed into the stock

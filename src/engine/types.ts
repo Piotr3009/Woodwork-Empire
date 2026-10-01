@@ -12,7 +12,7 @@ export type Difficulty = 'veryEasy' | 'easy' | 'hard';
 
 /** 0 is paused. Thirty is the fastest there is (PIOTR, 13.09 and 15.09; CLAUDE.md T9 3.11,
  *  T14 2.4). */
-export type Speed = 0 | 1 | 2 | 4 | 10 | 30;
+export type Speed = 0 | 1 | 4 | 10 | 30 | 100;
 
 export type MaterialKind = 'sheet' | 'solidWood';
 

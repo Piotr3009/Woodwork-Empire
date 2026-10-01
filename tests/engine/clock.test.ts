@@ -135,7 +135,6 @@ describe('clock time of day', () => {
   it('runs one game minute per real second at 1x, so a day is 8 real minutes', () => {
     expect(gameMinutesPerRealSecond(0)).toBe(0);
     expect(gameMinutesPerRealSecond(1)).toBe(1);
-    expect(gameMinutesPerRealSecond(2)).toBe(2);
     expect(gameMinutesPerRealSecond(4)).toBe(4);
     // Piotr's fifth chip: a working day in 48 real seconds (CLAUDE.md T9 3.11).
     expect(gameMinutesPerRealSecond(10)).toBe(10);

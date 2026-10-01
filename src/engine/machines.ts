@@ -87,7 +87,7 @@ import { lockReasonFor, template } from './catalog';
 import { jobHeldBy } from './jobs';
 import { stageOfMan } from './production';
 import { contractOfWorker, contractPiece, contractStageFamilyOf } from './contracts';
-import { jobPace, paceSum, stageDoing, stagePlanFor, tradeFactor } from './stages';
+import { jobPace, pacePoints, stageDoing, stagePlanFor, tradeFactor } from './stages';
 import { isWorkingToday, managerPaceFor, nightCrew } from './staff';
 import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
@@ -1045,8 +1045,8 @@ export interface WorkshopBreakdownRow {
   who: string;
   /** `<Name>, <tier> <role>, <doing> <job>`, in the words the person card uses; `Hall`. */
   main: string;
-  /** `<why>, <his minutes> min: 1.00 − 0.20 grade + 0.05 machines − 0.15 hall`, the points his
-   *  minute adds up from (v60); the hall's state on the hall's row. */
+  /** `<why>, <his minutes> min: 0.80 × (1.00 + 0.05 machines − 0.15 hall)`, his grade times the
+   *  points his minute is made of (v61); the hall's state on the hall's row. */
   words: string;
   /** His minutes today; nought on the hall's row, which is a factor and not a man. */
   minutes: number;
@@ -1131,30 +1131,32 @@ function manRow(
   // The job's one pace, the figure `runProductionMinute` reads before the air factor (v53).
   const worker = who === OWNER ? null : (state.workers.find((entry) => entry.id === who) ?? null);
   const role = worker?.role ?? null;
-  const pace = job === null ? 1 : paceSum(jobPace(state, job), tradeFactor(role, machine?.specId ?? null));
+  const pace = job === null ? 1 : pacePoints(jobPace(state, job), tradeFactor(role, machine?.specId ?? null));
   const figure = booked.minutes <= 0 ? 0 : Math.round((booked.worth / booked.minutes) * 100) / 100;
-  // His minute as the engine adds it up, point by point, and the hall as the remainder off what
-  // his minutes were really booked at: the saws too few for the crew, the dust, the air. A sum
-  // and not a product from v60 (PIOTR, 30.09: "it should be a sum"), so the row's own words add
-  // up to its figure: "1.00 − 0.20 grade + 0.05 machines − 0.15 hall".
+  // His minute as the engine makes it: his grade times the hall's points, the points named one by
+  // one and the hall as the remainder off what his minutes were really booked at, the saws too few
+  // for the crew, the dust, the air (PIOTR, 30.09 and 01.10; v61). So the row's own words work out
+  // to its figure: "0.80 × (1.00 + 0.05 machines − 0.15 hall)". A minute held up by the floor
+  // reads the floor's own remainder, which is the truth about it.
   const manager = worker === null ? 1 : managerPaceFor(state, worker);
   const away = worker === null ? 1 : staffOutputFactor(state);
   const parts: Array<[number, string]> = [
-    [rate - 1, who === OWNER ? 'you' : 'grade'],
     [pace - 1, 'machines'],
     [manager - 1, 'manager'],
     [away - 1, 'boss away'],
   ];
   const named = parts.reduce((sum, [points]) => sum + points, 0);
-  const hall = booked.minutes <= 0 ? 0 : booked.worth / booked.minutes - 1 - named;
+  const hall = booked.minutes <= 0 || rate <= 0 ? 0 : booked.worth / booked.minutes / rate - 1 - named;
   parts.push([hall, 'hall']);
   const terms = parts
     .filter(([points]) => Math.abs(points) >= 0.005)
-    .map(([points, label]) => `${points < 0 ? '−' : '+'} ${twoPlaceText(Math.abs(points))} ${label}`);
+    .map(([points, label]) => ` ${points < 0 ? '−' : '+'} ${twoPlaceText(Math.abs(points))} ${label}`)
+    .join('');
+  const own = who === OWNER ? `your ${twoPlaceText(rate)}` : twoPlaceText(rate);
   return {
     who,
     main: [name, trade, doing].filter((part) => part !== '').join(', '),
-    words: `${whyWords(state, stage, machine)}, ${booked.minutes} min: 1.00 ${terms.join(' ')}`.trimEnd(),
+    words: `${whyWords(state, stage, machine)}, ${booked.minutes} min: ${own} × (1.00${terms})`,
     minutes: booked.minutes,
     figure,
   };

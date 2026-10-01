@@ -29,7 +29,6 @@ import {
 import { managerTier } from '../../src/engine/owner';
 import { hands, machineWantedFor } from '../../src/engine/production';
 import { outputBreakdown } from '../../src/engine/machines';
-import { paceSum } from '../../src/engine/stages';
 import { workPlan } from '../../src/engine/plan';
 import type { GameState, Worker, WorkerTier } from '../../src/engine/index';
 import { runClock, sixJoinersOnSheetWork } from '../helpers';
@@ -247,7 +246,7 @@ describe('the senior spreads his men over the machines', () => {
 });
 
 describe('what a grade does to a man’s minutes', () => {
-  it('adds its points to the production minutes of the men he carries, and nobody else’s', () => {
+  it('puts its points on the production minutes of the men he carries, and nobody else’s', () => {
     for (const tier of TIERS) {
       const state = hallUnder(tier);
       state.jobs.forEach((job, index) => {
@@ -260,11 +259,11 @@ describe('what a grade does to a man’s minutes', () => {
       const first = state.workers[0];
       if (!first) throw new Error('a joiner is wanted');
       expect(managerPaceFor(state, first), tier).toBe(PRODUCTION_MANAGER_PACE[tier]);
-      // And it is on the minute itself, on the one path every rate goes through: his grade's
-      // points on top of the man's own, 0.60 + 0.03 for a novice manager, added and never
-      // multiplied from v60 (PIOTR, 30.09).
+      // And it is on the minute itself, on the one path every rate goes through: the hand carries
+      // the man's own grade and, beside it, the manager's points with the boss's absence (v61).
       const hand = hands(state).find((entry) => entry.who === 'staff-1');
-      expect(hand?.rate, tier).toBeCloseTo(paceSum(WORKER_RATES.novice, PRODUCTION_MANAGER_PACE[tier]), 9);
+      expect(hand?.rate, tier).toBe(WORKER_RATES.novice);
+      expect(hand?.boost, tier).toBeCloseTo(PRODUCTION_MANAGER_PACE[tier], 9);
     }
   });
 

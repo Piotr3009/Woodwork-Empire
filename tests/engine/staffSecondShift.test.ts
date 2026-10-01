@@ -33,7 +33,7 @@ import {
 } from '../../src/engine/staff';
 import { absenceFactor, nightShareOf } from '../../src/engine/owner';
 import { hands, jobOf } from '../../src/engine/production';
-import { paceSum } from '../../src/engine/stages';
+import { manPace } from '../../src/engine/stages';
 import { formatCalendarDay, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import { act, clearEvents, sixJoinersOnSheetWork } from '../helpers';
@@ -205,18 +205,17 @@ describe('the second shift', () => {
   it('runs at the rate the manager’s cover leaves, with the owner gone home', () => {
     const state = nightHall();
     state.owner.wentHome = true;
-    const rates = hands(state, { shift: 'night' }).map((hand) => hand.rate);
+    const night = hands(state, { shift: 'night' });
     // Three things on the minute and no more: the man's own rate, what the owner's absence takes
-    // off it, and what the manager over him adds, the three added as points from v60 (PIOTR,
-    // 30.09): 0.60 − 0.08 + 0.05 = 0.57, where the product was 0.5796. The manager of this hall
-    // is the experienced one, so his grade's pace is on the night the same as on the day: he
-    // runs the second shift and the men on it are men he carries (CLAUDE.md T13 3.9, T23 2.4).
+    // off it, and what the manager over him adds, the last two as points the first multiplies
+    // (v61; PIOTR, 01.10): 0.60 times (1 − 0.08 + 0.05) is 0.582, where v60 added the three to 0.57
+    // and the product read 0.5796. The manager of this hall is the experienced one, so his
+    // grade's pace is on the night the same as on the day: he runs the second shift and the men
+    // on it are men he carries (CLAUDE.md T13 3.9, T23 2.4).
     const pace = PRODUCTION_MANAGER_PACE.experienced;
-    expect(rates.map((rate) => Math.round(rate * 10000) / 10000)).toEqual([
-      Math.round(paceSum(WORKER_RATES.novice, absenceFactor(true), pace) * 10000) / 10000,
-      Math.round(paceSum(WORKER_RATES.novice, absenceFactor(true), pace) * 10000) / 10000,
-    ]);
-    expect(rates[0]).toBeCloseTo(0.57, 10);
+    expect(night.map((hand) => hand.rate)).toEqual([WORKER_RATES.novice, WORKER_RATES.novice]);
+    for (const hand of night) expect(hand.boost).toBeCloseTo(1 + (absenceFactor(true) - 1) + (pace - 1), 10);
+    for (const hand of night) expect(manPace(hand.rate, hand.boost)).toBeCloseTo(0.582, 10);
     expect(absenceFactor(true)).toBe(0.92);
     expect(pace).toBe(1.05);
   });

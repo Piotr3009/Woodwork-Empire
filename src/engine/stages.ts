@@ -210,15 +210,14 @@ export function stageMinutes(labour: number, rate: Rates, speed: number): number
 /** One man's rate, or the rates of every man on a job. */
 export type Rates = number | readonly number[];
 
-/** What a man, or a crew, is worth a minute at this speed: each man's own sum of points, and
- *  the men added up, because they stand at the job in the same minute (CLAUDE.md T17 2.10).
- *  From v60 the two cannot be folded into one rate first: a novice at 0.60 and a stage at 0.90
- *  are 0.50 a minute each, so two of them are 1.00, where one man at their summed 1.20 would
- *  read 1.10 (PIOTR, 30.09). The one place a crew's minute is added up, for the plan, the
- *  deadline and the card; the engine's own minute is `paceSum` a man at a time. */
+/** What a man, or a crew, is worth a minute at this speed: each man's own minute (`manPace`),
+ *  and the men added up, because they stand at the job in the same minute (CLAUDE.md T17 2.10).
+ *  A man at a time and never one summed rate, because of the floor: two novices under it are two
+ *  floors and not one (v60). The one place a crew's minute is added up, for the plan, the deadline
+ *  and the card. */
 export function crewPace(rate: Rates, speed: number): number {
-  if (typeof rate === 'number') return rate <= 0 ? 0 : paceSum(rate, speed);
-  return rate.reduce((sum, own) => sum + (own <= 0 ? 0 : paceSum(own, speed)), 0);
+  if (typeof rate === 'number') return rate <= 0 ? 0 : manPace(rate, speed);
+  return rate.reduce((sum, own) => sum + (own <= 0 ? 0 : manPace(own, speed)), 0);
 }
 
 /** The whole job, start to finish, for a man of this rate with the machines the hall has now. */
@@ -323,21 +322,34 @@ export function currentStage(
   return plan.length > 0 ? (plan[plan.length - 1] ?? null) : null;
 }
 
-/** The pace a minute runs at, out of the factors that used to be multiplied together: one plus
- *  the points of each (a factor of 0.8 is −0.20, of 1.12 is +0.12), floored at `PACE_FLOOR`. The
- *  one place the sum is done, so the minute, the plan, the contract and the Pace sheet cannot
- *  disagree (PIOTR, 30.09; v60). A nought among the factors is a stop, not a point: it stays a
- *  nought, which is what a stage that cannot be worked at all has always been. */
-export function paceSum(...factors: number[]): number {
-  if (factors.some((factor) => factor <= 0)) return 0;
-  const points = factors.reduce((sum, factor) => sum + (factor - 1), 0);
-  return Math.max(PACE_FLOOR, 1 + points);
+/** What the hall, the machines, the manager and the air do to a minute, as one number: one plus
+ *  the points of each factor (a factor of 0.85 is −0.15, of 1.12 is +0.12), added and never
+ *  multiplied (PIOTR, 30.09; v60). No floor here: this is the half of the minute that is not the
+ *  man's own, and `manPace` puts the floor under the whole. A nought among the factors is a stop,
+ *  not a point: it stays a nought, which is what a stage that cannot be worked at all has always
+ *  been. */
+export function pacePoints(...factors: number[]): number {
+  if (factors.some((factor) => factor === 0)) return 0;
+  return 1 + factors.reduce((sum, factor) => sum + (factor - 1), 0);
 }
 
-/** Labour per minute for a man of this rate working this stage at this speed. The one place a
- *  minute of somebody's time is turned into work in a job. */
+/** What a man's minute is worth: his own grade times the hall's points, floored at `PACE_FLOOR`
+ *  (PIOTR, 01.10; v61). A novice at 0.60 in a hall at +0.05 for its saw and −0.15 for its dust is
+ *  0.60 times 0.90, 0.54: the grade is a share of the man and the hall is the same points off
+ *  every man, so a better man is worth more in the same hall and a better hall shows on every
+ *  man. Until v61 the grade was points too, and a novice in a poor hall sat on the floor whatever
+ *  the player bought. The one place the minute is made, for the engine, the plan, the contract
+ *  and the Pace sheet alike. */
+export function manPace(rate: number, ...factors: number[]): number {
+  // A nought among the factors is a stop; points that add up to nothing or less are the floor,
+  // because a man at a job always works, however poor the hall.
+  if (rate <= 0 || factors.some((factor) => factor === 0)) return 0;
+  return Math.max(PACE_FLOOR, rate * pacePoints(...factors));
+}
+
+/** Labour per minute for a man of this rate working this stage at this speed. */
 export function labourPerMinute(rate: number, speed: number): number {
-  return OWNER_LABOUR_PER_MINUTE * paceSum(rate, speed);
+  return OWNER_LABOUR_PER_MINUTE * manPace(rate, speed);
 }
 
 /** What this man's minute is worth at the stage he is standing at, against his own rate: the one

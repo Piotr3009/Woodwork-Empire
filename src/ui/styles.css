@@ -798,10 +798,9 @@ input.num {
   color: #1c1f24;
 }
 
-/* What today's work is multiplied by, shown only when it is below 1 (CLAUDE.md T6 3.4). */
+/* The one number of the bar, Pace, in Efficiency's old place next to the clock (v61): the
+   summary below carries it, and this is its tone. */
 .output {
-  font-size: var(--fs-small);
-  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -3402,8 +3401,9 @@ input.num {
   padding: 4px 14px;
 }
 
-/* The efficiency number next to the clock, and the plate behind a click on it (T13 3.5). The
-   details element has no marker; the number is the whole control. */
+/* The Pace number next to the clock, and the plate behind a click on it (T13 3.5; Pace from
+   v61, Efficiency inside the plate). The details element has no marker; the number is the whole
+   control. */
 .efficiency {
   position: relative;
 }
@@ -3411,9 +3411,18 @@ input.num {
 .efficiency > summary {
   color: #f5efe2;
   cursor: pointer;
-  font-size: var(--fs-small);
+  font-size: var(--fs-body);
+  font-weight: 700;
   list-style: none;
   white-space: nowrap;
+}
+
+.efficiency > summary.warn {
+  color: var(--bad);
+}
+
+.efficiency > summary.good {
+  color: var(--good);
 }
 
 .efficiency > summary::-webkit-details-marker {

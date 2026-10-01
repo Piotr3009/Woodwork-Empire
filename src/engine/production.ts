@@ -91,7 +91,8 @@ import {
   type StagePlan,
   currentStage,
   jobPace,
-  paceSum,
+  manPace,
+  pacePoints,
   stageLeft,
   stagePlanFor,
   tradeFactor,
@@ -114,8 +115,12 @@ export interface Hand {
   /** 'owner', or a worker id. */
   who: string;
   job: Job;
-  /** What a minute of his is worth against a minute of the owner's at his best. */
+  /** His own grade: what a minute of his is worth against a minute of the owner's at his best,
+   *  the owner's own being his labour factor. The grade multiplies (v61). */
   rate: number;
+  /** What the owner's absence and the manager over him do to his minute, as one plus their
+   *  points (`pacePoints`): 1 for the owner, and for a man left to himself. */
+  boost: number;
 }
 
 /** The job this man is on, in production, or null. */
@@ -137,7 +142,7 @@ export function hands(
   const shift = options.shift ?? 'day';
   const ownerJob = jobOf(state, OWNER);
   if (shift === 'day' && options.owner !== false && ownerJob && ownerIsAvailable(state)) {
-    list.push({ who: OWNER, job: ownerJob, rate: ownerEfficiency(state) });
+    list.push({ who: OWNER, job: ownerJob, rate: ownerEfficiency(state), boost: 1 });
   }
   if (options.staff === false) return list;
   const away = staffOutputFactor(state);
@@ -151,10 +156,9 @@ export function hands(
     if (contractWantsToday(state, worker.id)) continue;
     const job = findJob(state, worker.jobId);
     if (!job || job.stage !== 'inProduction') continue;
-    // His own rate, what the owner's absence takes off it, and what the manager over him adds:
-    // the manager's pace multiplies the minute exactly the way a tier's rate does, on this one
-    // path and nowhere else (PIOTR, 20.09; CLAUDE.md T23 2.4).
-    list.push({ who: worker.id, job, rate: paceSum(worker.rate, away, managerPaceFor(state, worker)) });
+    // His own rate, and beside it what the owner's absence takes off his minute and what the
+    // manager over him adds, as points (PIOTR, 20.09; CLAUDE.md T23 2.4; v61).
+    list.push({ who: worker.id, job, rate: worker.rate, boost: pacePoints(away, managerPaceFor(state, worker)) });
   }
   return list;
 }
@@ -562,7 +566,7 @@ export function placeHand(state: GameState, hand: Hand, entry: PlaceEntry | unde
   // sprayer's, and he is a pair of hands anywhere else; a joiner is slower at the booth
   // (CLAUDE.md T19 2.6; v53).
   const role = hand.who === OWNER ? null : (state.workers.find((worker) => worker.id === hand.who)?.role ?? null);
-  const pace = paceSum(jobPace(state, hand.job), tradeFactor(role, entry.family));
+  const pace = pacePoints(jobPace(state, hand.job), tradeFactor(role, entry.family));
   return { work: { stage, book, pace, machine: entry.machine }, lost: null, noMaterial: false };
 }
 
@@ -805,9 +809,9 @@ export function workMinute(
     // minute, and a booth on wet air takes half as long again over the finish and marks the
     // piece (PIOTR, CLAUDE.md T10 3.2, 3.3). Points, not factors, from v60.
     const atTheBench = benchDrawsAir(stage) !== null;
-    speed = paceSum(speed, airFactorFor(state, air, machine, atTheBench));
+    speed = pacePoints(speed, airFactorFor(state, air, machine, atTheBench));
     if (finishOnWetAir(state, book)) {
-      speed = paceSum(speed, 1 / WET_AIR_FINISH_FACTOR);
+      speed = pacePoints(speed, 1 / WET_AIR_FINISH_FACTOR);
       hand.job.wetFinish = true;
     }
     // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3): one
@@ -815,9 +819,9 @@ export function workMinute(
     // every man, and wore out four times as fast as the clock in a hall of four (v55).
     const compressor = drawingOn(state, machine, atTheBench);
     if (compressor !== null) used.set(compressor.id, 1);
-    // One sum: his own rate, the pace of his stage and what the hall takes, added as points and
-    // never multiplied (PIOTR, 30.09; v60).
-    const worth = paceSum(hand.rate, speed, hall);
+    // His grade times the points of the hall, his stage, his manager and the boss's absence
+    // (PIOTR, 01.10; v61).
+    const worth = manPace(hand.rate, hand.boost, speed, hall);
     const minute = OWNER_LABOUR_PER_MINUTE * worth;
     // The minute's own multiplier, for the workshop's average output (v40): the same things the
     // labour is made of, and nothing else, booked against the man who worked it (v50).

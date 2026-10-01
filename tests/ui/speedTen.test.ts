@@ -73,7 +73,7 @@ function dismissEvents(): void {
 
 describe('the fifth chip', () => {
   it('is ten, and the top bar offers it', () => {
-    expect([...SPEEDS]).toEqual([0, 1, 2, 4, 10, 30]);
+    expect([...SPEEDS]).toEqual([0, 1, 4, 10, 30, 100]);
     expect(speedFromString('10')).toBe(10);
     expect(root().querySelector('[data-do="setSpeed"][data-speed="10"]')).not.toBeNull();
     click('[data-do="setSpeed"][data-speed="10"]');

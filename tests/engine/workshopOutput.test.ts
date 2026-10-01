@@ -90,8 +90,10 @@ describe('the workshop\'s average output today (v40)', () => {
     const average = workshopOutputToday(worked);
     const bar = parse(renderTopbar(worked, 'hall'));
     const chip = bar.querySelector('[data-output="today"]');
-    // The chip says Pace from v60, the word the sheet uses for it (PIOTR, 30.09).
+    // The number says Pace from v60, the word the sheet uses for it (PIOTR, 30.09), and from v61
+    // it is the one number at the clock, the plate's summary (PIOTR, 01.10).
     expect(chip?.textContent).toBe(`Pace ${average.toFixed(2)}`);
+    expect(chip?.tagName.toLowerCase()).toBe('summary');
     expect(bar.querySelectorAll('.output')).toHaveLength(1);
     const board = parse(renderCompany(worked));
     const note = board.querySelector('[data-figure="workshopToday"]');

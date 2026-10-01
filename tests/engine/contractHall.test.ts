@@ -18,7 +18,7 @@ import {
 } from '../../src/engine/contracts';
 import type { Contract, GameState } from '../../src/engine/index';
 import { fullCrew, hallPace, placeShortages } from '../../src/engine/machines';
-import { paceSum } from '../../src/engine/stages';
+import { manPace } from '../../src/engine/stages';
 import { planPlaces } from '../../src/engine/production';
 import { renderContracts } from '../../src/ui/contracts';
 import { renderWorkPlan } from '../../src/ui/workPlan';
@@ -47,10 +47,10 @@ function parse(html: string): HTMLElement {
 function crewWeek(state: GameState, contract: Contract, factor: number): number {
   const week = MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK;
   const pace = hallPace(state, 'tableSaw');
-  // The man's rate, the saw's pace and the shortage as points of one sum (v60), as the minute
-  // adds them.
+  // The saw's pace and the shortage as points, and the man's grade times them (v61), as the
+  // minute makes it.
   return state.workers.reduce((total, worker) => {
-    const minutes = Math.max(1, Math.round(contractPiece(contract).minutes / paceSum(worker.rate, pace, factor)));
+    const minutes = Math.max(1, Math.round(contractPiece(contract).minutes / manPace(worker.rate, pace, factor)));
     return total + Math.floor(week / minutes);
   }, 0);
 }
@@ -80,16 +80,16 @@ describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
     const [short] = atFullCrew(state);
     expect(short).toMatchObject({ family: 'tableSaw', capacity: 2, men: 7, over: 5 });
     expect(short?.factor).toBeCloseTo(shortage(2, 7), 10);
-    // A piece of 45 of the owner's minutes is 124 of a novice's: his 0.6, the budget pace 1.00
-    // and the 0.76 as points of one sum from v60 (PIOTR, 30.09), 0.36 a minute where the product
-    // read 0.46: 19 a week each and 114 for the six (98 minutes and 144 a week until v60; 105
-    // minutes and 132 a week on v54, when a budget saw covered one man; v52 counted only the one
-    // man the saw had a place for, 75 minutes a piece and 32 a week).
-    const minutes = Math.round(contractPiece(contract).minutes / paceSum(0.6, 1, shortage(2, 7)));
-    expect(minutes).toBe(124);
+    // A piece of 45 of the owner's minutes is 98 of a novice's: the budget pace 1.00 and the 0.76
+    // as points and his 0.6 times them (v61; PIOTR, 01.10): 24 a week each and 144 for the six
+    // (124 minutes and 114 a week on v60, when the grade was a point; 105 minutes and 132 a week
+    // on v54, when a budget saw covered one man; v52 counted only the one man the saw had a place
+    // for, 75 minutes a piece and 32 a week).
+    const minutes = Math.round(contractPiece(contract).minutes / manPace(0.6, 1, shortage(2, 7)));
+    expect(minutes).toBe(98);
     const week = MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK;
     expect(contractHallCapacity(state, contract).perWeek).toBe(6 * Math.floor(week / minutes));
-    expect(contractHallCapacity(state, contract).perWeek).toBe(114);
+    expect(contractHallCapacity(state, contract).perWeek).toBe(144);
   });
 
   it('makes fewer in a one saw hall than in a three saw hall, through the shortage and not a cap', () => {
@@ -105,9 +105,9 @@ describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
     const big = contractHallCapacity(three.state, three.contract).perWeek;
     expect(small).toBe(crewWeek(one.state, one.contract, shortage(2, 7)));
     expect(big).toBe(crewWeek(three.state, three.contract, shortage(6, 7)));
-    // 114 against 174 from v60, the points added (above); 144 against 180 until v60.
-    expect(small).toBe(114);
-    expect(big).toBe(174);
+    // 144 against 180 (114 against 174 on v60, when the grade was a point).
+    expect(small).toBe(144);
+    expect(big).toBe(180);
     expect(small).toBeLessThan(big);
   });
 
@@ -137,15 +137,15 @@ describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
     const sold = act(state, { type: 'SELL_MACHINE', equipmentId: second.id });
     expect(sold.equipment.find((item) => item.id === second.id)?.soldOnDay).not.toBeNull();
     const after = contractHallCapacity(sold, sold.contracts[0] ?? contract).perWeek;
-    // Two budget saws keep four of the seven busy, 0.86 of the hall's minute and 144 a week; one
-    // keeps two, 0.76 and 114 (v60, the points added; 162 and 144 until v60, v55). v52 halved it
+    // Two budget saws keep four of the seven busy, 0.86 of the hall's minute and 162 a week; one
+    // keeps two, 0.76 and 144 (v55; 144 and 114 on v60, when the grade was a point). v52 halved it
     // with the places, 64 to 32 (PIOTR, 24.09; v53).
     expect(atFullCrew(sold)[0]?.capacity).toBe(2);
     // With every man off his job nobody is at work, so the hall's own minute is short of nothing
     // and its Output sheet says so; the line still reckons with the seven (v54).
     expect(placeShortages(sold)).toEqual([]);
-    expect(before).toBe(144);
-    expect(after).toBe(114);
+    expect(before).toBe(162);
+    expect(after).toBe(144);
     expect(after).toBeLessThan(before);
   });
 
@@ -153,8 +153,9 @@ describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
     const standard = offered(1, 'standard', 20);
     const pro = offered(1, 'pro', 20);
     // A standard saw keeps two men busy and a pro one three (v55), so the pro hall is short by
-    // less, 0.81 against 0.76, and its pace is better as well, 1.08 against 1.05: 156 a week
-    // against 132 from v60, the points added (162 against 150 until v60). The old reading set an
+    // less, 0.81 against 0.76, and its pace is better as well, 1.08 against 1.05, the two as
+    // points of one bracket (v61): 168 a week against 156 (156 against 132 on v60, when the grade
+    // was a point; 162 against 150 until v60, the product). The old reading set an
     // industrial saw's three places against a budget saw's one, which is the shortage and not the
     // pace (PIOTR, 24.09; v53).
     expect(atFullCrew(standard.state)[0]?.factor).toBeCloseTo(shortage(2, 7), 10);
@@ -165,8 +166,8 @@ describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
     const fast = contractHallCapacity(pro.state, pro.contract).perWeek;
     expect(slow).toBe(crewWeek(standard.state, standard.contract, shortage(2, 7)));
     expect(fast).toBe(crewWeek(pro.state, pro.contract, shortage(3, 7)));
-    expect(slow).toBe(132);
-    expect(fast).toBe(156);
+    expect(slow).toBe(156);
+    expect(fast).toBe(168);
   });
 });
 

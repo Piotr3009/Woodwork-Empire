@@ -154,21 +154,24 @@ describe('the sprayer (CLAUDE.md T19 2.6)', () => {
   });
 
   it('finishes a lacquered job faster than a joiner does, by the points between the two rates', () => {
-    // The cross check of CLAUDE.md T19 section 7. The two rates are points of the minute's sum
-    // from v60 (PIOTR, 30.09): the joiner's 0.70 at the booth is 0.30 off every minute the
-    // sprayer's 1.00 is not, so the half hour between them is 0.30 of the owner's minute thirty
-    // times over; until v60 the two halves stood in the ratio 1.00 to 0.70. The hall is given an
-    // extractor the booth is piped to, a compressor that feeds it and a dryer first: the day one
-    // hall's short fan, short air and wet air take 0.93 off every minute at the booth on top of
-    // the man's own 0.20, and at that the two trades both stand at the floor, 0.25, and cannot be
-    // told apart (v60).
+    // The cross check of CLAUDE.md T19 section 7. The two rates are points of the bracket the
+    // man's grade multiplies (v61; PIOTR, 01.10): the joiner's 0.70 at the booth is 0.30 off
+    // every minute the sprayer's 1.00 is not, so the half hour between them is 0.30 of the
+    // owner's minute times the man's 0.80, thirty times over; until v60 the two halves stood in
+    // the ratio 1.00 to 0.70. The hall is given an extractor the booth is piped to, a compressor
+    // that feeds it and a dryer first: the day one hall's short fan, short air and wet air take
+    // 0.93 off every minute at the booth, and at that the two trades both stand at the floor,
+    // 0.25, and cannot be told apart.
     const booth = (role: 'joiner' | 'sprayer'): GameState =>
       connectAll(withDryAir(withAir(withExtraction(atTheBooth(role)), 'pro')));
     const sprayer = labourIn(booth('sprayer'), 30);
     const joiner = labourIn(booth('joiner'), 30);
     expect(joiner).toBeGreaterThan(0);
     expect(sprayer).toBeGreaterThan(joiner);
-    expect(sprayer - joiner).toBeCloseTo(30 * OWNER_LABOUR_PER_MINUTE * (SPRAYER_SPRAY_RATE - JOINER_SPRAY_RATE), 4);
+    expect(sprayer - joiner).toBeCloseTo(
+      30 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced * (SPRAYER_SPRAY_RATE - JOINER_SPRAY_RATE),
+      4,
+    );
   });
 
   it('leaves a workshop without one slower at the booth, and never stuck', () => {

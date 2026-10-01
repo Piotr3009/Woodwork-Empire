@@ -59,7 +59,7 @@ function drag(state: GameState, specId: string): GameState {
 }
 
 /** Presses Done and says yes to whatever it asks. */
-function doIt(state: GameState, speed: 0 | 1 | 2 | 4 = 1): GameState {
+function doIt(state: GameState, speed: 0 | 1 | 4 = 1): GameState {
   return act(act(state, { type: 'END_SETUP', speed }), {
     type: 'RESOLVE_EVENT',
     choiceId: 'do',
@@ -132,8 +132,8 @@ describe('leaving setup with two machines moved', () => {
     // And the clock is the player's again, at the speed he pressed Done on.
     expect(renderTopbar(state, 'hall')).toContain('data-do="setSpeed"');
     expect(state.speed).toBe(1);
-    state = act(state, { type: 'SET_SPEED', speed: 2 });
-    expect(state.speed).toBe(2);
+    state = act(state, { type: 'SET_SPEED', speed: 4 });
+    expect(state.speed).toBe(4);
   });
 
   it('puts every one of them back where it stood when he says so', () => {
@@ -274,11 +274,11 @@ describe('a move the day ended in the middle of', () => {
 
 describe('the speed the player was on', () => {
   it('comes back the moment the kit is down', () => {
-    let state = doIt(drag(inSetup(), 'tableSaw'), 2);
+    let state = doIt(drag(inSetup(), 'tableSaw'), 1);
     expect(state.speed).toBe(SKIP_SPEED);
     state = tick(state, MOVE_MINUTES_PER_ITEM);
     expect(movingMachines(state)).toBeNull();
-    expect(state.speed).toBe(2);
+    expect(state.speed).toBe(1);
     expect(state.skipTaskId).toBeNull();
   });
 });
