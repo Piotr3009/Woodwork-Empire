@@ -70,7 +70,9 @@ import {
   itemAtCell,
   palletCell,
   placeCellsAt,
+  roomBehindStation,
   standingCell,
+  standingCellsFor,
   stationMachine,
 } from '../engine/stations';
 import { ownerIsAvailable } from '../engine/owner';
@@ -827,14 +829,33 @@ export interface Standing {
 
 /** The standing cell a station puts a figure on, and the way he faces there: the station table's
  *  cell at the item, on its free side, facing the item (CLAUDE.md T16 2.1). Anything the workshop
- *  has not bought falls back to the middle of the floor (CLAUDE.md T2 3.3). `who` names the man,
- *  so a man at his place stands at his own place of his own machine and not in a heap at the first
- *  one (CLAUDE.md T25 2.6). */
+ *  has not bought falls back to the middle of the floor (CLAUDE.md T2 3.3). `who` names the man:
+ *  every man the hall draws this minute has a cell of his own out of `figureStandings`, the one
+ *  pass that hands the cells out, so no two figures are ever on one cell (CLAUDE.md T25 2.6,
+ *  T26 2.2). A station that is not the one he is at this minute, which a test may ask about, is
+ *  read off the hall alone. */
 export function stationCell(
   state: GameState,
   station: string,
   bench: { x: number; y: number },
   who: string | null = null,
+): Standing {
+  if (who !== null && station === stationNow(state, who)) {
+    const mine = figureStandings(state).get(who);
+    if (mine !== undefined) return mine;
+  }
+  return stationAnchor(state, station, bench, who);
+}
+
+/** Where a figure at this station would stand with the hall to himself: his place at a machine,
+ *  the head of the canteen door's queue, the operator's cell of the rack or the cell by the
+ *  pallet. `figureStandings` starts from it and moves him on to the next free cell when another
+ *  figure has it. */
+function stationAnchor(
+  state: GameState,
+  station: string,
+  bench: { x: number; y: number },
+  who: string | null,
 ): Standing {
   const specId = stationMachine(station);
   if (specId !== null) {
@@ -879,16 +900,8 @@ export function stationCell(
   // contract with no sheets (T24 2.3), and from Turn 21
   // every man of the hall at the dinner hour, who walks to this cell and goes through it
   // (CLAUDE.md T4 3.4, T11 3.4, T21 2.12). The walk is the walk the hall already had; what the lunch
-  // station adds is that he does not stop in the doorway.
-  if ((station === STATION_DOOR || station === STATION_IDLE) && who !== null) {
-    // Men who stand at the door, a contract short of sheets among them (T24 2.3) and a man with
-    // nothing to do, stand side by side in front of it and not on one cell, where their names were
-    // drawn over each other [PIOTR, 24.09] (v54). The first of them in the order they were hired
-    // has the door's own cell.
-    // Every one of them faces the way the man in the doorway always has, out into the hall.
-    const cell = doorQueueCell(state, roomDoorCell('canteen'), who);
-    return { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) };
-  }
+  // station adds is that he does not stop in the doorway. The men who wait in front of it stand
+  // side by side, each on his own cell (`doorQueueCell`; v54, T26 2.2).
   if (station === STATION_IDLE || station === STATION_DOOR || station === STATION_LUNCH) {
     const cell = roomDoorCell('canteen');
     return { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) };
@@ -908,7 +921,8 @@ export function stationCell(
 }
 
 /** The cells in front of the canteen door, nearest first: the door's own, the one beside it, then
- *  the row in front of them. A cell something stands on is passed over (v54). */
+ *  the row in front of them (v54). The cells round the door's own a ring at a time come after them
+ *  when there are more men than these. */
 const DOOR_QUEUE_OFFSETS: ReadonlyArray<{ x: number; y: number }> = [
   { x: 0, y: 0 },
   { x: 1, y: 0 },
@@ -920,23 +934,74 @@ const DOOR_QUEUE_OFFSETS: ReadonlyArray<{ x: number; y: number }> = [
   { x: 1, y: 2 },
 ];
 
-/** The cell this man stands on at the canteen door: his turn among the men at the door this
- *  minute, in the order they were hired, on the first free cells in front of it. */
+/** The cell the next man at the canteen door stands on: the first of the queue's cells in front of
+ *  it that nothing stands on and no figure has taken this minute, through the one rule every
+ *  standing cell is handed out by (`standingCellsFor`; v54, CLAUDE.md T26 2.2). */
 function doorQueueCell(
   state: GameState,
   door: { x: number; y: number },
-  who: string,
+  taken: Set<string>,
 ): { x: number; y: number } {
-  const waits = (station: string): boolean => station === STATION_DOOR || station === STATION_IDLE;
-  const atDoor = [
-    ...(waits(state.owner.station) ? [OWNER] : []),
-    ...state.workers.filter((worker) => waits(worker.station)).map((worker) => worker.id),
-  ];
-  const turn = Math.max(0, atDoor.indexOf(who));
-  const free = DOOR_QUEUE_OFFSETS.map((offset) => ({ x: door.x + offset.x, y: door.y + offset.y })).filter(
-    (cell) => itemAtCell(state, cell) === null,
-  );
-  return free[turn % Math.max(1, free.length)] ?? door;
+  const anchors = DOOR_QUEUE_OFFSETS.map((offset) => ({ x: door.x + offset.x, y: door.y + offset.y }));
+  return standingCellsFor(state, anchors, 1, taken)[0] ?? door;
+}
+
+/** Every man the hall draws this minute, and the owner while he is about: who they are and where
+ *  each of them is, in the order the cells are handed out: the owner, then the crew in the order
+ *  they were hired. */
+function figuresNow(state: GameState): Array<{ who: string; station: string; bench: { x: number; y: number } }> {
+  const figures: Array<{ who: string; station: string; bench: { x: number; y: number } }> = [];
+  if (ownerIsAvailable(state)) {
+    figures.push({ who: OWNER, station: stationNow(state, OWNER), bench: ownerBenchCell(state) });
+  }
+  for (const worker of state.workers) {
+    if (worker.startDay > state.clock.day) continue;
+    figures.push({ who: worker.id, station: stationNow(state, worker.id), bench: homeCellOf(state, worker) });
+  }
+  return figures;
+}
+
+/** Where every figure on the hall stands this minute, each on a cell of his own: the one pass that
+ *  hands the cells out [PIOTR, 02.10: "three of them stand in one cell"] (CLAUDE.md T26 2.2). The
+ *  men at their places first, machine by machine in the order the machines were bought and each
+ *  machine's men in the order of its places, through `placeCellsAt`; then everybody else in the
+ *  order of `figuresNow`, from the cell his station would give him to the next free one, the
+ *  canteen door's queue among them. A man on his way into a room, the office or the canteen at the
+ *  dinner hour, walks to its door and through it, and stands nowhere on the hall. */
+export function figureStandings(state: GameState): Map<string, Standing> {
+  const standings = new Map<string, Standing>();
+  const taken = new Set<string>();
+  const figures = figuresNow(state);
+  const atWork = new Set(figures.filter((figure) => stationMachine(figure.station) !== null).map((figure) => figure.who));
+  const places = menAtPlaces(state).filter((entry) => atWork.has(entry.who));
+  for (const item of state.equipment) {
+    const men = places.filter((entry) => entry.item.id === item.id).sort((a, b) => a.place - b.place);
+    if (men.length === 0) continue;
+    const cells = placeCellsAt(state, item, men.length, taken);
+    men.forEach((entry, index) => {
+      const cell = cells[index] ?? standingCellsFor(state, [standingCell(state, item)], 1, taken)[0];
+      if (cell !== undefined) standings.set(entry.who, { ...cell, facing: facingAt(cell, item) });
+    });
+  }
+  const door = roomDoorCell('canteen');
+  for (const figure of figures) {
+    if (standings.has(figure.who)) continue;
+    const anchor = stationAnchor(state, figure.station, figure.bench, figure.who);
+    // Into a room: through its door, and off the hall's drawing at the end of the walk.
+    if (roomBehindStation(figure.station) !== null) {
+      standings.set(figure.who, anchor);
+      continue;
+    }
+    if (figure.station === STATION_DOOR || figure.station === STATION_IDLE) {
+      const cell = doorQueueCell(state, door, taken);
+      // Every one of them faces the way the man in the doorway always has, out into the hall.
+      standings.set(figure.who, { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) });
+      continue;
+    }
+    const cell = standingCellsFor(state, [anchor], 1, taken)[0];
+    standings.set(figure.who, cell === undefined ? anchor : { ...cell, facing: anchor.facing });
+  }
+  return standings;
 }
 
 /** The cell the owner falls back to when his station is nothing in particular: his bench's own
@@ -952,17 +1017,7 @@ export function ownerBenchCell(state: GameState): { x: number; y: number } {
  *  reads it to know whether somebody is in it (CLAUDE.md T19 2.3); it is the same question the
  *  figure loop asks, through the same `stationCell`, so the two can never disagree. */
 export function standingCellsNow(state: GameState): Array<{ x: number; y: number }> {
-  const cells: Array<{ x: number; y: number }> = [];
-  for (const worker of state.workers) {
-    if (worker.startDay > state.clock.day) continue;
-    const cell = stationCell(state, worker.station, homeCellOf(state, worker), worker.id);
-    cells.push({ x: cell.x, y: cell.y });
-  }
-  if (ownerIsAvailable(state)) {
-    const cell = stationCell(state, state.owner.station, ownerBenchCell(state), OWNER);
-    cells.push({ x: cell.x, y: cell.y });
-  }
-  return cells;
+  return [...figureStandings(state).values()].map((cell) => ({ x: cell.x, y: cell.y }));
 }
 
 /** Whether this room's door has somebody standing in it, which is what opens it and what keeps it
@@ -1674,7 +1729,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     return before * MARK.step;
   };
 
-  // The crew, and the owner, each at the station the engine put him on.
+  // The crew, and the owner, each at the station the engine put him on, each on a cell of his own
+  // (CLAUDE.md T26 2.2).
+  const standings = figureStandings(state);
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
     const away = worker.absentDaysRemaining > 0;
@@ -1685,7 +1742,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // hour is read (CLAUDE.md T21 2.12).
     const station = stationNow(state, worker.id);
     const where = stationLabel(station, worker.noPlaceFor);
-    const cell = stationCell(state, station, bench, worker.id);
+    const cell = standings.get(worker.id) ?? stationCell(state, station, bench, worker.id);
     const bubble = bubbleOf(worker.id);
     // He has gone through a door and is in the room behind it: off the hall's drawing until he
     // comes out again (PIOTR, 18.09; CLAUDE.md T20 2.12). From Turn 21 that is every man and not the
@@ -1710,7 +1767,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     );
   }
   const ownerStation = stationNow(state, OWNER);
-  const ownerCell = stationCell(state, ownerStation, ownerBenchCell(state), OWNER);
+  const ownerCell = standings.get(OWNER) ?? stationCell(state, ownerStation, ownerBenchCell(state), OWNER);
   const ownerBubble = ownerIsAvailable(state) ? bubbleOf(OWNER) : null;
   // The owner in the office is not on the hall at all: he went through the door, and the office
   // view draws him at his desk (PIOTR, 18.09; CLAUDE.md T20 2.12, T19 2.2).

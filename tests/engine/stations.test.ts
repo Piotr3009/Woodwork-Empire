@@ -214,20 +214,26 @@ describe('the places at one thing (CLAUDE.md T19 2.5, T25 2.6)', () => {
     expect(placeCellsAt(state, item, 2)).toEqual(cells.slice(0, 2));
   });
 
-  it('gives a bench a row of places along its front, one to each of its own columns', () => {
+  it('gives a bench a row of places along its front, one to each of its own columns, then round it', () => {
     // The second place was behind the bench and on a two wide one it was a cell off its top
     // corner, so at the fit the second man read as standing past the end of it [REPORT-T23 0.12]
-    // (CLAUDE.md T24 2.5).
+    // (CLAUDE.md T24 2.5). Past its own columns the places go round it a ring at a time from
+    // Turn 26: the worked side's corners first, then the ends, then the far side (CLAUDE.md T26
+    // 2.2).
     const { state, item } = only('workbench');
     const box = footprintCells(item);
+    expect(box.width).toBe(2);
     const cells = placeCellsAt(state, item, 5);
     expect(cells).toHaveLength(5);
     expect(cells[0]).toEqual(standingCell(state, item, 'operator'));
-    // Every place is in front of the bench, and the first of them are its own columns in order.
-    for (const cell of cells) expect(cell.y).toBeGreaterThanOrEqual(box.y + box.depth);
-    for (let column = 0; column < box.width; column += 1) {
-      expect(cells[column]).toEqual({ x: box.x + column, y: box.y + box.depth });
-    }
+    const front = box.y + box.depth;
+    expect(cells).toEqual([
+      { x: box.x, y: front },
+      { x: box.x + 1, y: front },
+      { x: box.x - 1, y: front },
+      { x: box.x + 2, y: front },
+      { x: box.x - 1, y: box.y },
+    ]);
     expect(new Set(cells.map((cell) => `${cell.x},${cell.y}`)).size).toBe(5);
   });
 

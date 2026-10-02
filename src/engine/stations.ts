@@ -428,10 +428,6 @@ export function itemAtCell(state: GameState, cell: Cell): Equipment | null {
   );
 }
 
-function sameCell(left: Cell, right: Cell): boolean {
-  return left.x === right.x && left.y === right.y;
-}
-
 /** The side an item's places run along: the table's own side, or the free side of a rack or a
  *  fan. */
 function queueSide(state: GameState, item: Equipment): Side {
@@ -439,50 +435,106 @@ function queueSide(state: GameState, item: Equipment): Side {
   return row.operator === 'freeSide' ? freeSideOf(state, item) : row.operator.side;
 }
 
-/** Fills a list of standing cells up to `count` from the cells along one side of an item, a row at
- *  a time outwards, taking only cells that are free and not already in the list. The list is never
- *  shorter than `count`: when the hall has nothing else left the last cell is repeated, because a
- *  man has to be drawn somewhere and two men in one place is better than a man with none. */
-function fillAlong(
+/** The key a cell is known by in a set of the cells taken this minute. */
+export function cellKey(cell: Cell): string {
+  return `${cell.x},${cell.y}`;
+}
+
+/** The side across a footprint from this one. */
+const ACROSS: Record<Side, Side> = { front: 'back', back: 'front', left: 'right', right: 'left' };
+
+/** The two ends of a footprint worked from this side: the sides across it the other way. */
+const ENDS_OF: Record<Side, readonly Side[]> = {
+  front: ['left', 'right'],
+  back: ['left', 'right'],
+  left: ['front', 'back'],
+  right: ['front', 'back'],
+};
+
+/** The cells round a footprint one ring out at a time, from ring `first` (ring 0 touches it), in a
+ *  fixed order: the side it is worked from first, then its two ends, then the far side, then the
+ *  next ring (CLAUDE.md T26 2.2). The worked side and the far side carry the ring's corners. The
+ *  rings run out as far as the unit is wide, which is further than any hall can need. */
+export function ringCells(
   state: GameState,
-  item: Equipment,
-  side: Side,
-  cells: Cell[],
-  count: number,
+  box: { x: number; y: number; width: number; depth: number },
+  worked: Side,
+  first = 0,
 ): Cell[] {
-  const box = standsOn(item);
-  const extent = side === 'front' || side === 'back' ? box.width : box.depth;
-  for (let out = 0; cells.length < count && out < extent + count + 2; out += 1) {
-    for (let along = 0; along < extent && cells.length < count; along += 1) {
-      const cell = cellAt(box, { side, along, out });
-      if (!isFree(state, cell)) continue;
-      if (cells.some((taken) => sameCell(taken, cell))) continue;
-      cells.push(cell);
+  const cells: Cell[] = [];
+  const reach = Math.max(state.unit.widthCells, state.unit.depthCells);
+  const extentOf = (side: Side): number => (side === 'front' || side === 'back' ? box.width : box.depth);
+  for (let out = first; out <= reach; out += 1) {
+    for (const side of [worked, ...ENDS_OF[worked], ACROSS[worked]]) {
+      // The corners go with the worked side and the far side, so the ends run the footprint's own
+      // length and no corner is listed twice.
+      const corners = side === worked || side === ACROSS[worked] ? out + 1 : 0;
+      for (let along = -corners; along < extentOf(side) + corners; along += 1) {
+        cells.push(cellAt(box, { side, along, out }));
+      }
     }
   }
-  const last = cells[cells.length - 1];
-  while (cells.length < count && last !== undefined) cells.push({ ...last });
   return cells;
 }
 
-/** The cells of an item's places, the first `count` of them: the operator's cell, the second
- *  place where the family's row names one, then the next free cells along the side it is worked
- *  from, one out at a time. A bench's places are a row along its front, one to a column of its own
- *  footprint (T24 2.5), and a machine's run along the side its operator stands on; it is one list
- *  for every family, benches included, so a bench and a saw cannot lay their men out two different
- *  ways (CLAUDE.md T19 2.5, T25 2.6). Never fewer than `count` cells; a cell is repeated only when
- *  the hall leaves nothing else. */
-export function placeCellsAt(state: GameState, item: Equipment, count: number): Cell[] {
-  if (count <= 0) return [];
-  const cells: Cell[] = [standingCell(state, item, 'operator')];
-  const row = stationRow(item.specId);
-  if (cells.length < count && row.second !== null) {
-    const second = standingCell(state, item, 'second');
-    if (!cells.some((taken) => sameCell(taken, second))) cells.push(second);
+/** The first `count` cells of `anchors`, in their order, that a man can stand on (no footprint, no
+ *  room, the unit's own floor) and that no other figure has taken this minute; each one taken goes
+ *  into `taken`, so the next man asked passes it over. When the anchors run out the cells round the
+ *  first of them are taken a ring at a time. A cell is never handed out twice: two figures on one
+ *  cell is the thing this is for [PIOTR, 02.10] (CLAUDE.md T26 2.2). The places at a machine, the
+ *  canteen door's queue, the men at the gate and the home cells all come through here. */
+export function standingCellsFor(
+  state: GameState,
+  anchors: readonly Cell[],
+  count: number,
+  taken: Set<string>,
+): Cell[] {
+  const found: Cell[] = [];
+  const take = (cell: Cell): void => {
+    if (found.length >= count) return;
+    const key = cellKey(cell);
+    if (taken.has(key) || !isFree(state, cell)) return;
+    taken.add(key);
+    found.push({ x: cell.x, y: cell.y });
+  };
+  for (const cell of anchors) take(cell);
+  const centre = anchors[0];
+  if (centre !== undefined && found.length < count) {
+    for (const cell of ringCells(state, { x: centre.x, y: centre.y, width: 1, depth: 1 }, 'front')) {
+      if (found.length >= count) break;
+      take(cell);
+    }
   }
-  // `fillAlong` walks the same side a cell further out when the row itself is blocked, so a man
-  // never lands on the end of a bench.
-  return fillAlong(state, item, queueSide(state, item), cells, count);
+  return found;
+}
+
+/** The cells of an item's places, the first `count` of them: the operator's cell, the second
+ *  place where the family's row names one, the side it is worked from at the operator's distance,
+ *  then the cells round its footprint a ring at a time from that distance, the worked side first,
+ *  then the ends, then the far side (CLAUDE.md T26 2.2). A bench's places are a row along its front,
+ *  one to a column of its own footprint (T24 2.5), and a machine's run along the side its operator
+ *  stands on; it is one list for every family, benches included (CLAUDE.md T19 2.5, T25 2.6). A
+ *  cell is never repeated, and none another figure has taken this minute (`taken`) is handed out:
+ *  the list is shorter than `count` only in a hall with no floor left at all. */
+export function placeCellsAt(
+  state: GameState,
+  item: Equipment,
+  count: number,
+  taken: Set<string> = new Set<string>(),
+): Cell[] {
+  if (count <= 0) return [];
+  const row = stationRow(item.specId);
+  const box = standsOn(item);
+  const side = queueSide(state, item);
+  const anchors: Cell[] = [standingCell(state, item, 'operator')];
+  if (row.second !== null) anchors.push(standingCell(state, item, 'second'));
+  // The operator's distance out: a cell out from a saw's table, hard against a bench's front, and a
+  // cell out from a rack's or a fan's free side (CLAUDE.md T19 2.4).
+  const out = row.operator === 'freeSide' ? 1 : (row.operator.out ?? 0);
+  const extent = side === 'front' || side === 'back' ? box.width : box.depth;
+  for (let along = 0; along < extent; along += 1) anchors.push(cellAt(box, { side, along, out }));
+  anchors.push(...ringCells(state, box, side, out));
+  return standingCellsFor(state, anchors, count, taken);
 }
 
 /** Where the man unloading the pallet stands: in front of it on the hall side, the cell east of

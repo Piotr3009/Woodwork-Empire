@@ -90,3 +90,13 @@ A machine books one minute a clock minute however many men are at it, the dust o
 (collapsing both is my reading [TUNE]: eight men at a CNC is one CNC running), and a contract's wear
 is charged on its own `machineMinutes` (lifted from its man minutes). No scenario figure moved; the
 unit tests that wanted "a saw of one place" stand a used saw now, and the day 128 and 149 places are re-pinned.
+
+**T26-C2 A cell of his own for every man.** `standingCellsFor(state, anchorCells, count, taken)`
+in `src/engine/stations.ts` is the one rule: the anchors in order, then the rings round the first,
+never a cell twice and never one another figure has this minute. `placeCellsAt` gives it the
+operator's cell, the second place, the worked side at the operator's distance and then the rings
+(worked side, ends, far side); the renderer's `figureStandings` hands every figure its cell in one
+pass (places machine by machine, then the owner and the crew in order, the door's queue through
+`doorQueueCell`, the gate and the home cells through the same call), and a man going into a room
+walks through its door and stands on no cell. Asserted on the day 53, 128 and 149 halls and a door
+queue of four; the bench's fifth place is now its end and not a second row in front of it.
