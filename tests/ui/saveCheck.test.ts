@@ -126,7 +126,8 @@ describe('a fresh game in this build', () => {
     // (PIOTR, 25.09). v58 is state 33 as well: the machines' capacities of 24.09 back, which is no
     // change to the save (PIOTR, 25.09). v59 and v60 are state 33 too: the canteen door, the two
     // Jacks, the pace as a sum and the admin's take off touch no field of the save (PIOTR, 30.09).
-    expect(APP_VERSION).toBe('v62');
+    // v61 and v62 are state 33 as well; v63 is too until Turn 26's phase A bumps it.
+    expect(APP_VERSION).toBe('v63');
     expect(STATE_VERSION).toBe(33);
   });
 
