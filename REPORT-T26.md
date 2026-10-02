@@ -18,3 +18,10 @@ README names the Turn 25 brief, `REPORT-T26.md` and `docs/art/REQUESTS-T26.md`, 
 goes v62 to v63 with the two tests that name it flipped (`STATE_VERSION` is phase A's).
 `docs/art/REQUESTS-T26.md` takes the sprayer's four sheets off the list (2.6) and restates the
 labourer's bench sheet, the backs of every floor family but the tool cabinet, and the seven recordings.
+
+**T26-A2 The four mockups.** `docs/mockups/t26/` with its README: the day 53 hall before and after
+2.1 and 2.2 and a man behind the moulder before and after 2.4, drawn with `renderHall` and shot in
+headless Chromium, and the Pace sheet's head and the agency's card as HTML in the game's own
+classes. The tree has no day 53 save, so `day53Hall` in `tests/helpers.ts` stands Piotr's hall of
+01.10 up from his words (six joiners, a CNC, a pro saw, two edgebanders, a moulder, a booth, the
+labourer, the office, and Nathan on a contract); it is the day 53 fixture wherever the brief names it.

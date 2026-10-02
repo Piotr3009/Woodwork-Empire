@@ -6,6 +6,7 @@ import { WORKER_RATES } from '../src/engine/constants';
 // the tests use them to stand kit in the hall without sending the owner out for it.
 import { buyEquipment, buySoftware } from '../src/engine/game';
 import { hire } from '../src/engine/staff';
+import { acceptContract, assignContract, drawContract } from '../src/engine/contracts';
 import { jobProgress, takeEnquiry } from '../src/engine/jobs';
 import { sheetsDueFor } from '../src/engine/materials';
 import type { Orientation, Worker, WorkerRole, WorkerTier } from '../src/engine/types';
@@ -533,6 +534,117 @@ export function sixJoinersOnSheetWork(
     next = act(next, { type: 'ASSIGN_JOB', jobId: job.id, workerId: `staff-${man + 1}` });
   }
   return next;
+}
+
+/** Piotr's hall of the evening of 01.10, which Turn 26 is written from: six joiners, a CNC, a pro
+ *  saw, two edgebanders, a moulder and a booth, with the labourer beside them and the office
+ *  behind its door, on day 53 [PIOTR, 02.10]. The tree has no day 53 save (REPORT-T25 0.5), so the
+ *  hall is stood up from his words with the engine's own helpers and stands in for it wherever
+ *  CLAUDE.md T26 names "the day 53 fixture"; a save of his replaces it in one line. Six jobs of
+ *  sheet work, two of them lacquered, each at its own point of its making, one man on each. */
+export function day53Hall(): GameState {
+  let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+  // Day 53 from the start, so the book of work, the contract and the machines' service dates are
+  // that day's and not day one's.
+  state.clock.day = 53;
+  // The day one floor goes and Piotr's stands in its place, laid out so no two zones meet.
+  state.equipment = state.equipment.filter((item) => !item.id.startsWith('kit-') || item.anchorX === 2);
+  state.pipes = [];
+  const layout: Array<[string, string, number, number]> = [
+    ['extractor', 'industrial', 15, 0],
+    ['compressor', 'pro', 13, 0],
+    ['airDryer', 'standard', 12, 0],
+    ['cnc', 'pro', 5, 0],
+    ['tableSaw', 'pro', 11, 1],
+    ['spindleMoulder', 'standard', 17, 1],
+    ['edgebander', 'standard', 5, 4],
+    ['edgebander', 'standard', 10, 4],
+    ['sprayBooth', 'standard', 15, 4],
+    ['workbench', 'industrial', 5, 8],
+    ['workbench', 'industrial', 8, 8],
+    ['workbench', 'industrial', 11, 8],
+    ['sheetRack', 'pro', 2, 8],
+    ['toolCabinet', 'industrial', 16, 9],
+  ];
+  layout.forEach(([specId, variantId, x, y], index) => {
+    placeEquipment(state, specId, { variantId, x, y, id: `hall-${specId}-${index + 1}` });
+  });
+  for (let locker = 0; locker < 4; locker += 1) {
+    placeEquipment(state, 'locker', { variantId: 'standard', x: 3, y: locker, id: `hall-locker-${locker + 1}` });
+  }
+  fillRack(state, 120);
+  state.enquiries = [];
+  const book: Array<[string, string, string, number]> = [
+    ['lacqueredKitchen', 'Lacquered kitchen', 'lacquer', 18000],
+    ['handlelessKitchen', 'Handleless kitchen', 'laminate', 14000],
+    ['wardrobe', 'Wardrobe', 'laminate', 6500],
+    ['smallKitchen', 'Small kitchen (6 units)', 'laminate', 9000],
+    ['lacqueredWardrobe', 'Lacquered wardrobe', 'lacquer', 8000],
+    ['tvUnit', 'TV unit', 'laminate', 3500],
+  ];
+  for (const [templateId, name, finish, price] of book) {
+    const enquiry = placeEnquiry(state, {
+      templateId,
+      name,
+      finish: finish as Enquiry['finish'],
+      price,
+      basePrice: price,
+      budget: price,
+      deadlineDays: 40,
+    });
+    state = acceptNow(state, enquiry.id);
+  }
+  state.jobs.forEach((job, index) => {
+    job.stage = 'ready';
+    job.labourRemaining = job.labourValue * (1 - index / 8);
+  });
+  const crew: Array<[string, WorkerTier]> = [
+    ['Jack T', 'experienced'],
+    ['Jack B', 'senior'],
+    ['Pete', 'master'],
+    ['Eddie', 'experienced'],
+    ['Callum', 'senior'],
+    ['Ben', 'novice'],
+  ];
+  crew.forEach(([name, tier], index) => {
+    const man = testJoiner(`staff-${index + 1}`, name, 5 + index, 7);
+    man.tier = tier;
+    man.rate = WORKER_RATES[tier];
+    state.workers.push(man);
+  });
+  const others: Array<[WorkerRole, string]> = [
+    ['helper', 'Frank'],
+    ['officeAdmin', 'Sam'],
+    ['draftsman', 'Dan'],
+  ];
+  others.forEach(([role, name], index) => {
+    const man = testJoiner(`staff-${7 + index}`, name, 14, 7);
+    man.role = role;
+    man.tier = null;
+    man.rate = 0;
+    state.workers.push(man);
+  });
+  crew.forEach((_, index) => {
+    const job = state.jobs[index];
+    if (!job) throw new Error('a job each is wanted here');
+    state = act(state, { type: 'ASSIGN_JOB', jobId: job.id, workerId: `staff-${index + 1}` });
+  });
+  // And Nathan, the seventh joiner, on a standing contract of cut sheet packs, which this hall
+  // cuts on its CNC: the man whose Pace row 2.14 is about.
+  const nathan = testJoiner('staff-10', 'Nathan', 12, 7);
+  nathan.tier = 'experienced';
+  nathan.rate = WORKER_RATES.experienced;
+  state.workers.push(nathan);
+  const contract = drawContract(state);
+  contract.pieceId = 'cutSheetPack';
+  contract.name = 'Cut sheet packs for Ashcombe Retail';
+  contract.quantityPerWeek = 40;
+  state.contracts.push(contract);
+  acceptContract(state, contract.id);
+  assignContract(state, contract.id, nathan.id, true);
+  // One o'clock, the dinner hour over: the half hour three of the six have the CNC on their round.
+  state.clock.minute = 300;
+  return runClock(state, 1);
 }
 
 /** A joiner with no experience, on the books from day 1 and on nothing: the one shape a test puts
