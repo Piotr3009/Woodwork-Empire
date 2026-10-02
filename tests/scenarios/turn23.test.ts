@@ -355,29 +355,32 @@ const FULL_BOOKS = (() => {
 const FULL_BOOKS_PLAYED = stretch(clone(FULL_BOOKS.state), 5);
 
 describe('(nn) nine men and a novice', () => {
-  it('cannot be played at all, because the canteen stops the books at eight', () => {
-    // The brief asks for nine men under a novice, with the ninth waiting every day until the
-    // manager is experienced. This build cannot reach nine men, and the arithmetic is the turn's
-    // own two figures against each other:
-    //
-    //   the canteen holds eight compartments, and every man on the books keeps his things in one,
-    //   so `canHire` refuses the ninth man whatever his trade (CLAUDE.md T23 2.10);
-    //   a manager does not manage himself (docs/notes-t23-b1.md 2.1), so the most men a manager
-    //   can be asked to carry is the eight on the books less himself, which is seven;
-    //   a novice carries eight, and seven is not more than eight.
-    //
-    // So no man in this game is ever past a novice's number, and the grade a shop has to buy to
-    // take the red mark off a man is never reached. The rule itself is sound and is proved on a
-    // position written into the state by tests/engine/managerGrades.test.ts, which puts nine
-    // joiners and a manager on the books and watches the ninth wait. It becomes playable the day
-    // the bigger canteen of CLAUDE.md T23 8 lands, and this test goes red when it does.
+  it('is played from Turn 26, because the canteen stops the floor at eight and not the books', () => {
+    // The brief asked for nine men under a novice, with the ninth waiting until the manager is
+    // experienced, and until Turn 26 the canteen's eight lockers stopped the books at eight, the
+    // manager among them, so no man was ever past a novice's number. From Turn 26 the lockers are
+    // the joiners' and the labourer's and nobody else's [PIOTR, 02.10: "the same as the crew"], so
+    // the office passes eight and the ninth man is past the novice's eight (CLAUDE.md T26 2.10).
     expect(CANTEEN_LOCKERS - 1).toBeLessThanOrEqual(PRODUCTION_MANAGER_CARRIES.novice);
+    expect(FULL_BOOKS.ninth.ok).toBe(true);
+    // Two more hired through the card, nine under the manager, and the books played on to the
+    // morning they start.
+    let state = act(clone(FULL_BOOKS.state), { type: 'HIRE', role: 'officeAdmin', tier: null });
+    state = act(state, { type: 'HIRE', role: 'officeAdmin', tier: null });
+    state = playDay(state, THREE_MEN);
+    expect(state.workers).toHaveLength(CANTEEN_LOCKERS + 2);
+    expect(menCarried(state)).toHaveLength(PRODUCTION_MANAGER_CARRIES.novice);
+    const manager = state.workers.find((worker) => worker.role === 'productionManager');
+    const uncarried = state.workers.filter(
+      (worker) => worker.id !== manager?.id && !hasManager(state, worker),
+    );
+    expect(uncarried).toHaveLength(1);
   });
 
-  it('fills the books to eight through the hire card and refuses the ninth', () => {
+  it('fills the books to eight through the hire card and takes a ninth into the office', () => {
     expect(FULL_BOOKS.state.workers).toHaveLength(CANTEEN_LOCKERS);
-    expect(FULL_BOOKS.ninth.ok).toBe(false);
-    expect(FULL_BOOKS.ninth.reason).toBe('No locker for him: the canteen holds eight');
+    // The office keeps no locker from Turn 26 (CLAUDE.md T26 2.10), so the canteen refuses nobody.
+    expect(FULL_BOOKS.ninth.ok).toBe(true);
   });
 
   it('leaves the novice carrying every one of them, with nobody waiting', () => {

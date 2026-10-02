@@ -19,6 +19,7 @@ import {
   type RoomRect,
 } from '../engine/constants';
 import { countOf } from '../engine/machines';
+import { lockerMen } from '../engine/staff';
 import type { GameState } from '../engine/types';
 import { type Scene, escapeText } from './hall';
 import {
@@ -81,13 +82,14 @@ const LOCKER = 'locker';
 
 /** Whose locker each of the eight is, in the order they were bought: the first locker the company
  *  bought is the first man's, and a plate with no locker behind it or no man in front of it stays
- *  blank (CLAUDE.md T23 2.9). The owner is not on the books and needs no locker (2.10). */
+ *  blank (CLAUDE.md T23 2.9). The owner is not on the books and needs no locker (2.10), and from
+ *  Turn 26 the office and the manager have none either: the lockers are the men on the floor's,
+ *  the joiners' and the labourer's (PIOTR, 02.10; CLAUDE.md T26 2.10). */
 export function canteenPlateNames(state: GameState): string[] {
   const bought = countOf(state, LOCKER);
-  const inUse = Math.min(bought, state.workers.length);
-  return CANTEEN_PLATES.map((_plate, index) =>
-    index < inUse ? state.workers[index]?.name ?? '' : '',
-  );
+  const men = lockerMen(state);
+  const inUse = Math.min(bought, men.length);
+  return CANTEEN_PLATES.map((_plate, index) => (index < inUse ? men[index]?.name ?? '' : ''));
 }
 
 /** The plate is the size the picture painted it, so a longer name is cut to the characters that

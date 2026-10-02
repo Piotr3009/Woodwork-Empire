@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// The floor's verdict on the team page (PIOTR; CLAUDE.md T13 3.10): "Crew 4 / 5, floor limited",
-// on the two tabs that hire onto the floor, and the refusal on the tile when it is full.
+// The unit's verdict on the team page (PIOTR; CLAUDE.md T13 3.10): "Joiners 4 / 8, the unit takes
+// 8 joiners" from Turn 26 (CLAUDE.md T26 2.10), on the two tabs that hire onto the floor, and the
+// refusal on the tile when it is full.
 
 import { describe, expect, it } from 'vitest';
 import { crewLine } from '../../src/engine/index';
@@ -47,16 +48,16 @@ describe('the floor limit on the team page', () => {
     expect(parse(renderTeam(state, 'technical')).querySelector('.crew-limit')).toBeNull();
   });
 
-  it('reads "Crew 5 / 8" with the owner and four, and the tiles still hire (v37)', () => {
-    // The unit takes eight since v37 (PIOTR, 20.09), so four men and the owner leave three seats
-    // and the tiles are not refused by the crew line.
+  it('reads "Joiners 4 / 8" with four joiners, and the tiles still hire (v37, T26 2.10)', () => {
+    // The unit takes eight since v37 (PIOTR, 20.09), joiners and nobody else from Turn 26, so four
+    // joiners leave four places and the tiles are not refused by the crew line.
     const state = withCrew(buyStartingKit(known()), 4);
     const page = parse(renderTeam(state, 'workshop'));
-    expect(page.querySelector('.crew-limit')?.textContent).toBe('Crew 5 / 8, the unit takes 8 people');
+    expect(page.querySelector('.crew-limit')?.textContent).toBe('Joiners 4 / 8, the unit takes 8 joiners');
     const novice = page.querySelector('[data-candidate="joiner.novice"]');
     expect(novice?.textContent).not.toContain('the unit takes');
-    const helper = page.querySelector('[data-candidate="helper."]');
-    expect(helper?.textContent).not.toContain('the unit takes');
+    const labourer = page.querySelector('[data-candidate="helper."]');
+    expect(labourer?.textContent).not.toContain('the unit takes');
     // The desks are not on the floor: the admin can still be taken on.
     const office = parse(renderTeam(state, 'office'));
     expect(office.querySelector('[data-candidate="officeAdmin."]')?.querySelectorAll('[data-do="hire"]')).toHaveLength(1);

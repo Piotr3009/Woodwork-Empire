@@ -1,11 +1,12 @@
-// Eight lockers, eight men (PIOTR, 20.09; CLAUDE.md T23 2.10). The canteen was built with eight
-// compartments, so a ninth locker cannot be bought and a ninth man cannot be taken on. The owner
-// needs no locker: he is not on the books. A bigger canteen is parked (CLAUDE.md T23 8).
+// Eight lockers, eight men on the floor (PIOTR, 20.09; CLAUDE.md T23 2.10). The canteen was built
+// with eight compartments, so a ninth locker cannot be bought and a ninth man on the floor cannot
+// be taken on. The owner needs no locker: he is not on the books. A bigger canteen is parked
+// (CLAUDE.md T23 8). From Turn 26 the lockers are the joiners' and the labourer's and nobody
+// else's: the manager and the office keep none [PIOTR, 02.10: "the same as the crew"] (CLAUDE.md
+// T26 2.10).
 //
-// The crew is asked for with office staff, because the floor limit gets to the men on the floor
-// first: 200 m2 at 24 m2 a person is six people counting the owner, and the benches and cabinets
-// they want eat into that (CLAUDE.md T13 3.10). Office staff are not floor limited, so they are
-// how a shop reaches nine on the books at all, and the canteen is what stops them there.
+// The crew is asked for with labourers, because a labourer wants no bench and no kit and the unit's
+// crew limit counts joiners only, so the canteen is the one thing that stops them.
 
 import { describe, expect, it } from 'vitest';
 import { CANTEEN_LOCKERS, CANTEEN_PLATES } from '../../src/engine/constants';
@@ -23,11 +24,11 @@ function shop(lockers: number): GameState {
   return state;
 }
 
-/** The same shop with that many men on the books, taken on through the gate itself. */
+/** The same shop with that many labourers on the books, taken on through the gate itself. */
 function withCrew(size: number, lockers = size): GameState {
   let state = shop(lockers);
   for (let index = 0; index < size; index += 1) {
-    state = hireNow(state, 'officeAdmin', null);
+    state = hireNow(state, 'helper', null);
   }
   if (state.workers.length !== size) {
     throw new Error(`wanted ${size} on the books, took on ${state.workers.length}`);
@@ -64,28 +65,33 @@ describe('the ninth man', () => {
   it('is refused with the canteen as the reason, and the eighth is taken on', () => {
     const eight = withCrew(CANTEEN_LOCKERS);
     expect(eight.workers).toHaveLength(CANTEEN_LOCKERS);
-    const check = canHire(eight, 'officeAdmin', null);
+    const check = canHire(eight, 'helper', null);
     expect(check.ok).toBe(false);
     expect(check.reason).toBe('No locker for him: the canteen holds eight');
   });
 
   it('lets the eighth in: it is the ninth that is refused and not the eighth', () => {
     const seven = withCrew(CANTEEN_LOCKERS - 1);
-    expect(canHire(seven, 'officeAdmin', null).ok).toBe(true);
+    expect(canHire(seven, 'helper', null).ok).toBe(true);
   });
 
-  it('is the ninth whatever his trade, because every man on the books keeps his things there', () => {
-    // Every line of the hire card at once: with the standing, the admin and the cash all there,
-    // the canteen is the one thing left to refuse any of them.
+  it('is the ninth on the floor, a joiner or the labourer, and the office and the manager are not asked', () => {
+    // Every line of the hire card at once: a joiner and a labourer keep their things in the
+    // canteen and are refused by it; the manager and the office keep none from Turn 26 and are
+    // refused by nothing of the canteen's (CLAUDE.md T26 2.10).
     const eight = withCrew(CANTEEN_LOCKERS);
     const options = hiringOptions(eight);
     expect(options.length).toBeGreaterThan(4);
     for (const option of options) {
-      expect(option.available, `${option.role} ${option.tier ?? ''}`).toBe(false);
-      expect(option.blockReason, `${option.role} ${option.tier ?? ''}`).toBe(
-        'No locker for him: the canteen holds eight',
-      );
+      const label = `${option.role} ${option.tier ?? ''}`;
+      if (option.role === 'joiner' || option.role === 'helper') {
+        expect(option.available, label).toBe(false);
+        expect(option.blockReason, label).toBe('No locker for him: the canteen holds eight');
+      } else {
+        expect(option.blockReason, label).not.toBe('No locker for him: the canteen holds eight');
+      }
     }
+    expect(canHire(eight, 'officeAdmin', null).ok).toBe(true);
   });
 
   it('does not count the owner: he is not on the books and needs no locker', () => {
@@ -95,7 +101,7 @@ describe('the ninth man', () => {
     expect(eight.owner).toBeDefined();
     expect(eight.workers).toHaveLength(CANTEEN_LOCKERS);
     // The eight were taken on one by one and none of them was ever refused for want of a locker.
-    expect(canHire(withCrew(CANTEEN_LOCKERS - 1), 'officeAdmin', null).ok).toBe(true);
+    expect(canHire(withCrew(CANTEEN_LOCKERS - 1), 'helper', null).ok).toBe(true);
   });
 
   it('says the canteen and not the shopping list, because a ninth locker cannot be bought', () => {

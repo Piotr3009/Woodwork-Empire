@@ -128,26 +128,37 @@ const OFFICE_ROLES: WorkerRole[] = ['officeAdmin', 'salesman', 'draftsman', 'pro
  *  admin's specialist work. */
 const BEHIND_THE_ADMIN: WorkerRole[] = ['salesman', 'draftsman'];
 
-/** The roles that stand on the hall floor and so count against it: the crew the floor limits
- *  (CLAUDE.md T13 3.10). The office is in the office block. The production manager stands on the
- *  floor, because the floor is what he runs. */
+/** The roles that stand on the hall floor: the joiners, the labourer and the production manager,
+ *  who runs it (CLAUDE.md T13 3.10). The office is in the office block, behind its door. */
 export const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager'];
 
-/** The crew on the floor, the owner among them (CLAUDE.md T13 3.10). */
-export function crewCount(state: GameState): number {
-  return 1 + state.workers.filter((worker) => FLOOR_ROLES.includes(worker.role)).length;
+/** The men the canteen keeps a locker and a plate for: the men on the floor, the joiners and the
+ *  labourer, and nobody else [PIOTR, 02.10: "the same as the crew"] (CLAUDE.md T26 2.10). */
+export const LOCKER_ROLES: WorkerRole[] = ['joiner', 'helper'];
+
+/** The men of the canteen's lockers, in the order they were taken on. */
+export function lockerMen(state: GameState): Worker[] {
+  return state.workers.filter((worker) => LOCKER_ROLES.includes(worker.role));
 }
 
-/** True when the floor has no room for one more of this role (CLAUDE.md T13 3.10). */
+/** The crew the unit limits: its joiners and nobody else, the owner, the labourer, the manager and
+ *  the office all outside it [PIOTR, 02.10: "eight joiners, however many others"] (CLAUDE.md T13
+ *  3.10, T26 2.10). */
+export function crewCount(state: GameState): number {
+  return joiners(state).length;
+}
+
+/** True when the unit has no room for one more joiner; it is never full for anybody else
+ *  (CLAUDE.md T26 2.10). */
 export function crewFull(state: GameState, role: WorkerRole): boolean {
-  if (!FLOOR_ROLES.includes(role)) return false;
+  if (role !== 'joiner') return false;
   return crewCount(state) + 1 > crewLimit(state);
 }
 
-/** "Crew 4 / 8, the unit takes eight": what the team page says (CLAUDE.md T13 3.10; v37). */
+/** "Joiners 4 / 8, the unit takes 8": what the team page says (CLAUDE.md T13 3.10; v37; T26 2.10). */
 export function crewLine(state: GameState): string {
   const limit = crewLimit(state);
-  return `Crew ${crewCount(state)} / ${limit}, the unit takes ${plural(limit, 'person', 'people')}`;
+  return `Joiners ${crewCount(state)} / ${limit}, the unit takes ${plural(limit, 'joiner', 'joiners')}`;
 }
 
 /** The office role every other one is hired behind. She is the base office person: emails,
@@ -501,7 +512,7 @@ export function hiringOptions(state: GameState): HiringOption[] {
       // The floor limits the crew: one person per so many square metres of free floor
       // (PIOTR; CLAUDE.md T13 3.10).
       blockReason = crewLine(state);
-    } else if (state.workers.length >= CANTEEN_LOCKERS) {
+    } else if (LOCKER_ROLES.includes(spec.role) && lockerMen(state).length >= CANTEEN_LOCKERS) {
       // And so does the canteen: it was built with eight compartments, every man on the books
       // keeps his things in one of them, and the owner needs none. This comes before the
       // shortfall below, because a ninth locker cannot be bought either and "Buy first: Locker"

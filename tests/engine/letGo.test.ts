@@ -116,10 +116,10 @@ describe('let go', () => {
 
   it('is counted by the crew limit and the hiring gate until he has gone', () => {
     const { state, man } = withAJoiner();
-    // The floor counts the owner and the crew, and the team page prints the count
-    // (CLAUDE.md T13 3.10). A man under notice is still on the floor.
+    // The unit counts its joiners, and the team page prints the count (CLAUDE.md T13 3.10, T26
+    // 2.10). A man under notice is still on the floor.
     const line = crewLine(state);
-    expect(line).toContain('Crew 2 /');
+    expect(line).toContain('Joiners 1 /');
     letGo(state, man.id);
     morningOf(state, (man.leavesOnDay ?? 0) - 1);
     expect(crewLine(state)).toBe(line);
@@ -129,6 +129,6 @@ describe('let go', () => {
     );
     expect(canHire(state, 'joiner', 'experienced').reason).toBe(during?.blockReason ?? '');
     morningOf(state, (man.leavesOnDay ?? 0) + 1);
-    expect(crewLine(state)).toContain('Crew 1 /');
+    expect(crewLine(state)).toContain('Joiners 0 /');
   });
 });

@@ -224,6 +224,23 @@ describe('the eight door plates', () => {
     expect(canteenPlateNames(withoutLockers).every((name) => name === '')).toBe(true);
   });
 
+  it('letters the men on the floor and nobody of the office or the manager (CLAUDE.md T26 2.10)', () => {
+    // Two joiners, then a manager and an office admin on the books between them and a labourer:
+    // the lockers are the floor's, the joiners' and the labourer's, so the desk and the manager
+    // keep no plate and the labourer takes the third (PIOTR, 02.10: "the same as the crew").
+    let state = crewOf(2);
+    state = buyNow(state, 'locker');
+    state = buyNow(state, 'locker');
+    state.reputation = 60;
+    state = hireNow(state, 'officeAdmin', null);
+    state = hireNow(state, 'productionManager', 'novice');
+    state = hireNow(state, 'helper', null);
+    const floor = state.workers.filter((worker) => worker.role === 'joiner' || worker.role === 'helper');
+    expect(floor).toHaveLength(3);
+    expect(state.workers).toHaveLength(5);
+    expect(canteenPlateNames(state)).toEqual([...floor.map((worker) => worker.name), '', '', '', '', '']);
+  });
+
   it('cuts a name that is longer than the plate the picture painted', () => {
     const state = crewOf(1);
     const man = state.workers[0];

@@ -39,3 +39,12 @@ survey; and the draftsman moved to the Technical tab, which would otherwise hire
 word a player reads says labourer (`helperOnDuty` and the `HELPER_*` names renamed too; the id
 `helper` and the sheets stay). `liftToVersion34` does section 4. The three month playthrough now
 goes to the bank on day 89 (no take off man's site measures, no quarter of answer skew).
+
+**T26-B1 The crew limit is joiners.** `crewCount` counts the joiners and nobody else, the owner
+included, and the line reads `Joiners 4 / 8, the unit takes 8 joiners`; `crewFull` is never true
+for anybody but a joiner; the canteen's lockers, its plates and its hiring gate count the joiners
+and the labourer only (`LOCKER_ROLES`), so the office and the manager pass eight on the books.
+Two things the brief did not settle and this left as they were: the unit's bench slots (six on
+very easy, four on easy and hard) refuse a seventh joiner at the hire card before the eight is
+reached, and the eight lockers still hold eight joiners and labourers between them; T23's (nn),
+nine men under a novice, is reachable through the hire card from tonight and is flipped to say so.
