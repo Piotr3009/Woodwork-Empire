@@ -74,3 +74,10 @@ slope]; `canAccept` says `Wants 4 joiners free: you have 2` (red on the card, gr
 and the client's yes puts the first free joiners on it, who stand by it until it is ready and it
 goes into production with them. Note: at the deadline cap of 30 days the top of the range cannot
 be made on time (D2 measures it).
+
+**T26-B5 The Pace sheet says the real number.** The head is `workshopOutputToday`, `every worked
+minute today was worth`, the number the top bar carries; the note that carried it under the hall's
+own figure is gone, and the hall's total of its lines is the sum under `What moves it` and nowhere
+above it. A man on a standing contract takes his `machines` from `contractPieceSpeed`, the figure
+`runContractMinute` books him at, and his place's machine in the words (Nathan `CNC, pro ... 0.80 ×
+(1.00 + n machines ...)`), so the row multiplies out to its figure; a job man's row is v61's.

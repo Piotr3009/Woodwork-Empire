@@ -85,7 +85,7 @@ describe('the workshop\'s average output today (v40)', () => {
     expect(worked.dayStats.outputWorth / worked.dayStats.workMinutes).toBeCloseTo(average, 2);
   });
 
-  it('is the one Pace on the top bar, and the board says it beside the hall\'s own', () => {
+  it('is the one Pace on the top bar, and the head of the board\'s Pace sheet', () => {
     const worked = tick(twoMenOnSheetWork({ sawVariant: 'standard' }), 60);
     const average = workshopOutputToday(worked);
     const bar = parse(renderTopbar(worked, 'hall'));
@@ -95,10 +95,15 @@ describe('the workshop\'s average output today (v40)', () => {
     expect(chip?.textContent).toBe(`Pace ${average.toFixed(2)}`);
     expect(chip?.tagName.toLowerCase()).toBe('summary');
     expect(bar.querySelectorAll('.output')).toHaveLength(1);
+    // From Turn 26 the sheet's head is that number and the hall's own is the sum of its lines
+    // (PIOTR, 02.10; CLAUDE.md T26 2.14).
     const board = parse(renderCompany(worked));
-    const note = board.querySelector('[data-figure="workshopToday"]');
-    expect(note?.querySelector('strong')?.textContent).toBe(average.toFixed(2));
-    expect(board.querySelector('[data-figure="output"]')?.textContent).toBe(
+    expect(board.querySelector('[data-figure="workshopToday"]')).toBeNull();
+    expect(board.querySelector('[data-figure="output"]')?.textContent).toBe(average.toFixed(2));
+    const hallSum = Array.from(board.querySelectorAll('[data-sheet="output"] .ledger-sum')).find(
+      (sum) => sum.querySelector('[data-sum="plus"]') !== null,
+    );
+    expect(hallSum?.querySelector('[data-sum="total"]')?.textContent).toContain(
       hallProductivityFactor(worked).toFixed(2),
     );
   });

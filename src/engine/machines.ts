@@ -86,7 +86,7 @@ import {
 import { lockReasonFor, template } from './catalog';
 import { jobHeldBy } from './jobs';
 import { stageOfMan } from './production';
-import { contractOfWorker, contractPiece, contractStageFamilyOf } from './contracts';
+import { contractOfWorker, contractPiece, contractPieceSpeed, contractStageFamilyOf } from './contracts';
 import { jobPace, stageDoing, stagePlanFor } from './stages';
 import { isWorkingToday, managerPaceFor, nightCrew } from './staff';
 import type { StagePlan } from './stages';
@@ -1125,12 +1125,24 @@ function manRow(
 ): WorkshopBreakdownRow {
   const job = jobHeldBy(state, who);
   const stage = job === null ? null : stageOfMan(state, who, job);
-  const machine = job === null ? null : (menAtPlaces(state).find((entry) => entry.who === who)?.item ?? null);
+  // A man on a standing contract holds no job: his piece is what his minute is made on
+  // (CLAUDE.md T26 2.14).
+  const contract = job === null && who !== OWNER ? contractOfWorker(state, who) : null;
+  const machine =
+    job === null && contract === null ? null : (menAtPlaces(state).find((entry) => entry.who === who)?.item ?? null);
   const doing =
     job === null || stage === null ? '' : `${stageDoing(stage.id, job.finish === 'lacquer')} ${job.name}`;
-  // The job's one pace, the figure `runProductionMinute` reads before the air factor (v53).
+  // The job's one pace, the figure `runProductionMinute` reads before the air factor (v53); for a
+  // man on a contract his piece's own, the figure `runContractMinute` reads, so the CNC he cuts
+  // the packs on is his `machines` and not a remainder called hall (PIOTR, 02.10; CLAUDE.md T26
+  // 2.14).
   const worker = who === OWNER ? null : (state.workers.find((entry) => entry.id === who) ?? null);
-  const pace = job === null ? 1 : jobPace(state, job);
+  const pace =
+    job !== null
+      ? jobPace(state, job)
+      : contract !== null
+        ? contractPieceSpeed(state, contractPiece(contract))
+        : 1;
   const figure = booked.minutes <= 0 ? 0 : Math.round((booked.worth / booked.minutes) * 100) / 100;
   // His minute as the engine makes it: his grade times the hall's points, the points named one by
   // one and the hall as the remainder off what his minutes were really booked at, the saws too few

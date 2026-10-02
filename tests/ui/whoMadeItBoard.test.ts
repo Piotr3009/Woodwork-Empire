@@ -81,8 +81,8 @@ describe('who made it today, on the Output sheet', () => {
     );
     expect(sum?.querySelector('[data-sum="plus"]')).toBeNull();
     expect(sum?.querySelector('[data-sum="minus"]')).toBeNull();
-    // The same figure as the workshop line over the block.
-    expect(outputSheet(state).querySelector('[data-figure="workshopToday"] strong')?.textContent).toBe(
+    // The same figure as the sheet's head over the block (CLAUDE.md T26 2.14).
+    expect(outputSheet(state).querySelector('[data-figure="output"]')?.textContent).toBe(
       workshopOutputToday(state).toFixed(2),
     );
   });
