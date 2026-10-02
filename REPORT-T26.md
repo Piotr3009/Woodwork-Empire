@@ -1,5 +1,53 @@
 # Report, Turn 26: one kind of man on the floor, and a hall that looks like a workshop
 
+Woodwork Empire, Turn 26. Built against `CLAUDE.md` of 02.10.2026 (first line "Turn 26").
+Branch `turn-26-one-kind-of-man`, off `1a58cfb`, the tree `origin/main` stands on (v62).
+`APP_VERSION` v62 to v63, `STATE_VERSION` 33 to 34. One agent, serial, no worktrees, one commit a
+task, `npm run check` green on its own exit code before each (2,431 tests in 255 files at the end).
+
+## 0. What Piotr should read first
+
+1. **A big job, as written, ruins the shop that takes it** (D2, notes 4). Its labour is 0.4 of its
+   value like any job's and its deadline is the ordinary rule, capped at 30 working days and a
+   little slack. Measured, the hall's own points aside: at 100,000 four experienced men need 27.5
+   of the 34 days, at 250,000
+   eight need 34.4, at 1,000,000 eight need 137. On the day 53 hall at a standing of 60 the agency
+   brought Bookcases x 233 (210,000) on day 106; the four stood by it for its drawings for three
+   weeks, eight men made it from day 127, it was finished on day 180, 22 working days late, and the
+   bank closed the company on day 181 with it at the gate (the late days would have taken the whole
+   108,310 balance). The three month playthrough never sees the agency at all: its standing is 3
+   on day 91 and the agency takes a shop on from 50. The levers are the deadline cap for a big job,
+   its labour, and its drawings (24 minutes a thousand pounds); none of them is mine to move.
+2. **Eight joiners cannot be hired through the card.** The crew limit is eight joiners (2.10), but
+   the unit's bench slots, untouched tonight, refuse a seventh joiner on very easy and a fifth on
+   easy and hard first; and the eight lockers hold the joiners and the labourer between them, so
+   eight joiners leave no locker for a labourer. Notes 2.
+3. **The depth keys alone could not hide a man behind a machine** (2.4). The moulder's key is the
+   back corner of its zone, and a man on the row behind its table sorts after it whatever the
+   re-sort does. He is now placed by his feet against the thing's drawn footprint, the keys
+   unchanged; a stepped walker is before the moulder for every frame he is behind it, and was not
+   on v62. Picture 2, notes 6.
+4. **The overhang is half a cell, everywhere** (2.3). Every one of the 62 delivered floor pictures
+   is exactly the canvas its footprint gives, so the only overhang is a footprint centred half a cell
+   into the cell beside it. A machine's half cells are not walked across (benches' and racks' are:
+   their fronts are where the men stand). On my day 53 stand-in the moulder's corner is sealed by the
+   saw's and the booth's half cells, and 20 of 110 walks there go through them; nothing walks the
+   straight line on any of the three halls. Notes 5.
+5. **The reputation curve is half as steep** (2.11). Thirty days on Easy ends at 11.5 (23); the
+   three month playthrough trades to day 92 as it traded to day 91 on v62, with an experienced
+   manager on day 65; between A3's roles and 2.11 its bank had closed it on day 89.
+6. **There is no day 53 save.** `day53Hall` in `tests/helpers.ts` stands Piotr's hall of 01.10 up
+   from his words and is "the day 53 fixture" everywhere; a save of his replaces it in one line. Its
+   Pace head is 0.96, not his 2.20. Notes 1.
+7. **Four readings of mine, each [TUNE] and in the notes**: the agency is locked below a standing of
+   50; a big job's four stand by it from the click until it is ready (a job can only be assigned once
+   ready, so they are written on it); the dust is booked on a machine's minutes as the hours are (two
+   men at a saw make one saw's dust); the draftsman is on the Technical tab, and a job's drawing waits
+   for its meeting and its survey.
+8. **Two files are left for Piotr to delete**: `public/sprites/palletTruck.standard.png` and `.r.png`
+   (renamed in v54, listed in v61's DELETED.txt). The session's permissions refused it; the turned
+   sprite count is 67 in two tests until they go (A0).
+
 ## The tasks
 
 **T26-A0 The suite settled on v62.** On main as it stands the full suite failed 30 of 2,388: 27
@@ -161,3 +209,35 @@ four, the CNC's card at `Places: 3 of 8 in use`, the hire cards, the labourer's 
 sheet's head (0.96 on the stand-in, not Piotr's 2.20), Nathan's `machines`, the agency card off and
 on, and the big job red and green. The red never showed in the first shot: the folder inks every
 paragraph of a tile, so the colour went on a span inside the line (no new style).
+
+**T26-D5 Report and PR.** This file, and the pull request titled `Turn 26: one kind of man on the
+floor, and a hall that looks like a workshop`, not merged. Nothing was left running: the pictures
+were shot from a static server inside the shooting script, which stops it before it exits.
+
+## The ten pictures
+
+The third column is the nearest existing picture of the same screen, and what each pair differs by
+is what this turn did to it.
+
+| picture | what it shows | beside |
+| --- | --- | --- |
+| `01-day53-one-minute.png` | the day 53 stand-in at 13:01: Jack B, Callum, Ben and Nathan at the pro CNC's places, every figure on a cell of his own | `docs/mockups/t26/hall-before.png`: v62's one man at the CNC and the rest at the benches |
+| `02-day53-tenth-minute-behind-the-moulder.png` | 13:10, Frank the labourer walking the row behind the moulder from the saw's side, his legs hidden by it | `docs/mockups/t26/moulder-before.png`: Frank painted over the moulder's table |
+| `03-door-queue-of-four.png` | four men on an empty contract at the canteen door, four cells, the owner in the doorway | `report-t21/09-canteen-door-at-lunch.png`: the door before the queue |
+| `04-cnc-card-places-3-of-8.png` | the CNC's card, `Places: 3 of 8 in use, Jack B, Callum and Nathan` | `report-t25/06-a-machine-card-with-its-places.png`: `Places: 2 of 2 in use` on a saw of v52's table |
+| `05-hire-cards.png` | Technical with the draftsman in three grades, Office with the admin and the salesman, Workshop with the joiners and the labourer | `report-t23/04-the-four-manager-hire-cards.png` and `report-t21/07-hire-cards-four-tiers.png` |
+| `06-labourer-card.png` | Frank's card, `labourer` | `report-t23/14-a-persons-card-opened-from-the-hall.png` |
+| `07-pace-sheet-head.png` | the Company board's Pace sheet: `every worked minute today was worth 0.96` at the head, the hall's 0.59 as the sum of its lines | `docs/mockups/t26/pace-sheet-head.png`: v62's head beside 2.14's |
+| `08-contract-row-machines.png` | `Nathan ... CNC, pro, 60 min: 0.80 × (1.00 + 1.16 machines − 0.41 hall)` | `report-t24/08-the-who-made-it-block-at-its-foot.png` |
+| `09-agency-card-off-and-on.png` | the agency's card under the website's ladder, off, and on with a big job on the board | `report-t13/29-laptop-website.jpg`: the ladder alone |
+| `10-big-job-red-and-green.png` | `Wants 4 joiners free: you have 2` in red with no Accept, and `you have 4` in green with it | `report-t13/06-board-enquiries.jpg`: an ordinary enquiry's tile |
+
+## What was not done tonight
+
+- Piotr's own day 53 save: there is none in the tree, so the stand-in is used (0.6).
+- The two pallet truck files (0.8).
+- Section 8's parked list, untouched: the second 200 square metres, bigger contracts, pathfinding
+  round other men (two men may still cross on a walk), the owner's holidays, the weekly summary
+  card, the tips under a monthly report, the backs of the sprites, the sound files, the three Turn
+  20 leftovers.
+
