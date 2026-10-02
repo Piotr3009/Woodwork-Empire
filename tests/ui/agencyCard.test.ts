@@ -82,13 +82,14 @@ describe('the big job s card on the board', () => {
     const short = parse(renderBoard(state, '')).querySelector('[data-enquiry="enq-big"]');
     const red = short?.querySelector('[data-big-job="crew"]');
     expect(red?.textContent).toBe('Wants 4 joiners free: you have 2');
-    expect(red?.classList.contains('bad')).toBe(true);
+    // In the game's red, on a span of its own inside the line (the folder inks the paragraph).
+    expect(red?.querySelector('span')?.classList.contains('bad')).toBe(true);
     expect(short?.querySelector('[data-do="acceptEnquiry"]')).toBeNull();
     state.workers.push(testJoiner('staff-3', 'Cal', 6, 6), testJoiner('staff-4', 'Dee', 7, 6));
     const ready = parse(renderBoard(state, '')).querySelector('[data-enquiry="enq-big"]');
     const green = ready?.querySelector('[data-big-job="crew"]');
     expect(green?.textContent).toBe('Wants 4 joiners free: you have 4');
-    expect(green?.classList.contains('good')).toBe(true);
+    expect(green?.querySelector('span')?.classList.contains('good')).toBe(true);
     expect(ready?.querySelector('[data-do="acceptEnquiry"]')).not.toBeNull();
   });
 });

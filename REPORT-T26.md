@@ -153,3 +153,11 @@ at the CNC (`placesAreCapacity`); the ninth joiner and nobody else (`staffCrewLi
 grades (`draftsmanSurvey`, `team`); a month of ratings at half (`companyBoard`); the fourth contract
 (`contractsMax`); the agency (`agency`, `agencyCard`); the Pace head and Nathan's `machines`
 (`paceHead`); every scenario green; `git diff main --stat -- src/ui/styles.css` empty.
+
+**T26-D4 Look and shoot.** Ten pictures in `docs/report-t26/`, drawn by the game's own renderer and
+UI functions in the game's stylesheet and shot in headless Chromium: the day 53 hall at 13:01 (four
+at the CNC, every figure on a cell of his own), Frank behind the moulder at 13:10, a door queue of
+four, the CNC's card at `Places: 3 of 8 in use`, the hire cards, the labourer's card, the Pace
+sheet's head (0.96 on the stand-in, not Piotr's 2.20), Nathan's `machines`, the agency card off and
+on, and the big job red and green. The red never showed in the first shot: the folder inks every
+paragraph of a tile, so the colour went on a span inside the line (no new style).

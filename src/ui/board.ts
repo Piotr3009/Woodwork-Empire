@@ -97,10 +97,11 @@ function tile(state: GameState, enquiry: Enquiry): string {
         )
       : '';
   // A big job of the agency's says what it wants of the crew, red until the hall has the free
-  // joiners and green once it has (CLAUDE.md T26 2.13).
+  // joiners and green once it has (CLAUDE.md T26 2.13). The colour is on a span of its own: the
+  // folder's paper inks every paragraph of a tile, so a colour on the paragraph never shows.
   const crewLine = isBigJob(enquiry)
-    ? `<p class="tile-figures ${bigJobCheck(state, enquiry).ok ? 'good' : 'bad'}" data-big-job="crew">` +
-      `${escapeHtml(bigJobLine(state, enquiry))}</p>`
+    ? '<p class="tile-figures" data-big-job="crew">' +
+      `<span class="${bigJobCheck(state, enquiry).ok ? 'good' : 'bad'}">${escapeHtml(bigJobLine(state, enquiry))}</span></p>`
     : '';
   const lockLine = enquiry.unreachable
     ? `<p class="lock">Cannot take this: ${escapeHtml(enquiry.blockReason)}</p>`
