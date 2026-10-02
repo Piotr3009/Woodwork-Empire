@@ -127,3 +127,9 @@ the v62 re-sort); the T20 walk past the saw moves him on two frames now and not 
 `WALK_CELLS_PER_SECOND_FAST` 1.5 to 1.8 [TUNE, the x1 pace's own fifth more]; the walk sheet plays
 at `frames * pace / WALK_STRIDE_METRES` as before, so the feet stay planted. The staircase test's
 frame count is restated for the shorter walk (479 frames at 60 a second for twelve cells).
+
+**T26-D1 Notes.** `docs/notes-t26.md`: the day 53 stand-in, the bench slots and the lockers in
+front of the crew limit, the draftsman's tab and order of work, the agency's readings and the
+measured workload of a big job (from about 250,000 no crew the unit holds makes the deadline), the
+overhang as measured, the depth keys against the order, the dust on machine minutes, and what is
+left for Piotr.
