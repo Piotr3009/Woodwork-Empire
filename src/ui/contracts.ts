@@ -241,33 +241,30 @@ export function renderContracts(state: GameState): string {
   );
 }
 
-/** The list the contract's blue button opens: every joiner on the books, with the one click that
- *  puts him on, and everybody else told why not (only a joiner goes on a contract; a man already
- *  on it; a man not in today). A joiner on a job is offered too: the contract takes him alongside
- *  the job, as the engine allows, and the plan shows him on both. */
+/** The list the contract's blue button opens: the joiners who are free, in today, on no job and
+ *  on no contract, with the one click that puts each on, and nobody else (PIOTR, 02.10: "only
+ *  free people"; v62). Until v62 it listed everybody on the books, the helper and the admin told
+ *  they do not go on a contract and a man on another contract or a job offered all the same. */
 function contractAssignList(state: GameState, contract: Contract): string {
-  const rows = state.workers
-    .filter((worker) => onTheBooksToday(state, worker))
-    .map((worker) => {
-      const head =
-        `<span>${escapeHtml(worker.name)} ` +
-        `<span class="assign-tier">${escapeHtml(
-          manTrade(state, worker.id),
-        )}</span></span>`;
-      if (contract.assigned.includes(worker.id)) {
-        return `<div class="assign-row is-busy">${head}<span class="assign-why">already on this contract</span></div>`;
-      }
-      const check = contractAssignCheck(state, contract, worker.id);
-      if (!check.ok) {
-        return `<div class="assign-row is-busy">${head}<span class="assign-why">${escapeHtml(check.reason)}</span></div>`;
-      }
-      return (
-        `<div class="assign-row">${head}` +
-        `<button class="chip" data-do="assignContract" data-id="${contract.id}" data-worker="${worker.id}" data-on="1">add</button>` +
-        '</div>'
-      );
-    })
-    .join('');
+  const free = state.workers.filter(
+    (worker) =>
+      onTheBooksToday(state, worker) &&
+      !contract.assigned.includes(worker.id) &&
+      contractAssignCheck(state, contract, worker.id).ok &&
+      worker.jobId === null,
+  );
+  const rows =
+    free.length === 0
+      ? '<div class="assign-row is-busy"><span class="assign-why">Nobody is free: every joiner is on a job or a contract</span></div>'
+      : free
+          .map(
+            (worker) =>
+              `<div class="assign-row"><span>${escapeHtml(worker.name)} ` +
+              `<span class="assign-tier">${escapeHtml(manTrade(state, worker.id))}</span></span>` +
+              `<button class="chip" data-do="assignContract" data-id="${contract.id}" data-worker="${worker.id}" data-on="1">add</button>` +
+              '</div>',
+          )
+          .join('');
   return (
     '<div class="assign-list" data-popover="assign-contract">' + closeButton('closeAssign') +
     `<span class="row-figure">Who goes on ${escapeHtml(contract.name)}?</span>${rows}</div>`

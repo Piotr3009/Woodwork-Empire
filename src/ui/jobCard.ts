@@ -183,22 +183,23 @@ export function jobAssignControls(state: GameState, job: Job, open = false): str
   );
 }
 
-/** The list the blue button opens: everybody who could stand at this job, with the ones who
- *  cannot greyed and told why (PIOTR, 17.09; CLAUDE.md T19 2.5, 2.6). */
+/** The list the blue button opens: the men who are free to stand at this job and nobody else
+ *  (PIOTR, 02.10: "only free people, not the ones already on jobs or contracts"; v62). Until v62
+ *  it listed everybody, the busy ones greyed and told why, and a man on another job with a Move
+ *  here button (PIOTR, 17.09; CLAUDE.md T19 2.5, 2.6); with twenty men on the books that was a
+ *  list to read, not a list to pick from. */
 function assignList(state: GameState, job: Job): string {
-  const rows = assignCandidates(state)
-    .map((who) => {
-      if (isOnJob(job, who)) return assignRow(state, job, who, 'already on this job');
-      const worker = who === OWNER ? null : workerById(state, who);
-      if (worker && !BUILDING_ROLES.includes(worker.role)) {
-        return assignRow(state, job, who, 'helpers do not build');
-      }
-      if (!canBuild(state, who)) return assignRow(state, job, who, 'not in the hall today');
-      const other = state.jobs.find((entry) => entry.id !== job.id && isOnJob(entry, who));
-      if (other) return assignRow(state, job, who, '', other);
-      return assignRow(state, job, who, '');
-    })
-    .join('');
+  const free = assignCandidates(state).filter((who) => {
+    if (isOnJob(job, who)) return false;
+    const worker = who === OWNER ? null : workerById(state, who);
+    if (worker && !BUILDING_ROLES.includes(worker.role)) return false;
+    if (!canBuild(state, who)) return false;
+    return !state.jobs.some((entry) => entry.id !== job.id && isOnJob(entry, who));
+  });
+  const rows =
+    free.length === 0
+      ? '<div class="assign-row is-busy"><span class="assign-why">Nobody is free: everybody who builds is on a job or a contract</span></div>'
+      : free.map((who) => assignRow(state, job, who, '')).join('');
   // The cross every modal, popover and list has (PIOTR, 18.09): the same one as the Company board.
   return (
     '<div class="assign-list" data-popover="assign-job">' + closeButton('closeAssign') +

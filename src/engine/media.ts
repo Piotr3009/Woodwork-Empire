@@ -220,17 +220,28 @@ export function compressorLabel(state: GameState, item: Equipment): string {
   return index < 0 ? 'compressor' : `compressor ${index + 1}`;
 }
 
-/** The compressor this machine draws from. Everything is on the first one unless the player has
- *  assigned it somewhere else, which is what "default: all" means (CLAUDE.md T10 3.2). A machine
- *  whose compressor has been sold or scrapped falls back to the first one, so no consumer is ever
- *  left pointing at nothing. */
+/** The compressor this machine draws from: the one the player set it on with the valve, or, with
+ *  none set, the biggest compressor in the hall (v62). Until v62 it was the first one bought, so a
+ *  CNC landing in a hall with a budget compressor and a pro one beside it hung on the budget one
+ *  and ran short while the pro one stood idle [PIOTR, 02.10]. A machine whose compressor has
+ *  been sold or scrapped falls back the same way, so no consumer is ever left pointing at nothing.
+ *  The dryer follows the same rule, so the biggest compressor is the dry one unless the player
+ *  says otherwise; the benches' hoses stay on the first compressor (`drawingOn`). */
 export function compressorFor(state: GameState, item: Equipment): Equipment | null {
   const list = compressors(state);
   if (list.length === 0) return null;
   const named = item.compressorId === null
     ? null
     : list.find((entry) => entry.id === item.compressorId) ?? null;
-  return named ?? list[0] ?? null;
+  return named ?? biggestCompressor(state);
+}
+
+/** The compressor that gives the most air, the first bought among equals. */
+export function biggestCompressor(state: GameState): Equipment | null {
+  return compressors(state).reduce<Equipment | null>(
+    (best, item) => (best === null || compressorAirOf(item).litres > compressorAirOf(best).litres ? item : best),
+    null,
+  );
 }
 
 /** The dryers fitted to this compressor: the ones assigned to it, and the one an industrial

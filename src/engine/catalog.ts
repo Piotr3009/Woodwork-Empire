@@ -26,9 +26,18 @@ export function templatesForReputation(reputation: number): ProductTemplate[] {
 }
 
 /** Tools the workshop is short of for this template. Only kit standing in the hall counts: a
- *  machine on the lorry takes no work until it has landed [PIOTR, 30.09] (v60, reversing T8 3.2). */
+ *  machine on the lorry takes no work until it has landed [PIOTR, 30.09] (v60, reversing T8 3.2).
+ *  A CNC stands in for the saw on sheet work: the cutting goes on the CNC whenever the hall has
+ *  one (`jobOnCnc`), so a hall with a CNC and no saw is short of nothing for a sheet job
+ *  (PIOTR, 02.10: "a CNC replaces several saws"; v62). The one reader: the board's lock and the
+ *  catalogue's grey both ask here. */
 export function missingEquipment(state: GameState, entry: ProductTemplate): string[] {
-  return entry.requiredEquipment.filter((specId) => !has(state, specId));
+  return entry.requiredEquipment.filter((specId) => !has(state, specId) && !cncStandsIn(state, entry, specId));
+}
+
+/** True when a CNC in the hall does what this tool would have done for this template. */
+function cncStandsIn(state: GameState, entry: ProductTemplate, specId: string): boolean {
+  return specId === 'tableSaw' && entry.material === 'sheet' && has(state, 'cnc');
 }
 
 /** The greyed out reason on the board, or null when the job can be taken as it stands. */

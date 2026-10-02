@@ -323,9 +323,12 @@ describe('the assignment', () => {
     placeEquipment(state, 'compressor', { variantId: 'pro', x: 18, y: 8, id: 'kit-air-2' });
     const page = renderCatalogue(state, '', 'owned', null, 'all');
     // The consumer's line moved under the rule of its card in v35, in colour, and says what it
-    // needs beside what the compressor gives (PIOTR, 20.09).
-    expect(page).toContain('compressor 1 gives');
+    // needs beside what the compressor gives (PIOTR, 20.09). With no valve set the bander is on
+    // the biggest compressor in the hall, the pro one bought second, and not on the first bought
+    // (v62; PIOTR, 02.10: a CNC on the budget compressor ran short while the pro one stood idle).
+    expect(page).toContain('compressor 2 gives');
     expect(page).toContain('compressor 1: 10 bar, 450 l/min');
+    expect(page).toContain('compressor 2: 10 bar, 1,100 l/min');
     // Two compressors, so the valve is on the tile, one chip each and one click each.
     expect(page).toContain('data-do="assignAir"');
   });

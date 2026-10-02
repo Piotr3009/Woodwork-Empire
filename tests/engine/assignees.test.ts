@@ -272,28 +272,20 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     expect(open.querySelector(`[data-plan="${job.id}"] .assign-list`)).not.toBeNull();
   });
 
-  it('greys the men it cannot take, says why, and moves a man off another job in one click', () => {
+  it('lists only the men who are free, and says so when nobody is (v62)', () => {
     const state = menOnOne(2);
     const job = jobOfFirst(state);
-    const other = state.jobs.find((entry) => leadAssignee(entry) === 'staff-3');
-    if (!other) throw new Error('the third joiner has no job of his own');
     const list = parse(renderWorkPlan(state, 'jobs', job.id)).querySelector('.assign-list');
     const rowFor = (who: string): Element | null =>
       list?.querySelector(`[data-worker="${who}"]`)?.closest('.assign-row') ?? null;
-    // The men already on this job: greyed, with no way to add them twice.
-    const onIt = Array.from(list?.querySelectorAll('.assign-row.is-busy') ?? []).map(
-      (row) => row.textContent ?? '',
-    );
-    expect(onIt.some((text) => text.includes('Joiner 1') && text.includes('already on this job')))
-      .toBe(true);
-    // A man on another job is not greyed: his row says where he is and moves him here in one
-    // click, off that job and on to this one (PIOTR, 18.09).
-    const third = rowFor('staff-3');
-    expect(third?.className).not.toContain('is-busy');
-    expect(third?.textContent).toContain(`leaves ${other.name}`);
-    const move = third?.querySelector('[data-do="assignMove"]');
-    expect(move?.getAttribute('data-from')).toBe(other.id);
-    expect(move?.getAttribute('data-id')).toBe(job.id);
+    // The men already on this job and the men on other jobs are not on the list at all: with
+    // twenty men on the books it is a list to pick from, not to read (PIOTR, 02.10: "only free
+    // people, not the ones already on jobs or contracts"). Until v62 they were greyed and told
+    // why, and a man on another job had a Move here button (PIOTR, 18.09).
+    expect(rowFor('staff-1')).toBeNull();
+    expect(rowFor('staff-3')).toBeNull();
+    expect(list?.querySelector('[data-do="assignMove"]')).toBeNull();
+    expect(list?.textContent).not.toContain('already on this job');
     // The cross every popover has (PIOTR, 18.09).
     expect(list?.querySelector('.modal-close[data-do="closeAssign"]')).not.toBeNull();
     // The owner is free, so his row is the one that can be clicked, once.

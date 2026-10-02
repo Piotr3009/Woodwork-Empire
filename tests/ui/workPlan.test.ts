@@ -251,7 +251,7 @@ describe('the row says who is on it', () => {
     expect(row?.querySelector('.assign-none')).toBeNull();
   });
 
-  it('opens the list on one click, with the men already on it greyed', () => {
+  it('opens the list on one click, without the men already on it', () => {
     const state = act(boardWith({ deadlineDays: 10 }), { type: 'WORK_HERE', jobId: null });
     const job = firstJob(state);
     const open = parse(renderWorkPlan(state, 'jobs', job.id));
@@ -259,12 +259,11 @@ describe('the row says who is on it', () => {
     expect(list).not.toBeNull();
     expect(list?.textContent).toContain(`Who goes on ${job.name}?`);
     const owner = list?.querySelector('[data-worker="owner"]');
-    // He is on it already, so his row is greyed and carries no way of adding him twice.
+    // He is on it already, so he is not on the list at all: only the free men are (v62; until
+    // v62 his row was greyed and said `already on this job`).
     expect(owner).toBeNull();
-    const busy = Array.from(list?.querySelectorAll('.assign-row.is-busy') ?? []);
-    expect(busy.some((entry) => (entry.textContent ?? '').includes('already on this job'))).toBe(
-      true,
-    );
+    expect(list?.textContent).not.toContain('already on this job');
+    expect(list?.textContent).toContain('Nobody is free');
     // One button closes it again, and it is the same single click.
     expect(open.querySelector('[data-do="closeAssign"]')).not.toBeNull();
     expect(open.querySelector('[data-do="openAssign"]')).toBeNull();

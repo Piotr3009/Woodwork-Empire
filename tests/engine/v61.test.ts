@@ -7,7 +7,9 @@
 // owner's own speed; the clock runs at 1, 4, 10, 30 and 100.
 
 import { describe, expect, it } from 'vitest';
-import { PACE_FLOOR, SPEEDS, WORKER_RATES } from '../../src/engine/constants';
+import { PACE_FLOOR, PRODUCT_TEMPLATES, SPEEDS, WORKER_RATES } from '../../src/engine/constants';
+import { lockReasonFor, missingEquipment } from '../../src/engine/catalog';
+import { compressorFor, compressors } from '../../src/engine/media';
 import { crewPace, manPace, pacePoints } from '../../src/engine/stages';
 import { outputBreakdown } from '../../src/engine/machines';
 import { STATION_IDLE, STATION_OFFICE } from '../../src/engine/stations';
@@ -15,7 +17,7 @@ import { bestTakerOf, rolesForTask, taskWorkRate } from '../../src/engine/tasks'
 import { renderHall } from '../../src/render/hall';
 import { renderTopbar } from '../../src/ui/topbar';
 import { missingForHire } from '../../src/engine/staff';
-import type { GameState, TaskInstance, Worker } from '../../src/engine/index';
+import type { Equipment, GameState, TaskInstance, Worker } from '../../src/engine/index';
 import { buyNow, buyStartingKit, fillRack, hireNow, newGame, runClock } from '../helpers';
 
 /** A joiner taken on with everything the gate wants bought first. */
@@ -174,5 +176,33 @@ describe('the material take off', () => {
     expect(bestTakerOf(state, [admin], task)?.id).toBe('admin-1');
     expect(taskWorkRate(admin, task)).toBe(1);
     expect(taskWorkRate(estimator, task)).toBe(WORKER_RATES.novice);
+  });
+});
+
+describe('v62 (PIOTR, 02.10)', () => {
+  it('lets a CNC stand in for the saw on sheet work, on the board and in the catalogue', () => {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    state.equipment = state.equipment.filter((item) => item.specId !== 'tableSaw');
+    const shelves = PRODUCT_TEMPLATES.find((entry) => entry.id === 'garageShelves');
+    if (!shelves) throw new Error('the shelves are wanted');
+    expect(missingEquipment(state, shelves)).toEqual(['tableSaw']);
+    state.equipment.push({ ...(state.equipment[0] as Equipment), id: 'kit-cnc', specId: 'cnc', variantId: 'pro', anchorX: 2, anchorY: 6 });
+    expect(missingEquipment(state, shelves)).toEqual([]);
+    expect(lockReasonFor(state, shelves)).toBeNull();
+  });
+
+  it('puts a machine with no valve set on the biggest compressor, not the first bought', () => {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const first = compressors(state)[0];
+    if (!first) throw new Error('the day one compressor is wanted');
+    expect(first.variantId).toBe('used');
+    state.equipment.push({ ...first, id: 'kit-air-pro', variantId: 'pro', anchorX: 18, anchorY: 8 });
+    const bander = state.equipment.find((item) => item.specId === 'edgebander');
+    if (!bander) throw new Error('the bander is wanted');
+    expect(bander.compressorId).toBeNull();
+    expect(compressorFor(state, bander)?.id).toBe('kit-air-pro');
+    // The valve still wins.
+    bander.compressorId = first.id;
+    expect(compressorFor(state, bander)?.id).toBe(first.id);
   });
 });

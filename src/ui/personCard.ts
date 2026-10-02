@@ -21,6 +21,7 @@ import {
 import type { GameState, Job, Worker } from '../engine/index';
 // Straight off their own modules, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { OWNER } from '../engine/machines';
+import { contractOfWorker } from '../engine/contracts';
 import { stageLabel } from '../engine/stages';
 import { jobStage } from '../engine/jobs';
 import { placeLine } from '../engine/production';
@@ -186,6 +187,10 @@ export function workerDoing(state: GameState, worker: Worker): string {
   if (worker.startDay > state.clock.day) return `starts ${formatCalendarDay(worker.startDay)}`;
   if (worker.taskId !== null) return 'on a job of work';
   if (job) return `${night ? 'tonight on' : 'on'} ${job.name}`;
+  // A man on a standing contract is the contract's all day, and the column said `free` of him
+  // until v62, because a contract is not a job (PIOTR, 02.10: "how is he free?").
+  const contract = contractOfWorker(state, worker.id);
+  if (contract) return `on ${contract.name}`;
   // Nobody has put him on anything and there is no manager on duty to: the words the crew column
   // of the Work Plan, the mark over his head and his own tile all say (PIOTR, 20.09;
   // CLAUDE.md T23 2.1). He was called "free" until tonight, which read as a man at leisure and

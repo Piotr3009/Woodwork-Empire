@@ -40,6 +40,7 @@ import {
   findTemplate,
   lockReasonFor,
   marketPriceFactor,
+  missingEquipment,
   priceFor,
   templatesForReputation,
 } from './catalog';
@@ -306,7 +307,7 @@ export function kitBlockFor(state: GameState, entry: ProductTemplate): BoardBloc
   if (entry.allowedFinishes.includes('lacquer') && !has(state, 'sprayBooth')) {
     return { reason: 'needs a spray booth', where: 'catalogue' };
   }
-  const missing = entry.requiredEquipment.filter((specId) => !has(state, specId));
+  const missing = missingEquipment(state, entry);
   if (missing.length > 0) {
     const names = missing.map((specId) => findSpec(specId)?.name ?? specId);
     return { reason: `no ${names.join(', ').toLowerCase()}`, where: 'catalogue' };
