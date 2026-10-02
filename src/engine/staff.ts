@@ -132,9 +132,12 @@ const BEHIND_THE_ADMIN: WorkerRole[] = ['salesman', 'draftsman'];
  *  who runs it (CLAUDE.md T13 3.10). The office is in the office block, behind its door. */
 export const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager'];
 
-/** The men the canteen keeps a locker and a plate for: the men on the floor, the joiners and the
- *  labourer, and nobody else [PIOTR, 02.10: "the same as the crew"] (CLAUDE.md T26 2.10). */
-export const LOCKER_ROLES: WorkerRole[] = ['joiner', 'helper'];
+/** The men the canteen keeps a locker and a plate for: the joiners, and nobody else [PIOTR,
+ *  02.10: "the same as the crew"] (CLAUDE.md T26 2.10). Turn 26 counted the labourer in with them,
+ *  so a shop of seven joiners and a labourer had no locker for an eighth joiner and the eight the
+ *  unit takes could not be reached; from v64 the eight lockers are the eight joiners' (PIOTR,
+ *  02.10: "I cannot hire more joiners"). */
+export const LOCKER_ROLES: WorkerRole[] = ['joiner'];
 
 /** The men of the canteen's lockers, in the order they were taken on. */
 export function lockerMen(state: GameState): Worker[] {
@@ -496,7 +499,6 @@ export function standingWanted(
 export function hiringOptions(state: GameState): HiringOption[] {
   return HIRING_SPECS.map((spec) => {
     const missing = missingLabelsForHire(state, spec.role);
-    const benchSlotsUsed = spec.role === 'joiner' ? joiners(state).length + 1 : 0;
     let blockReason = '';
     // The figure the player reads on the board, website bonus and all: `effectiveReputation` is
     // the one function the tier tables go through, and who answers an advert is a tier table
@@ -506,11 +508,13 @@ export function hiringOptions(state: GameState): HiringOption[] {
     } else if (BEHIND_THE_ADMIN.includes(spec.role) && !hasOfficeAdmin(state)) {
       // Nobody in the office before the one who runs it (PIOTR, CLAUDE.md T10 3.6).
       blockReason = 'Hire an office admin first';
-    } else if (spec.role === 'joiner' && benchSlotsUsed > state.unit.benchSlots) {
-      blockReason = 'No free bench slot in this unit';
     } else if (crewFull(state, spec.role)) {
-      // The floor limits the crew: one person per so many square metres of free floor
-      // (PIOTR; CLAUDE.md T13 3.10).
+      // The floor limits the crew: one joiner per so many square metres of the unit, eight in all
+      // (PIOTR; CLAUDE.md T13 3.10, T26 2.10). Until v64 a joiner was also counted against the
+      // unit's bench slots, six on very easy and four on the others, a rule from the days when a
+      // bench held one man: it refused a seventh joiner in a hall with twelve places at its
+      // benches (PIOTR, 02.10). The slots still limit how many benches the unit holds, and a
+      // place at a bench for every joiner is the shortfall below.
       blockReason = crewLine(state);
     } else if (LOCKER_ROLES.includes(spec.role) && lockerMen(state).length >= CANTEEN_LOCKERS) {
       // And so does the canteen: it was built with eight compartments, every man on the books

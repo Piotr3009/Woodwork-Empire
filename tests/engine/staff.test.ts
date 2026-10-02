@@ -194,17 +194,21 @@ describe('the hiring pool', () => {
     expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
   });
 
-  it('stops at the bench slots of the unit, six, before the unit limit of eight (v37)', () => {
-    // One person per so many square metres of the whole unit, the owner among them, so a 200 m2
-    // hall holds the owner and seven (PIOTR, 20.09; v37); its six bench slots stop the seventh
-    // joiner first, which is the floor limiting men the only way it does now.
+  it('stops at the unit limit of eight joiners, and not at its six bench slots (v37, v64)', () => {
+    // One joiner per so many square metres of the whole unit: a 200 m2 hall holds eight (PIOTR,
+    // 20.09; v37; CLAUDE.md T26 2.10). Until v64 its six bench slots stopped the seventh joiner
+    // first, a rule from the days when a bench held one man; the slots count benches and not men
+    // now, so nine asked for are eight taken on and the ninth is the unit's to refuse (PIOTR,
+    // 02.10: "I cannot hire more joiners; there are 12 places at the benches").
     // Benches of two places, because the gate counts the owner's own place from Turn 24 and six
     // benches of one place hold five men and the boss (CLAUDE.md T24 2.2).
-    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 9, 'novice', 'standard');
-    expect(joiners(state)).toHaveLength(6);
+    const start = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    start.cash = 900000;
+    const state = withCrew(start, 9, 'novice', 'standard');
+    expect(joiners(state)).toHaveLength(8);
     expect(crewLimit(state)).toBe(8);
     const option = hiringOptions(state).find((entry) => entry.tier === 'novice');
-    expect(option?.blockReason).not.toContain('the unit takes');
+    expect(option?.blockReason).toBe('Joiners 8 / 8, the unit takes 8 joiners');
   });
 
   it('starts the new man the next working day and pays him monthly', () => {

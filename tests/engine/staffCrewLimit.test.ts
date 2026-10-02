@@ -93,13 +93,14 @@ describe('the floor limit', () => {
     expect(crewLimit(state)).toBe(8);
   });
 
-  it('counts six joiners and a labourer as six, and the seventh joiner is the bench slots\' to refuse', () => {
+  it('takes a seventh and an eighth joiner on beside a labourer, and the ninth is the unit\'s to refuse', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     state.reputation = 40;
+    state.cash = 900000;
     expect(state.unit.areaM2).toBe(200);
     expect(crewCount(state)).toBe(0);
     expect(crewLimit(state)).toBe(8);
-    // Six joiners fill the unit's six bench slots; the labourer is not a joiner and is not counted.
+    // Six joiners and the labourer, who is not a joiner and is not counted.
     state = withCrew(state, 6, 'novice');
     state = hireNow(state, 'helper', null);
     expect(joiners(state)).toHaveLength(6);
@@ -109,17 +110,27 @@ describe('the floor limit', () => {
     expect(crewLimit(state)).toBe(8);
     expect(crewLine(state)).toBe('Joiners 6 / 8, the unit takes 8 joiners');
     expect(crewFull(state, 'joiner')).toBe(false);
-    // A seventh joiner is stopped by the six bench slots, which this turn leaves as they are.
+    // Until v64 the unit's six bench slots refused a seventh joiner here, in a hall with places
+    // at its benches to spare (PIOTR, 02.10: "I cannot hire more joiners; there are 12 places at
+    // the benches"). The slots count benches and not men from v64: with his kit bought the seventh
+    // is taken on and the eighth after him, the labourer keeping none of the eight lockers.
+    state = withCrew(state, 2, 'novice');
+    expect(joiners(state)).toHaveLength(8);
+    expect(state.workers).toHaveLength(9);
+    expect(crewLine(state)).toBe('Joiners 8 / 8, the unit takes 8 joiners');
+    // The ninth joiner is the unit's to refuse, in the crew's own line, and a second labourer is
+    // nobody's.
     expect(canHire(state, 'joiner', 'novice')).toEqual({
       ok: false,
-      reason: 'No free bench slot in this unit',
+      reason: 'Joiners 8 / 8, the unit takes 8 joiners',
     });
+    expect(canHire(state, 'helper', null).ok).toBe(true);
   });
 
   it('is full for a ninth joiner and for nobody else, with eight joiners and six others on the books', () => {
     // The cross check of CLAUDE.md T26 7: eight joiners, a labourer, a manager and three office
-    // staff. The eight are put on the books directly, because the unit's bench slots refuse a
-    // seventh joiner at the hire card before the crew line is reached.
+    // staff, put on the books directly: the line is what is asked about here, and the hire card
+    // that takes the eight on is the test above.
     const state = newGame();
     for (let index = 0; index < 8; index += 1) {
       state.workers.push({ ...manager(`j${index}`), role: 'joiner', tier: 'novice' });

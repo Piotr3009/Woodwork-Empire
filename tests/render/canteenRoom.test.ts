@@ -224,10 +224,10 @@ describe('the eight door plates', () => {
     expect(canteenPlateNames(withoutLockers).every((name) => name === '')).toBe(true);
   });
 
-  it('letters the men on the floor and nobody of the office or the manager (CLAUDE.md T26 2.10)', () => {
-    // Two joiners, then a manager and an office admin on the books between them and a labourer:
-    // the lockers are the floor's, the joiners' and the labourer's, so the desk and the manager
-    // keep no plate and the labourer takes the third (PIOTR, 02.10: "the same as the crew").
+  it('letters the joiners and nobody else: the labourer, the office and the manager keep no plate (v64)', () => {
+    // Two joiners, then an office admin, a manager and a labourer on the books: the eight lockers
+    // are the joiners' from v64, so the third and the fourth compartment are bought and blank
+    // (PIOTR, 02.10: "the same as the crew"; CLAUDE.md T26 2.10).
     let state = crewOf(2);
     state = buyNow(state, 'locker');
     state = buyNow(state, 'locker');
@@ -235,10 +235,10 @@ describe('the eight door plates', () => {
     state = hireNow(state, 'officeAdmin', null);
     state = hireNow(state, 'productionManager', 'novice');
     state = hireNow(state, 'helper', null);
-    const floor = state.workers.filter((worker) => worker.role === 'joiner' || worker.role === 'helper');
-    expect(floor).toHaveLength(3);
+    const joiners = state.workers.filter((worker) => worker.role === 'joiner');
+    expect(joiners).toHaveLength(2);
     expect(state.workers).toHaveLength(5);
-    expect(canteenPlateNames(state)).toEqual([...floor.map((worker) => worker.name), '', '', '', '', '']);
+    expect(canteenPlateNames(state)).toEqual([...joiners.map((worker) => worker.name), '', '', '', '', '', '']);
   });
 
   it('cuts a name that is longer than the plate the picture painted', () => {
