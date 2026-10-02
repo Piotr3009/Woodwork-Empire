@@ -25,7 +25,7 @@ import {
   withDryAir,
   withExtraction,
 } from '../helpers';
-import { JOINER_SPRAY_RATE, OWNER_LABOUR_PER_MINUTE, SPRAYER_SPRAY_RATE } from '../../src/engine/constants';
+import { JOINER_SPRAY_RATE, OWNER_LABOUR_PER_MINUTE, SPRAYER_SPRAY_RATE, WORKER_RATES } from '../../src/engine/constants';
 import { dustBand, familyForStage, joiners, stagePlanFor } from '../../src/engine/index';
 import { cleanerAtWork } from '../../src/engine/tasks';
 import type { GameEvent, GameState, Job } from '../../src/engine/index';
@@ -142,10 +142,13 @@ describe('(aa) three men on one job, on Very easy', () => {
     // (PIOTR, 30.09): a novice's 0.60 less the fan's 0.30 less the moulding by hand is at the
     // floor, 0.25, through nearly every half hour the three are on the round, where the product
     // read 0.37; alone he is at the floor while a saw runs and at 0.49 at his bench.
+    //
+    // From v61, 16,026 against 12,622, 27% more: the grade times the points (PIOTR, 01.10) lifts
+    // the novice off the floor at the saw, 0.60 times the hall's 0.65 [measured].
     const shared = watched(THREE).productionMinutes;
     const alone = watched(ONE).productionMinutes;
-    expect(shared).toBe(21552);
-    expect(alone).toBe(15201);
+    expect(shared).toBe(16026);
+    expect(alone).toBe(12622);
   });
 
   it('never goes more than three times faster with three men on it', () => {
@@ -313,10 +316,15 @@ describe('(bb) a lacquered kitchen, by a joiner and by a sprayer', () => {
     // the joiner's 0.70 at the booth is 0.30 off every one of his booth minutes, eight half hours
     // over the two days, 240 minutes, which is 48.00 of labour between the two men, and nothing
     // else about the two days differs. 445.20 and 493.20 [measured]; the ratio, 1.1078, is no
-    // longer a constant's, because a difference of points is not a ratio of rates.
-    expect(sprayerDid - joinerDid).toBeCloseTo(240 * OWNER_LABOUR_PER_MINUTE * (SPRAYER_SPRAY_RATE - JOINER_SPRAY_RATE), 2);
-    expect(joinerDid).toBeCloseTo(445.2, 2);
-    expect(sprayerDid).toBeCloseTo(493.2, 2);
+    // longer a constant's, because a difference of points is not a ratio of rates. From v61 the
+    // 0.30 is points times the man's grade, 0.80 (PIOTR, 01.10): 38.40 between them, 458.56 and
+    // 496.96 [measured].
+    expect(sprayerDid - joinerDid).toBeCloseTo(
+      240 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced * (SPRAYER_SPRAY_RATE - JOINER_SPRAY_RATE),
+      2,
+    );
+    expect(joinerDid).toBeCloseTo(458.56, 2);
+    expect(sprayerDid).toBeCloseTo(496.96, 2);
   });
 });
 

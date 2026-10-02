@@ -409,11 +409,14 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // burglary of day 79 and a hall with no saw after it.
     // Re-measured for v60: 4,100, 174 and -7,031 (the note above the describe), every minute a
     // sum of points, the novice's jobs slower for it, no manager and no burglary.
+    // Re-measured for v61: 4,100, -90 and -7,424, a man's grade times the hall's points (PIOTR,
+    // 01.10) [measured].
     expect(Math.round(months[0]?.cashClose ?? 0)).toBe(4100);
-    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(174);
-    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-7031);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-90);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-7424);
     // Two charges in three months: 7 on day 31 for the few days month 1 ran under, and 72 on day
-    // 91 for month 3. Month 2 never went under and pays nothing on day 61 (CLAUDE.md T23 2.12).
+    // 91 for month 3. Month 2 pays nothing on day 61 (CLAUDE.md T23 2.12), on v61 too, though it
+    // closes 90 under.
     const overdraft = state.ledger.filter((entry) => entry.category === 'overdraftInterest');
     expect(overdraft.map((entry) => entry.day)).toEqual([31, 91]);
     expect(Math.abs(overdraft[0]?.amount ?? 0)).toBeLessThan(15);
@@ -450,8 +453,9 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // the saw and the script buys none, so from day 80 the hall stands on the cutting, a day at 50
     // from day 81 to the end of the month (the note above the describe). Ninety from v60, 90.33:
     // no burglary in this stream, so the saw is in the hall to the end and nothing stands.
+    // Ninety one from v61, the grade times the hall's points (PIOTR, 01.10) [measured].
     expect(months[1]?.efficiencyMean ?? 0).toBeGreaterThan(55);
-    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(90);
+    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(91);
   });
 
   it('took the first contract its crew could keep up with and made every week of it in full', () => {

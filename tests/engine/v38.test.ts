@@ -48,6 +48,10 @@ describe('a man on a contract is not offered for a job', () => {
     expect(contractMen(state)).toContain(onContract.id);
     const job = state.jobs[state.jobs.length - 1];
     if (!job) throw new Error('a job is wanted');
+    // The other man taken off his own job first: from v62 the list offers free men only, and every
+    // joiner of this hall is on a job of his own (PIOTR, 02.10; T26-A0).
+    for (const entry of state.jobs) entry.assignees = entry.assignees.filter((who) => who !== free.id);
+    free.jobId = null;
     const html = jobAssignControls(state, job, true);
     expect(html).toContain(`data-worker="${free.id}"`);
     expect(html).not.toContain(`data-worker="${onContract.id}"`);

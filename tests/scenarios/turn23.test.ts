@@ -240,7 +240,10 @@ describe('(ll) three men, no manager, and the boss assigns each morning', () => 
     // 14,400 hand minutes of the stretch is booked at the floor, 0.25, where the product read
     // 0.37: 14,400 times two thirds of a pound times 0.25 is 2,400, and the four pounds over it
     // are the half hours a saw did not run. What this says about the sum is in the v60 report.
-    expect(NO_MANAGER.done).toBeCloseTo(2404.33, 2);
+    //
+    // 3,337.80 from v61: the grade times the hall's points (PIOTR, 01.10), 0.60 times 0.58, is
+    // 0.35 and over the floor again [measured on this build].
+    expect(NO_MANAGER.done).toBeCloseTo(3337.8, 2);
     expect(NO_MANAGER.state.jobs.every((job) => job.stage === 'inProduction')).toBe(true);
   });
 });
@@ -303,8 +306,11 @@ describe('(mm) the same crew with a novice manager over them', () => {
     // still holds them at 0.25, so the grade shows only in the few half hours a saw is not running
     // and the fan's 0.30 is off the minute. The assertion that he puts more in than (ll) holds by
     // that margin and no other; what this says about the sum is in the v60 report.
+    //
+    // 3,510.60 from v61, 172.80 over (ll): the men are off the floor (above), so his 0.03 is on
+    // every minute again (PIOTR, 01.10) [measured].
     expect(NOVICE.done).toBeGreaterThan(NO_MANAGER.done);
-    expect(NOVICE.done).toBeCloseTo(2406.01, 2);
+    expect(NOVICE.done).toBeCloseTo(3510.6, 2);
   });
 
   it('never sends the owner to the Work Plan', () => {
@@ -490,7 +496,8 @@ describe('(oo) a bench and no compressor', () => {
     // the day reads 249.43 to 172.86, 76.58 of work in the eight saw half hours where it was
     // 84.35: what the hall takes off the owner's minute at the saw, the fan short of it first, is
     // points off the job's pace and not a share of it (PIOTR, 30.09), and the days before this one
-    // ran on the same arithmetic, which is where the 249.43 comes from [measured].
+    // ran on the same arithmetic, which is where the 249.43 comes from [measured]. From v61 the
+    // owner's own factor times the hall's points (PIOTR, 01.10) ends the day at 157.32 [measured].
     const day = BENCH_DAY.halfHours.filter((entry) => entry.minute < DAY_END_MINUTE);
     const bench = day.filter((entry) => entry.station === machineStation('workbench'));
     const saw = day.filter((entry) => entry.station === machineStation('tableSaw'));
@@ -505,7 +512,7 @@ describe('(oo) a bench and no compressor', () => {
     for (const entry of bench) expect(leftAfter(entry)).toBe(entry.left);
     for (const entry of saw) expect(leftAfter(entry)).toBeLessThan(entry.left);
     expect(BENCH_DAY.after).toBeLessThan(BENCH_DAY.before);
-    expect(BENCH_DAY.after).toBeCloseTo(172.86, 2);
+    expect(BENCH_DAY.after).toBeCloseTo(157.32, 2);
   });
 
   it('says why over his head at the bench, and nothing at the saw', () => {

@@ -604,7 +604,10 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // on couriers, and an extractor breakdown and its 150 repair that this stream has and v57's
     // had not. The lowest point is the owner's draw on the morning of day 32 in both [measured,
     // off the ledger by category].
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-1202);
+    //
+    // -862 from v61: the novice's grade times the hall's points (PIOTR, 01.10), 0.60 of a minute
+    // that has lost the penalties, not the penalties off his 0.60 [measured].
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-862);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
@@ -1032,7 +1035,7 @@ describe('a month of six joiners behind two saws', () => {
     expect(two.longest).toBe(0);
   });
 
-  it('gets two of the book out on two saws and two on one: at the floor the second saw buys nothing (v60)', () => {
+  it('gets three of the book out on two saws and two on one: the second saw buys a job again (v61)', () => {
     const done = (month: CrewMonth): number =>
       month.state.jobs.filter((job) => job.stage === 'completed').length;
     /** How far through its making each job still on the books is, to a tenth of a per cent. */
@@ -1075,11 +1078,14 @@ describe('a month of six joiners behind two saws', () => {
     // multiplied, so it cost the crew a share of what they had and never the same 0.22 off a man
     // who had 0.60 to give [all measured, off the ledger by category]. What this month says about
     // the sum is in the v60 report: at the floor nothing the player buys shows.
-    expect(done(two)).toBe(2);
+    //
+    // Re-measured for v61: three out on two saws and two on one, 4,368 ahead; the grade times the
+    // hall's points (PIOTR, 01.10) lifts the one saw minute off the floor, so the second saw shows.
+    expect(done(two)).toBe(3);
     expect(done(one)).toBe(2);
-    expect(unfinished(two)).toEqual([0.744, 0.786, 0.865, 0.965]);
-    expect(unfinished(one)).toEqual([0.733, 0.778, 0.857, 0.958]);
-    expect(Math.round(two.state.cash - one.state.cash)).toBe(-120);
+    expect(unfinished(two)).toEqual([0.858, 0.882, 0.946]);
+    expect(unfinished(one)).toEqual([0.77, 0.808, 0.883, 0.981]);
+    expect(Math.round(two.state.cash - one.state.cash)).toBe(4368);
   });
 
   it('has no longest stand at all on one saw either, the one saw having the places the crew wants', () => {

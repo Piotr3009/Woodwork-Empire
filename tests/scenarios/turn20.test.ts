@@ -170,9 +170,10 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // product). Eight pieces a day against the eight the week asks for, so a whole week is exactly
     // his week and there is nothing in hand for the part weeks at either end of the term. Turn 20
     // read him at 1.0 of the owner and 47 minutes a piece, and it is that step down the ladder,
-    // and not the pay, that turns this month from comfortable into tight.
+    // and not the pay, that turns this month from comfortable into tight. 59 again from v61: his
+    // grade times the saw's points, 0.80 times 0.95, 0.76 (PIOTR, 01.10).
     const result = contractResultFor(CC.opened, contract, CC.man);
-    expect(result.minutes).toBe(60);
+    expect(result.minutes).toBe(59);
     expect(result.piecesPerDay).toBe(Math.floor(MINUTES_PER_WORKING_DAY / result.minutes));
     expect(result.piecesPerDay).toBe(8);
     expect(result.piecesNeededPerDay).toBe(PACKS_A_WEEK / WORKING_DAYS_PER_WEEK);
@@ -185,7 +186,7 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // 71 minutes on the floor, 33 a week (v54).
   });
 
-  it('makes thirty nine of its forty two weeks running, and the client ends it on day 22 (v60)', () => {
+  it('makes forty and then thirty nine twice, and the client ends it on day 29 (v61)', () => {
     const contract = theContract(CC.ended);
     expect(contract.status).toBe('ended');
     // The man alone at the used saw's one place: forty and forty, then thirty nine and thirty
@@ -209,15 +210,19 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // a pack short of the forty where the product made forty exactly, and two short weeks in a row
     // end a contract (CLAUDE.md T20 2.1.6) [measured]. What this says about the sum is in the v60
     // report: the forty a week was set against the product, and the sum is one pack under it.
+    //
+    // From v61 the grade times the points (PIOTR, 01.10): forty in week 2, then thirty nine twice,
+    // and the client ends it on day 29, a week later than v60 [measured].
     expect(contract.endedBy).toBe('client');
-    expect(contract.endDay).toBe(22);
+    expect(contract.endDay).toBe(29);
     expect(contract.weeks).toEqual([
-      { week: 2, wanted: 40, made: 39 },
+      { week: 2, wanted: 40, made: 40 },
       { week: 3, wanted: 40, made: 39 },
+      { week: 4, wanted: 40, made: 39 },
     ]);
-    // 78 of the two weeks' 80 (159 of the term's 160 until v60; 158 on v54 to v56, v52's figure;
-    // v53 made 66 of the fortnight's 80).
-    expect(contract.piecesMade).toBe(78);
+    // 118 of the three weeks' 120 from v61 (78 of 80 on v60; 159 of the term's 160 until v60;
+    // 158 on v54 to v56, v52's figure; v53 made 66 of the fortnight's 80).
+    expect(contract.piecesMade).toBe(118);
     // Two short weeks, two points of the workshop's standing, and the reason says the figures.
     const log = CC.ended.reputationLog.filter((entry) => entry.reason.startsWith(contract.name));
     expect(log).toHaveLength(2);
@@ -254,12 +259,13 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // From v57, 159 packs (the term above): 10,971 taken, 4,770 of stock, the same 2,470, and the
     // month is 3,731 above water [measured]. From v60, 78 packs before the client ended it (the
     // term above): 5,382 taken, 2,340 of stock, the same 2,470, and the month is 572 above water
-    // [measured]. The line of the cross check holds by 572 and no more.
-    expect(revenue).toBe(78 * contract.pricePerPiece);
-    expect(revenue).toBe(5382);
-    expect(material).toBe(2340);
+    // [measured]. The line of the cross check holds by 572 and no more. From v61, 118 packs (the
+    // term above): 8,142 taken, 3,540 of stock, the same 2,470, 2,132 above water [measured].
+    expect(revenue).toBe(118 * contract.pricePerPiece);
+    expect(revenue).toBe(8142);
+    expect(material).toBe(3540);
     expect(wages.total).toBe(2470);
-    expect(profit).toBe(572);
+    expect(profit).toBe(2132);
     expect(profit).toBeGreaterThan(0);
     // The closing report the player is handed says the same thing in its own arithmetic: it costs
     // the minutes he actually stood at the contract and not the days he was paid for, which reads
@@ -271,10 +277,11 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     expect(report.margin).toBe(pounds(revenue - material - report.labourCost - report.machineWear));
     // 3,835.67 over the same 160 hours from v57, the one pack more of the term above. From v60,
     // 1,859.33 over the two weeks' 80 hours, the saw's wear 30 on them, the client having ended
-    // it on day 22 (above) [measured].
-    expect(report.margin).toBe(1859.33);
-    expect(report.machineWear).toBe(30);
-    expect(report.labourHours).toBe(80);
+    // it on day 22 (above) [measured]. From v61, 2,828 over three weeks' 120 hours, the wear 45
+    // (the client ending it on day 29, above) [measured].
+    expect(report.margin).toBe(2828);
+    expect(report.machineWear).toBe(45);
+    expect(report.labourHours).toBe(120);
     expect(report.margin + report.machineWear).toBeGreaterThan(profit);
     expect(report.margin).toBeGreaterThan(0);
     console.log(
