@@ -56,3 +56,9 @@ late ones books 5 where it booked 17. Moved figures, one line each in the tests:
 ends at 11.5 (23 at half), its lowest balance 2,741 (2,746) and the short handed month's -680 (-862);
 the fan month is read by the value delivered, the big fan's standing taking bigger jobs; the three
 month playthrough trades to day 92 again (months 7,350, 398, -12,999, an experienced manager on day 65).
+
+**T26-B3 At most three standing contracts.** `CONTRACTS_MAX` 3 [PIOTR]: `offerContract` draws
+nothing while three run, the weekly offer owed or not, and `acceptContractCheck` refuses a fourth
+already on the board, the Contracts tab's card and the laptop's tile showing `3 contracts running:
+the most the shop takes on` where the take button was (the one click of `takeContract` asks it
+first). No scenario moved: none of them runs more than one contract.

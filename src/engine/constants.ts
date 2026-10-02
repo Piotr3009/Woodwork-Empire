@@ -4062,6 +4062,9 @@ export const CONTRACT_FREE_END_DAYS = DAYS_PER_MONTH;
  *  the board at a time, and an offer stands for this many days [TUNE]. */
 export const CONTRACT_MIN_TIER = 1;
 export const CONTRACT_OFFER_DAYS = 5;
+/** [PIOTR, 02.10] At most this many standing contracts run at once: no offer is drawn while they
+ *  do, and one already on the board cannot be taken (CLAUDE.md T26 2.12). */
+export const CONTRACTS_MAX = 3;
 /** [PIOTR, 22.09] From this reputation up a shop rings at least once a week: a week with no
  *  offer on the board and none made in it ends with one, whatever the dice said. Under it the
  *  chance of the day is all there is. */

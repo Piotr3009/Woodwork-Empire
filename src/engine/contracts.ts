@@ -10,6 +10,7 @@ import {
   CONTRACT_MARGIN_PER_DAY,
   CONTRACT_MIN_TIER,
   CONTRACT_OFFER_DAYS,
+  CONTRACTS_MAX,
   CONTRACT_PIECES,
   CONTRACT_QUANTITY_BANDS,
   CONTRACT_REFERENCE_CLASS,
@@ -103,6 +104,17 @@ export function offeredContract(state: GameState): Contract | null {
 
 export function activeContracts(state: GameState): Contract[] {
   return state.contracts.filter((contract) => contract.status === 'active');
+}
+
+/** True while the shop runs as many standing contracts as it may (PIOTR, 02.10; CLAUDE.md T26
+ *  2.12). */
+export function contractsFull(state: GameState): boolean {
+  return activeContracts(state).length >= CONTRACTS_MAX;
+}
+
+/** The one line an offer card says when the shop is full of contracts. */
+export function contractsFullLine(): string {
+  return `${plural(CONTRACTS_MAX, 'contract', 'contracts')} running: the most the shop takes on`;
 }
 
 /** Terms that are over, with the renew answer still to be given. */
@@ -696,6 +708,9 @@ export function weeklyOfferOwed(state: GameState): boolean {
 export function offerContract(state: GameState): void {
   if (!isWorkingDay(state.clock.day)) return;
   if (!contractsAllowed(state) || offeredContract(state) !== null) return;
+  // Nothing is drawn while the shop runs as many as it may, the weekly offer included
+  // (CLAUDE.md T26 2.12).
+  if (contractsFull(state)) return;
   const carrier = offerCarrier(state);
   if (!weeklyOfferOwed(state) && !chance(carrier, CONTRACT_OFFER_CHANCE_PER_DAY)) return;
   state.contracts.push(drawContract(state, carrier));
@@ -705,9 +720,10 @@ export function offerContract(state: GameState): void {
 /** Accepting opens the term from today: the week in hand starts now and the last day is the
  *  term's weeks on from it. */
 export function acceptContract(state: GameState, contractId: string): ContractCheck {
+  const check = acceptContractCheck(state, contractId);
+  if (!check.ok) return check;
   const contract = findContract(state, contractId);
   if (!contract) return { ok: false, reason: 'No such contract' };
-  if (contract.status !== 'offered') return { ok: false, reason: 'Not on offer' };
   const today = state.clock.day;
   contract.status = 'active';
   contract.startDay = today;
@@ -715,6 +731,16 @@ export function acceptContract(state: GameState, contractId: string): ContractCh
   contract.weekStartDay = today;
   contract.piecesThisWeek = 0;
   contract.pieceMinutes = 0;
+  return OK;
+}
+
+/** Why this offer cannot be taken, or that it can: it has to be on offer, and the shop has to
+ *  run fewer standing contracts than it may (CLAUDE.md T26 2.12). */
+export function acceptContractCheck(state: GameState, contractId: string): ContractCheck {
+  const contract = findContract(state, contractId);
+  if (!contract) return { ok: false, reason: 'No such contract' };
+  if (contract.status !== 'offered') return { ok: false, reason: 'Not on offer' };
+  if (contractsFull(state)) return { ok: false, reason: contractsFullLine() };
   return OK;
 }
 

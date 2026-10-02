@@ -30,6 +30,7 @@ import {
 } from '../engine/index';
 // Straight off their own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import {
+  acceptContractCheck,
   contractAssignCheck,
   contractCandidates,
   contractMachineTip,
@@ -103,6 +104,13 @@ function expiryLine(state: GameState, contract: Contract): string {
   return `the offer stands for ${days(left + 1)} more`;
 }
 
+/** The take button of an offer, or, while the shop already runs as many contracts as it may, the
+ *  one line that says so in its place (CLAUDE.md T26 2.12). */
+function acceptButton(state: GameState, contract: Contract, take: string): string {
+  const check = acceptContractCheck(state, contract.id);
+  return check.ok ? take : reasonLabel(check.reason);
+}
+
 function offerTile(state: GameState, contract: Contract): string {
   const months = Math.round((contract.termWeeks * 7) / 30);
   return (
@@ -115,7 +123,7 @@ function offerTile(state: GameState, contract: Contract): string {
     hallLine(state, contract) +
     `<p class="tile-text">A short week costs a point of reputation and the client remembers it ` +
     'at the end of the term.</p>' +
-    `<div class="tile-action">${primaryButton('acceptContract', 'Accept', `data-id="${contract.id}"`)}` +
+    `<div class="tile-action">${acceptButton(state, contract, primaryButton('acceptContract', 'Accept', `data-id="${contract.id}"`))}` +
     `${button('declineContract', 'Decline', `data-id="${contract.id}"`)}</div>` +
     '</div>'
   );
@@ -478,9 +486,13 @@ function offerCard(state: GameState, contract: Contract, picked: string | null):
   const check = contractManCheck(state, who);
   // A button that does what it says: with a man who can go on it, one click takes it and puts him
   // on it; with the owner, who cannot, it takes it and says so (CLAUDE.md T20 2.1.1).
-  const take = check.ok
-    ? primaryButton('takeContract', `Take it, ${name} on it`, `data-id="${contract.id}" data-worker="${who}"`)
-    : primaryButton('acceptContract', 'Take it', `data-id="${contract.id}"`) + reasonLabel(check.reason);
+  const take = acceptButton(
+    state,
+    contract,
+    check.ok
+      ? primaryButton('takeContract', `Take it, ${name} on it`, `data-id="${contract.id}" data-worker="${who}"`)
+      : primaryButton('acceptContract', 'Take it', `data-id="${contract.id}"`) + reasonLabel(check.reason),
+  );
   const other = nextBestMan(state, contract, who);
   return (
     `<div class="card contract-offer" data-contract="${contract.id}"><div class="card-main">` +

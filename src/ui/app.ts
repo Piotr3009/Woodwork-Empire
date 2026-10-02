@@ -73,7 +73,7 @@ import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderContracts } from './contracts';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import { contractManCheck } from '../engine/contracts';
+import { acceptContractCheck, contractManCheck } from '../engine/contracts';
 import { renderHouseCard } from './house';
 import { renderMonthEnd, renderMonthlyReport } from './monthEnd';
 import { renderSettings } from './settings';
@@ -1611,7 +1611,8 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // first: a click that cannot put him on it would otherwise take the contract and leave it
       // with nobody on it, which is not what the button says.
       const onIt = element.dataset.worker ?? '';
-      const check = contractManCheck(game(), onIt);
+      const taken = acceptContractCheck(game(), id);
+      const check = taken.ok ? contractManCheck(game(), onIt) : taken;
       if (!check.ok) {
         ui.toast = check.reason;
         requestRender();
