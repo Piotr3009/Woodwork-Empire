@@ -10,7 +10,7 @@ import {
   ACCIDENT_DAYS_OFF,
   CANTEEN_LOCKERS,
   DAY_END_MINUTE,
-  HELPER_HOME_CELL,
+  LABOURER_HOME_CELL,
   HIRE_START_DELAY_DAYS,
   MINUTES_PER_WORKING_DAY,
   NIGHT_ERROR_FACTOR,
@@ -55,7 +55,6 @@ import { crewLimit } from './layout';
 import { plural } from './text';
 import {
   benchPlaceOf,
-  SPRAY_BOOTH,
   accidentRisk,
   breakMachine,
   findSpec,
@@ -89,35 +88,29 @@ import type {
 } from './types';
 
 /** What a trade is called, one man of it and several. The one table: the crew rows, Our team, the
- *  job's Assign list and the hire card's refusal all read it, so a sprayer is called a sprayer
- *  wherever he is named (CLAUDE.md T19 2.5, 2.6). It sits here and not in the UI because the
+ *  job's Assign list and the hire card's refusal all read it, so a labourer is called a labourer
+ *  wherever he is named (CLAUDE.md T19 2.5, T26 2.7). It sits here and not in the UI because the
  *  refusal the hire card prints is written in this module: "excellent joiners come from
  *  reputation 60" (PIOTR; CLAUDE.md T20 2.5, T21 2.9, the words his own of 19.09).
  *  `src/ui/team.ts` hands `ROLE_WORDS` on. */
 export const ROLE_WORDS: Record<WorkerRole, string> = {
   joiner: 'joiner',
-  helper: 'helper',
+  helper: 'labourer',
   officeAdmin: 'office admin',
-  purchasingClerk: 'purchasing clerk',
   salesman: 'salesman',
   draftsman: 'draftsman',
-  estimator: 'estimator',
   productionManager: 'production manager',
-  sprayer: 'sprayer',
 };
 
 /** The same trades, several of them: the plural is written out because a salesman is not a
  *  "salesmans" (CLAUDE.md 3: plain English, never the engine key). */
 export const ROLE_WORDS_MANY: Record<WorkerRole, string> = {
   joiner: 'joiners',
-  helper: 'helpers',
+  helper: 'labourers',
   officeAdmin: 'office admins',
-  purchasingClerk: 'purchasing clerks',
   salesman: 'salesmen',
   draftsman: 'draftsmen',
-  estimator: 'estimators',
   productionManager: 'production managers',
-  sprayer: 'sprayers',
 };
 
 /** True for a man who produces. The one rule, asked by the board (CLAUDE.md T20 2.3). */
@@ -126,43 +119,46 @@ export function produces(role: WorkerRole): boolean {
 }
 
 /** The roles that have a working day of their own, the way the owner does (CLAUDE.md T2 3.8).
- *  A helper still clears his workshop jobs at no cost, as in Turn 1. */
-const OFFICE_ROLES: WorkerRole[] = [
-  'officeAdmin',
-  'purchasingClerk',
-  'salesman',
-  'draftsman',
-  'estimator',
-  'productionManager',
-];
+ *  A labourer still clears his workshop jobs at no cost, as in Turn 1. */
+const OFFICE_ROLES: WorkerRole[] = ['officeAdmin', 'salesman', 'draftsman', 'productionManager'];
 
 /** The desks that sit in the office block behind the one who runs it: nobody at them before the
- *  office admin (PIOTR, CLAUDE.md T10 3.6). The estimator and the production manager are not on
- *  this list: the playthrough of CLAUDE.md T13 10.4 hires both without an admin, the estimator
- *  reads drawings and the manager runs the hall, and neither is the admin's specialist work. */
-const BEHIND_THE_ADMIN: WorkerRole[] = ['purchasingClerk', 'salesman', 'draftsman'];
+ *  office admin (PIOTR, CLAUDE.md T10 3.6). The production manager is not on this list: the
+ *  playthrough of CLAUDE.md T13 10.4 hires him without an admin, and running the hall is not the
+ *  admin's specialist work. */
+const BEHIND_THE_ADMIN: WorkerRole[] = ['salesman', 'draftsman'];
 
-/** The roles that stand on the hall floor and so count against it: the crew the floor limits
- *  (CLAUDE.md T13 3.10). The office is in the office block. The production manager stands on the
- *  floor, because the floor is what he runs, and so does the sprayer, who is at the booth
- *  (CLAUDE.md T19 2.6). */
-export const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager', 'sprayer'];
+/** The roles that stand on the hall floor: the joiners, the labourer and the production manager,
+ *  who runs it (CLAUDE.md T13 3.10). The office is in the office block, behind its door. */
+export const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager'];
 
-/** The crew on the floor, the owner among them (CLAUDE.md T13 3.10). */
-export function crewCount(state: GameState): number {
-  return 1 + state.workers.filter((worker) => FLOOR_ROLES.includes(worker.role)).length;
+/** The men the canteen keeps a locker and a plate for: the men on the floor, the joiners and the
+ *  labourer, and nobody else [PIOTR, 02.10: "the same as the crew"] (CLAUDE.md T26 2.10). */
+export const LOCKER_ROLES: WorkerRole[] = ['joiner', 'helper'];
+
+/** The men of the canteen's lockers, in the order they were taken on. */
+export function lockerMen(state: GameState): Worker[] {
+  return state.workers.filter((worker) => LOCKER_ROLES.includes(worker.role));
 }
 
-/** True when the floor has no room for one more of this role (CLAUDE.md T13 3.10). */
+/** The crew the unit limits: its joiners and nobody else, the owner, the labourer, the manager and
+ *  the office all outside it [PIOTR, 02.10: "eight joiners, however many others"] (CLAUDE.md T13
+ *  3.10, T26 2.10). */
+export function crewCount(state: GameState): number {
+  return joiners(state).length;
+}
+
+/** True when the unit has no room for one more joiner; it is never full for anybody else
+ *  (CLAUDE.md T26 2.10). */
 export function crewFull(state: GameState, role: WorkerRole): boolean {
-  if (!FLOOR_ROLES.includes(role)) return false;
+  if (role !== 'joiner') return false;
   return crewCount(state) + 1 > crewLimit(state);
 }
 
-/** "Crew 4 / 8, the unit takes eight": what the team page says (CLAUDE.md T13 3.10; v37). */
+/** "Joiners 4 / 8, the unit takes 8": what the team page says (CLAUDE.md T13 3.10; v37; T26 2.10). */
 export function crewLine(state: GameState): string {
   const limit = crewLimit(state);
-  return `Crew ${crewCount(state)} / ${limit}, the unit takes ${plural(limit, 'person', 'people')}`;
+  return `Joiners ${crewCount(state)} / ${limit}, the unit takes ${plural(limit, 'joiner', 'joiners')}`;
 }
 
 /** The office role every other one is hired behind. She is the base office person: emails,
@@ -180,7 +176,7 @@ export function hasWorkingDay(role: WorkerRole): boolean {
 }
 
 /** True for a man who works a job of work off minute by minute, the way the owner does: the
- *  office, and the helper with them (PIOTR, 16.09; CLAUDE.md T17 2.3). The helper used to clear
+ *  office, and the labourer with them (PIOTR, 16.09; CLAUDE.md T17 2.3). The labourer used to clear
  *  an unload or a cleaning on the spot for nothing, in the same minute it was raised, so nobody
  *  ever saw him do it. He spends the minutes now. His day is the clock's and not a meter of his
  *  own: he is on the floor and he takes his dinner with the workshop, so only the office has the
@@ -243,18 +239,18 @@ export function joiners(state: GameState): Worker[] {
   return state.workers.filter((worker) => worker.role === 'joiner');
 }
 
-export function helpers(state: GameState): Worker[] {
+export function labourers(state: GameState): Worker[] {
   return state.workers.filter((worker) => worker.role === 'helper');
 }
 
-/** A helper on the books and in the hall today. The unloading, the bags and the cleaning are his
+/** A labourer on the books and in the hall today. The unloading, the bags and the cleaning are his
  *  and nobody else's while this is true (PIOTR, 14.09; CLAUDE.md T11 3.4). */
-export function helperOnDuty(state: GameState): boolean {
-  return helpers(state).some((worker) => isWorkingToday(state, worker));
+export function labourerOnDuty(state: GameState): boolean {
+  return labourers(state).some((worker) => isWorkingToday(state, worker));
 }
 
 /** Where a man stands when the hall has nothing else for him. A joiner has his own bench; the
- *  helper stands at the fan when there is one and in the gate lane when there is not, because the
+ *  labourer stands at the fan when there is one and in the gate lane when there is not, because the
  *  bags and the van are his. Both are on the painted floor: (1, 1), where every man who is not a
  *  joiner used to be put, is inside the office block (CLAUDE.md T11 3.4). */
 export function homeCellOf(state: GameState, worker: Worker): { x: number; y: number } {
@@ -276,7 +272,7 @@ export function homeCellOf(state: GameState, worker: Worker): { x: number; y: nu
     (item) => item.specId === 'extractor' && itemStandsInTheHall(item),
   );
   if (fan) return { x: fan.anchorX, y: fan.anchorY };
-  return { ...HELPER_HOME_CELL };
+  return { ...LABOURER_HOME_CELL };
 }
 
 export function workerById(state: GameState, workerId: string): Worker | null {
@@ -516,7 +512,7 @@ export function hiringOptions(state: GameState): HiringOption[] {
       // The floor limits the crew: one person per so many square metres of free floor
       // (PIOTR; CLAUDE.md T13 3.10).
       blockReason = crewLine(state);
-    } else if (state.workers.length >= CANTEEN_LOCKERS) {
+    } else if (LOCKER_ROLES.includes(spec.role) && lockerMen(state).length >= CANTEEN_LOCKERS) {
       // And so does the canteen: it was built with eight compartments, every man on the books
       // keeps his things in one of them, and the owner needs none. This comes before the
       // shortfall below, because a ninth locker cannot be bought either and "Buy first: Locker"
@@ -587,16 +583,8 @@ function nameFor(state: GameState, role: WorkerRole): string {
 }
 
 function benchAnchor(state: GameState, role: WorkerRole): { x: number; y: number } {
-  // The helper's own corner of the hall, and the office door for everybody else (T11 3.4).
-  if (role === 'helper') return { ...HELPER_HOME_CELL };
-  // The sprayer's place is the booth, if the hall has one: he is a floor man and (1, 1) is
-  // inside the office block (CLAUDE.md T19 2.6, T11 3.4).
-  if (role === 'sprayer') {
-    const booth = state.equipment.find(
-      (item) => item.specId === SPRAY_BOOTH && itemStandsInTheHall(item),
-    );
-    return booth ? { x: booth.anchorX, y: booth.anchorY } : { x: 0, y: 4 };
-  }
+  // The labourer's own corner of the hall, and the office door for everybody else (T11 3.4).
+  if (role === 'helper') return { ...LABOURER_HOME_CELL };
   if (role !== 'joiner') return { x: 1, y: 1 };
   // His home bench is the first with a place free. A class holds one, two or three men, so the
   // second man at a standard bench stands at the same bench as the first and is drawn there

@@ -30,7 +30,7 @@ export type Facing = 'sw' | 'se' | 'nw' | 'ne';
 /** What a figure can be doing: every state the character system can be in has a frame key
  *  (CLAUDE.md T9 3.13, T13 3.23). `home` is the figure going home at the end of the day; no
  *  sheet is wanted for it, so it falls back to idle like any missing frame.
- *  `sweep` is the helper with a broom, whose sheet came in with v28 (CLAUDE.md T20 2.8). */
+ *  `sweep` is the labourer with a broom, whose sheet came in with v28 (CLAUDE.md T20 2.8). */
 export type Animation = 'walk' | 'bench' | 'carry' | 'idle' | 'phone' | 'home' | 'sweep';
 
 export const ANIMATIONS: readonly Animation[] = [
@@ -45,7 +45,7 @@ export const ANIMATIONS: readonly Animation[] = [
 
 /** What a role with no sheet of its own for an animation plays instead of it, before the idle
  *  fallback of Turn 19 is reached. A man with no broom sheet sweeping is a man working with his
- *  hands, so he plays the bench and not the standing about of idle: the helper has the broom, the
+ *  hands, so he plays the bench and not the standing about of idle: the labourer has the broom, the
  *  joiner and the owner fall to the bench (CLAUDE.md T20 2.8). */
 const INSTEAD_OF: Partial<Record<Animation, Animation>> = { sweep: 'bench' };
 

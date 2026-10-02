@@ -87,12 +87,13 @@ describe('the Website tab', () => {
     expect(buys.map((buy) => buy.getAttribute('data-id'))).toEqual(['4', '5']);
     expect(text(buys[0])).toBe(`Buy, ${money(8500)}`);
     expect(text(buys[1])).toBe(`Buy, ${money(15000)}`);
-    expect(page.querySelectorAll('button[disabled]')).toHaveLength(0);
+    // The ladder's own buttons: the agency's card under it has its own lock (CLAUDE.md T26 2.13).
+    expect(page.querySelectorAll('.website-level button[disabled]')).toHaveLength(0);
     // Past the overdraft floor nothing can be bought: both levels are greyed with the reason.
     state.cash = state.finance.overdraftLimit + 1000;
     const poor = parse(renderWebsite(state));
     expect(poor.querySelectorAll('[data-do="setWebsiteLevel"]')).toHaveLength(0);
-    const locked = Array.from(poor.querySelectorAll('button[disabled]'));
+    const locked = Array.from(poor.querySelectorAll('.website-level button[disabled]'));
     expect(locked).toHaveLength(2);
     expect(locked[0]?.getAttribute('title')).toBe('Not enough cash');
   });

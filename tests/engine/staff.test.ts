@@ -32,7 +32,7 @@ import {
 import { crewLimit } from '../../src/engine/layout';
 import { STATION_HOME } from '../../src/engine/stations';
 import { MATERIAL_TAKE_OFF_MINUTES } from '../../src/engine/constants';
-import { createTask, estimatorCapacity } from '../../src/engine/tasks';
+import { createTask, takeOffCapacity } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { monthlyWageBill } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
@@ -96,7 +96,7 @@ describe('the hiring pool', () => {
         .map((option) => option.label);
     expect(byLabel(-50)).toContain('Office admin');
     expect(byLabel(-50)).not.toContain('Joiner, no experience');
-    expect(byLabel(-50)).not.toContain('Helper');
+    expect(byLabel(-50)).not.toContain('Labourer');
     // The tier comes with the standing the workshop has earned: a man with no experience always
     // answers, an experienced one from 15, a very experienced one from 35 and an excellent one
     // from 60 (CLAUDE.md T21 2.9).
@@ -107,7 +107,12 @@ describe('the hiring pool', () => {
     expect(byLabel(15)).not.toContain('Salesman');
     expect(byLabel(35)).not.toContain('Joiner, very experienced');
     expect(byLabel(35)).toContain('Joiner, excellent');
-    expect(byLabel(60)).toHaveLength(0);
+    // And the draftsman on his own gate, 15, 50 and 90 (PIOTR, 02.10; CLAUDE.md T26 2.8): at 60
+    // only his excellent grade is still to come, and at 90 nobody.
+    expect(byLabel(0)).toContain('Draftsman, experienced');
+    expect(byLabel(35)).toContain('Draftsman, very experienced');
+    expect(byLabel(60)).toEqual(['Draftsman, excellent']);
+    expect(byLabel(90)).toHaveLength(0);
   });
 
   it('names what has to be bought before a joiner can start, and how many of each', () => {
@@ -404,13 +409,14 @@ describe('the places at the saw', () => {
     return bossAssigns(clearEvents(runToDay(state, 2).state));
   }
 
-  it('lets one man cut at the budget saw s one place and works the other three at their benches', () => {
+  it('lets two men cut at the budget saw s two places and works the other two at their benches', () => {
     const state = fourAtTheCutting();
     expect(state.jobs.filter((job) => job.stage === 'inProduction')).toHaveLength(4);
     const before = state.jobs.map((job) => job.labourRemaining);
     const worked = tick(state, 60);
     const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
-    // One saw, one place, one man at it. Until v53 the other three stood with no place and put
+    // One saw, two places from Turn 26, its capacity, two men at it (CLAUDE.md T26 2.1); one place
+    // and one man until then. Until v53 the other three stood with no place and put
     // nothing in; now nobody waits for the saw: they work their wardrobes at their benches, and
     // every job gets the same hour (PIOTR, 24.09; v53). The hall's line for the four men at work
     // and a budget saw that keeps two busy, (2 + 2 / 1.5) / 4 = 0.8333, is on every minute, and
@@ -423,14 +429,21 @@ describe('the places at the saw', () => {
     const worth = manPace(WORKER_RATES.experienced, pace, (2 + 2 / 1.5) / 4);
     for (const value of done) expect(value).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * worth, 6);
     expect(done[0]).toBeCloseTo(23.1111, 4);
-    expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(1);
-    expect(worked.workers.filter((worker) => worker.station === 'machine:workbench')).toHaveLength(3);
+    expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(2);
+    expect(worked.workers.filter((worker) => worker.station === 'machine:workbench')).toHaveLength(2);
     expect(worked.workers.filter((worker) => worker.station === STATION_HOME)).toHaveLength(0);
     for (const man of worked.workers) expect(man.noPlaceFor, man.id).toBe('');
   });
 
   it('puts a second man on the saw the moment a second saw is bought', () => {
-    const state = buyNow(fourAtTheCutting(), 'tableSaw');
+    // The hall's saw a used one of one place, so the second saw is what makes the second place
+    // (CLAUDE.md T26 2.1).
+    const hall = fourAtTheCutting();
+    const first = hall.equipment.find((item) => item.specId === 'tableSaw');
+    if (first === undefined) throw new Error('a saw is wanted');
+    first.variantId = 'used';
+    expect(tick(hall, 60).workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(1);
+    const state = buyNow(hall, 'tableSaw');
     const worked = tick(state, 60);
     expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(2);
   });
@@ -465,7 +478,7 @@ describe('one path for putting a man on a job', () => {
 });
 
 describe('the office working day', () => {
-  function officeWorker(id: string, role: 'officeAdmin' | 'purchasingClerk' | 'estimator'): Worker {
+  function officeWorker(id: string, role: 'officeAdmin' | 'salesman' | 'draftsman'): Worker {
     return {
       id,
       name: id,
@@ -502,7 +515,7 @@ describe('the office working day', () => {
 
   it('gives the three office roles 480 minutes of their own, and nobody else', () => {
     expect(hasWorkingDay('officeAdmin')).toBe(true);
-    expect(hasWorkingDay('purchasingClerk')).toBe(true);
+    expect(hasWorkingDay('draftsman')).toBe(true);
     expect(hasWorkingDay('salesman')).toBe(true);
     expect(hasWorkingDay('helper')).toBe(false);
     expect(hasWorkingDay('joiner')).toBe(false);
@@ -541,19 +554,21 @@ describe('the office working day', () => {
     expect(state.tasks.find((task) => task.kind === 'bookkeeping')?.doneBy).toBe('owner');
   });
 
-  it('lets the estimator do as many take offs as his minutes allow, not five', () => {
-    // The count of jobs a day is gone: a take off is half an hour of his desk, so an experienced
-    // man gets sixteen of them out of his 480 minutes (PIOTR, 18.09; CLAUDE.md T20 2.3).
+  it('lets the admin do as many take offs as her minutes allow, at the owner s own speed', () => {
+    // The count of jobs a day is gone: a take off is half an hour of the desk, so the admin, who
+    // does them at the owner's own speed, gets sixteen of them out of her 480 minutes (PIOTR,
+    // 18.09 and 02.10; CLAUDE.md T20 2.3, T26 2.9).
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     state.enquiries = [];
-    state.workers.push(officeWorker('e1', 'estimator'));
+    state.workers.push(officeWorker('e1', 'officeAdmin'));
     const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 90 });
     state = acceptNow(state, enquiry.id, false);
     const first = firstJob(state);
     for (let index = 1; index < 20; index += 1) {
       state.jobs.push({ ...first, id: `job-clone-${index}` });
     }
-    state.tasks = state.tasks.filter((task) => task.jobId === null);
+    // Nothing on the desk but the take offs: the day's own chores are hers as well.
+    state.tasks = [];
     for (const job of state.jobs) {
       job.stage = 'materialPending';
       createTask(state, {
@@ -563,15 +578,17 @@ describe('the office working day', () => {
         jobId: job.id,
       });
     }
-    // One action to settle the state, so the estimator is holding his first list at 08:00.
+    // One action to settle the state, so the admin is holding her first list at 08:00.
     const morning = act(clearEvents(state), { type: 'SET_SPEED', speed: 1 });
     // His day is the 480 minutes of work, and the clock takes the dinner hour on top of them.
     const day = clearEvents(runClock(morning, DAY_END_MINUTE));
     const done = day.tasks.filter((task) => task.kind === 'materialTakeOff' && task.done).length;
-    expect(done).toBe(estimatorCapacity(day));
-    // Twelve, not the sixteen of Turn 20: an experienced man is 0.8 of the owner on Piotr's
-    // ladder, so a half hour take off is 37.5 minutes of his day (CLAUDE.md T21 2.9).
-    expect(done).toBe(12);
+    // Sixteen a day at the owner's own speed, and fifteen of them out of this one with the
+    // sixteenth a minute short: the run to the end of the day is 479 of her minutes and not 480.
+    // Until Turn 26 it was twelve, the experienced man of the trade that went being 0.8 of the owner.
+    expect(takeOffCapacity(day)).toBe(16);
+    expect(done).toBe(15);
+    expect(day.tasks.filter((task) => task.kind === 'materialTakeOff' && !task.done)[0]?.minutesRemaining).toBe(1);
     // And the cap is his minutes now: the day is spent, not a counter run out.
     expect(staffMinutesLeft(day.workers[0] as Worker)).toBeLessThan(MATERIAL_TAKE_OFF_MINUTES);
   });

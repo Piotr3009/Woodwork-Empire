@@ -109,24 +109,24 @@ export interface WeekMeters {
  *  engine number: the day ends the same way whatever it says (CLAUDE.md T4 3.6). */
 export type SummaryCadence = 'daily' | 'weekly' | 'monthly';
 
+/** On the floor there are joiners and the labourer, and nobody else (PIOTR, 02.10; CLAUDE.md T26
+ *  2.6): the booth's own trade, the man who counted the sheets and the man who ordered them went
+ *  with Turn 26, and the lift of `migrate.ts` makes them a joiner and two office admins. */
 export type WorkerRole =
   | 'joiner'
+  /** The labourer. The id is `helper` and stays so: a save carries the id and the art side's
+   *  sheets carry the name (`character.helper.*`); every word the player reads says labourer
+   *  (PIOTR, 02.10; CLAUDE.md T26 2.7). */
   | 'helper'
-  | 'officeAdmin'
-  | 'purchasingClerk'
-  | 'salesman'
-  /** The one who draws, at 0.8 of the owner's own speed (PIOTR; CLAUDE.md T10 3.6). */
-  | 'draftsman'
-  /** Reads the drawing and counts the sheets: the material take off, so many a day
-   *  (CLAUDE.md T13 3.8). The tab calls him Technical. */
-  | 'estimator'
   /** The first management role: the second shift, the assigning, and the owner's absence covered
    *  (CLAUDE.md T13 3.9). */
   | 'productionManager'
-  /** The finishing man. A lacquered job's finishing is his at his full rate; a joiner may still
-   *  do it, slower, so a workshop without one is slower there and never stuck
-   *  (PIOTR, 17.09; CLAUDE.md T19 2.6). */
-  | 'sprayer';
+  /** Everything of the office that is not the drawing board's or the phone's: the emails, the
+   *  books, the material list and the orders (CLAUDE.md T26 2.9). */
+  | 'officeAdmin'
+  /** The drawings, the site survey and the client meeting, in three grades (CLAUDE.md T26 2.8). */
+  | 'draftsman'
+  | 'salesman';
 
 /** Which shift a man on the floor works. The second one runs after the day shift, at the night
  *  rate, only while a production manager is on the books (CLAUDE.md T13 3.9). */
@@ -463,7 +463,8 @@ export interface Worker {
    *  man may hand his notice in at the month end (CLAUDE.md T8 3.6). */
   overtimeDays: number;
   tiredOfOvertime: boolean;
-  /** Per job material orders this clerk has put through today. */
+  /** Per job material orders put through today: counted by the trade that went with Turn 26 and
+   *  read by nothing since, kept so a save loads as it is (CLAUDE.md T26 2.6). */
   ordersToday: number;
   /** Where he is standing: bench, machine:<specId>, rack, gate, office or idle. */
   station: string;
@@ -538,6 +539,9 @@ export interface Enquiry {
   byHandAvailable: boolean;
   /** Residential or commercial (CLAUDE.md T13 3.15). */
   kind: EnquiryKind;
+  /** The free joiners a big one off job of the agency wants before it can be taken; 0 for every
+   *  enquiry that is not one (CLAUDE.md T26 2.13). */
+  joinersWanted: number;
   /** What the client says he has to spend: the figure the board shows. What he actually offers
    *  when the job is taken is the budget times a factor drawn inside the band, and that becomes
    *  the job's price (CLAUDE.md T13 3.24). */
@@ -586,6 +590,9 @@ export interface Job {
   sheetsReserved: number;
   /** Residential or commercial, as the enquiry was (CLAUDE.md T13 3.15). */
   kind: EnquiryKind;
+  /** The free joiners it wanted when it was taken: a big one off job of the agency's, or 0 for
+   *  every job that is not one (CLAUDE.md T26 2.13). */
+  joinersWanted: number;
   /** What the client said he had to spend. The price is what he offered (CLAUDE.md T13 3.24). */
   budget: number;
   /** Minutes of production put into this piece on the second shift, at night: the client sees
@@ -695,7 +702,7 @@ export type TaskKind =
   | 'clientCall'
   | 'design'
   /** Reading the drawing and counting the sheets for one accepted job: the owner's until an
-   *  estimator is taken on (CLAUDE.md T13 3.8). It was the per job material order. */
+   *  office admin is taken on (CLAUDE.md T13 3.8, T26 2.9). It was the per job material order. */
   | 'materialTakeOff'
   | 'siteMeasure'
   /** The weekly minutes the company website costs whoever keeps it (CLAUDE.md T13 3.7). */
@@ -819,6 +826,8 @@ export type LedgerCategory =
   | 'wagesNight'
   | 'salaries'
   | 'software'
+  /** The advertising agency's month, on the 1st while it is on (CLAUDE.md T26 2.13). */
+  | 'agency'
   | 'waste'
   | 'equipment'
   | 'material'
@@ -940,6 +949,14 @@ export interface WebsiteState {
   lastUpkeepDay: number | null;
 }
 
+/** The advertising agency: a monthly subscription, on and off from the Office, that brings the
+ *  big one off jobs to the board while it is on (PIOTR, 02.10; CLAUDE.md T26 2.13). */
+export interface AgencyState {
+  on: boolean;
+  /** The month it was last turned on, or null while it never has been. */
+  sinceMonth: number | null;
+}
+
 /** The eight thresholds the owner pays himself at (CLAUDE.md T13 3.18). */
 export interface OwnerDrawState {
   /** Index into the tiers table. */
@@ -992,6 +1009,9 @@ export interface Contract {
   revenue: number;
   materialCost: number;
   labourMinutes: number;
+  /** Clock minutes a machine ran for this contract, one a machine however many of its men stood at
+   *  it: what its wear is charged on (CLAUDE.md T24 2.4, T26 2.1). */
+  machineMinutes: number;
   /** The price the client offers at the end of the term, from the delivery history. Null until
    *  the term ends. */
   renegotiatedPrice: number | null;
@@ -1123,8 +1143,8 @@ export interface SoftwareState {
   tier: SoftwareTier;
   /** Jobs left on a one-off licence. */
   jobsRemaining: number;
-  /** Joinery Core on the laptop: the estimator does ten take offs a day instead of five, and five
-   *  more per extension, at most two (CLAUDE.md T13 3.8). */
+  /** Joinery Core on the laptop: a take off takes half the minutes, and a quarter less again per
+   *  extension, at most two (CLAUDE.md T13 3.8). */
   joineryCore: boolean;
   joineryCoreExtensions: number;
   /** The month the subscription starts running: the month after the one it was bought in, because
@@ -1281,6 +1301,8 @@ export interface GameState {
   insurance: InsuranceState;
   security: SecurityState;
   website: WebsiteState;
+  /** The advertising agency of CLAUDE.md T26 2.13, off in a new game and in every lifted save. */
+  agency: AgencyState;
   /** Standing contracts, offered, active and ended (CLAUDE.md T13 3.16). */
   contracts: Contract[];
   ownerDraw: OwnerDrawState;
@@ -1408,6 +1430,7 @@ export type GameAction =
   | { type: 'BUY_JOINERY_CORE_EXTENSION' }
   // Orders and stock:
   | { type: 'SET_WEBSITE_LEVEL'; level: number }
+  | { type: 'SET_AGENCY'; on: boolean }
   // Machines and the hall:
   | { type: 'CONNECT_EXTRACTION'; equipmentId: string }
   | { type: 'BUY_GATE'; equipmentId: string }

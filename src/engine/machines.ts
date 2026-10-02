@@ -28,8 +28,8 @@ import {
   MACHINE_HOURS_PER_MONTH,
   TIER_WORDS,
   MACHINE_PACE,
+  CAPACITY_FAMILIES,
   MACHINE_CAPACITY,
-  MACHINE_PLACES,
   PACED_FAMILIES,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
@@ -40,12 +40,12 @@ import {
   EXTRACTOR_BREAKDOWN_CHANCE,
   EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
   EXTRACTOR_BROKEN_DUST_MULTIPLIER,
-  HELPER_REQUIRED_FROM_JOINERS,
+  LABOURER_REQUIRED_FROM_JOINERS,
   MACHINE_SHORT_WORDS,
   NO_DUCTING_SPECS,
   DUST_PER_SAWDUST_PILE,
-  NO_HELPER_DUST_MULTIPLIER,
-  NO_HELPER_PRODUCTIVITY_FACTOR,
+  NO_LABOURER_DUST_MULTIPLIER,
+  NO_LABOURER_PRODUCTIVITY_FACTOR,
   PROPERTY_INSURANCE_RATE_YEARLY,
   PAST_LIFE_WEEK_HOURS,
   PRODUCING_ROLES,
@@ -58,7 +58,7 @@ import {
   TOOL_CABINET_SLOTS,
   USED_VARIANT,
   PRODUCTION_MANAGER_PACE,
-  BAGS_HELPER_EMPTY_AT,
+  BAGS_LABOURER_EMPTY_AT,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
@@ -86,8 +86,8 @@ import {
 import { lockReasonFor, template } from './catalog';
 import { jobHeldBy } from './jobs';
 import { stageOfMan } from './production';
-import { contractOfWorker, contractPiece, contractStageFamilyOf } from './contracts';
-import { jobPace, pacePoints, stageDoing, stagePlanFor, tradeFactor } from './stages';
+import { contractOfWorker, contractPiece, contractPieceSpeed, contractStageFamilyOf } from './contracts';
+import { jobPace, stageDoing, stagePlanFor } from './stages';
 import { isWorkingToday, managerPaceFor, nightCrew } from './staff';
 import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
@@ -360,11 +360,11 @@ export function cabinetTools(state: GameState, specId: string): Equipment[] {
   return owned(state, specId).filter((item) => !itemStandsInTheHall(item) && !isSold(item));
 }
 
-/** How many men can work at this machine at once: its class's row of `MACHINE_PLACES`, and
- *  nought for anything that is not a floor family men work at. The one reader of the table
- *  (PIOTR, 21.09; CLAUDE.md T25 2.1). */
+/** How many men can work at this machine at once, which is how many it keeps busy: its class's
+ *  row of `MACHINE_CAPACITY`, and nought for anything that is not a floor family men work at. The
+ *  one reader of the table (PIOTR, 21.09 and 02.10; CLAUDE.md T25 2.1, T26 2.1). */
 export function placesOf(item: { specId: string; variantId: string }): number {
-  return MACHINE_PLACES[item.specId]?.[item.variantId] ?? 0;
+  return MACHINE_CAPACITY[item.specId]?.[item.variantId] ?? 0;
 }
 
 /** True while at least one machine of this family can be worked at this minute: one of them is
@@ -473,7 +473,7 @@ export function machinesAtWork(state: GameState): Set<string> {
 }
 
 /** The whole day crew on the books: the owner and every joiner who is in today, at work this minute
- *  or not; the helpers, the office and the sprayer are not counted (PIOTR, 25.09; v57). What a
+ *  or not; the labourers and the office are not counted (PIOTR, 25.09; v57). What a
  *  contract's line reckons with, because it says what the hall makes "at full crew"
  *  (CLAUDE.md T25 2.7), where the hall's own minute reckons with the men at work in it
  *  (`crewAtFamily`; v54, v55). */
@@ -484,24 +484,12 @@ export function fullCrew(state: GameState): number {
   return men + 1;
 }
 
-/** How many men this one machine keeps busy: its class's figure in `MACHINE_CAPACITY`, or nought
- *  for a family with no capacity rule (v55). */
-export function capacityOf(item: { specId: string; variantId: string }): number {
-  return MACHINE_CAPACITY[item.specId]?.[item.variantId] ?? 0;
-}
-
-/** The men the hall's running machines of this family keep busy between them: two budget saws
- *  are four men (v55). */
-export function hallCapacity(state: GameState, family: string): number {
-  return placedMachines(state, family).reduce((total, item) => total + capacityOf(item), 0);
-}
-
 /** The men at work this minute whose work goes through a machine of this family: a man on a job
  *  with a stage of the family in its plan, and a man on a standing contract whose piece is done on
  *  it [PIOTR, 24.09: "only the men whose work goes through the machine"] (v55). A job cut on a
  *  CNC has no stage at the saw, so its men are the CNC's and not the saw's; a job that is not
  *  lacquered never counts against the booth. By day the owner and the joiners the plan has working,
- *  and never a helper, the office or the sprayer (`CAPACITY_ROLES`; PIOTR, 25.09; v57); by night
+ *  and never a labourer or the office (`CAPACITY_ROLES`; PIOTR, 25.09; v57); by night
  *  the second shift, which is joiners. */
 export function crewAtFamily(state: GameState, family: string, shift: 'day' | 'night' = 'day'): number {
   const men: Array<{ id: string; working: boolean }> =
@@ -541,7 +529,7 @@ export interface PlaceShortage {
   factor: number;
 }
 
-/** Every family of `MACHINE_CAPACITY` whose machines keep fewer men busy than want them [PIOTR,
+/** Every family of `CAPACITY_FAMILIES` whose machines keep fewer men busy than want them [PIOTR,
  *  24.09: "with three places at the saw and four men, too few saws for the men"]. Nobody waits for
  *  the saw: the men past its capacity work elsewhere, slower, at the by hand pace, and the hall's
  *  output falls by what they lose (v53). Only the men whose work goes through the family count
@@ -554,8 +542,10 @@ export function placeShortages(
   count: (family: string) => number = (family) => crewAtFamily(state, family, shift),
 ): PlaceShortage[] {
   const found: PlaceShortage[] = [];
-  for (const family of Object.keys(MACHINE_CAPACITY)) {
-    const capacity = hallCapacity(state, family);
+  for (const family of CAPACITY_FAMILIES) {
+    // The men the hall's running machines of the family keep busy between them, which is its
+    // places: two budget saws are four men (v55; CLAUDE.md T26 2.1).
+    const capacity = hallPlaces(state, family);
     if (capacity <= 0) continue;
     const men = count(family);
     if (men <= capacity) continue;
@@ -684,8 +674,8 @@ export function countOf(state: GameState, specId: string): number {
  *  he is standing at (CLAUDE.md T4 3.4). */
 export const BENCH = 'workbench';
 
-/** The booth family. The finishing of a lacquered job is done at it, and it is the sprayer's own
- *  trade: he is at his full rate there and a joiner is slower (CLAUDE.md T19 2.6). */
+/** The booth family. The finishing of a lacquered job is done at it, by a joiner like every other
+ *  stage (PIOTR, 02.10; CLAUDE.md T26 2.6). */
 export const SPRAY_BOOTH = 'sprayBooth';
 
 /** The benches standing in the hall, in the order they were bought, which is the order the men
@@ -705,8 +695,8 @@ export function benchPlaces(state: GameState): number {
  *  places against the men on the books and buys a place for every one of them, so a man the
  *  player has paid for a bench for is never the one standing at the canteen door; the owner takes
  *  what is left, which is the whole bench on the first morning and nothing at all in a hall whose
- *  benches are all spoken for. Only the trades that stand at a bench are on the list: a helper
- *  with a broom, an estimator at a desk and the production manager take no place at one
+ *  benches are all spoken for. Only the trades that stand at a bench are on the list: a labourer
+ *  with a broom, the office at its desks and the production manager take no place at one
  *  (CLAUDE.md T4 3.4, T19 2.5, T23 2.17). */
 function benchQueue(state: GameState): string[] {
   const crew = state.workers
@@ -823,7 +813,7 @@ export function sawdustPiles(dust: number): number {
 }
 
 /** True while there is dirt on the floor to look at, which is from the first pile on. This is the
- *  question the helper is asked, and it is asked of the drawing and not of a band of its own: the
+ *  question the labourer is asked, and it is asked of the drawing and not of a band of its own: the
  *  bands say what the dust does to the work and to the men (CLAUDE.md 9.7) and they start past 40,
  *  eight times the dust the first pile is drawn at. Between the two the player saw dirt and the
  *  labourer stood beside it, which is PIOTR's complaint of 18.09 word for word (CLAUDE.md T20 2.8;
@@ -832,11 +822,11 @@ export function hallLooksDirty(dust: number): boolean {
   return sawdustPiles(dust) > 0;
 }
 
-/** True once five joiners are on the books without a helper (CLAUDE.md 9.3). */
-export function helperMissing(state: GameState): boolean {
+/** True once five joiners are on the books without a labourer (CLAUDE.md 9.3). */
+export function labourerMissing(state: GameState): boolean {
   const joiners = state.workers.filter((worker) => worker.role === 'joiner').length;
-  const helpers = state.workers.filter((worker) => worker.role === 'helper').length;
-  return joiners >= HELPER_REQUIRED_FROM_JOINERS && helpers === 0;
+  const labourers = state.workers.filter((worker) => worker.role === 'helper').length;
+  return joiners >= LABOURER_REQUIRED_FROM_JOINERS && labourers === 0;
 }
 
 /** Finished pieces waiting for transport. Counted here rather than imported from jobs.ts, which
@@ -875,7 +865,7 @@ function roundPoints(value: number): number {
   return Math.round(value * 10000) / 10000;
 }
 
-/** A man's grade and his trade in the game's own words: "experienced joiner", "a helper". The one
+/** A man's grade and his trade in the game's own words: "experienced joiner", "a labourer". The one
  *  spelling, read by the Output sheet's own line for him and by the row that says what he made
  *  today, so the two cannot disagree about him (CLAUDE.md T20 2.5, T24 2.1). */
 function tradeWords(worker: { tier: WorkerTier | null; role: string }): string {
@@ -902,7 +892,7 @@ export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'
   };
   const band = dustBand(state.dust);
   hallLine(band.label === 'clean' ? 'Hall clean' : `Hall ${band.label}`, band.factor);
-  if (helperMissing(state)) hallLine('Five joiners and no helper', NO_HELPER_PRODUCTIVITY_FACTOR);
+  if (labourerMissing(state)) hallLine('Five joiners and no labourer', NO_LABOURER_PRODUCTIVITY_FACTOR);
   // Nowhere to put anything down with four finished pieces in the way (CLAUDE.md T2 3.7).
   if (gateIsCrowded(state)) hallLine('No room at the gate', GATE_CROWD_FACTOR);
   // The extraction is down: the hall crawls rather than stopping dead (CLAUDE.md T2 3.9).
@@ -952,8 +942,8 @@ export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'
     });
   }
   // Everybody on the books who PRODUCES, and only them: this sheet is the men and the machines
-  // that act where they are, and a rate at a desk is not a production rate, so an estimator, an
-  // admin, a draftsman, a clerk and a salesman are off it whatever their rate is (PIOTR;
+  // that act where they are, and a rate at a desk is not a production rate, so an admin, a
+  // draftsman and a salesman are off it whatever their rate is (PIOTR;
   // CLAUDE.md T20 2.3.3). The rule is the role and never the name, so two men called Dave cannot
   // take each other's line off the sheet. The guard used to read the rate: it stopped at 1 as
   // well, from the days when no tier reached the owner, and tonight the experienced man is his
@@ -1125,13 +1115,24 @@ function manRow(
 ): WorkshopBreakdownRow {
   const job = jobHeldBy(state, who);
   const stage = job === null ? null : stageOfMan(state, who, job);
-  const machine = job === null ? null : (menAtPlaces(state).find((entry) => entry.who === who)?.item ?? null);
+  // A man on a standing contract holds no job: his piece is what his minute is made on
+  // (CLAUDE.md T26 2.14).
+  const contract = job === null && who !== OWNER ? contractOfWorker(state, who) : null;
+  const machine =
+    job === null && contract === null ? null : (menAtPlaces(state).find((entry) => entry.who === who)?.item ?? null);
   const doing =
     job === null || stage === null ? '' : `${stageDoing(stage.id, job.finish === 'lacquer')} ${job.name}`;
-  // The job's one pace, the figure `runProductionMinute` reads before the air factor (v53).
+  // The job's one pace, the figure `runProductionMinute` reads before the air factor (v53); for a
+  // man on a contract his piece's own, the figure `runContractMinute` reads, so the CNC he cuts
+  // the packs on is his `machines` and not a remainder called hall (PIOTR, 02.10; CLAUDE.md T26
+  // 2.14).
   const worker = who === OWNER ? null : (state.workers.find((entry) => entry.id === who) ?? null);
-  const role = worker?.role ?? null;
-  const pace = job === null ? 1 : pacePoints(jobPace(state, job), tradeFactor(role, machine?.specId ?? null));
+  const pace =
+    job !== null
+      ? jobPace(state, job)
+      : contract !== null
+        ? contractPieceSpeed(state, contractPiece(contract))
+        : 1;
   const figure = booked.minutes <= 0 ? 0 : Math.round((booked.worth / booked.minutes) * 100) / 100;
   // His minute as the engine makes it: his grade times the hall's points, the points named one by
   // one and the hall as the remainder off what his minutes were really booked at, the saws too few
@@ -1611,12 +1612,12 @@ export function bagsFull(state: GameState): boolean {
   return bagStore(state).full;
 }
 
-/** True once the store is far enough up for a helper to start on it: `BAGS_HELPER_EMPTY_AT` of
+/** True once the store is far enough up for a labourer to start on it: `BAGS_LABOURER_EMPTY_AT` of
  *  its capacity (PIOTR, 22.09; v46). Full counts too. */
 export function bagsWantEmptying(state: GameState): boolean {
   const store = bagStore(state);
   if (!store.exists || store.bags <= 0) return false;
-  return store.fillM3 >= store.capacityM3 * BAGS_HELPER_EMPTY_AT;
+  return store.fillM3 >= store.capacityM3 * BAGS_LABOURER_EMPTY_AT;
 }
 
 /** What the store reads on the floor, on the Owned tab and under the hall: "Bags 4.6 / 10 m3",
@@ -1632,12 +1633,12 @@ export function emptyBags(state: GameState): void {
 
 /** Dust gained per minute of production, tripled by a broken extractor or by a hall whose
  *  machines are asking for more air than its fans will move, and doubled when the crew is too big
- *  for no helper (CLAUDE.md 9.6, 9.7, T10 3.1). */
+ *  for no labourer (CLAUDE.md 9.6, 9.7, T10 3.1). */
 export function dustGainPerMinute(state: GameState): number {
   let gain = DUST_PER_PRODUCTION_MINUTE;
   if (extractorBroken(state)) gain *= EXTRACTOR_BROKEN_DUST_MULTIPLIER;
   if (underExtracted(state)) gain *= UNDER_EXTRACTION_DUST_MULTIPLIER;
-  if (helperMissing(state)) gain *= NO_HELPER_DUST_MULTIPLIER;
+  if (labourerMissing(state)) gain *= NO_LABOURER_DUST_MULTIPLIER;
   return gain;
 }
 

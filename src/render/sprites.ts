@@ -29,7 +29,7 @@ const DELIVERED: readonly string[] = deliveredFiles();
 export const PLACEHOLDER_SPRITES: readonly string[] = ['spindleMoulder'];
 
 /** The placeholder kind for a sprite key and its class, `spindleMoulder.used`, or null when the
- *  family is not one the placeholder helper draws. */
+ *  family is not one the placeholder function draws. */
 export function placeholderKindFor(spriteKey: string, tier?: string | null): string | null {
   if (!PLACEHOLDER_SPRITES.includes(spriteKey)) return null;
   return typeof tier === 'string' && tier !== '' ? `${spriteKey}.${tier}` : spriteKey;

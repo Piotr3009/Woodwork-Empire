@@ -4,7 +4,6 @@ import {
   CONSUMABLES_LABEL,
   DAILY_ORDERING_MINUTES,
   DAY_END_MINUTE,
-  WORKER_RATES,
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
   JOINERY_CORE_MAX_EXTENSIONS,
   JOINERY_CORE_PRICE_YEARLY,
@@ -18,7 +17,8 @@ import {
   createTask,
   designMinutes,
   emailsForPrice,
-  estimatorCapacity,
+  takeOffCapacity,
+  taskWorkRate,
   takeOffMinutes,
   findTask,
   jobTasks,
@@ -168,6 +168,7 @@ describe('the daily list', () => {
       sheetsUsed: 0,
       sheetsReserved: 0,
       kind: 'residential',
+      joinersWanted: 0,
       budget: 400,
       nightMinutes: 0,
       needsSpindle: false,
@@ -359,7 +360,7 @@ describe('emails scale with what the job is worth (CLAUDE.md T3 3.2)', () => {
   });
 });
 
-// The estimator and the material list (PIOTR; CLAUDE.md T13 3.8). Two jobs that were one: the
+// The office admin and the material list (PIOTR; CLAUDE.md T13 3.8, T26 2.9). Two jobs that were one: the
 // take off, which reads the drawing and counts the sheets for one job, and the daily consumables
 // and materials chore, which is the admin's and has nothing to do with the number of projects.
 describe('the material take off', () => {
@@ -377,23 +378,23 @@ describe('the material take off', () => {
     return jobTasks(state, firstJob(state).id).find((task) => task.kind === 'materialTakeOff');
   }
 
-  it('is as many a day as his minutes allow: 12 bare, 25 with Joinery Core (CLAUDE.md T20 2.3)', () => {
+  it('is as many a day as the minutes allow: 16 bare, 32 with Joinery Core (CLAUDE.md T20 2.3)', () => {
     const state = newGame();
     expect(MATERIAL_TAKE_OFF_MINUTES).toBe(30);
     expect(takeOffMinutes(state)).toBe(MATERIAL_TAKE_OFF_MINUTES);
-    // The figures are the experienced man's, and he is 0.8 of the owner on Piotr's ladder from
-    // tonight, so every one of them came down a step with him (CLAUDE.md T21 2.9).
-    expect(estimatorCapacity(state)).toBe(12);
+    // The figures are the office admin's, at the owner's own speed from Turn 26 (CLAUDE.md T26
+    // 2.9); they were 12, 25, 34 and 45 for the experienced man of the trade that went.
+    expect(takeOffCapacity(state)).toBe(16);
     state.software.joineryCore = true;
     expect(takeOffMinutes(state)).toBe(15);
-    expect(estimatorCapacity(state)).toBe(25);
+    expect(takeOffCapacity(state)).toBe(32);
     state.software.joineryCoreExtensions = 1;
-    expect(estimatorCapacity(state)).toBe(34);
+    expect(takeOffCapacity(state)).toBe(42);
     state.software.joineryCoreExtensions = 2;
-    expect(estimatorCapacity(state)).toBe(45);
+    expect(takeOffCapacity(state)).toBe(56);
     // At most two: a third counts for nothing, whatever the state says.
     state.software.joineryCoreExtensions = 3;
-    expect(estimatorCapacity(state)).toBe(45);
+    expect(takeOffCapacity(state)).toBe(56);
     expect(JOINERY_CORE_MAX_EXTENSIONS).toBe(2);
   });
 
@@ -414,15 +415,13 @@ describe('the material take off', () => {
     expect(materialOrderMinutes(100000)).not.toBe(MATERIAL_TAKE_OFF_MINUTES);
   });
 
-  it('gives a man with no experience 50 minutes over one and the top man 25', () => {
-    const state = newGame();
-    // His tier is his speed at the desk, off the one WORKER_RATES table, which is Piotr's own
-    // 0.6, 0.8, 1.0 and 1.2 from tonight (CLAUDE.md T21 2.9). The half hour of a take off is 50
-    // minutes to a man with no experience and 25 to an excellent one.
-    expect(MATERIAL_TAKE_OFF_MINUTES / WORKER_RATES.novice).toBeCloseTo(50, 6);
-    expect(MATERIAL_TAKE_OFF_MINUTES / WORKER_RATES.master).toBeCloseTo(25, 6);
-    expect(estimatorCapacity(state, 'novice')).toBe(9);
-    expect(estimatorCapacity(state, 'master')).toBe(19);
+  it('is the half hour of the desk at the owner s own speed, whoever does it', () => {
+    // The admin has no grade: a take off is a minute a minute of her day, as it is of the owner's
+    // (PIOTR, 30.09 and 02.10; CLAUDE.md T26 2.9). Until Turn 26 a graded trade did them at 0.6 to
+    // 1.2 of the owner.
+    const admin = { role: 'officeAdmin', tier: null } as Worker;
+    expect(taskWorkRate(admin, { kind: 'materialTakeOff' } as never)).toBe(1);
+    expect(taskWorkRate(admin, { kind: 'dailyOrdering' } as never)).toBe(1);
   });
 
   it('is the owner’s with nobody hired, and only once the drawing is done', () => {
@@ -446,28 +445,29 @@ describe('the material take off', () => {
     expect(['ready', 'materialPending', 'materialOrdered']).toContain(firstJob(state).stage);
   });
 
-  it('is the estimator’s from the day he is in, at the speed of his tier, and waits for the drawing too', () => {
+  it('is the admin’s from the day she is in, at the owner s own speed, and waits for the drawing too', () => {
     let state = withTakeOff();
-    // A very experienced man answers from reputation 35 (CLAUDE.md T21 2.9), and the bank
-    // wants a month of his pay before anybody is taken on (CLAUDE.md T17 2.11).
+    // The bank wants a month of her pay before anybody is taken on (CLAUDE.md T17 2.11).
     state.reputation = 40;
     state.cash = 100000;
-    state = hireNow(state, 'estimator', 'senior');
-    const estimator = state.workers.find((worker) => worker.role === 'estimator');
-    expect(estimator).toBeDefined();
+    state = hireNow(state, 'officeAdmin', null);
+    const admin = state.workers.find((worker) => worker.role === 'officeAdmin');
+    expect(admin).toBeDefined();
     for (const worker of state.workers) worker.startDay = state.clock.day;
+    // Nothing else on her desk this morning: her emails and her daily chores would come first, and
+    // the take off is what is measured here.
+    state.tasks = state.tasks.filter((task) => task.kind === 'design' || task.kind === 'materialTakeOff');
     state = clearEvents(runClock(state, 1));
     // The drawing is still to do, so the take off waits on the desk for it.
     expect(takeOffOf(state)?.doneBy).toBeNull();
     state = clearEvents(doTask(state, 'design'));
     state = clearEvents(runClock(state, 1));
-    expect(takeOffOf(state)?.doneBy).toBe(estimator?.id);
+    expect(takeOffOf(state)?.doneBy).toBe(admin?.id);
     const before = takeOffOf(state)?.minutesRemaining ?? 0;
     const later = clearEvents(runClock(state, 10));
     const after = takeOffOf(later)?.minutesRemaining ?? 0;
-    // A very experienced estimator works it off at a minute a minute, which is the owner's own
-    // speed and what his tier is worth from tonight (CLAUDE.md T21 2.9).
-    expect(before - after).toBeCloseTo(10 * WORKER_RATES.senior, 6);
+    // A minute a minute, the owner's own speed (CLAUDE.md T26 2.9).
+    expect(before - after).toBeCloseTo(10, 6);
     expect(later.owner.minutesWorked).toBe(state.owner.minutesWorked);
   });
 
@@ -480,10 +480,10 @@ describe('the material take off', () => {
     expect(offer.held).toBe(false);
     expect(offer.core.ok).toBe(true);
     expect(offer.extension).toEqual({ ok: false, reason: 'Joinery Core first' });
-    expect(offer.capacity).toBe(12);
-    expect(offer.baseCapacity).toBe(12);
-    expect(offer.coreCapacity).toBe(25);
-    expect(offer.extensionCapacities).toEqual([34, 45]);
+    expect(offer.capacity).toBe(16);
+    expect(offer.baseCapacity).toBe(16);
+    expect(offer.coreCapacity).toBe(32);
+    expect(offer.extensionCapacities).toEqual([42, 56]);
     expect(offer.yearlyPrice).toBe(JOINERY_CORE_PRICE_YEARLY);
     expect(offer.extensionYearlyPrice).toBe(JOINERY_CORE_EXTENSION_PRICE_YEARLY);
     // The click switches it on and pays the first twelfth of the year (CLAUDE.md T13 3.8).
@@ -492,11 +492,11 @@ describe('the material take off', () => {
     expect(state.software.joineryCore).toBe(true);
     expect(cash - state.cash).toBeCloseTo(JOINERY_CORE_PRICE_YEARLY / 12, 2);
     expect(joineryCoreOffer(state).core).toEqual({ ok: false, reason: 'On the laptop' });
-    expect(joineryCoreOffer(state).capacity).toBe(25);
+    expect(joineryCoreOffer(state).capacity).toBe(32);
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
     expect(joineryCoreOffer(state).extension).toEqual({ ok: false, reason: 'Both extensions bought' });
-    expect(joineryCoreOffer(state).capacity).toBe(45);
+    expect(joineryCoreOffer(state).capacity).toBe(56);
     // A third click buys nothing.
     const two = state.cash;
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });

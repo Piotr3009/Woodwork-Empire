@@ -65,7 +65,14 @@ import {
 } from '../../src/engine/contracts';
 import { workerMinuteCost } from '../../src/engine/jobs';
 import { freeSheets, reservedSheets } from '../../src/engine/materials';
-import { hallPace, hallProductivityFactor, machineWearPerMinute, menAtMachine, menAtPlaces } from '../../src/engine/machines';
+import {
+  accumulateMachineMinute,
+  hallPace,
+  hallProductivityFactor,
+  machineWearPerMinute,
+  menAtMachine,
+  menAtPlaces,
+} from '../../src/engine/machines';
 import { planPlaces } from '../../src/engine/production';
 import { manPace } from '../../src/engine/stages';
 import { STATION_DOOR, STATION_HOME } from '../../src/engine/stations';
@@ -159,7 +166,11 @@ function minutes(state: GameState, count: number): number {
   for (let at = 0; at < count; at += 1) {
     // The day plan the day's own minute would hand it (CLAUDE.md T25 2.3).
     const plan = new Map(planPlaces(state).map((entry) => [entry.who, entry]));
-    worked += runContractMinute(state, plan).worked;
+    const minute = runContractMinute(state, plan);
+    worked += minute.worked;
+    // The machines it worked at book their minute with the day's own, once each (CLAUDE.md T26
+    // 2.1), which is what the day's minute does with them.
+    accumulateMachineMinute(state, new Map(minute.machineIds.map((id) => [id, 1])));
   }
   return worked;
 }
@@ -595,6 +606,8 @@ describe('the week and the term', () => {
     contract.revenue = 3800;
     contract.materialCost = 3000;
     contract.labourMinutes = 6000;
+    // One man on it the whole term: a machine minute for every minute of his (CLAUDE.md T26 2.1).
+    contract.machineMinutes = 6000;
     const report = closingReport(state, contract);
     const labourCost =
       Math.round(6000 * workerMinuteCost(JOINER_MONTHLY_WAGE.novice) * 100) / 100;

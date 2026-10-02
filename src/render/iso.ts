@@ -1,4 +1,4 @@
-// Isometric projection helpers. Pure geometry, no SVG and no DOM, so the same numbers can feed a
+// Isometric projection functions. Pure geometry, no SVG and no DOM, so the same numbers can feed a
 // sprite renderer later (CLAUDE.md 10.3).
 //
 // 2:1 dimetric. One grid cell is 48 by 24 pixels on screen and, from Turn 5 on, one metre by one
@@ -138,6 +138,52 @@ export function centreOf(
 /** Painter order: objects further from the camera are drawn first. */
 export function depthKey(x: number, y: number): number {
   return x + y;
+}
+
+/** The floor a thing stands on, as it is drawn: its footprint in cells, fractional where it stands
+ *  centred in its zone. */
+export interface FloorBox {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+}
+
+/** True while a man whose feet are at this point is behind this thing: his feet are short of its
+ *  front on both axes, so it stands between him and the camera wherever the two meet on the screen
+ *  (PIOTR, 02.10: "when a man goes behind a machine the machine does not hide him"; CLAUDE.md T26
+ *  2.4). The depth keys stay what they are; this is what honouring them means for a man and a thing
+ *  bigger than a cell, whose key is the back corner of its zone. */
+export function standsBehind(feet: { x: number; y: number }, box: FloorBox): boolean {
+  return feet.x < box.x + box.width && feet.y < box.y + box.depth;
+}
+
+/** One drawable a figure is placed among: its depth key, and the floor it stands on when it is a
+ *  thing on the floor with a footprint. */
+export interface DepthSibling {
+  depth: number;
+  foot: FloorBox | null;
+}
+
+/** Where a figure goes among the drawables round him, painted in order: after everything he is in
+ *  front of and before everything he is behind. A thing with a footprint is placed by
+ *  `standsBehind`; everything else, another man among them, by its key against his. When the two
+ *  cannot both hold, the thing he is behind wins and he is hidden. A full insertion every time it
+ *  is asked, so a man crossing behind a machine is before it for every frame he is behind it
+ *  (CLAUDE.md T26 2.4). */
+export function figureSlot(
+  siblings: readonly DepthSibling[],
+  figure: { depth: number; feet: { x: number; y: number } },
+): number {
+  let lastBefore = -1;
+  let firstAfter = siblings.length;
+  siblings.forEach((sibling, index) => {
+    const before =
+      sibling.foot !== null ? !standsBehind(figure.feet, sibling.foot) : sibling.depth <= figure.depth;
+    if (before) lastBefore = index;
+    else if (firstAfter === siblings.length) firstAfter = index;
+  });
+  return lastBefore < firstAfter ? lastBefore + 1 : firstAfter;
 }
 
 export interface Bounds {

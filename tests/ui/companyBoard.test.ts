@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { changeReputation, companyTotals, effectiveReputation, formatReputation } from '../../src/engine/reputation';
-import { outputBreakdown } from '../../src/engine/machines';
+import { outputBreakdown, workshopOutputToday } from '../../src/engine/machines';
 import { PACE_FLOOR } from '../../src/engine/constants';
 import { COMPANY_BOARD_BOX, OFFICE_TEXTS } from '../../src/render/office';
 import { machineSavings } from '../../src/engine/machines';
@@ -60,10 +60,12 @@ function ruleBody(selector: string): string {
 function traded(): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy', companyName: 'Joinery Core' })), 40);
   state.clock.day = 3;
-  changeReputation(state, 3, 'Bookcase: on time');
+  // A gain is booked at half from Turn 26 (CLAUDE.md T26 2.11), so the two gains are asked at twice
+  // the +3 and +5 the sheet is read for below.
+  changeReputation(state, 6, 'Bookcase: on time');
   changeReputation(state, -1, 'Bookcase: calls not answered');
   state.clock.day = 9;
-  changeReputation(state, 5, 'Wardrobe: express, on time');
+  changeReputation(state, 10, 'Wardrobe: express, on time');
   state.clock.day = 11;
   changeReputation(state, -10, 'Dropped: Garage shelves');
   state.owner.dayLog = [
@@ -367,12 +369,13 @@ describe('the Pace sheet', () => {
     // Pace, not Output, from v60: what a worked minute is worth, added up from points and never
     // multiplied, with the line that says so beside Efficiency (PIOTR, 30.09).
     expect(sheet?.querySelector('h3')?.textContent).toBe('Pace');
+    // The head is the workshop's average today from Turn 26 (CLAUDE.md T26 2.14).
     expect(sheet?.querySelector('.ledger-total-label')?.textContent).toBe(
-      'every worked minute in this hall is worth',
+      'every worked minute today was worth',
     );
     expect(sheet?.textContent).toContain('Efficiency says how much of the day was worked. Pace says how fast a worked minute goes');
     expect(sheet?.textContent).toContain(`nothing runs slower than ${PACE_FLOOR.toFixed(2)}`);
-    expect(sheet?.querySelector('[data-figure="output"]')?.textContent).toBe(breakdown.total.toFixed(2));
+    expect(sheet?.querySelector('[data-figure="output"]')?.textContent).toBe(workshopOutputToday(state).toFixed(2));
     const base = sheet?.querySelector('.ledger-row[data-line="base"]');
     expect(base?.querySelector('.ledger-main')?.textContent).toBe('Base');
     expect(base?.querySelector('.ledger-points')?.textContent).toBe('1.00');

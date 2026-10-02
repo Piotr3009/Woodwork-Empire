@@ -146,29 +146,32 @@ describe('a man goes through it (CLAUDE.md T20 2.12)', () => {
 });
 
 describe('every man goes through the office door, not the owner alone (CLAUDE.md T21 2.11)', () => {
-  it('takes the estimator off the hall at his take off, and gives him back when it is done', () => {
+  it('takes the office admin off the hall at her take off, and gives her back when it is done', () => {
     // Turn 20 drew him standing in the doorway and this test asserted that, because the office view
     // draws the owner alone and a man on neither picture was a man the player had lost. Turn 21 sends
     // him through, and Turn 22 leaves nothing behind him: a man in a room has nothing wrong with him,
     // so he has no mark, and where he is, is the line under his name on the team page (PIOTR, 19.09;
     // CLAUDE.md T21 2.11, T22 2.5).
+    // The office admin of Turn 26 stands in for the take off man of Turn 20, whose trade went
+    // (CLAUDE.md T26 2.6).
     const start = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     start.cash = 50_000;
-    const hired = hireNow(start, 'estimator', 'novice');
+    start.reputation = 10;
+    const hired = hireNow(start, 'officeAdmin', null);
     hired.enquiries = [];
-    const estimator = hired.workers.find((worker) => worker.role === 'estimator');
-    if (estimator === undefined) throw new Error('nobody was hired');
-    estimator.startDay = hired.clock.day;
+    const admin = hired.workers.find((worker) => worker.role === 'officeAdmin');
+    if (admin === undefined) throw new Error('nobody was hired');
+    admin.startDay = hired.clock.day;
     // A take off, the books, a drawing or the phone are all desk work: the engine puts him on the
     // office station and his cell is the doorway.
-    estimator.station = STATION_OFFICE;
+    admin.station = STATION_OFFICE;
     hired.owner.station = STATION_BENCH;
     const root = page(hired);
     syncWalkers(root, 0, straight);
     walkOn(root, 0);
     const drawn = renderHall(hired);
-    expect(drawn).not.toContain(`data-worker="${estimator.id}"`);
-    expect(figureIsThroughADoor(`worker-${estimator.id}`, roomDoorCell('office'), STATION_OFFICE)).toBe(
+    expect(drawn).not.toContain(`data-worker="${admin.id}"`);
+    expect(figureIsThroughADoor(`worker-${admin.id}`, roomDoorCell('office'), STATION_OFFICE)).toBe(
       true,
     );
     // And nothing of his is left at the door: the bubble of Turn 21 that used to stand there in the
@@ -178,8 +181,8 @@ describe('every man goes through the office door, not the owner alone (CLAUDE.md
     // And the office view is still the owner's alone: one box, measured for him (CLAUDE.md T19 2.2).
     expect(drawn).not.toContain('data-office-figure');
     // The take off is over and he is on the floor again.
-    estimator.station = STATION_BENCH;
-    expect(renderHall(hired)).toContain(`data-worker="${estimator.id}"`);
+    admin.station = STATION_BENCH;
+    expect(renderHall(hired)).toContain(`data-worker="${admin.id}"`);
   });
 });
 

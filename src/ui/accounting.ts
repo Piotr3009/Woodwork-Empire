@@ -23,6 +23,7 @@ import {
 } from '../engine/index';
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
 import { monthlyPremiums, nextInstalmentFor } from '../engine/index';
+import { AGENCY_MONTHLY_FEE } from '../engine/constants';
 import { renderFinance } from './finance';
 import { button, escapeHtml, money, tabBar, whyLink } from './modal';
 
@@ -54,6 +55,7 @@ const CATEGORY_LABELS: Record<LedgerCategory, string> = {
   wagesNight: 'Night shift wages',
   salaries: 'Salaries',
   software: 'Software',
+  agency: 'Advertising agency',
   waste: 'Waste collection',
   equipment: 'Equipment',
   material: 'Material',
@@ -227,6 +229,8 @@ function dayRows(
  *  the Friday row above this one carries the whole payroll (CLAUDE.md T20 2.6). */
 function monthlyBillsLine(state: GameState): string {
   const items = ['software', 'waste'];
+  // The agency's month while it is on (CLAUDE.md T26 2.13).
+  if (state.agency.on) items.push(`advertising agency ${money(AGENCY_MONTHLY_FEE)}`);
   const loan = state.finance.loan;
   if (loan !== null) items.push(`loan instalment ${money(nextInstalmentFor(loan))}`);
   const premiums = monthlyPremiums(state);

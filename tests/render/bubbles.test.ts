@@ -51,13 +51,14 @@ function groupOf(svg: string, figure: string): string {
   throw new Error(`${figure} has no end`);
 }
 
-/** Three men on one job at its cutting stage, a budget saw of one place and the day one kit's one
+/** Three men on one job at its cutting stage, a used saw of one place (a budget saw has two from
+ *  Turn 26, its capacity; CLAUDE.md T26 2.1) and the day one kit's one
  *  bench, the five other benches taken out: the saw and that bench are every place the hall has.
  *  Nobody waits for the saw, so one man cuts, the second takes the bench, and the third and the
  *  three men on the other jobs stand with every place taken (CLAUDE.md T25 2.3; PIOTR, 24.09;
  *  v53). Until v53 the one saw alone stood the second man. */
 function everyPlaceTaken(): GameState {
-  let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
+  let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'used' });
   const first = state.jobs[0];
   if (!first) throw new Error('a job is wanted');
   state = act(state, { type: 'ADD_TO_JOB', jobId: first.id, workerId: 'staff-2' });
@@ -325,10 +326,11 @@ describe('the mark over a machine (PIOTR, 24.09; v53)', () => {
     expect(mark).toContain('class="mark-disc"');
     expect(mark).toContain('>!</text>');
     expect(mark).toContain(`<div class="bubble">${words}</div>`);
-    // The saw's hover line carries the same words, after its places: the second man's, whose
-    // turn the saw is in the first half hour (v55).
+    // The saw's hover line carries the same words, after its places: the second and the fourth
+    // man's, whose turn the saw is in the first half hour, its two places being its capacity from
+    // Turn 26 (v55; CLAUDE.md T26 2.1).
     const title = svg.slice(svg.indexOf('<title>', kitAt), svg.indexOf('</title>', kitAt));
-    expect(title).toContain(`Places: 1 of 1 in use, Joiner 2. ${words}.`);
+    expect(title).toContain(`Places: 2 of 2 in use, Joiner 2 and Joiner 4. ${words}.`);
     // No man's mark is touched by it: the marks over men are the men's own, and here that is the
     // owner, who is on nothing.
     const men = (svg.match(/data-bubble-for="[^"]*"/g) ?? []).filter(
@@ -343,7 +345,7 @@ describe('the mark over a machine (PIOTR, 24.09; v53)', () => {
   });
 
   it('wears it on the first saw with places, and moves it to the next while the first is down', () => {
-    // Two budget saws, a place each and two men's capacity each, for six men at work: the one
+    // Two budget saws, two places each, their capacity (T26 2.1), for six men at work: the one
     // bought first is the one filled first and the one marked. Broken, it has no places and no
     // capacity, and the mark goes to the other (v55).
     const state = sixJoinersOnSheetWork({ saws: 2, sawVariant: 'budget' });

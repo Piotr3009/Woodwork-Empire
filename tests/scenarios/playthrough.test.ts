@@ -1,7 +1,8 @@
 // The three month playthrough of CLAUDE.md T13 10.4, headless, through the one scripted player:
 // Easy, a joiner in week 1, a standard saw and a twin bag extractor connected, every residential
 // enquiry with a margin over twenty per cent after the client's answer, the first contract
-// offered, an estimator asked for in month 2, a manager in month 3, five days away in month 3,
+// offered, an office admin asked for in month 2 (the take off man of 10.4, whose take offs are hers
+// from Turn 26), a manager in month 3, five days away in month 3,
 // the draw raised to 400 in month 2, level 1 security and both covers in month 2. The three month
 // end reports are written to the scratchpad for REPORT-T13.md.
 //
@@ -11,7 +12,7 @@
 // until tonight what it could not carry piled up beside it. Turn 17's phase C re-scripted the run
 // rather than move the claims off Easy: the player goes to the bank the day the account first goes
 // under, which is what the bank is for and what a careful owner does at 15% instead of the
-// overdraft's 25%. With the loan drawn he takes the estimator and the manager on, has his five
+// overdraft's 25%. With the loan drawn he takes the office and the manager on, has his five
 // days away, keeps the contract's rack fed and ends the three months a few thousand overdrawn. The
 // figures of that run are in REPORT-T17.md.
 //
@@ -65,6 +66,10 @@ function marginOf(state: GameState, event: GameEvent): number {
 
 let holidayTaken = false;
 
+/** Every morning from month 2 the scripted player asks for the advertising agency, and what the
+ *  switch said: the scenario (tt) of CLAUDE.md T26 2.13 and D2. */
+let agencyAsks: Array<{ day: number; reputation: number; on: boolean }> = [];
+
 const PLAYTHROUGH: Policy = {
   maxOpenJobs: 3,
   buyKit: true,
@@ -103,25 +108,29 @@ const PLAYTHROUGH: Policy = {
     ) {
       next = act(next, { type: 'RESTOCK', sheets: RESTOCK_SHEETS });
     }
+    // (tt) The agency on from month 2: asked for every working morning until it is on
+    // (CLAUDE.md T26 2.13). It is taken on from a standing of 50.
+    if (day >= 31 && isWorkingDay(day) && !next.agency.on) {
+      next = act(next, { type: 'SET_AGENCY', on: true });
+      agencyAsks.push({ day, reputation: next.reputation, on: next.agency.on });
+    }
     if (day === 31) {
       next = act(next, { type: 'SET_OWNER_DRAW', tier: 1 });
       next = act(next, { type: 'SET_SECURITY_LEVEL', level: 1 });
       next = act(next, { type: 'SET_INSURANCE', cover: 'property', on: true });
       next = act(next, { type: 'SET_INSURANCE', cover: 'liability', on: true });
     }
-    // From day 31 the owner takes an estimator on. A hire wants a month of his pay in the bank
-    // now (CLAUDE.md T17 2.11), and the interview is an hour of the owner's day, so the script
-    // asks again on the days that follow until he is on the books.
+    // From day 31 the owner takes the office admin on, whose the take offs are from Turn 26 (the
+    // brief's take off man, a trade that went; CLAUDE.md T26 2.9). A hire wants a month of her pay in
+    // the bank (CLAUDE.md T17 2.11), and the interview is an hour of the owner's day, so the script
+    // asks again on the days that follow until she is on the books.
     if (
       day >= 31 &&
       isWorkingDay(day) &&
-      !next.workers.some((worker) => worker.role === 'estimator') &&
+      !next.workers.some((worker) => worker.role === 'officeAdmin') &&
       !next.tasks.some((task) => task.kind === 'hiring' && !task.done)
     ) {
-      // The tier answers to the workshop's standing from tonight, and an experienced man wants
-      // 15 of it (CLAUDE.md T20 2.5). Three months in, the one who answers is the man with no
-      // experience, and he is the one the script takes on.
-      next = act(next, { type: 'HIRE', role: 'estimator', tier: 'novice' });
+      next = act(next, { type: 'HIRE', role: 'officeAdmin', tier: null });
     }
     // From day 61 the owner takes a production manager on. The interview is an hour of his day and
     // the day he is free to sit it is not always the 61st, so the script asks again until one is on
@@ -159,8 +168,15 @@ interface MonthLog {
   houseTier: number;
 }
 
-function play(difficulty: 'easy' | 'veryEasy'): { state: GameState; days: GameState[]; events: GameEvent[]; months: MonthLog[] } {
+function play(difficulty: 'easy' | 'veryEasy'): {
+  state: GameState;
+  days: GameState[];
+  events: GameEvent[];
+  months: MonthLog[];
+  agencyAsks: Array<{ day: number; reputation: number; on: boolean }>;
+} {
   holidayTaken = false;
+  agencyAsks = [];
   const events: GameEvent[] = [];
   const days: GameState[] = [];
   let state = newGame({ seed: SEED, difficulty });
@@ -192,7 +208,7 @@ function play(difficulty: 'easy' | 'veryEasy'): { state: GameState; days: GameSt
       deliveredBefore = delivered;
     }
   }
-  return { state, days, events, months };
+  return { state, days, events, months, agencyAsks };
 }
 
 const played = play('easy');
@@ -300,12 +316,13 @@ const control = play('veryEasy');
 describe('the three month playthrough of 10.4, on Easy as the brief scripts it', () => {
   it('has the crew, the kit and the paper the brief asked for, in the order it asked', () => {
     // It traded all three months and is still trading on day 91 (v53, the note above; on v52 the
-    // bank pulled the overdraft that morning).
+    // bank pulled the overdraft that morning). From v63 the company's standing grows at half
+    // (CLAUDE.md T26 2.11), the board draws other work for it, and it trades on to day 92 [measured].
     expect(state.clock.day).toBeGreaterThanOrEqual(91);
     expect(state.gameOver).toBeNull();
     const joiner = state.workers.find((worker) => worker.role === 'joiner');
     expect(joiner?.startDay).toBeLessThanOrEqual(5);
-    // The estimator on day 32, as ever. The production manager of 10.4 is back on the books from
+    // The office on day 32, as ever. The production manager of 10.4 is back on the books from
     // v52: month 2 closed in the black, and the gate that refuses a hire the account cannot carry
     // a month of lets him through (CLAUDE.md T17 2.11, T23 2.12). On v52 a novice on day 73; from
     // v53 an experienced man on day 65, the month closing 1,168 better (the note above); from v55
@@ -314,11 +331,11 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // 64, month 2 closing at 2,627 (the note above). From v60 there is no manager at all: month 2
     // closes at 174 and the hire card refuses a novice's 2,400 every working day of month 3 (the
     // note above).
-    expect(state.workers.some((worker) => worker.role === 'estimator' && worker.startDay <= 35)).toBe(true);
-    expect(state.workers.some((worker) => worker.role === 'productionManager')).toBe(false);
-    const manager = hiringOptions(state).find((option) => option.role === 'productionManager' && option.tier === 'novice');
-    expect(manager?.available).toBe(false);
-    expect(manager?.blockReason).toBe('Not enough in the bank: needs £2,400');
+    // The office admin in the take off man's place from Turn 26, on the same days (CLAUDE.md T26 2.9).
+    expect(state.workers.some((worker) => worker.role === 'officeAdmin' && worker.startDay <= 35)).toBe(true);
+    // From v63 an experienced manager is taken on, on day 65, month 2 closing in the black with the
+    // standing's slower growth drawing other work (CLAUDE.md T26 2.11) [measured].
+    expect(state.workers.find((worker) => worker.role === 'productionManager')?.startDay).toBe(65);
     // The standard saw of 10.4 was bought in week 1. From v57 to v59 the burglary of day 79 took it
     // and the script bought none again; from v60 the stream that rolled the burglary has moved and
     // the saw stands in the hall to the end (the note above the describe).
@@ -334,9 +351,9 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(state.insurance.property && state.insurance.liability).toBe(true);
     expect(state.ownerDraw.tier).toBe(1);
     // The holiday of 10.4 comes with the manager: a man only takes one while there is somebody to
-    // cover the hall (CLAUDE.md T13 3.9), and from v60 there is no manager (above), so the owner
-    // takes none.
-    expect(days.some((day) => onHoliday(day))).toBe(false);
+    // cover the hall (CLAUDE.md T13 3.9). From v60 to v62 there was no manager and no holiday; from
+    // v63 the manager of day 78 lets the owner take it [measured].
+    expect(days.some((day) => onHoliday(day))).toBe(true);
   });
 
   it('took every residential enquiry with a margin over twenty per cent, and no commercial one', () => {
@@ -409,16 +426,19 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // burglary of day 79 and a hall with no saw after it.
     // Re-measured for v60: 4,100, 174 and -7,031 (the note above the describe), every minute a
     // sum of points, the novice's jobs slower for it, no manager and no burglary.
-    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(4100);
-    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(174);
-    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-7031);
-    // Two charges in three months: 7 on day 31 for the few days month 1 ran under, and 72 on day
-    // 91 for month 3. Month 2 never went under and pays nothing on day 61 (CLAUDE.md T23 2.12).
+    // Re-measured for v61: 4,100, -90 and -7,424, a man's grade times the hall's points (PIOTR,
+    // 01.10) [measured].
+    // Re-measured for v63: 7,350, 398 and -12,999, the standing growing at half and the board
+    // drawing other work for it, with an experienced manager's pay from day 65 (CLAUDE.md T26 2.11).
+    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(7350);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(398);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-12999);
+    // Three charges: 7.65 on day 31, 1.01 on day 61 and 44.74 on day 91, for the days each month
+    // ran under (CLAUDE.md T23 2.12) [measured].
     const overdraft = state.ledger.filter((entry) => entry.category === 'overdraftInterest');
-    expect(overdraft.map((entry) => entry.day)).toEqual([31, 91]);
+    expect(overdraft.map((entry) => entry.day)).toEqual([31, 61, 91]);
     expect(Math.abs(overdraft[0]?.amount ?? 0)).toBeLessThan(15);
-    expect(Math.abs(overdraft[1]?.amount ?? 0)).toBeGreaterThan(10);
-    expect(Math.abs(overdraft[1]?.amount ?? 0)).toBeLessThan(100);
+    expect(Math.abs(overdraft[1]?.amount ?? 0)).toBeLessThan(2);
   });
 
   it('reaches house tier 2 in month 2 once the raised draw is really paid, and keeps it', () => {
@@ -450,8 +470,11 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // the saw and the script buys none, so from day 80 the hall stands on the cutting, a day at 50
     // from day 81 to the end of the month (the note above the describe). Ninety from v60, 90.33:
     // no burglary in this stream, so the saw is in the hall to the end and nothing stands.
+    // Ninety one from v61, the grade times the hall's points (PIOTR, 01.10) [measured]. Ninety two
+    // from v63, month 3 read again: the standing grows at half and the board draws other work
+    // (CLAUDE.md T26 2.11); month 2 reads 77 [measured].
     expect(months[1]?.efficiencyMean ?? 0).toBeGreaterThan(55);
-    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(90);
+    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(92);
   });
 
   it('took the first contract its crew could keep up with and made every week of it in full', () => {
@@ -483,6 +506,7 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // line of its own, and not a line of the run left unpaid (CLAUDE.md T22 2.1, 2.2, T23 2.12).
     const running = state.contracts.find((contract) => contract.status !== 'offered');
     if (running === undefined) throw new Error('no contract was taken');
+    // Thirteen weeks again from v63, the company trading to the end (above) [measured].
     expect(running.weeks.length).toBe(13);
     expect(running.status).toBe('active');
     expect(running.renegotiatedPrice).toBeNull();
@@ -495,16 +519,16 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
   });
 
   it('pays every trade by the month, on its last working day, and never by the week', () => {
-    // The crew of 10.4 is a joiner in week 1 and an estimator in month 2. Every one of them is on
+    // The crew of 10.4 is a joiner in week 1 and the office in month 2. Every one of them is on
     // the one unit, and it is the month
     // (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10), so the three months are a
     // played proof that monthly pay covers the office as well as the bench.
     const roles = new Set(state.workers.map((worker) => worker.role));
     expect(roles.has('joiner')).toBe(true);
-    expect(roles.has('estimator')).toBe(true);
+    expect(roles.has('officeAdmin')).toBe(true);
     // The production manager of 10.4 was on the books from v52 to v59 (the note above the
-    // describe); from v60 the account never carries his month of pay and there is none.
-    expect(roles.has('productionManager')).toBe(false);
+    // describe), none from v60 to v62, and a novice from day 78 on v63 (above).
+    expect(roles.has('productionManager')).toBe(true);
     for (const worker of state.workers) expect(worker.monthlyWage, worker.role).toBeGreaterThan(0);
     // The office salary line of the 1st of the month is gone with `monthlyWage`.
     expect(state.ledger.filter((entry) => entry.category === 'salaries')).toEqual([]);
@@ -518,11 +542,12 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
       expect(entry.label, `day ${entry.day}`).toBe('Monthly wages');
     }
     // The last pay day of the three months pays the whole crew, each at his own monthly wage and
-    // nothing on top of it: the estimator is in the same line as the joiner (and the manager was,
+    // nothing on top of it: the admin is in the same line as the joiner (and the manager was,
     // from v52 to v59).
     const last = wages[wages.length - 1];
     const crew = state.workers.filter((worker) => worker.startDay <= (last?.day ?? 0));
-    expect(crew.length).toBe(2);
+    // The joiner, the admin and from v63 the manager of day 78 (above).
+    expect(crew.length).toBe(3);
     expect(Math.abs(last?.amount ?? 0)).toBeCloseTo(
       crew.reduce((total, worker) => total + worker.monthlyWage, 0),
       2,
@@ -597,10 +622,34 @@ describe('the same script on Very easy, the control', () => {
     // carries the fitting out without going under, so nothing is borrowed and the control stays
     // the control (CLAUDE.md T13 10.4).
     expect(control.state.finance.loan).toBeNull();
-    expect(control.state.workers.some((worker) => worker.role === 'estimator')).toBe(true);
+    expect(control.state.workers.some((worker) => worker.role === 'officeAdmin')).toBe(true);
     expect(control.state.workers.some((worker) => worker.role === 'productionManager')).toBe(true);
     expect(control.days.some((day) => onHoliday(day))).toBe(true);
     expect(holidayTaken).toBe(true);
   });
 });
 
+// ---------------------------------------------------------------------------
+// (tt) The three months with the advertising agency asked for from month 2 (CLAUDE.md T26 2.13,
+// D2). One big job taken and made, or why not. Why not: the agency takes on a shop from a standing
+// of 50 and its big jobs come from 50, and this company's standing, every gain booked at half from
+// tonight (2.11), never comes near it in three months. The scripted player asks every working
+// morning from day 31 and is refused every time, so nothing of the run moves for it. What a big job
+// does to a shop that has the name and the men is scenario (tt) of tests/scenarios/turn26.test.ts.
+// ---------------------------------------------------------------------------
+
+describe('(tt) the three month playthrough with the agency asked for from month 2', () => {
+  it('is refused every morning, the standing far under 50, so no fee is charged and no big job comes', () => {
+    for (const run of [played, control]) {
+      expect(run.agencyAsks.length).toBeGreaterThan(20);
+      expect(run.agencyAsks.every((ask) => !ask.on)).toBe(true);
+      expect(Math.max(...run.agencyAsks.map((ask) => ask.reputation))).toBeLessThan(50);
+      expect(run.state.agency.on).toBe(false);
+      expect(run.state.ledger.some((entry) => entry.category === 'agency')).toBe(false);
+      expect(run.state.enquiries.some((enquiry) => enquiry.joinersWanted > 0)).toBe(false);
+      expect(run.state.jobs.some((job) => job.joinersWanted > 0)).toBe(false);
+    }
+    // The figures for the report: the standing on day 91 (Easy, then Very easy).
+    console.log('TT_PLAYTHROUGH', played.state.reputation, control.state.reputation);
+  });
+});

@@ -130,12 +130,13 @@ describe('on a played day, off the tally the production minute keeps', () => {
   });
 
   it('books a man with every place taken as no place, and the man past the saw s place not at all', () => {
-    // Two men, one budget saw of one place, both jobs at their cutting (CLAUDE.md T25 2.3). Until
+    // Two men, one used saw of one place, both jobs at their cutting (CLAUDE.md T25 2.3; a budget
+    // saw has two places from Turn 26, T26 2.1). Until
     // v53 the joiner stood the whole 200 minutes with no place at the saw and the day read 50.
     // Now he works his job at a bench, so a third man is wanted to stand anybody: the hall is
     // left one bench of one place, and the third man, on the joiner's job, has the saw and the
     // bench both taken (PIOTR, 24.09; v53).
-    let start = withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' }));
+    let start = withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'used' }));
     const first = start.equipment.find((item) => item.specId === 'workbench');
     start.equipment = start.equipment.filter((item) => item.specId !== 'workbench' || item === first);
     start.workers.push(testJoiner('staff-2', 'Tom', 8, 6));

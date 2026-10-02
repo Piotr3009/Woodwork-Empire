@@ -3,7 +3,7 @@
 // tonight"). The hall used to sort a man by the depth of the station he was walking TO, so for the
 // whole of a walk he was painted in the order of where he was going: he passed behind a machine he
 // should have been in front of and snapped into place on arrival. The order is now the cell his
-// feet are on, checked every frame and changed only where it has crossed a neighbour.
+// feet are on, checked every frame by a full insertion among the drawables round him (T26 2.4).
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FIGURE_DEPTH_OFFSET } from '../../src/engine/constants';
@@ -137,9 +137,11 @@ describe('a man walking past a machine', () => {
     // And he ends in front of it: painted after it.
     const end = order(root);
     expect(end.owner).toBeGreaterThan(end.saw);
-    // The whole walk moved him in the order on one frame and no other: the re-sort is a swap
-    // where his feet have crossed a neighbour, and not a sort of the scene every frame.
-    expect(moves).toBe(1);
+    // The whole walk moved him in the order on two frames and no other: a full insertion among the
+    // drawables round him from Turn 26, the saw and its bench passed on one frame and the fan and
+    // the compressor, off to the right where they never meet him on the screen, on the next
+    // (CLAUDE.md T26 2.4); a swap where his key crossed a neighbour's until then, one frame.
+    expect(moves).toBe(2);
     // And nothing is moved again once he is standing still.
     expect(tick(root)).toBe(0);
     expect(tick(root)).toBe(0);

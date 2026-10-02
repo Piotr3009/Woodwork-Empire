@@ -1,7 +1,7 @@
 // The laptop's home screen, in numbers (CLAUDE.md T14 2.1): what the three big tiles say under
 // their names. One function, so the screen prints and computes nothing: the open tasks and the
 // ones due today, the free sheets and the low lines of the stock page (T13 3.2), and the jobs
-// accepted without their material list yet, which is the estimator's queue (T13 3.8).
+// accepted without their material list yet, which is the office admin's queue (T13 3.8, T26 2.9).
 
 import { openJobs, takeOffOutstanding } from './jobs';
 import { freeSheets, stockLines } from './materials';

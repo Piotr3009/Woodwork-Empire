@@ -253,8 +253,9 @@ export function freeFloorM2(state: GameState): number {
   return Math.max(0, state.unit.widthCells * state.unit.depthCells - taken);
 }
 
-/** How many people the unit has room for, the owner among them: one per so many square metres of
- *  the whole unit, 200 over 24 is eight (PIOTR, 20.09: "the whole hall over 24, simplest"; v37).
+/** How many joiners the unit has room for: one per so many square metres of the whole unit, 200
+ *  over 24 is eight (PIOTR, 20.09: "the whole hall over 24, simplest"; v37), and from Turn 26 the
+ *  eight are joiners, whoever else is on the books (PIOTR, 02.10; CLAUDE.md T26 2.10).
  *  Until v37 it was the free floor after the machines' zones, which refused a fifth joiner on a
  *  working hall and left the canteen's eight lockers unreachable (REPORT-T23 items 1 and 6). The
  *  machines still take floor: a bench needs its place, and that is the only way they limit men. */

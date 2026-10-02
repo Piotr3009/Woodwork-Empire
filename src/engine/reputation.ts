@@ -12,6 +12,7 @@ import {
   RATING_EXPRESS_ON_TIME,
   RATING_ON_TIME,
   RATING_PER_DAY_LATE,
+  REPUTATION_GAIN_FACTOR,
   REPUTATION_LOG_MAX,
   REPUTATION_MAX,
   REPUTATION_MIN,
@@ -65,10 +66,14 @@ export function formatReputation(value: number): string {
  *  company board is this log read week by week, so nothing may move the number without leaving a
  *  line behind it (PIOTR, 13.09; CLAUDE.md T9 3.10). The points written down are the points the
  *  company actually moved: at the top or the bottom of the scale that is less than was asked for,
- *  and the week's total then adds up to what the player can see. */
+ *  a gain is worth `REPUTATION_GAIN_FACTOR` of itself from Turn 26, and the week's total then adds
+ *  up to what the player can see. */
 export function changeReputation(state: GameState, points: number, reason: string): number {
   const before = state.reputation;
-  state.reputation = clampReputation(before + points);
+  // A gain is booked at the factor and a loss at its whole, here and nowhere else (CLAUDE.md T26
+  // 2.11), so the log below is the points actually booked.
+  const booked = points > 0 ? points * REPUTATION_GAIN_FACTOR : points;
+  state.reputation = clampReputation(before + booked);
   const moved = Math.round((state.reputation - before) * 100) / 100;
   state.reputationLog.push({ day: state.clock.day, reason, points: moved });
   if (state.reputationLog.length > REPUTATION_LOG_MAX) state.reputationLog.shift();

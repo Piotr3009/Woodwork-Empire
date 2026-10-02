@@ -82,10 +82,11 @@ describe('the helper on the floor', () => {
     const state = hallWithA('helper');
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper on the books');
-    // The sprayer has no sheets yet (docs/art/REQUESTS-T20.md 2), so he is the placeholder, and
-    // the placeholder is what this measures.
-    const id = 'staff-sprayer';
-    state.workers.push({ ...helper, id, name: 'sprayer', role: 'sprayer' as WorkerRole });
+    // The draftsman has no sheets (he is drawn on the floor only when he is out of the office), so
+    // he is the placeholder, and the placeholder is what this measures. It was the booth's own
+    // trade until Turn 26, whose sheets were never made.
+    const id = 'staff-draftsman';
+    state.workers.push({ ...helper, id, name: 'draftsman', role: 'draftsman' as WorkerRole, station: 'bench' });
     const group = groupOf(renderHall(state), `[data-worker="${id}"]`);
     expect(group.querySelector('[data-character]')).toBeNull();
     const body = bodyOf(group);

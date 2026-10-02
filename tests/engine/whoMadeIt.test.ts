@@ -199,13 +199,14 @@ describe('the day fixtures Piotr sent, one minute in', () => {
     // every one of them has a row (PIOTR, 24.09; v53).
     const state = runClock(load('tests/fixtures/day128-v25.woodwork.json'), 1);
     const made = workshopBreakdownToday(state);
-    // In the first half hour the four go one each to the kitchen's four machines, the owner to the
-    // saw and the men hired after him one machine further on each (v55).
+    // In the first half hour the four go round the kitchen's machines, the owner to the saw and
+    // the men hired after him one machine further on each (v55); Callum's turn is the saw too, and
+    // the budget saw's second place is his from Turn 26, its capacity (CLAUDE.md T26 2.1).
     expect(made.men.map((row) => row.main)).toEqual([
       'Piotr, cutting Small kitchen (6 units), commercial',
       'Eddie, experienced joiner, moulding Small kitchen (6 units), commercial',
       'Pete, very experienced joiner, assembling Small kitchen (6 units), commercial',
-      'Callum, excellent joiner, edging Small kitchen (6 units), commercial',
+      'Callum, excellent joiner, cutting Small kitchen (6 units), commercial',
     ]);
     // The why is the family and the class that sets the hall's pace for it, in place of the
     // machine he stood at (CLAUDE.md T25 2.4). The figure after it was the cutting's own pace
@@ -215,7 +216,7 @@ describe('the day fixtures Piotr sent, one minute in', () => {
       'saw, budget, 1 min',
       'moulder, standard, 1 min',
       'at the bench, 1 min',
-      'edgebander, standard, 1 min',
+      'saw, budget, 1 min',
     ]);
     // And the hall's 0.83 after it from v54, so the row works out to its figure (PIOTR, 24.09):
     // the pace's 0.07 on and the hall's 0.17 off, as points in the bracket the grade multiplies

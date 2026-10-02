@@ -279,6 +279,7 @@ describe('the board over time', () => {
       price: 12000,
       basePrice: 12000,
       kind: 'residential',
+      joinersWanted: 0,
       budget: 12000,
       offer: null,
       finish: 'laminate',
@@ -312,6 +313,7 @@ describe('the board over time', () => {
       price: 480,
       basePrice: 400,
       kind: 'residential',
+      joinersWanted: 0,
       budget: 480,
       offer: null,
       finish: 'laminate',
@@ -598,10 +600,12 @@ describe('the client\'s answer (CLAUDE.md T13 3.24)', () => {
     expect(answerSkew(state)).toBe(-ANSWER_SKEW_PER_REPUTATION_TIER);
     state.reputation = 40;
     expect(answerSkew(state)).toBeCloseTo(ANSWER_SKEW_PER_REPUTATION_TIER);
-    withRole(state, 'estimator');
-    expect(answerSkew(state)).toBeCloseTo(0.5);
+    // The salesman's quarter and nobody else's: the quarter of the man who counted the sheets
+    // went with his trade (CLAUDE.md T26 2.6).
+    withRole(state, 'officeAdmin');
+    expect(answerSkew(state)).toBeCloseTo(ANSWER_SKEW_PER_REPUTATION_TIER);
     withRole(state, 'salesman');
-    expect(answerSkew(state)).toBeCloseTo(0.75);
+    expect(answerSkew(state)).toBeCloseTo(0.5);
     expect(answerSkew(state)).toBeLessThanOrEqual(ANSWER_SKEW_MAX);
     // The bend itself: uniform at nothing, towards the top for a plus, the bottom for a minus.
     expect(skewed(0.5, 0)).toBe(0.5);
@@ -617,10 +621,7 @@ describe('the client\'s answer (CLAUDE.md T13 3.24)', () => {
       const state = newGame();
       state.website.level = 2;
       state.reputation = reputation;
-      if (reputation > 20) {
-        withRole(state, 'estimator');
-        withRole(state, 'salesman');
-      }
+      if (reputation > 20) withRole(state, 'salesman');
       // A big budget, so the rounding to ten is a hair and not a tenth.
       const enquiry = placeEnquiry(state, { price: 100000 });
       for (let i = 0; i < 1000; i += 1) {
@@ -653,13 +654,14 @@ describe('the client\'s answer (CLAUDE.md T13 3.24)', () => {
     });
     const good = factors((state) => {
       state.reputation = 40;
-      withRole(state, 'estimator');
       withRole(state, 'salesman');
     });
     // A new company with nobody: uniform in the band, so the middle of it.
     expect(Math.abs(mean(plain) - (ANSWER_MIN + ANSWER_MAX) / 2)).toBeLessThan(0.01);
     expect(mean(poor)).toBeLessThan(mean(plain) - 0.01);
-    expect(mean(good)).toBeGreaterThan(mean(plain) + 0.03);
+    // Two quarters of skew and not three from Turn 26 (the take off man's went with his trade), so
+    // the good team's mean is about two hundredths over the middle and not three (CLAUDE.md T26 2.6).
+    expect(mean(good)).toBeGreaterThan(mean(plain) + 0.02);
     // Nothing guaranteed: the good team still hears a poor number now and then, and the poor
     // team a good one.
     expect(good.some((factor) => factor < 0.95)).toBe(true);

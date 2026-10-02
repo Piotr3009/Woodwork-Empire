@@ -10,6 +10,7 @@ import {
   CONTRACT_MARGIN_PER_DAY,
   CONTRACT_MIN_TIER,
   CONTRACT_OFFER_DAYS,
+  CONTRACTS_MAX,
   CONTRACT_PIECES,
   CONTRACT_QUANTITY_BANDS,
   CONTRACT_REFERENCE_CLASS,
@@ -47,7 +48,6 @@ import { isOnJob, stagedJob, takeOffJob, workerMinuteCost } from './jobs';
 import { freeSheets } from './materials';
 import {
   OWNER,
-  accumulateMachineMinute,
   bestMachineOf,
   classPaceOf,
   bookOutputMinute,
@@ -103,6 +103,17 @@ export function offeredContract(state: GameState): Contract | null {
 
 export function activeContracts(state: GameState): Contract[] {
   return state.contracts.filter((contract) => contract.status === 'active');
+}
+
+/** True while the shop runs as many standing contracts as it may (PIOTR, 02.10; CLAUDE.md T26
+ *  2.12). */
+export function contractsFull(state: GameState): boolean {
+  return activeContracts(state).length >= CONTRACTS_MAX;
+}
+
+/** The one line an offer card says when the shop is full of contracts. */
+export function contractsFullLine(): string {
+  return `${plural(CONTRACTS_MAX, 'contract', 'contracts')} running: the most the shop takes on`;
 }
 
 /** Terms that are over, with the renew answer still to be given. */
@@ -674,6 +685,7 @@ export function drawContract(state: GameState, carrier: RngCarrier = state): Con
     revenue: 0,
     materialCost: 0,
     labourMinutes: 0,
+    machineMinutes: 0,
     renegotiatedPrice: null,
     endedBy: 'term',
   };
@@ -696,6 +708,9 @@ export function weeklyOfferOwed(state: GameState): boolean {
 export function offerContract(state: GameState): void {
   if (!isWorkingDay(state.clock.day)) return;
   if (!contractsAllowed(state) || offeredContract(state) !== null) return;
+  // Nothing is drawn while the shop runs as many as it may, the weekly offer included
+  // (CLAUDE.md T26 2.12).
+  if (contractsFull(state)) return;
   const carrier = offerCarrier(state);
   if (!weeklyOfferOwed(state) && !chance(carrier, CONTRACT_OFFER_CHANCE_PER_DAY)) return;
   state.contracts.push(drawContract(state, carrier));
@@ -705,9 +720,10 @@ export function offerContract(state: GameState): void {
 /** Accepting opens the term from today: the week in hand starts now and the last day is the
  *  term's weeks on from it. */
 export function acceptContract(state: GameState, contractId: string): ContractCheck {
+  const check = acceptContractCheck(state, contractId);
+  if (!check.ok) return check;
   const contract = findContract(state, contractId);
   if (!contract) return { ok: false, reason: 'No such contract' };
-  if (contract.status !== 'offered') return { ok: false, reason: 'Not on offer' };
   const today = state.clock.day;
   contract.status = 'active';
   contract.startDay = today;
@@ -715,6 +731,16 @@ export function acceptContract(state: GameState, contractId: string): ContractCh
   contract.weekStartDay = today;
   contract.piecesThisWeek = 0;
   contract.pieceMinutes = 0;
+  return OK;
+}
+
+/** Why this offer cannot be taken, or that it can: it has to be on offer, and the shop has to
+ *  run fewer standing contracts than it may (CLAUDE.md T26 2.12). */
+export function acceptContractCheck(state: GameState, contractId: string): ContractCheck {
+  const contract = findContract(state, contractId);
+  if (!contract) return { ok: false, reason: 'No such contract' };
+  if (contract.status !== 'offered') return { ok: false, reason: 'Not on offer' };
+  if (contractsFull(state)) return { ok: false, reason: contractsFullLine() };
   return OK;
 }
 
@@ -897,8 +923,10 @@ export function contractStationFor(state: GameState, worker: Worker): string | n
 export interface ContractMinute {
   /** Staff minutes put in, at the owner away factor, for the efficiency tally. */
   worked: number;
-  /** True the minute the hall's bag store fills on a contract's saw. */
-  bagsFilled: boolean;
+  /** The machines a contract man worked at this minute, each once however many of them were at
+   *  it: the day's minute books their hours and their dust with the jobs' own, so a machine two
+   *  trades share books the minute once (CLAUDE.md T26 2.1). */
+  machineIds: string[];
 }
 
 /** A piece is done: the revenue goes through the ledger, one growing line a day, the sheets in it
@@ -930,7 +958,7 @@ export function runContractMinute(
   state: GameState,
   places: ReadonlyMap<string, { working: boolean; machine: Equipment | null }>,
 ): ContractMinute {
-  const result: ContractMinute = { worked: 0, bagsFilled: false };
+  const result: ContractMinute = { worked: 0, machineIds: [] };
   const active = activeContracts(state);
   if (active.length === 0) return result;
   const minute = state.clock.minute;
@@ -938,9 +966,12 @@ export function runContractMinute(
   // The men on a contract go home at five with everybody else (CLAUDE.md T17 2.12).
   if (crewHasGoneHome(state)) return result;
   const away = staffOutputFactor(state);
-  const used = new Map<string, number>();
+  const used = new Set<string>();
   let hall: number | null = null;
   for (const contract of active) {
+    // The machines this contract's men were at this minute: its wear is charged on these, one
+    // minute a machine however many of its men stood at it (CLAUDE.md T24 2.4, T26 2.1).
+    const atMachines = new Set<string>();
     const piece = contractPiece(contract);
     // The contract has the whole day of every man on it (PIOTR, 21.09; v42): its hands are its
     // own this minute, first to last, with no job of work to give them back to.
@@ -979,14 +1010,19 @@ export function runContractMinute(
       state.dayStats.workMinutes += 1;
       bookOutputMinute(state, worker.id, worth);
       result.worked += away;
-      // A machine books an hour for every hour a man works at one of its places (T25 section 6).
-      if (place.machine !== null) used.set(place.machine.id, (used.get(place.machine.id) ?? 0) + 1);
+      // A machine books an hour for every clock hour at least one man works at one of its places
+      // (T25 section 6, T26 2.1).
+      if (place.machine !== null) {
+        used.add(place.machine.id);
+        atMachines.add(place.machine.id);
+      }
       while (contract.pieceMinutes >= piece.minutes) {
         if (!finishPiece(state, contract, piece)) break;
       }
     }
+    contract.machineMinutes += atMachines.size;
   }
-  if (used.size > 0 && accumulateMachineMinute(state, used)) result.bagsFilled = true;
+  result.machineIds = [...used];
   return result;
 }
 
@@ -1062,8 +1098,9 @@ export function closingReport(state: GameState, contract: Contract): ClosingRepo
   const labourCost = pence(contract.labourMinutes * labourMinuteCost(state));
   const piece = contractPiece(contract);
   const machine = pieceMachine(state, piece);
-  // The same rule as the card's: the minutes at the machine and no others (CLAUDE.md T24 2.4).
-  const machineMinutes = contract.labourMinutes * pieceMachineShare(state, piece);
+  // The same rule as the card's: the minutes at the machine and no others (CLAUDE.md T24 2.4), and
+  // one a clock minute a machine however many of the contract's men stood at it (T26 2.1).
+  const machineMinutes = contract.machineMinutes * pieceMachineShare(state, piece);
   const machineWear = pence(machineMinutes * (machine === null ? 0 : machineWearPerMinute(machine)));
   return {
     pieces: contract.piecesMade,
@@ -1241,6 +1278,7 @@ export function renewContract(state: GameState, contractId: string, accept: bool
     revenue: 0,
     materialCost: 0,
     labourMinutes: 0,
+    machineMinutes: 0,
     renegotiatedPrice: null,
     endedBy: 'term',
   };

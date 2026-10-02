@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DRAFTSMAN_MONTHLY_WAGE,
   DRAFTSMAN_RATE,
-  DRAFTSMAN_REPUTATION,
+  DRAFTSMAN_MIN_REPUTATION,
   HIRING_SPECS,
   JOINERY_CORE_PRICE_YEARLY,
   PRODUCTION_MANAGER_MONTHLY_WAGE,
@@ -54,7 +54,7 @@ describe('the board itself', () => {
     expect(laptopPageFrom('team')).toBe('team');
     const page = parse(renderTeam(known(), 'workshop'));
     const tabs = Array.from(page.querySelectorAll('[data-do="teamTab"]'));
-    // The estimator's tab joined in Turn 13 (CLAUDE.md T13 3.8).
+    // The Technical tab joined in Turn 13 (CLAUDE.md T13 3.8), the draftsman's from Turn 26.
     expect(tabs.map((tab) => tab.getAttribute('data-id'))).toEqual([
       // Our team leads them: the roll call, which hires nobody (CLAUDE.md T17 2.9).
       'ourTeam',
@@ -72,7 +72,7 @@ describe('the board itself', () => {
     for (const spec of HIRING_SPECS) {
       const trade = tradeOf(spec.role);
       expect(['workshop', 'office', 'technical', 'management'], spec.role).toContain(trade);
-      // Every desk has a working day: the office, the estimator and the manager (T13 3.8, 3.9).
+      // Every desk has a working day: the office, the draftsman and the manager (T13 3.9, T26 2.8).
       expect(trade !== 'workshop', spec.role).toBe(hasWorkingDay(spec.role));
     }
   });
@@ -82,28 +82,18 @@ describe('the board itself', () => {
     const names = Array.from(workshop.querySelectorAll('[data-candidate]')).map((tile) =>
       tile.getAttribute('data-candidate'),
     );
-    // The sprayer stands on the workshop tab beside the joiners and the helper: he is a floor
-    // man and he is hired with the same four tiers as them (CLAUDE.md T19 2.6, T20 2.5).
-    expect(names).toEqual([
-      'joiner.novice',
-      'joiner.experienced',
-      'joiner.senior',
-      'joiner.master',
-      'helper.',
-      'sprayer.novice',
-      'sprayer.experienced',
-      'sprayer.senior',
-      'sprayer.master',
-    ]);
+    // The joiners and the labourer, and nobody else on the floor (PIOTR, 02.10; CLAUDE.md T26
+    // 2.6): the booth's own trade's four cards went with it.
+    expect(names).toEqual(['joiner.novice', 'joiner.experienced', 'joiner.senior', 'joiner.master', 'helper.']);
     const office = parse(renderTeam(known(), 'office'));
     expect(
       Array.from(office.querySelectorAll('[data-candidate]')).map((tile) =>
         tile.getAttribute('data-candidate'),
       ),
-    ).toEqual(['officeAdmin.', 'purchasingClerk.', 'draftsman.', 'salesman.']);
+    ).toEqual(['officeAdmin.', 'salesman.']);
   });
 
-  it('offers the production manager on Management, and the estimator on Technical', () => {
+  it('offers the production manager on Management, and the draftsman on Technical', () => {
     // The first management role in the game (CLAUDE.md T13 3.9); the chief executive is parked.
     const management = parse(renderTeam(known(), 'management'));
     expect(
@@ -122,12 +112,8 @@ describe('the board itself', () => {
       Array.from(technical.querySelectorAll('[data-candidate]')).map((tile) =>
         tile.getAttribute('data-candidate'),
       ),
-    ).toEqual([
-      'estimator.novice',
-      'estimator.experienced',
-      'estimator.senior',
-      'estimator.master',
-    ]);
+    // The draftsman's three grades, at the drawing (CLAUDE.md T26 2.8).
+    ).toEqual(['draftsman.experienced', 'draftsman.senior', 'draftsman.master']);
   });
 
   it('says each manager grade\u2019s three figures in words on his own card', () => {
@@ -194,8 +180,8 @@ describe('the board itself', () => {
 describe('the office admin is the one who must be there', () => {
   it('blocks every other desk until she is on the books, and says so', () => {
     const state = known();
-    for (const role of ['purchasingClerk', 'salesman', 'draftsman'] as Worker['role'][]) {
-      expect(canHire(state, role, null), role).toEqual({
+    for (const [role, tier] of [['salesman', null], ['draftsman', 'experienced']] as const) {
+      expect(canHire(state, role, tier), role).toEqual({
         ok: false,
         reason: 'Hire an office admin first',
       });
@@ -209,35 +195,44 @@ describe('the office admin is the one who must be there', () => {
     );
   });
 
-  it('lets the clerk in the moment she is', () => {
+  it('lets the salesman in the moment she is', () => {
     const state = hireNow(known(), 'officeAdmin', null);
-    expect(canHire(state, 'purchasingClerk', null).ok).toBe(true);
+    expect(canHire(state, 'salesman', null).ok).toBe(true);
     const page = parse(renderTeam(state, 'office'));
-    const clerk = page.querySelector('[data-candidate="purchasingClerk."]');
-    expect(clerk?.querySelectorAll('[data-do="hire"]')).toHaveLength(1);
+    const salesman = page.querySelector('[data-candidate="salesman."]');
+    expect(salesman?.querySelectorAll('[data-do="hire"]')).toHaveLength(1);
   });
 });
 
 describe('the draftsman', () => {
-  it('is an office role at Piotr’s wage, by the month, and his standing', () => {
-    const spec = HIRING_SPECS.find((entry) => entry.role === 'draftsman');
-    expect(spec?.monthlyWage).toBe(DRAFTSMAN_MONTHLY_WAGE);
-    // Piotr's 2,400 a month, whole, paid like everybody else's (CLAUDE.md T21 2.10).
-    expect(DRAFTSMAN_MONTHLY_WAGE).toBe(2400);
-    expect(spec?.minReputation).toBe(DRAFTSMAN_REPUTATION);
-    expect(DRAFTSMAN_REPUTATION).toBe(15);
+  it('comes in three grades, on his own gate and his own wages, by the month', () => {
+    // No novice at a drawing board: experienced from 15, very experienced from 50 and excellent
+    // from 90 (PIOTR, 02.10), at 2,400, 2,900 and 3,400 a month [TUNE] (CLAUDE.md T26 2.8). Until
+    // Turn 26 he was one man at 2,400 from 15.
+    const specs = HIRING_SPECS.filter((entry) => entry.role === 'draftsman');
+    expect(specs.map((spec) => spec.tier)).toEqual(['experienced', 'senior', 'master']);
+    expect(specs.map((spec) => spec.monthlyWage)).toEqual([2400, 2900, 3400]);
+    expect(specs.map((spec) => spec.minReputation)).toEqual([15, 50, 90]);
+    for (const spec of specs) {
+      const tier = spec.tier as 'experienced' | 'senior' | 'master';
+      expect(spec.monthlyWage).toBe(DRAFTSMAN_MONTHLY_WAGE[tier]);
+      expect(spec.minReputation).toBe(DRAFTSMAN_MIN_REPUTATION[tier]);
+    }
     expect(hasWorkingDay('draftsman')).toBe(true);
-    expect(tradeOf('draftsman')).toBe('office');
+    // At the drawing, the Technical tab, from Turn 26.
+    expect(tradeOf('draftsman')).toBe('technical');
     // Nobody of that standing answers a workshop nobody has heard of.
-    expect(canHire(known(10), 'draftsman', null).ok).toBe(false);
+    expect(canHire(known(10), 'draftsman', 'experienced').ok).toBe(false);
   });
 
-  it('draws at 0.8 of the owner, and the software factor is counted once', () => {
-    expect(DRAFTSMAN_RATE).toBe(0.8);
-    const worker = { role: 'draftsman' } as Worker;
-    expect(taskWorkRate(worker, { kind: 'design' } as never)).toBe(DRAFTSMAN_RATE);
-    // And nothing else he could be handed is worked at that rate.
-    expect(taskWorkRate(worker, { kind: 'emails' } as never)).toBe(1);
+  it('draws at his grade s speed, 0.8, 1.0 and 1.2 of the owner, and the software factor once', () => {
+    expect(DRAFTSMAN_RATE).toEqual({ experienced: 0.8, senior: 1.0, master: 1.2 });
+    for (const tier of ['experienced', 'senior', 'master'] as const) {
+      const worker = { role: 'draftsman', tier } as Worker;
+      expect(taskWorkRate(worker, { kind: 'design' } as never), tier).toBe(DRAFTSMAN_RATE[tier]);
+      // And nothing else he could be handed is worked at that rate.
+      expect(taskWorkRate(worker, { kind: 'emails' } as never), tier).toBe(1);
+    }
   });
 
   it('takes the drawing off the owner, and the owner’s queue shrinks', () => {
@@ -254,31 +249,31 @@ describe('the draftsman', () => {
         .flatMap((job) => jobTasks(current, job.id))
         .filter((task) => task.kind === 'design' && !task.done && task.doneBy === null).length;
     expect(ownersQueue(state)).toBe(1);
-    let hired = hireNow(hireNow(state, 'officeAdmin', null), 'draftsman', null);
+    let hired = hireNow(hireNow(state, 'officeAdmin', null), 'draftsman', 'experienced');
     for (const worker of hired.workers) worker.startDay = hired.clock.day;
     hired = clearEvents(runClock(hired, 1));
     const taken = jobTasks(hired, firstJob(hired).id).find((task) => task.kind === 'design');
     const draftsman = hired.workers.find((worker) => worker.role === 'draftsman');
     expect(taken?.doneBy).toBe(draftsman?.id);
     expect(ownersQueue(hired)).toBe(0);
-    // And he works it off at 0.8 of a minute a minute.
+    // And he works it off at 0.8 of a minute a minute, his grade's.
     const before = taken?.minutesRemaining ?? 0;
     const later = clearEvents(runClock(hired, 10));
     const after = jobTasks(later, firstJob(later).id).find((task) => task.kind === 'design');
-    expect(before - (after?.minutesRemaining ?? 0)).toBeCloseTo(10 * DRAFTSMAN_RATE, 6);
+    expect(before - (after?.minutesRemaining ?? 0)).toBeCloseTo(10 * DRAFTSMAN_RATE.experienced, 6);
   });
 });
 
 describe('the Technical tab (CLAUDE.md T13 3.8)', () => {
-  it('sells Joinery Core beside the estimator, with the capacity and the yearly prices', () => {
+  it('sells Joinery Core beside the drawings, with the capacity and the yearly prices', () => {
     const state = buyStartingKit(known());
     const page = parse(renderTeam(state, 'technical'));
     expect(page.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(1);
-    // As many a day as his minutes allow, and the day is the experienced man's, who is 0.8 of the
-    // owner on Piotr's ladder from tonight: 12 at 37.5 minutes each, 25 with the software
-    // (CLAUDE.md T20 2.3, T21 2.9).
-    expect(page.textContent).toContain('12 a day, 25 with Joinery Core');
-    expect(page.textContent).toContain('34 and 45 with its extensions');
+    // As many a day as the minutes allow, at the owner's own speed, whose the take offs are with
+    // the admin's from Turn 26: 16 at half an hour each, 32 with the software (CLAUDE.md T20 2.3,
+    // T26 2.9). Until Turn 26 they were the experienced take off man's 12 and 25.
+    expect(page.textContent).toContain('16 a day, 32 with Joinery Core');
+    expect(page.textContent).toContain('42 and 56 with its extensions');
     expect(page.textContent).toContain(`${money(JOINERY_CORE_PRICE_YEARLY)} a year`);
     // The extension waits for the core: a reason, not a button.
     expect(page.querySelectorAll('[data-do="buyJoineryCoreExtension"]')).toHaveLength(0);
@@ -286,24 +281,22 @@ describe('the Technical tab (CLAUDE.md T13 3.8)', () => {
     const bought = parse(renderTeam(act(state, { type: 'BUY_JOINERY_CORE' }), 'technical'));
     expect(bought.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(0);
     expect(bought.querySelectorAll('[data-do="buyJoineryCoreExtension"]')).toHaveLength(1);
-    expect(bought.textContent).toContain('25 take offs a day');
-    // The minutes are his own and not the owner's: the software's quarter of an hour is 19 minutes
-    // to an experienced man at 0.8 of him (CLAUDE.md T21 2.9).
-    expect(bought.textContent).toContain('19 min each');
+    expect(bought.textContent).toContain('32 take offs a day');
+    // The software's quarter of an hour, at the owner's own speed (CLAUDE.md T26 2.9).
+    expect(bought.textContent).toContain('15 min each');
   });
 
-  it('works the day out for the estimator on the books, and names him', () => {
-    // With nobody at the desk the figures are the experienced man's and the line says so.
+  it('works the day out for the office admin on the books, and names her', () => {
+    // With nobody at the desk the take offs are the owner's own, and the line says so.
     const empty = parse(renderTeam(buyStartingKit(known()), 'technical'));
-    expect(empty.textContent).toContain('Take offs for an experienced man: 12 a day');
-    // With a man of no experience at it they are his: half an hour at 0.6 is 50 minutes, and 9
-    // of them fill his day (CLAUDE.md T20 2.3, T21 2.9).
-    const state = hireNow(buyStartingKit(known()), 'estimator', 'novice');
-    const man = state.workers[0];
-    if (!man) throw new Error('nobody at the desk');
+    expect(empty.textContent).toContain('Take offs at your own desk: 16 a day');
+    // With the admin at it they are hers, at the owner's own speed (CLAUDE.md T26 2.9).
+    const state = hireNow(buyStartingKit(known()), 'officeAdmin', null);
+    const admin = state.workers[0];
+    if (!admin) throw new Error('nobody at the desk');
     const page = parse(renderTeam(state, 'technical'));
-    expect(page.textContent).toContain(`Take offs for ${man.name}, no experience: 9 a day`);
-    expect(page.textContent).toContain('19 with Joinery Core');
+    expect(page.textContent).toContain(`Take offs for ${admin.name}, the office admin: 16 a day`);
+    expect(page.textContent).toContain('32 with Joinery Core');
   });
 
   it('says so when there is no laptop to put it on', () => {

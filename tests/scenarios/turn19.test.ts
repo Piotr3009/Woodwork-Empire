@@ -1,5 +1,6 @@
 // The Turn 19 months of CLAUDE.md T19 3, T19-C2: (aa) a month with three men on one job, and
-// (bb) a lacquered kitchen made once by a joiner and once by a sprayer. The cleaning month of 2.7
+// (bb) a lacquered kitchen made once by an experienced joiner and once by a very experienced one
+// (until Turn 26, a joiner and the booth's own trade). The cleaning month of 2.7
 // is here too, because it is a scripted day with a helper on the books and no player action at
 // all, which is exactly what section 7 asks for.
 //
@@ -25,7 +26,7 @@ import {
   withDryAir,
   withExtraction,
 } from '../helpers';
-import { JOINER_SPRAY_RATE, OWNER_LABOUR_PER_MINUTE, SPRAYER_SPRAY_RATE } from '../../src/engine/constants';
+import { WORKER_RATES } from '../../src/engine/constants';
 import { dustBand, familyForStage, joiners, stagePlanFor } from '../../src/engine/index';
 import { cleanerAtWork } from '../../src/engine/tasks';
 import type { GameEvent, GameState, Job } from '../../src/engine/index';
@@ -142,10 +143,13 @@ describe('(aa) three men on one job, on Very easy', () => {
     // (PIOTR, 30.09): a novice's 0.60 less the fan's 0.30 less the moulding by hand is at the
     // floor, 0.25, through nearly every half hour the three are on the round, where the product
     // read 0.37; alone he is at the floor while a saw runs and at 0.49 at his bench.
+    //
+    // From v61, 16,026 against 12,622, 27% more: the grade times the points (PIOTR, 01.10) lifts
+    // the novice off the floor at the saw, 0.60 times the hall's 0.65 [measured].
     const shared = watched(THREE).productionMinutes;
     const alone = watched(ONE).productionMinutes;
-    expect(shared).toBe(21552);
-    expect(alone).toBe(15201);
+    expect(shared).toBe(16026);
+    expect(alone).toBe(12622);
   });
 
   it('never goes more than three times faster with three men on it', () => {
@@ -169,7 +173,7 @@ describe('(aa) three men on one job, on Very easy', () => {
 });
 
 // ---------------------------------------------------------------------------
-// (bb) A lacquered kitchen, with a sprayer and without (CLAUDE.md T19 2.6)
+// (bb) A lacquered kitchen, by a joiner of two grades (CLAUDE.md T19 2.6, T26 2.6)
 // ---------------------------------------------------------------------------
 
 /** Nothing on the board and nothing to clean: the month is the one kitchen and the one man on it.
@@ -190,8 +194,7 @@ function boothHall(): GameState {
   let kitted = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 80);
   // A joiner wants all of JOINER_PREREQUISITES before he will come, and the day 1 list does not
   // carry the locker, the seat or the hand tools; the tool cabinet is counted one higher than the
-  // rest, because the owner keeps his own tools in one (CLAUDE.md T6 3.5). The sprayer wants none
-  // of it, so buying the lot here is what keeps the two runs the same hall.
+  // rest, because the owner keeps his own tools in one (CLAUDE.md T6 3.5).
   // The cabinet before the set: a man's tools have to have a slot to live in, and the owner's own
   // set is already in the one slot the day one used cabinet holds (CLAUDE.md T22 2.12).
   for (const specId of ['locker', 'toolCabinet', 'handToolSet']) {
@@ -221,20 +224,20 @@ function boothHall(): GameState {
   return next;
 }
 
-/** The same hall and the same kitchen with one man on it, who is a joiner in one run and a
- *  sprayer in the other. `hireNow` goes straight to the engine's own write, so the reputation
+/** The same hall and the same kitchen with one joiner on it, experienced in one run and very
+ *  experienced in the other. `hireNow` goes straight to the engine's own write, so the reputation
  *  gate, the month of pay and the kit shortfall are all out of the way and the two runs differ in
- *  the man's trade and in nothing else. */
-function withTrade(role: 'joiner' | 'sprayer'): GameState {
-  const hired = hireNow(boothHall(), role, 'experienced');
+ *  the man's grade and in nothing else. Until Turn 26 the two runs were a joiner and the booth's
+ *  own trade;
+ *  from tonight the booth is a joiner's like every machine (CLAUDE.md T26 2.6). */
+function withGrade(tier: 'experienced' | 'senior'): GameState {
+  const hired = hireNow(boothHall(), 'joiner', tier);
   for (const worker of hired.workers) worker.startDay = hired.clock.day;
   const job = hired.jobs[hired.jobs.length - 1];
-  const man = hired.workers.find((worker) => worker.role === role);
-  if (!job || !man) throw new Error(`no ${role} and no kitchen`);
+  const man = hired.workers.find((worker) => worker.role === 'joiner');
+  if (!job || !man) throw new Error(`no ${tier} joiner and no kitchen`);
   // The piece starts at the top of its finishing, so the only stage either man works is the one
-  // the trade is about. A sprayer is slower than a joiner at a bench (SPRAYER_BENCH_RATE), so a
-  // run from the beginning would measure the cutting and the assembly as well and say the joiner
-  // was faster overall, which is true and is not what 2.6 is about.
+  // at the booth.
   const plan = stagePlanFor(hired, job);
   const finishing = plan.find((entry) => entry.id === 'finishing');
   if (finishing === undefined) throw new Error('this kitchen has no finishing stage');
@@ -242,8 +245,8 @@ function withTrade(role: 'joiner' | 'sprayer'): GameState {
   return act(hired, { type: 'ADD_TO_JOB', jobId: job.id, workerId: man.id });
 }
 
-const BY_JOINER = withTrade('joiner');
-const BY_SPRAYER = withTrade('sprayer');
+const BY_JOINER = withGrade('experienced');
+const BY_SENIOR = withGrade('senior');
 
 /** How far through the piece the run got, and how much of the finishing is left. */
 function finishingLeft(state: GameState): number {
@@ -261,62 +264,37 @@ function finishingLeft(state: GameState): number {
 
 /** Two working days: long enough for both men to be well into the booth and short enough that
  *  neither has finished it, so what each got through can be compared at all. It was three until
- *  Turn 20 moved the tier ladder up (CLAUDE.md T20 2.5): at the new rates the sprayer is done
+ *  Turn 20 moved the tier ladder up (CLAUDE.md T20 2.5): at the new rates the better man is done
  *  inside three days and the measurement hits a ceiling instead of a rate. */
 const BOOTH_DAYS = 2;
 const JOINER_RAN = playUntilDay(BY_JOINER, BY_JOINER.clock.day + BOOTH_DAYS, BOOTH_MONTH, []);
-const SPRAYER_RAN = playUntilDay(BY_SPRAYER, BY_SPRAYER.clock.day + BOOTH_DAYS, BOOTH_MONTH, []);
+const SENIOR_RAN = playUntilDay(BY_SENIOR, BY_SENIOR.clock.day + BOOTH_DAYS, BOOTH_MONTH, []);
 
-describe('(bb) a lacquered kitchen, by a joiner and by a sprayer', () => {
+describe('(bb) a lacquered kitchen, by a joiner of two grades', () => {
   it('sends the finishing of a lacquered job to the booth for both of them', () => {
     // Neither man is doing something different: it is the same stage at the same machine, and
     // only what a minute of it is worth differs (CLAUDE.md T19 2.6).
-    const job = BY_SPRAYER.jobs[BY_SPRAYER.jobs.length - 1];
-    if (!job) throw new Error('no kitchen');
-    expect(job.finish).toBe('lacquer');
-    expect(familyForStage(job, 'finishing')).toBe('sprayBooth');
-    const joinersJob = BY_JOINER.jobs[BY_JOINER.jobs.length - 1];
-    if (!joinersJob) throw new Error('no kitchen');
-    expect(familyForStage(joinersJob, 'finishing')).toBe('sprayBooth');
+    for (const state of [BY_JOINER, BY_SENIOR]) {
+      const job = state.jobs[state.jobs.length - 1];
+      if (!job) throw new Error('no kitchen');
+      expect(job.finish).toBe('lacquer');
+      expect(familyForStage(job, 'finishing')).toBe('sprayBooth');
+    }
   });
 
-  it('is the sprayer who gets through it faster, and the joiner who is slower and never stuck', () => {
-    // The whole point of 2.6: a workshop without a sprayer is slower at the booth, not stopped
-    // (PIOTR, 17.09). Section 7 asks for exactly this assertion.
-    const whole = finishingLeft(BY_SPRAYER);
+  it('is the better joiner who gets through it faster, by his grade, and nobody is stuck', () => {
+    // The booth is a joiner's from Turn 26 and a stage is worth the man's grade times the hall's
+    // points, so the two runs stand in the ratio of the grades, 1.00 to 0.80 (CLAUDE.md T26 2.6).
+    // Until Turn 26 this was a joiner at 0.70 of himself at the booth against the booth's own trade.
+    const whole = finishingLeft(BY_JOINER);
     expect(whole).toBeGreaterThan(0);
     const joinerDid = whole - finishingLeft(JOINER_RAN);
-    const sprayerDid = whole - finishingLeft(SPRAYER_RAN);
-    // The joiner did move it: the booth is not a wall for him, which is the half of 2.6 that says
-    // a workshop without a sprayer is slower and never stuck.
+    const seniorDid = whole - finishingLeft(SENIOR_RAN);
     expect(joinerDid).toBeGreaterThan(0);
-    expect(sprayerDid).toBeGreaterThan(joinerDid);
-    // And by exactly the figure the constant names. Re-measured in Turn 20 over two working days,
-    // because the tier ladder moved and both men were 1.0 of the owner then where they had been 0.8
-    // (CLAUDE.md T20 2.5); Turn 21 puts them back to 0.8 (CLAUDE.md T21 2.9), so the two figures
-    // below are four fifths of what they read, and the assertion is a ratio between two men on the
-    // same ladder, which is why it holds whatever rung they are on. Three days would see the
-    // sprayer finish the stage and the reading
-    // hit a ceiling instead of a rate.
-    //
-    // Until v55 the joiner stood at the booth the whole two days and the ratio was the constant's:
-    // 348.32 of the 900 the stage carries against the sprayer's 497.60 on v54, 1.4286 to one. From
-    // v55 a man goes round the machines of his job a half hour at a time (PIOTR, 24.09) and the
-    // minute is written on the stage the bar stands at wherever he is: the joiner's round is the
-    // saw, the spindle moulder, the bench and the booth, eight half hours at each, and only the
-    // booth's are at JOINER_SPRAY_RATE. The sprayer is at the booth every half hour, his trade
-    // (CLAUDE.md T19 2.6). So the joiner gets through 459.69 and the sprayer 496.96 [measured],
-    // which is 1.0811 to one: the sprayer's rate against a quarter of the joiner's day at 0.7 and
-    // three quarters at his own. The month and the constants are one number still.
-    //
-    // From v60 the two rates are points of the minute's sum and not factors on it (PIOTR, 30.09):
-    // the joiner's 0.70 at the booth is 0.30 off every one of his booth minutes, eight half hours
-    // over the two days, 240 minutes, which is 48.00 of labour between the two men, and nothing
-    // else about the two days differs. 445.20 and 493.20 [measured]; the ratio, 1.1078, is no
-    // longer a constant's, because a difference of points is not a ratio of rates.
-    expect(sprayerDid - joinerDid).toBeCloseTo(240 * OWNER_LABOUR_PER_MINUTE * (SPRAYER_SPRAY_RATE - JOINER_SPRAY_RATE), 2);
-    expect(joinerDid).toBeCloseTo(445.2, 2);
-    expect(sprayerDid).toBeCloseTo(493.2, 2);
+    expect(seniorDid / joinerDid).toBeCloseTo(WORKER_RATES.senior / WORKER_RATES.experienced, 2);
+    // The experienced joiner gets through what the booth's own man of v62 did, every half hour at his own
+    // rate [measured].
+    expect(joinerDid).toBeCloseTo(496.96, 2);
   });
 });
 

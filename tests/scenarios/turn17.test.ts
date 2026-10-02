@@ -152,8 +152,11 @@ describe('(y) two men on one job, on Very easy', () => {
     // floor, 0.25, for most of the days a saw runs. Two men at the floor are twice one man at the
     // floor, but the days the piece takes are the days at the floor, so the halving is further
     // off than it was [measured].
-    expect(daysAlone).toBe(33);
-    expect(daysTogether).toBe(20);
+    //
+    // Re-measured on v61: 32 alone and 15 together, 0.47: the grade multiplies the hall's points
+    // (PIOTR, 01.10), 0.60 times 0.65 is 0.39 and over the floor, so two men are twice one again.
+    expect(daysAlone).toBe(32);
+    expect(daysTogether).toBe(15);
     expect(daysAlone).toBeGreaterThan(15);
     expect(daysTogether).toBeLessThan(daysAlone);
     expect(daysTogether / daysAlone).toBeGreaterThan(0.4);
@@ -183,12 +186,11 @@ describe('(y) a contract whose material comes off the rack', () => {
     // minute is a sum of points (PIOTR, 30.09), and a novice's 0.60 less the fan short of the saws,
     // 0.30, less the used saw's 0.05 is at the floor, 0.25, where the product read 0.40. Five
     // packs of the part week's eight and thirteen of the twenty are two short weeks in a row, and
-    // that ends a contract (CLAUDE.md T20 2.1.6) [measured].
+    // that ends a contract (CLAUDE.md T20 2.1.6) [measured]. From v61 it runs to the month's end
+    // holding 3 again: the grade times the points, 0.60 times 0.65, is 0.39 and not the floor.
     const running = contractOf(TOGETHER);
-    expect(running?.status).toBe('ended');
-    expect(running?.endedBy).toBe('client');
-    expect(running?.endDay).toBe(15);
-    expect(running?.sheetsReserved).toBe(0);
+    expect(running?.status).toBe('active');
+    expect(running?.sheetsReserved).toBe(3);
   });
 
   it('draws them as the pieces are made, and never buys them as money on the contract line', () => {
@@ -196,9 +198,9 @@ describe('(y) a contract whose material comes off the rack', () => {
     // 112 packs and 17 sheets over the month with the term running on, v52's figures again, from
     // v54 to v59; v53 made 26 and drew 4 over the two weeks it ran before the client ended it
     // (v54). From v60 the client ends it on day 15 (above) and the two weeks made 18 and drew 3
-    // [measured].
-    expect(contract?.piecesMade).toBe(18);
-    expect(contract?.sheetsUsed).toBe(3);
+    // [measured]. From v61 the term runs on (above): 109 packs and 17 sheets [measured].
+    expect(contract?.piecesMade).toBe(109);
+    expect(contract?.sheetsUsed).toBe(17);
     // The rack is lower than the day it was filled by what the job cut and the contract drew.
     expect(TOGETHER.stock.sheets).toBeLessThan(OPENING.state.stock.sheets);
     // The one thing 2.22 forbids: a material charge on the contract.
@@ -219,12 +221,17 @@ describe('(y) a contract whose material comes off the rack', () => {
       // measured]. From v60 the three are points and not factors (PIOTR, 30.09): 0.60 less 0.30
       // less 0.05 is under the floor, so he makes at 0.25 where he made at 0.40, five of the eight
       // and thirteen of the twenty, and the client ends it on day 15 again [measured]. What
-      // this says about the sum is in the v60 report.
+      // this says about the sum is in the v60 report. From v61 the grade times the points, 0.39:
+      // eight of eight and then 20, 20, 20, 20 and 21 of twenty, and the term runs on [measured].
       expect(contract?.weeks).toEqual([
-        { week: 1, wanted: 8, made: 5 },
-        { week: 2, wanted: 20, made: 13 },
+        { week: 1, wanted: 8, made: 8 },
+        { week: 2, wanted: 20, made: 20 },
+        { week: 3, wanted: 20, made: 20 },
+        { week: 4, wanted: 20, made: 20 },
+        { week: 5, wanted: 20, made: 20 },
+        { week: 6, wanted: 20, made: 21 },
       ]);
-      expect(contract?.status).toBe('ended');
+      expect(contract?.status).toBe('active');
       // The rack never ran dry under him: not one of his minutes stood for want of sheets.
       const man = state.workers.find((worker) => worker.id === OPENING.men[2]);
       expect(man?.idleByReason.noMaterial).toBe(0);

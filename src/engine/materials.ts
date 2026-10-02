@@ -325,8 +325,8 @@ export function createDelivery(
 /** The order for this job: the shortfall bought at the ad hoc price, on a lorry for this job
  *  (CLAUDE.md T13 3.3). The cash leaves at the click, so it is refused past the overdraft.
  *
- *  `orderedBy` is the name of the man who placed it without being asked: the purchasing clerk, or
- *  the estimator, or the office admin, the minute the drawings are done (CLAUDE.md T21 2.5.2). A
+ *  `orderedBy` is the name of the man who placed it without being asked: the office admin, the
+ *  minute the drawings are done (CLAUDE.md T21 2.5.2, T26 2.9). A
  *  `LedgerEntry` has no field for who did a thing, so the name goes in the label, which is what the
  *  player reads on the Accounting page; an order the owner placed himself names nobody, as it always
  *  did. */

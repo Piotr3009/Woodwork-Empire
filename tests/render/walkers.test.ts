@@ -77,8 +77,9 @@ describe("a man's pace (PIOTR, 17.09, 21.09; CLAUDE.md T18 2.1)", () => {
     // A quarter more than the one cell of 17.09 (PIOTR, 21.09: "walking is too slow"), and half
     // as fast again while the clock runs faster than x1, the same at x2 and at x30, so the
     // figures keep up with a hurried day without flying (PIOTR: "not too much"; v44).
-    expect(WALK_CELLS_PER_SECOND).toBe(1.25);
-    expect(WALK_CELLS_PER_SECOND_FAST).toBe(1.5);
+    // 1.5 [PIOTR] and 1.8 [TUNE] from v63, a shade quicker (CLAUDE.md T26 2.5).
+    expect(WALK_CELLS_PER_SECOND).toBe(1.5);
+    expect(WALK_CELLS_PER_SECOND_FAST).toBe(1.8);
     expect(walkPaceFor(0)).toBe(WALK_CELLS_PER_SECOND);
     expect(walkPaceFor(1)).toBe(WALK_CELLS_PER_SECOND);
     for (const speed of [2, 4, 10, 30]) expect(walkPaceFor(speed)).toBe(WALK_CELLS_PER_SECOND_FAST);
@@ -415,8 +416,9 @@ describe('The movement (CLAUDE.md T19 2.1, PIOTR: "like robots, shaking like a l
       stepWalkers(root, now);
       if (walker.path.length > 0) facings.push(facingOf(root, key));
     }
-    // Twelve cells at a cell and a quarter a second is under ten seconds of frames (v44).
-    expect(facings.length).toBeGreaterThan(500);
+    // Twelve cells at a cell and a half a second is eight seconds of frames, 479 of them at 60 a
+    // second (v44; 1.5 from v63, CLAUDE.md T26 2.5): the leg is long enough to see a flip.
+    expect(facings.length).toBeGreaterThan(400);
     expect(new Set(facings).size, `facings seen: ${Array.from(new Set(facings)).join(',')}`).toBe(1);
     // And the mirror never flips with it, which is what the eye actually catches.
     expect(

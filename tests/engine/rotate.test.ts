@@ -237,9 +237,11 @@ describe('what turning does to the picture', () => {
     // Fifty one from v49: the thicknessers, the van, the forklift and the pallet truck of the
     // pack of 22.09 turned too. Fifty six from v54: the five CNCs of the pack of 24.09, each a true
     // quarter turn of its mesh and never a mirror. Sixty six from v56: the five spray booths and the
-    // five CNCs with their tool changers, of the same pack.
+    // five CNCs with their tool changers, of the same pack. Sixty seven while the pallet truck's
+    // turned file of v49 is still on disk beside its rename, `forklift.used.r.png` (v54), which
+    // v61's DELETED.txt asked deleted: the build's manifest counts what is on disk (T26-A0).
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    expect(turned).toHaveLength(66);
+    expect(turned).toHaveLength(67);
     for (const family of ['cnc', 'cncToolChanger', 'compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'sprayBooth', 'tableSaw', 'toolCabinet', 'workbench']) {
       for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
         expect(turned, `${family}.${tier}`).toContain(`${family}.${tier}.r.png`);

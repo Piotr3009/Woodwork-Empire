@@ -240,7 +240,10 @@ describe('(ll) three men, no manager, and the boss assigns each morning', () => 
     // 14,400 hand minutes of the stretch is booked at the floor, 0.25, where the product read
     // 0.37: 14,400 times two thirds of a pound times 0.25 is 2,400, and the four pounds over it
     // are the half hours a saw did not run. What this says about the sum is in the v60 report.
-    expect(NO_MANAGER.done).toBeCloseTo(2404.33, 2);
+    //
+    // 3,337.80 from v61: the grade times the hall's points (PIOTR, 01.10), 0.60 times 0.58, is
+    // 0.35 and over the floor again [measured on this build].
+    expect(NO_MANAGER.done).toBeCloseTo(3337.8, 2);
     expect(NO_MANAGER.state.jobs.every((job) => job.stage === 'inProduction')).toBe(true);
   });
 });
@@ -303,8 +306,11 @@ describe('(mm) the same crew with a novice manager over them', () => {
     // still holds them at 0.25, so the grade shows only in the few half hours a saw is not running
     // and the fan's 0.30 is off the minute. The assertion that he puts more in than (ll) holds by
     // that margin and no other; what this says about the sum is in the v60 report.
+    //
+    // 3,510.60 from v61, 172.80 over (ll): the men are off the floor (above), so his 0.03 is on
+    // every minute again (PIOTR, 01.10) [measured].
     expect(NOVICE.done).toBeGreaterThan(NO_MANAGER.done);
-    expect(NOVICE.done).toBeCloseTo(2406.01, 2);
+    expect(NOVICE.done).toBeCloseTo(3510.6, 2);
   });
 
   it('never sends the owner to the Work Plan', () => {
@@ -349,29 +355,32 @@ const FULL_BOOKS = (() => {
 const FULL_BOOKS_PLAYED = stretch(clone(FULL_BOOKS.state), 5);
 
 describe('(nn) nine men and a novice', () => {
-  it('cannot be played at all, because the canteen stops the books at eight', () => {
-    // The brief asks for nine men under a novice, with the ninth waiting every day until the
-    // manager is experienced. This build cannot reach nine men, and the arithmetic is the turn's
-    // own two figures against each other:
-    //
-    //   the canteen holds eight compartments, and every man on the books keeps his things in one,
-    //   so `canHire` refuses the ninth man whatever his trade (CLAUDE.md T23 2.10);
-    //   a manager does not manage himself (docs/notes-t23-b1.md 2.1), so the most men a manager
-    //   can be asked to carry is the eight on the books less himself, which is seven;
-    //   a novice carries eight, and seven is not more than eight.
-    //
-    // So no man in this game is ever past a novice's number, and the grade a shop has to buy to
-    // take the red mark off a man is never reached. The rule itself is sound and is proved on a
-    // position written into the state by tests/engine/managerGrades.test.ts, which puts nine
-    // joiners and a manager on the books and watches the ninth wait. It becomes playable the day
-    // the bigger canteen of CLAUDE.md T23 8 lands, and this test goes red when it does.
+  it('is played from Turn 26, because the canteen stops the floor at eight and not the books', () => {
+    // The brief asked for nine men under a novice, with the ninth waiting until the manager is
+    // experienced, and until Turn 26 the canteen's eight lockers stopped the books at eight, the
+    // manager among them, so no man was ever past a novice's number. From Turn 26 the lockers are
+    // the joiners' and the labourer's and nobody else's [PIOTR, 02.10: "the same as the crew"], so
+    // the office passes eight and the ninth man is past the novice's eight (CLAUDE.md T26 2.10).
     expect(CANTEEN_LOCKERS - 1).toBeLessThanOrEqual(PRODUCTION_MANAGER_CARRIES.novice);
+    expect(FULL_BOOKS.ninth.ok).toBe(true);
+    // Two more hired through the card, nine under the manager, and the books played on to the
+    // morning they start.
+    let state = act(clone(FULL_BOOKS.state), { type: 'HIRE', role: 'officeAdmin', tier: null });
+    state = act(state, { type: 'HIRE', role: 'officeAdmin', tier: null });
+    state = playDay(state, THREE_MEN);
+    expect(state.workers).toHaveLength(CANTEEN_LOCKERS + 2);
+    expect(menCarried(state)).toHaveLength(PRODUCTION_MANAGER_CARRIES.novice);
+    const manager = state.workers.find((worker) => worker.role === 'productionManager');
+    const uncarried = state.workers.filter(
+      (worker) => worker.id !== manager?.id && !hasManager(state, worker),
+    );
+    expect(uncarried).toHaveLength(1);
   });
 
-  it('fills the books to eight through the hire card and refuses the ninth', () => {
+  it('fills the books to eight through the hire card and takes a ninth into the office', () => {
     expect(FULL_BOOKS.state.workers).toHaveLength(CANTEEN_LOCKERS);
-    expect(FULL_BOOKS.ninth.ok).toBe(false);
-    expect(FULL_BOOKS.ninth.reason).toBe('No locker for him: the canteen holds eight');
+    // The office keeps no locker from Turn 26 (CLAUDE.md T26 2.10), so the canteen refuses nobody.
+    expect(FULL_BOOKS.ninth.ok).toBe(true);
   });
 
   it('leaves the novice carrying every one of them, with nobody waiting', () => {
@@ -490,7 +499,8 @@ describe('(oo) a bench and no compressor', () => {
     // the day reads 249.43 to 172.86, 76.58 of work in the eight saw half hours where it was
     // 84.35: what the hall takes off the owner's minute at the saw, the fan short of it first, is
     // points off the job's pace and not a share of it (PIOTR, 30.09), and the days before this one
-    // ran on the same arithmetic, which is where the 249.43 comes from [measured].
+    // ran on the same arithmetic, which is where the 249.43 comes from [measured]. From v61 the
+    // owner's own factor times the hall's points (PIOTR, 01.10) ends the day at 157.32 [measured].
     const day = BENCH_DAY.halfHours.filter((entry) => entry.minute < DAY_END_MINUTE);
     const bench = day.filter((entry) => entry.station === machineStation('workbench'));
     const saw = day.filter((entry) => entry.station === machineStation('tableSaw'));
@@ -505,7 +515,7 @@ describe('(oo) a bench and no compressor', () => {
     for (const entry of bench) expect(leftAfter(entry)).toBe(entry.left);
     for (const entry of saw) expect(leftAfter(entry)).toBeLessThan(entry.left);
     expect(BENCH_DAY.after).toBeLessThan(BENCH_DAY.before);
-    expect(BENCH_DAY.after).toBeCloseTo(172.86, 2);
+    expect(BENCH_DAY.after).toBeCloseTo(157.32, 2);
   });
 
   it('says why over his head at the bench, and nothing at the saw', () => {

@@ -327,7 +327,8 @@ describe('production', () => {
     expect(job?.balancePaid).toBe(200);
     expect(job?.penalty).toBe(0);
     expect(job?.rating).toBe(3);
-    expect(run.state.reputation).toBe(3);
+    // The client's +3 is booked at half from Turn 26 (CLAUDE.md T26 2.11).
+    expect(run.state.reputation).toBe(1.5);
     expect(eventsOfKind(run.events, 'jobPaid')).toHaveLength(1);
   });
 
@@ -427,7 +428,8 @@ describe('scenario: garage shelves on Easy', () => {
     expect(job?.completedDay).toBe(3);
     expect(job?.daysLate).toBe(0);
     expect(job?.rating).toBe(3);
-    expect(day3.reputation).toBe(3);
+    // The client's +3 is booked at half from Turn 26 (CLAUDE.md T26 2.11).
+    expect(day3.reputation).toBe(1.5);
     // 200 deposit in, one sheet at the ad hoc price out, 120 courier out, 200 balance in: 80 of
     // the 400 is left (CLAUDE.md 8.4, T13 3.3).
     const jobMoves = day3.ledger

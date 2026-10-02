@@ -72,8 +72,9 @@ describe('the figure of a man at work', () => {
     expect(renderHall(assembling)).toContain('workbench');
   });
 
-  it('stands the man the budget saw has no place for at a bench, and draws no mark over him', () => {
-    const state = tick(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' })), 1);
+  it('stands the man the used saw has no place for at a bench, and draws no mark over him', () => {
+    // A used saw has one place; a budget saw has two from Turn 26, its capacity (CLAUDE.md T26 2.1).
+    const state = tick(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'used' })), 1);
     const joiner = state.workers[0];
     if (!joiner) throw new Error('no joiner');
     // Until v53 he stood at his home cell with `no place at the saw` over him. Nobody waits for
@@ -89,8 +90,9 @@ describe('the figure of a man at work', () => {
 
   it('stands a man at his home cell with the mark only when every place he could take is taken', () => {
     // A third man on the joiner's job and one bench of one place left in the hall: the owner has
-    // the saw, the joiner the bench, and the third man nothing (PIOTR, 24.09; v53).
-    let start = withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' }));
+    // the saw, the joiner the bench, and the third man nothing (PIOTR, 24.09; v53). A used saw of
+    // one place (CLAUDE.md T26 2.1).
+    let start = withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'used' }));
     const first = start.equipment.find((item) => item.specId === 'workbench');
     start.equipment = start.equipment.filter((item) => item.specId !== 'workbench' || item === first);
     start.workers.push(testJoiner('staff-2', 'Tom', 8, 6));

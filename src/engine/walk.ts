@@ -4,14 +4,16 @@
 //
 // A cell is free when it is inside the unit, on no footprint, in no room, and not the pallet's
 // own cells. The working zones of machines are free (a man walks through a zone), the gate lane
-// is free, and a pipe tile is free because it is in the air.
+// is free, and a pipe tile is free because it is in the air. From Turn 26 a walk goes between the
+// machines: over the free cells no machine's picture covers, the long way round when it has to,
+// and the straight line only for a cell boxed in on every side (CLAUDE.md T26 2.3).
 //
 // This is the path finder for men. `pathBetween` in pipes.ts is the one for pipes: a pipe goes
 // over equipment in the air and never round it, so the two are not the same search and are not
 // shared (CLAUDE.md T16 2.2).
 
-import { PALLET_LAYOUT, ROOM_LAYOUT } from './constants';
-import { isSold, itemStandsInTheHall } from './machines';
+import { PALLET_LAYOUT, PICTURE_COVER_SHARE, ROOM_LAYOUT } from './constants';
+import { findSpec, isSold, itemStandsInTheHall } from './machines';
 import { footprintOrigin } from './pipes';
 import type { Cell } from './pipes';
 import type { GameState, Orientation } from './types';
@@ -67,6 +69,57 @@ export function isFree(state: GameState, cell: Cell): boolean {
   return true;
 }
 
+/** Whether a machine's picture covers this cell on the floor: its drawn footprint over at least
+ *  `PICTURE_COVER_SHARE` of the cell. The pictures are drawn on their own footprints and no bigger
+ *  (every delivered file is the canvas docs/art/SPRITES.md 2 gives its class's footprint, measured
+ *  on 02.10), and a footprint stands centred in its working zone, so it may reach part of the way
+ *  into the cells round `footprintCells`: what it covers of them is the picture's overhang, and a
+ *  man walking across it would cross the table on screen (CLAUDE.md T26 2.3). */
+export function pictureCovers(
+  item: { specId: string; variantId: string; orientation?: Orientation; anchorX: number; anchorY: number },
+  cell: Cell,
+): boolean {
+  const drawn = footprintOrigin(item);
+  const across = Math.min(drawn.x + drawn.width, cell.x + 1) - Math.max(drawn.x, cell.x);
+  const along = Math.min(drawn.y + drawn.depth, cell.y + 1) - Math.max(drawn.y, cell.y);
+  if (across <= 0 || along <= 0) return false;
+  return across * along >= PICTURE_COVER_SHARE - 1e-9;
+}
+
+/** Can a man walk across here: a cell he can stand on (`isFree`) that no machine's picture covers
+ *  either, so a man never crosses a saw's table on screen (PIOTR, 02.10: "they walk over the
+ *  machines"; CLAUDE.md T26 2.3). The rest of the working zones are walked as they always were, and
+ *  the two ends of a walk are taken as they are. */
+export function isWalkable(state: GameState, cell: Cell, own: ReadonlySet<string> = new Set<string>()): boolean {
+  if (!isFree(state, cell)) return false;
+  for (const item of state.equipment) {
+    if (isSold(item) || !itemStandsInTheHall(item)) continue;
+    if (item.anchorX >= state.unit.widthCells) continue;
+    if (own.has(item.id) || !isAMachine(item)) continue;
+    if (pictureCovers(item, cell)) return false;
+  }
+  return true;
+}
+
+/** True for a machine, whose table a man is not to be drawn crossing: a bench's top reaching into
+ *  its front row is where its men stand, and a rack or a fan is gone round by its own free side
+ *  (CLAUDE.md T26 2.3: "a machine's drawn picture"). */
+function isAMachine(item: { specId: string }): boolean {
+  return findSpec(item.specId)?.category === 'machine';
+}
+
+/** The machines whose pictures cover either end of a walk: the one he steps off and the one he
+ *  steps up to. He may walk along their covered cells, which is how a man in the middle of a row of
+ *  places at a bench gets out of it; nobody else's (CLAUDE.md T26 2.3). */
+function ownPictures(state: GameState, from: Cell, to: Cell): Set<string> {
+  const own = new Set<string>();
+  for (const item of state.equipment) {
+    if (isSold(item) || !itemStandsInTheHall(item)) continue;
+    if (isAMachine(item) && (pictureCovers(item, from) || pictureCovers(item, to))) own.add(item.id);
+  }
+  return own;
+}
+
 function keyOf(cell: Cell): string {
   return `${cell.x},${cell.y}`;
 }
@@ -94,12 +147,15 @@ export function straightLine(from: Cell, to: Cell): Cell[] {
   return cells;
 }
 
-/** The cells from `from` to `to` inclusive, over the four neighbours on free cells: a breadth
- *  first search, so the first path found is a shortest one. The two ends are taken as they are
- *  (a standing cell is free by construction, and a man who is somewhere odd still walks off it).
- *  Falls back to the straight line when no free path exists. */
-export function walkPath(state: GameState, from: Cell, to: Cell): Cell[] {
-  if (from.x === to.x && from.y === to.y) return [{ x: from.x, y: from.y }];
+/** How a walk was found: over the walkable floor, which is every walk the aim allows; through a
+ *  picture's overhang when the walkable floor has no way to the cell; or the straight line, which
+ *  is kept only for a cell with no free neighbour at all (CLAUDE.md T26 2.3). */
+export type WalkKind = 'floor' | 'overhang' | 'straight';
+
+/** A breadth first search over the four neighbours on the cells `open` allows: the first path
+ *  found is a shortest one, however far round it goes. The two ends are taken as they are. Null
+ *  when there is none. */
+function search(from: Cell, to: Cell, open: (cell: Cell) => boolean): Cell[] | null {
   const target = keyOf(to);
   const cameFrom = new Map<string, Cell | null>();
   cameFrom.set(keyOf(from), null);
@@ -111,7 +167,7 @@ export function walkPath(state: GameState, from: Cell, to: Cell): Cell[] {
       const next = { x: cell.x + step.x, y: cell.y + step.y };
       const key = keyOf(next);
       if (cameFrom.has(key)) continue;
-      if (key !== target && !isFree(state, next)) continue;
+      if (key !== target && !open(next)) continue;
       cameFrom.set(key, cell);
       if (key === target) {
         found = true;
@@ -120,7 +176,7 @@ export function walkPath(state: GameState, from: Cell, to: Cell): Cell[] {
       queue.push(next);
     }
   }
-  if (!found) return straightLine(from, to);
+  if (!found) return null;
   const path: Cell[] = [];
   let cursor: Cell | null = { x: to.x, y: to.y };
   while (cursor !== null) {
@@ -128,4 +184,23 @@ export function walkPath(state: GameState, from: Cell, to: Cell): Cell[] {
     cursor = cameFrom.get(keyOf(cursor)) ?? null;
   }
   return path.reverse();
+}
+
+/** The cells from `from` to `to` inclusive, and how they were found: between the machines over the
+ *  walkable floor, the long way round when that is what it takes (PIOTR, 02.10: "they should walk
+ *  between the machines"); through a picture's overhang only when the floor has no way at all; and
+ *  the straight line only for a cell boxed in on every side (CLAUDE.md T16 2.2, T26 2.3). */
+export function walkRoute(state: GameState, from: Cell, to: Cell): { path: Cell[]; kind: WalkKind } {
+  if (from.x === to.x && from.y === to.y) return { path: [{ x: from.x, y: from.y }], kind: 'floor' };
+  const own = ownPictures(state, from, to);
+  const floor = search(from, to, (cell) => isWalkable(state, cell, own));
+  if (floor !== null) return { path: floor, kind: 'floor' };
+  const overhang = search(from, to, (cell) => isFree(state, cell));
+  if (overhang !== null) return { path: overhang, kind: 'overhang' };
+  return { path: straightLine(from, to), kind: 'straight' };
+}
+
+/** The cells from `from` to `to` inclusive, the way `walkRoute` finds them. */
+export function walkPath(state: GameState, from: Cell, to: Cell): Cell[] {
+  return walkRoute(state, from, to).path;
 }

@@ -1,7 +1,7 @@
-// The floor limits the crew (PIOTR; CLAUDE.md T13 3.10): one person per so many square metres of
-// free floor, the owner among them, so that a 200 m2 hall with a normal set of machines and racks
-// lands at the owner plus four, five at most. "Without this the player buys ten people and pushes
-// everything through two shifts."
+// The unit limits the crew (PIOTR; CLAUDE.md T13 3.10): one place per so many square metres of the
+// whole unit, 200 over 24 is eight. From Turn 26 the eight are joiners and nobody else: the owner,
+// the labourer, the manager and the office are outside it [PIOTR, 02.10: "eight joiners, however
+// many others"] (CLAUDE.md T26 2.10).
 
 import { describe, expect, it } from 'vitest';
 import { M2_PER_PERSON, PRODUCTION_MANAGER_MONTHLY_WAGE } from '../../src/engine/constants';
@@ -93,41 +93,59 @@ describe('the floor limit', () => {
     expect(crewLimit(state)).toBe(8);
   });
 
-  it('lands a 200 m2 hall at the owner and seven, and refuses the eighth man', () => {
+  it('counts six joiners and a labourer as six, and the seventh joiner is the bench slots\' to refuse', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     state.reputation = 40;
     expect(state.unit.areaM2).toBe(200);
-    expect(crewCount(state)).toBe(1);
+    expect(crewCount(state)).toBe(0);
     expect(crewLimit(state)).toBe(8);
-    // Six joiners fill the unit's six bench slots; the helper needs no bench and is the eighth
-    // seat, so the crew is eight and the next man is refused by the unit and not the floor.
+    // Six joiners fill the unit's six bench slots; the labourer is not a joiner and is not counted.
     state = withCrew(state, 6, 'novice');
     state = hireNow(state, 'helper', null);
     expect(joiners(state)).toHaveLength(6);
-    expect(crewCount(state)).toBe(8);
+    expect(crewCount(state)).toBe(6);
     // The benches and the cabinets took floor of their own and the limit did not move: eight is
     // the unit's (v37).
     expect(crewLimit(state)).toBe(8);
-    expect(crewLine(state)).toBe('Crew 8 / 8, the unit takes 8 people');
-    expect(crewFull(state, 'joiner')).toBe(true);
-    // A seventh joiner is stopped by the six bench slots before the crew line is reached; a
-    // second helper needs no bench and hears the unit's own line. The office does not.
-    expect(canHire(state, 'joiner', 'novice').ok).toBe(false);
-    expect(canHire(state, 'helper', null)).toEqual({
+    expect(crewLine(state)).toBe('Joiners 6 / 8, the unit takes 8 joiners');
+    expect(crewFull(state, 'joiner')).toBe(false);
+    // A seventh joiner is stopped by the six bench slots, which this turn leaves as they are.
+    expect(canHire(state, 'joiner', 'novice')).toEqual({
       ok: false,
-      reason: 'Crew 8 / 8, the unit takes 8 people',
+      reason: 'No free bench slot in this unit',
     });
-    expect(crewFull(state, 'officeAdmin')).toBe(false);
   });
 
-  it('counts the owner, the men on the floor and the manager, and never the desks', () => {
+  it('is full for a ninth joiner and for nobody else, with eight joiners and six others on the books', () => {
+    // The cross check of CLAUDE.md T26 7: eight joiners, a labourer, a manager and three office
+    // staff. The eight are put on the books directly, because the unit's bench slots refuse a
+    // seventh joiner at the hire card before the crew line is reached.
     const state = newGame();
-    expect(crewCount(state)).toBe(1);
+    for (let index = 0; index < 8; index += 1) {
+      state.workers.push({ ...manager(`j${index}`), role: 'joiner', tier: 'novice' });
+    }
+    state.workers.push({ ...manager('l1'), role: 'helper', tier: null });
     state.workers.push(manager());
-    expect(crewCount(state)).toBe(2);
-    state.workers.push({ ...manager('e1'), role: 'estimator', tier: 'experienced' });
-    expect(crewCount(state)).toBe(2);
+    state.workers.push({ ...manager('a1'), role: 'officeAdmin', tier: null });
+    state.workers.push({ ...manager('d1'), role: 'draftsman', tier: 'experienced' });
+    state.workers.push({ ...manager('s1'), role: 'salesman', tier: null });
+    expect(crewCount(state)).toBe(8);
+    expect(crewLine(state)).toBe('Joiners 8 / 8, the unit takes 8 joiners');
+    expect(crewFull(state, 'joiner')).toBe(true);
+    for (const role of ['helper', 'productionManager', 'officeAdmin', 'draftsman', 'salesman'] as const) {
+      expect(crewFull(state, role)).toBe(false);
+    }
+  });
+
+  it('counts the joiners and nobody else, the owner included', () => {
+    const state = newGame();
+    expect(crewCount(state)).toBe(0);
+    state.workers.push(manager());
+    state.workers.push({ ...manager('h1'), role: 'helper', tier: null });
+    state.workers.push({ ...manager('e1'), role: 'draftsman', tier: 'experienced' });
     state.workers.push({ ...manager('a1'), role: 'officeAdmin' });
-    expect(crewCount(state)).toBe(2);
+    expect(crewCount(state)).toBe(0);
+    state.workers.push({ ...manager('j1'), role: 'joiner', tier: 'novice' });
+    expect(crewCount(state)).toBe(1);
   });
 });

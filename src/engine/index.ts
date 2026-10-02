@@ -321,7 +321,6 @@ export {
   stageMinutes,
   stagePlanFor,
   stageSpeed,
-  tradeFactor,
 } from './stages';
 export type { StageOptions, StagePlan, StagedJob } from './stages';
 // Air and dust that have to add up (CLAUDE.md T10 3.1, 3.2, 3.3)
@@ -380,16 +379,16 @@ export {
 export {
   bestTakerOf,
   DAY_CATEGORY_OF_TASK,
-  HELPER_ONLY_KINDS,
+  LABOURER_ONLY_KINDS,
   TASK_KINDS,
-  WAITING_FOR_HELPER,
+  WAITING_FOR_LABOURER,
   dayCategoryOf,
   designMinutes,
   emptyBagsLabel,
   emptyBagsMinutes,
-  estimatorCapacity,
+  takeOffCapacity,
   handlingIn,
-  isHelperTask,
+  isLabourerTask,
   emailsForPrice,
   findTask,
   jobTasks,
@@ -421,9 +420,9 @@ export {
   crewLine,
   freeToolSlots,
   hasWorkingDay,
-  helperOnDuty,
+  labourerOnDuty,
   homeCellOf,
-  helpers,
+  labourers,
   hiringOptions,
   isWorkingToday,
   joiners,
@@ -511,7 +510,7 @@ export {
   machineWearPerMinute,
   bestMachineOf,
   SPRAY_BOOTH,
-  // The service rule and the dirt the helper answers, Turn 20 (CLAUDE.md T20 2.8, 2.9).
+  // The service rule and the dirt the labourer answers, Turn 20 (CLAUDE.md T20 2.8, 2.9).
   hallLooksDirty,
   hoursPastLife,
   lifeAfterServices,
@@ -733,8 +732,6 @@ export {
   paceLines,
   placesLine,
   crewAtFamily,
-  hallCapacity,
-  capacityOf,
   fullCrew,
   familyRuns,
   placeShortages,

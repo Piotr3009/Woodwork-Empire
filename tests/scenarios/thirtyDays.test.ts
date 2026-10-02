@@ -77,7 +77,7 @@ import {
 } from '../../src/engine/constants';
 import {
   DAY_CATEGORIES,
-  HELPER_ONLY_KINDS,
+  LABOURER_ONLY_KINDS,
   STATION_IDLE,
   STATION_DOOR,
   hallPlaces,
@@ -85,7 +85,7 @@ import {
   bagStore,
   dayPercentages,
   dropReputationCost,
-  helperOnDuty,
+  labourerOnDuty,
   homeCellOf,
   extractionCheck,
   madeInADustyWorkshop,
@@ -206,7 +206,8 @@ describe('30 days on Easy, working the board', () => {
         state.finance.overdraftLimit,
       );
     }
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(2746);
+    // 2,741 from Turn 26: a gain booked at half moves the board's draw by a standing (T26 2.11).
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(2741);
     expect(state.finance.daysBelowOverdraft).toBe(0);
   });
 
@@ -221,7 +222,8 @@ describe('30 days on Easy, working the board', () => {
     // is other enquiries (the board draws no timber, above) and one of the seven is an express
     // bookcase taken on day 10, five points where an on time job is three: 23 where it was 21.
     expect(state.reputation).toBeGreaterThan(0);
-    expect(state.reputation).toBeCloseTo(23, 6);
+    // 11.5 from Turn 26: the same 23 points of ratings, every one a gain, booked at half (T26 2.11).
+    expect(state.reputation).toBeCloseTo(11.5, 6);
     expect(state.jobs.filter((job) => job.stage === 'completed')).toHaveLength(7);
   });
 
@@ -604,7 +606,11 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // on couriers, and an extractor breakdown and its 150 repair that this stream has and v57's
     // had not. The lowest point is the owner's draw on the morning of day 32 in both [measured,
     // off the ledger by category].
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-1202);
+    //
+    // -862 from v61: the novice's grade times the hall's points (PIOTR, 01.10), 0.60 of a minute
+    // that has lost the penalties, not the penalties off his 0.60 [measured].
+    // -680 from Turn 26: a gain booked at half moves which enquiries the board draws (T26 2.11).
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-680);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
@@ -1032,7 +1038,7 @@ describe('a month of six joiners behind two saws', () => {
     expect(two.longest).toBe(0);
   });
 
-  it('gets two of the book out on two saws and two on one: at the floor the second saw buys nothing (v60)', () => {
+  it('gets three of the book out on two saws and two on one: the second saw buys a job again (v61)', () => {
     const done = (month: CrewMonth): number =>
       month.state.jobs.filter((job) => job.stage === 'completed').length;
     /** How far through its making each job still on the books is, to a tenth of a per cent. */
@@ -1075,11 +1081,14 @@ describe('a month of six joiners behind two saws', () => {
     // multiplied, so it cost the crew a share of what they had and never the same 0.22 off a man
     // who had 0.60 to give [all measured, off the ledger by category]. What this month says about
     // the sum is in the v60 report: at the floor nothing the player buys shows.
-    expect(done(two)).toBe(2);
+    //
+    // Re-measured for v61: three out on two saws and two on one, 4,368 ahead; the grade times the
+    // hall's points (PIOTR, 01.10) lifts the one saw minute off the floor, so the second saw shows.
+    expect(done(two)).toBe(3);
     expect(done(one)).toBe(2);
-    expect(unfinished(two)).toEqual([0.744, 0.786, 0.865, 0.965]);
-    expect(unfinished(one)).toEqual([0.733, 0.778, 0.857, 0.958]);
-    expect(Math.round(two.state.cash - one.state.cash)).toBe(-120);
+    expect(unfinished(two)).toEqual([0.858, 0.882, 0.946]);
+    expect(unfinished(one)).toEqual([0.77, 0.808, 0.883, 0.981]);
+    expect(Math.round(two.state.cash - one.state.cash)).toBe(4368);
   });
 
   it('has no longest stand at all on one saw either, the one saw having the places the crew wants', () => {
@@ -1427,8 +1436,12 @@ describe('a month of two men on a fan too small for them', () => {
     // balances +524, material -460). Neither the pace table of 2.4 nor the saw's second place is
     // the cause: the short fan's month takes 14 jobs with the v51 figures put back for either one,
     // measured. What is left is 2.2, each man on his own job's current stage.
+    //
+    // From Turn 26 the count is the delivered value and not the delivered jobs: with a gain booked
+    // at half (CLAUDE.md T26 2.11) the big fan's standing opens bookcases and a TV unit to it where
+    // the short fan's takes garage shelves, 13 bigger jobs at 9,660 against 14 at 8,940 [measured].
     const done = (state: GameState): number =>
-      state.jobs.filter((job) => job.stage === 'completed').length;
+      state.jobs.filter((job) => job.stage === 'completed').reduce((total, job) => total + job.price, 0);
     expect(done(fine.state)).toBeGreaterThanOrEqual(done(short.state));
     expect(fine.state.reputation).toBeGreaterThanOrEqual(short.state.reputation);
   });
@@ -1452,7 +1465,7 @@ describe('a month with a helper, where the owner never unloads', () => {
     expect(state.clock.day).toBe(31);
     const helper = state.workers.find((worker) => worker.role === 'helper');
     expect(helper).toBeDefined();
-    expect(helperOnDuty(state)).toBe(true);
+    expect(labourerOnDuty(state)).toBe(true);
     // He is on the painted floor and out of the office block (CLAUDE.md T11 3.4).
     const home = helper === undefined ? { x: -1, y: -1 } : homeCellOf(state, helper);
     expect(home.x).toBeGreaterThanOrEqual(0);
@@ -1461,7 +1474,7 @@ describe('a month with a helper, where the owner never unloads', () => {
 
   it('never put the owner on an unload, a bag or the cleaning all month', () => {
     const helper = state.workers.find((worker) => worker.role === 'helper');
-    const chores = state.tasks.filter((task) => HELPER_ONLY_KINDS.includes(task.kind));
+    const chores = state.tasks.filter((task) => LABOURER_ONLY_KINDS.includes(task.kind));
     expect(chores.length).toBeGreaterThan(0);
     // Both of the labourer's own jobs of work came up in the month and both were his: measured,
     // twelve loads off the lorry and thirty two sweeps of the hall (CLAUDE.md T17 2.3, section 7).
@@ -1614,7 +1627,7 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
       expect(state.equipment.some((item) => item.specId === specId), specId).toBe(true);
     }
     expect(bagStore(state)).toMatchObject({ exists: true, bags: 1, capacityM3: 1 });
-    expect(helperOnDuty(state)).toBe(true);
+    expect(labourerOnDuty(state)).toBe(true);
     // Until v57 the month took an oak table off the board. The board offers no timber until the
     // timber branch [PIOTR, 25.09], so the machines stand for it and the month is sheet work: ten
     // jobs out of the door [measured].

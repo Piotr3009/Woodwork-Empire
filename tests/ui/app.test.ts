@@ -323,6 +323,7 @@ describe('the order board as tiles', () => {
           price: 12000,
           basePrice: 12000,
           kind: 'residential',
+          joinersWanted: 0,
           budget: 12000,
           offer: null,
           finish: 'laminate',
@@ -526,8 +527,10 @@ describe('the walking figures', () => {
 describe('setting the hall out', () => {
   it('stops the clock, offers Done, and starts it again', () => {
     click('[data-do="setView"][data-view="hall"]');
-    click('[data-do="setSpeed"][data-speed="2"]');
-    expect(currentState()?.speed).toBe(2);
+    // At 4x: the 2x went from the bar in v61 for the 100x (PIOTR, 01.10), so 4x is the first speed
+    // above 1x the Done button can be seen to put back (T26-A0).
+    click('[data-do="setSpeed"][data-speed="4"]');
+    expect(currentState()?.speed).toBe(4);
     expect(html()).toContain('data-do="startSetup"');
     click('[data-do="startSetup"]');
     expect(currentState()?.speed).toBe(0);
@@ -535,7 +538,7 @@ describe('setting the hall out', () => {
     expect(html()).toContain('Drag the machines');
     expect(html()).not.toContain('data-do="startSetup"');
     click('[data-do="endSetup"]');
-    expect(currentState()?.speed).toBe(2);
+    expect(currentState()?.speed).toBe(4);
     expect(html()).toContain('data-do="startSetup"');
     // Back to a running clock: nothing in the office opens on a stopped one (T7 3.10).
     click('[data-do="setSpeed"][data-speed="1"]');

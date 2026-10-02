@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { HIRING_SPECS } from '../../src/engine/constants';
-import { MACHINE_PLACES, WORKBENCH_VARIANTS } from '../../src/engine/constants';
+import { MACHINE_CAPACITY, WORKBENCH_VARIANTS } from '../../src/engine/constants';
 import { canHire, hiringOptions, monthlyWageOf } from '../../src/engine/staff';
 import { OWNER, benchOf, benchPlaces, classPaceOf, paceOf } from '../../src/engine/machines';
 import { renderMachine } from '../../src/ui/machine';
@@ -152,7 +152,8 @@ describe('a free place at a bench', () => {
   }
 
   it('counts the classes places over the benches of the hall', () => {
-    expect(MACHINE_PLACES.workbench).toEqual({ used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 });
+    // The bench's row of the one table from Turn 26 (CLAUDE.md T26 2.1).
+    expect(MACHINE_CAPACITY.workbench).toEqual({ used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 });
     const one = hallWith('budget', 1);
     expect(benchPlaces(one)).toBe(1);
     expect(benchPlaces(hallWith('standard', 1))).toBe(2);
@@ -237,7 +238,7 @@ describe('a free place at a bench', () => {
     // the one ladder of every family (CLAUDE.md T23 2.17, T25 2.4).
     const variant = WORKBENCH_VARIANTS.find((entry) => entry.id === 'pro');
     expect(classPaceOf({ specId: 'workbench', variantId: variant?.id ?? '' })).toBe(1.08);
-    expect(MACHINE_PLACES.workbench?.pro).toBe(2);
+    expect(MACHINE_CAPACITY.workbench?.pro).toBe(2);
     let state = hallWith('pro', 4);
     state = hireNow(state, 'joiner', 'novice');
     state = hireNow(state, 'joiner', 'novice');

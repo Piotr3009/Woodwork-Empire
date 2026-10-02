@@ -148,7 +148,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(33);
+    expect(STATE_VERSION).toBe(34);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -293,7 +293,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(33);
+    expect(lifted.version).toBe(34);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -315,7 +315,10 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
     // way down (CLAUDE.md T20 2.6, T21 2.10).
     // And from v38 every graded man comes out on this build's wage for his grade, whatever his
     // conversions came to (PIOTR, 21.09); the admin has no grade and keeps his 1,899.
-    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([1950, 2470, 3055, 1899]);
+    // From Turn 26 the sprayer is a joiner of his grade at the joiner's wage for it, 2,940 and not
+    // the sprayer's 3,055 (CLAUDE.md T26 section 4).
+    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([1950, 2470, 2940, 1899]);
+    expect(lifted.workers.map((worker) => worker.role)[2]).toBe('joiner');
     for (const worker of lifted.workers) {
       expect(Object.keys(worker), String(worker.name)).not.toContain('weeklyWage');
       expect(worker.leavesOnDay, String(worker.name)).toBeNull();
@@ -419,7 +422,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(33);
+    expect(lifted.version).toBe(34);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
     // told the player he cost (CLAUDE.md T21 2.10). From v38 that holds until the v22 lift, which
@@ -637,7 +640,7 @@ describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
     // There is one track for money from tonight: a cost the player did not choose is paid out of
     // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
     // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
-    expect(lifted.version).toBe(33);
+    expect(lifted.version).toBe(34);
     expect(lifted.cash).toBe(-4998 - 2780);
   });
 
@@ -729,7 +732,7 @@ describe('a v35 save in this build (CLAUDE.md T23 section 4)', () => {
     // A played company starts its list at its next month end: the card the player was shown that
     // evening is the report, and one worked out again tonight would not be that card
     // (CLAUDE.md T23 2.14).
-    expect(lifted.version).toBe(33);
+    expect(lifted.version).toBe(34);
     expect(lifted.monthlyReports).toEqual([]);
   });
 
@@ -825,7 +828,7 @@ describe('a v23 save made under the split day (PIOTR, 21.09; v42)', () => {
   if (lifted === null) throw new Error('the lift refused a version 23 state');
 
   it('comes up at this build s version', () => {
-    expect(lifted.version).toBe(33);
+    expect(lifted.version).toBe(34);
   });
 
   it('takes every man on a running contract off the jobs he was standing on', () => {
@@ -852,7 +855,7 @@ describe('a v24 save in this build (v44)', () => {
   it('comes in with no evening take-over in hand', () => {
     const lifted = migrateState({ version: 24, owner: { wentHome: false } }, 24);
     if (lifted === null) throw new Error('the lift refused a version 24 state');
-    expect(lifted.version).toBe(33);
+    expect(lifted.version).toBe(34);
     expect(lifted.owner.tookOverJobId).toBe(null);
   });
 });
@@ -864,7 +867,7 @@ describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
       25,
     );
     if (lifted === null) throw new Error('the lift refused a version 25 state');
-    expect(lifted.version).toBe(33);
+    expect(lifted.version).toBe(34);
     expect(lifted.dayStats.byMan).toEqual({});
     // The figure the sheet prints above the block is the save's own and is not guessed at.
     expect(lifted.dayStats.workMinutes).toBe(12);
@@ -878,7 +881,7 @@ describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
       };
       const lifted = migrateState(raw.state, raw.state.version);
       if (lifted === null) throw new Error(`${path} did not open`);
-      expect(lifted.version).toBe(33);
+      expect(lifted.version).toBe(34);
       expect(lifted.dayStats.byMan).toEqual({});
     }
   });
@@ -897,7 +900,7 @@ describe('a v25 save in this build (PIOTR, 22.09; v51)', () => {
   if (lifted === null) throw new Error('the lift refused a version 25 state');
 
   it('comes up at this build s version, through v26 on the way', () => {
-    expect(lifted.version).toBe(33);
+    expect(lifted.version).toBe(34);
     expect(lifted.version).toBe(STATE_VERSION);
     expect(lifted.dayStats.byMan).toEqual({});
   });
@@ -928,7 +931,7 @@ describe('a v25 save in this build (PIOTR, 22.09; v51)', () => {
       26,
     );
     if (fromT24 === null) throw new Error('the lift refused a version 26 state');
-    expect(fromT24.version).toBe(33);
+    expect(fromT24.version).toBe(34);
     expect(fromT24.equipment[0]?.servicedDay).toBe(40);
   });
 });
@@ -986,7 +989,7 @@ describe('a v27 save in this build (CLAUDE.md T25 section 4)', () => {
 
   it('clears every claim on a machine and never writes one again', () => {
     const lifted = lifted27();
-    expect(lifted.version).toBe(33);
+    expect(lifted.version).toBe(34);
     for (const item of lifted.equipment) expect(item.takenBy, item.id).toBeNull();
   });
 
@@ -1098,7 +1101,7 @@ describe('a v28 save in this build (PIOTR, 24.09; v53)', () => {
 
   it('comes up at this build s version with no job waiting on the CNC', () => {
     const { after } = lifted28();
-    expect(after.version).toBe(33);
+    expect(after.version).toBe(34);
     for (const job of after.jobs) expect('sawFallback' in job, job.id).toBe(false);
   });
 
@@ -1147,7 +1150,7 @@ describe('a v29 save in this build (PIOTR, 24.09; v54)', () => {
 
   it('makes the pallet truck and the better forklift classes of the one family', () => {
     const after = lifted29();
-    expect(after.version).toBe(33);
+    expect(after.version).toBe(34);
     const byId = new Map(after.equipment.map((item) => [item.id, item]));
     expect([byId.get('kit-pt')?.specId, byId.get('kit-pt')?.variantId]).toEqual(['forklift', 'used']);
     expect([byId.get('kit-fb')?.specId, byId.get('kit-fb')?.variantId]).toEqual(['forklift', 'pro']);
@@ -1186,7 +1189,7 @@ describe('a v30 save in this build (PIOTR, 24.09; v55)', () => {
 
   it('empties the bags of the stages that are gone and loses nothing of the job', () => {
     const { after } = lifted30();
-    expect(after.version).toBe(33);
+    expect(after.version).toBe(34);
     const job = after.jobs[0];
     if (job === undefined) throw new Error('the job went missing in the lift');
     expect(job.stageLabour).toEqual({ cutting: job.labourValue * 0.25 });
@@ -1237,7 +1240,7 @@ describe('a v55 save with its spray booths at their old size (PIOTR, 25.09; v56)
     const { raw, used } = hallOfV55();
     const after = migrateState(raw, 31);
     if (after === null) throw new Error('the lift refused a v31 state');
-    expect(after.version).toBe(33);
+    expect(after.version).toBe(34);
     const booth = (id: string) => {
       const item = after.equipment.find((entry) => entry.id === id);
       if (item === undefined) throw new Error(`${id} went missing in the lift`);
@@ -1268,12 +1271,89 @@ describe('a v56 save with timber offers on its board (PIOTR, 25.09; v57)', () =>
     raw.version = 32;
     const after = migrateState(raw, 32);
     if (after === null) throw new Error('the lift refused a v32 state');
-    expect(after.version).toBe(33);
+    expect(after.version).toBe(34);
     const ids = after.enquiries.map((enquiry) => enquiry.id);
     expect(ids).toContain(shelves.id);
     expect(ids).not.toContain(oak.id);
     expect(ids).not.toContain(greyedOak.id);
     // The one already taken is a job on the books and not an offer.
     expect(after.jobs.some((job) => job.templateId === 'oakDiningTable')).toBe(true);
+  });
+});
+
+describe('a v33 save in this build (CLAUDE.md T26 section 4)', () => {
+  /** A v62 save with every trade Turn 26 folds away on its books, written as the JSON a save is:
+   *  the roles that went are strings here and nowhere else in the tests. */
+  function v33Save(): Record<string, unknown> {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    state.enquiries = [];
+    const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40, needsMeasure: true });
+    const withJob = acceptNow(state, enquiry.id, false);
+    placeEnquiry(withJob, { price: 900 });
+    const raw = JSON.parse(JSON.stringify(withJob)) as Record<string, unknown> & {
+      workers: Array<Record<string, unknown>>;
+      tasks: Array<Record<string, unknown>>;
+      jobs: Array<Record<string, unknown>>;
+      enquiries: Array<Record<string, unknown>>;
+    };
+    raw.version = 33;
+    delete raw.agency;
+    for (const job of raw.jobs) delete job.joinersWanted;
+    for (const offer of raw.enquiries) delete offer.joinersWanted;
+    const measure = raw.tasks.find((task) => task.kind === 'siteMeasure');
+    const chore = raw.tasks.find((task) => task.kind === 'dailyOrdering') ?? null;
+    const man = (id: string, role: string, tier: string | null, wage: number, taskId: string | null): Record<string, unknown> => ({
+      id,
+      name: id,
+      role,
+      tier,
+      rate: 0.8,
+      monthlyWage: wage,
+      startDay: 1,
+      jobId: null,
+      taskId,
+    });
+    raw.workers = [
+      man('w-spray', 'sprayer', 'senior', 3055, null),
+      man('w-take', 'estimator', 'novice', 1950, (measure?.id as string) ?? null),
+      man('w-order', 'purchasingClerk', null, 1700, (chore?.id as string) ?? null),
+      man('w-draw', 'draftsman', null, 2400, null),
+    ];
+    if (measure !== undefined) measure.doneBy = 'w-take';
+    if (chore !== null) chore.doneBy = 'w-order';
+    return raw;
+  }
+
+  const lifted = migrateState(v33Save(), 33);
+  if (lifted === null) throw new Error('the lift refused a v33 state');
+
+  it('comes up at this build s version, the agency off and no job or offer wanting free joiners', () => {
+    expect(lifted.version).toBe(STATE_VERSION);
+    expect(lifted.agency).toEqual({ on: false, sinceMonth: null });
+    expect(lifted.jobs.every((job) => job.joinersWanted === 0)).toBe(true);
+    expect(lifted.enquiries.length).toBeGreaterThan(0);
+    expect(lifted.enquiries.every((offer) => offer.joinersWanted === 0)).toBe(true);
+  });
+
+  it('makes the booth s man a joiner of his grade at a joiner s wage, and the two desks admins', () => {
+    const byId = new Map(lifted.workers.map((worker) => [worker.id, worker]));
+    expect(byId.get('w-spray')).toMatchObject({ role: 'joiner', tier: 'senior', rate: 1, monthlyWage: 2940 });
+    expect(byId.get('w-take')).toMatchObject({ role: 'officeAdmin', tier: null, rate: 0, monthlyWage: 1900 });
+    expect(byId.get('w-order')).toMatchObject({ role: 'officeAdmin', tier: null, rate: 0, monthlyWage: 1900 });
+    // The draftsman takes the first of his three grades and its wage (CLAUDE.md T26 2.8).
+    expect(byId.get('w-draw')).toMatchObject({ role: 'draftsman', tier: 'experienced', monthlyWage: 2400 });
+  });
+
+  it('puts down a job of work the new trade does not do, and leaves the one it does', () => {
+    // The survey is not an admin's: it goes back on the desk for the day's own pass to hand out.
+    const measure = lifted.tasks.find((task) => task.kind === 'siteMeasure');
+    expect(measure?.doneBy).toBeNull();
+    expect(lifted.workers.find((worker) => worker.id === 'w-take')?.taskId).toBeNull();
+    // The consumables chore is the admin's, so the man who had it keeps it.
+    const chore = lifted.tasks.find((task) => task.kind === 'dailyOrdering');
+    if (chore !== undefined) {
+      expect(chore.doneBy).toBe('w-order');
+      expect(lifted.workers.find((worker) => worker.id === 'w-order')?.taskId).toBe(chore.id);
+    }
   });
 });

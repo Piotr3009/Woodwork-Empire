@@ -170,7 +170,7 @@ function row(label: string, value: string): string {
 }
 
 /** A money line whose sign is the point of it: in is green, out is red, nothing is plain, through
- *  the one helper every signed figure goes through (CLAUDE.md T13 3.1). */
+ *  the one function every signed figure goes through (CLAUDE.md T13 3.1). */
 function signedRow(label: string, value: number): string {
   return (
     `<div class="row"><span class="row-main">${escapeHtml(label)}</span>` +

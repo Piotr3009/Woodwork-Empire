@@ -37,6 +37,7 @@ import {
   WORKER_MINUTE_RATE_DIVISOR,
   type VanClass,
 } from './constants';
+import { putCrewOnBigJob } from './agency';
 import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
@@ -81,6 +82,7 @@ import {
 } from './stages';
 import { applyRating, changeReputation } from './reputation';
 import { float, int, makeId, next } from './rng';
+import type { RngCarrier } from './rng';
 import { plural } from './text';
 import {
   AD_HOC_TASK_MINUTES,
@@ -103,6 +105,7 @@ import type {
   JsonValue,
   MaterialKind,
   StageId,
+  Worker,
   WorkerRole,
 } from './types';
 
@@ -177,10 +180,10 @@ export interface DeadlineDraw {
   rng: number;
 }
 
-export function drawDeadline(state: GameState): DeadlineDraw {
-  const draw = { rng: state.rng };
+export function drawDeadline(carrier: RngCarrier): DeadlineDraw {
+  const draw = { rng: carrier.rng };
   // The one draw the deadline takes, whatever the size of the job.
-  float(state, 0, 1);
+  float(carrier, 0, 1);
   return draw;
 }
 
@@ -288,8 +291,8 @@ export function jobLabourCost(state: GameState, job: Job): { minutes: number; co
   for (const who of jobMen(job)) {
     const worker = state.workers.find((entry) => entry.id === who);
     if (!worker || worker.rate <= 0) continue;
-    // Everybody is paid by the month, the sprayer with the rest of them, so there is one wage to
-    // read and no weekly one behind it (CLAUDE.md T21 2.10).
+    // Everybody is paid by the month, so there is one wage to read and no weekly one behind it
+    // (CLAUDE.md T21 2.10).
     perMinute += workerMinuteCost(worker.monthlyWage);
   }
   return { minutes, cost: minutes * perMinute };
@@ -420,6 +423,7 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     sheetsUsed: 0,
     sheetsReserved: 0,
     kind: enquiry.kind,
+    joinersWanted: enquiry.joinersWanted,
     budget: enquiry.budget,
     nightMinutes: 0,
     needsSpindle: entry.requiredEquipment.includes('spindleMoulder'),
@@ -466,6 +470,8 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
   // Reserved from the free stock at once; what it could not have is its shortfall (T13 3.3).
   reserveSheetsFor(state, job);
   createJobTasks(state, job);
+  // A big job takes the free joiners it wants with it (CLAUDE.md T26 2.13).
+  putCrewOnBigJob(state, job);
   return { ok: true, reason: '', job };
 }
 
@@ -493,6 +499,16 @@ export function createJobTasks(state: GameState, job: Job): void {
       jobId: job.id,
     });
   }
+  // The site survey before the drawing as well, created before it so the draftsman, whose all
+  // three are, is handed the survey first and the drawing waits for it (CLAUDE.md T26 2.8).
+  if (job.needsMeasure) {
+    createTask(state, {
+      kind: 'siteMeasure',
+      label: `Site measure: ${job.name}`,
+      minutes: SITE_MEASURE_MINUTES,
+      jobId: job.id,
+    });
+  }
   // Emails ride with the job, in any order with the drawing, and hold nothing up.
   const emails = emailsForPrice(job.price);
   for (let index = 0; index < emails; index += 1) {
@@ -510,23 +526,15 @@ export function createJobTasks(state: GameState, job: Job): void {
     jobId: job.id,
   });
   // The material take off: reading the drawing and counting the sheets. The owner's until an
-  // estimator is taken on, and never before the drawing (CLAUDE.md T13 3.8). Half an hour of the
-  // desk it is done at, less what the software takes off it, whatever the job is worth: the curve
-  // by price went with the five a day (PIOTR, 18.09; CLAUDE.md T20 2.3).
+  // office admin is taken on, and never before the drawing (CLAUDE.md T13 3.8, T26 2.9). Half an
+  // hour of the desk it is done at, less what the software takes off it, whatever the job is
+  // worth: the curve by price went with the five a day (PIOTR, 18.09; CLAUDE.md T20 2.3).
   createTask(state, {
     kind: 'materialTakeOff',
     label: `Material take off: ${job.name}`,
     minutes: takeOffMinutes(state),
     jobId: job.id,
   });
-  if (job.needsMeasure) {
-    createTask(state, {
-      kind: 'siteMeasure',
-      label: `Site measure: ${job.name}`,
-      minutes: SITE_MEASURE_MINUTES,
-      jobId: job.id,
-    });
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -580,7 +588,9 @@ export function refreshJob(state: GameState, job: Job): void {
   // Anything free that has come onto the rack since it was taken is held for it now.
   reserveSheetsFor(state, job);
   if (shortfallOf(job) === 0) {
-    job.stage = 'ready';
+    // A big job has had its crew on it since the Take it click, and goes into production with
+    // them the minute it is ready (CLAUDE.md T26 2.13); every other job waits on the list.
+    job.stage = job.assignees.length > 0 ? 'inProduction' : 'ready';
     return;
   }
   const coming = state.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded);
@@ -590,15 +600,10 @@ export function refreshJob(state: GameState, job: Job): void {
   if (job.stage === 'materialPending') autoOrderMaterial(state, job);
 }
 
-/** Who places a job's material order when nobody asks him to, in the order he is asked: the
- *  purchasing clerk, whose job it is; the estimator, who read the drawing and counted the sheets;
- *  and the office admin, who covers for a specialist the company has not taken on, which is the
- *  order every other job of office work is handed out in (CLAUDE.md T7 3.12, T21 2.5.2). */
-export const MATERIAL_ORDER_ROLES: ReadonlyArray<WorkerRole> = [
-  'purchasingClerk',
-  'estimator',
-  'officeAdmin',
-];
+/** Who places a job's material order when nobody asks him to: the office admin, whose the
+ *  material list and its order are, and nobody else (PIOTR, 02.10; CLAUDE.md T21 2.5.2, T26
+ *  2.9). */
+export const MATERIAL_ORDER_ROLES: ReadonlyArray<WorkerRole> = ['officeAdmin'];
 
 /** The material is ordered the moment the drawings are done, by whoever in the office is there to
  *  order it, and not when the owner next has time to open the job's card (PIOTR, 19.09: "they wait
@@ -608,15 +613,15 @@ export const MATERIAL_ORDER_ROLES: ReadonlyArray<WorkerRole> = [
  *  `orderForJob`: the only difference is the name in the ledger line. `orderForJob` asks the
  *  engine's own `canAfford`, which is the overdraft floor to the penny, so the office never takes
  *  the company past the limit the bank allows; it simply has nothing to order with until the money
- *  is there, and orders the minute it is. With none of the three on the books nothing happens here
+ *  is there, and orders the minute it is. With no office admin on the books nothing happens here
  *  and the job's card asks the owner exactly as it always did. */
 export function autoOrderMaterial(state: GameState, job: Job): boolean {
   if (takeOffOutstanding(state, job)) return false;
   if (shortfallOf(job) <= 0) return false;
   if (!orderForJobCheck(state, job).ok) return false;
-  const clerk = firstOnDutyOf(state, MATERIAL_ORDER_ROLES);
-  if (clerk === null) return false;
-  if (orderForJob(state, job, clerk.name) === null) return false;
+  const admin = firstOnDutyOf(state, MATERIAL_ORDER_ROLES);
+  if (admin === null) return false;
+  if (orderForJob(state, job, admin.name) === null) return false;
   job.stage = 'materialOrdered';
   return true;
 }
@@ -1066,7 +1071,14 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
  *  caller still reads it from here, where it has always been (CLAUDE.md T19 2.5, 2.6, T23 2.17). */
 export { BUILDING_ROLES };
 
-/** True while this man could be put on a job at all: a joiner or a sprayer, on the books, not off
+/** The joiners on no job and no contract this minute: a man on a contract carries its marker as
+ *  his job, so one test answers both. What a big job of the agency's counts before it can be taken
+ *  (CLAUDE.md T26 2.13). */
+export function freeJoiners(state: GameState): Worker[] {
+  return state.workers.filter((worker) => worker.role === 'joiner' && worker.jobId === null);
+}
+
+/** True while this man could be put on a job at all: a joiner, on the books, not off
  *  sick and not on a standing contract. The owner is always able, if he is about.
  *
  *  The contract is the one gate that is not about the man himself: a man put on a contract is the

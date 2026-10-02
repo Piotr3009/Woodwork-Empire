@@ -103,18 +103,19 @@ describe('Our team', () => {
     expect(first?.querySelector('[data-figures]')?.textContent).toContain('this week');
   });
 
-  it('lists the sprayer with his trade and the month he is paid by (CLAUDE.md T21 2.10)', () => {
+  it('lists the draftsman with his grade and the month he is paid by (CLAUDE.md T21 2.10, T26 2.8)', () => {
     const ready = withAJoiner();
-    // An experienced sprayer answers from the middle of the ladder, and a month of his pay has to
-    // be in the bank before anybody is taken on (CLAUDE.md T17 2.11).
+    // An experienced draftsman answers from 15, behind the office admin, and a month of his pay has
+    // to be in the bank before anybody is taken on (CLAUDE.md T17 2.11). Until Turn 26 this tile was
+    // the booth's own trade's, which went.
     ready.reputation = 40;
     ready.cash = 200000;
-    const state = hireNow(ready, 'sprayer', 'experienced');
+    const state = hireNow(hireNow(ready, 'officeAdmin', null), 'draftsman', 'experienced');
     const man = state.workers[state.workers.length - 1];
-    if (!man || man.role !== 'sprayer') throw new Error('no sprayer on the books');
+    if (!man || man.role !== 'draftsman') throw new Error('no draftsman on the books');
     const tile = tileFor(state, man.id);
     expect(tile?.querySelector('[data-name]')?.textContent).toBe(man.name);
-    expect(tile?.querySelector('[data-role]')?.textContent).toBe('sprayer');
+    expect(tile?.querySelector('[data-role]')?.textContent).toBe('draftsman');
     expect(tile?.querySelector('[data-grade]')?.textContent).toContain('experienced');
     // He is paid by the month like everybody else (CLAUDE.md T21 2.10), and the tile prints that
     // one figure.

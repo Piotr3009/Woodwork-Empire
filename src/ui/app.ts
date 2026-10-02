@@ -73,7 +73,7 @@ import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderContracts } from './contracts';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import { contractManCheck } from '../engine/contracts';
+import { acceptContractCheck, contractManCheck } from '../engine/contracts';
 import { renderHouseCard } from './house';
 import { renderMonthEnd, renderMonthlyReport } from './monthEnd';
 import { renderSettings } from './settings';
@@ -770,7 +770,7 @@ function renderWhy(): string {
   const left = Math.max(8, Math.min(open.left, Math.max(8, width - 340)));
   return (
     `<div class="why-pop" data-popover="why" style="left:${left}px;top:${open.top + 16}px">` +
-    // The one cross, the same helper every modal and every list calls: the bubble used to be shut
+    // The one cross, the same function every modal and every list calls: the bubble used to be shut
     // by a "Right" button of its own, which was a second way out of a popover
     // (PIOTR, 18.09; CLAUDE.md T20 2.15, T18 2.5).
     closeButton('closeWhy') +
@@ -1602,6 +1602,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         on: element.dataset.on === '1',
       });
       return;
+    case 'setAgency':
+      // The Office's switch for the advertising agency (CLAUDE.md T26 2.13).
+      dispatch({ type: 'SET_AGENCY', on: id === 'on' });
+      return;
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
       return;
@@ -1611,7 +1615,8 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // first: a click that cannot put him on it would otherwise take the contract and leave it
       // with nobody on it, which is not what the button says.
       const onIt = element.dataset.worker ?? '';
-      const check = contractManCheck(game(), onIt);
+      const taken = acceptContractCheck(game(), id);
+      const check = taken.ok ? contractManCheck(game(), onIt) : taken;
       if (!check.ok) {
         ui.toast = check.reason;
         requestRender();

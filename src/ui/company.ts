@@ -293,12 +293,11 @@ function outputSheet(breakdown: OutputBreakdown, workshopToday: number, made: Wo
     '<section class="sheet" data-sheet="output">' +
     pin() +
     '<h3>Pace</h3>' +
-    // The hall's own pace for a man at 1.00: one plus the points of the lines under it (v60).
-    totalLine('every worked minute in this hall is worth', breakdown.total.toFixed(2), 'output') +
-    // The one number the top bar shows, said here beside the hall's own: the average over the
-    // minutes worked today, everybody and every machine in it (PIOTR, 21.09; v40).
-    `<div class="ledger-note" data-figure="workshopToday"><span>Workshop today, everybody and every machine, ` +
-    `over the minutes worked</span><strong class="${signClass(workshopToday - 1)}">${workshopToday.toFixed(2)}</strong></div>` +
+    // The number the top bar carries, at the head: the average over the minutes worked today,
+    // everybody and every machine in it (PIOTR, 21.09; v40). The hall's own total of the lines is
+    // the sum under What moves it and is not printed up here a second time (PIOTR, 02.10;
+    // CLAUDE.md T26 2.14).
+    totalLine('every worked minute today was worth', workshopToday.toFixed(2), 'output') +
     // What the number is, in one line: Efficiency is how much of the day was worked, Pace is how
     // fast a worked minute goes, and the two are never one number (PIOTR, 30.09; v60).
     '<div class="ledger-note"><span>Efficiency says how much of the day was worked. Pace says how fast a ' +

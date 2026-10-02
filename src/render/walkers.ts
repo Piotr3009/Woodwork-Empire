@@ -31,7 +31,7 @@ import {
   setCharacterAnimation,
   walkPace,
 } from './characters';
-import { centreOf, depthKey } from './iso';
+import { type FloorBox, centreOf, depthKey, figureSlot } from './iso';
 
 export interface Cell {
   x: number;
@@ -111,11 +111,36 @@ function depthOf(node: Element): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-/** Puts every figure back in the painter's order for the cell his feet are on this frame. The
- *  cheap re-sort Turn 19's report proposed and did not do (REPORT-T19, "What was not done
- *  tonight"): a figure is swapped with the sibling before or after it only when its own depth key
- *  has crossed that sibling's, so a frame in which nothing crosses moves nothing at all and the
- *  scene is never sorted again. A sibling with no depth on it is a boundary and is not crossed.
+/** The floor a drawable stands on, as the scene wrote it, or null for one with no footprint. */
+function footOf(node: Element): FloorBox | null {
+  const raw = node.getAttribute('data-foot');
+  if (raw === null) return null;
+  const [x, y, width, depth] = raw.split(',').map(Number);
+  if ([x, y, width, depth].some((value) => value === undefined || !Number.isFinite(value))) return null;
+  return { x: x as number, y: y as number, width: width as number, depth: depth as number };
+}
+
+/** The drawables round a figure that carry a depth, in document order and without him, and how
+ *  many of them are before him now: the run the scene sorted, between the siblings with no depth
+ *  on either side of it, which are not crossed. */
+function runAround(node: Element): { run: Element[]; index: number } {
+  const before: Element[] = [];
+  for (let at = node.previousElementSibling; at !== null && depthOf(at) !== null; at = at.previousElementSibling) {
+    before.unshift(at);
+  }
+  const after: Element[] = [];
+  for (let at = node.nextElementSibling; at !== null && depthOf(at) !== null; at = at.nextElementSibling) {
+    after.push(at);
+  }
+  return { run: [...before, ...after], index: before.length };
+}
+
+/** Puts every figure in the painter's order for where his feet are this frame: a full insertion
+ *  into the drawables round him, after everything he is in front of and before every thing he
+ *  stands behind (`figureSlot`), so a man crossing behind a moulder is before it for every frame he
+ *  is behind it (PIOTR, 02.10; CLAUDE.md T20 2.11, T26 2.4). Until Turn 26 he was swapped a sibling
+ *  at a time while his key crossed theirs, and the moulder's key is the back corner of its zone, so
+ *  he never crossed it. A frame in which nobody's place changes moves nothing.
  *
  *  Returns how many figures were moved, which is what the stability test counts. */
 export function resortFigures(root: ParentNode): number {
@@ -128,24 +153,18 @@ export function resortFigures(root: ParentNode): number {
     node.setAttribute('data-depth', String(Math.round(depth * 1000) / 1000));
     const parent = node.parentNode;
     if (parent === null) continue;
-    let shifted = false;
-    // Up the list while the drawable before him is painted after him.
-    for (let guard = 0; guard < 64; guard += 1) {
-      const before = node.previousElementSibling;
-      const value = before === null ? null : depthOf(before);
-      if (before === null || value === null || value <= depth) break;
-      parent.insertBefore(node, before);
-      shifted = true;
-    }
-    // And down it while the drawable after him is painted before him.
-    for (let guard = 0; guard < 64; guard += 1) {
-      const after = node.nextElementSibling;
-      const value = after === null ? null : depthOf(after);
-      if (after === null || value === null || value >= depth) break;
-      parent.insertBefore(after, node);
-      shifted = true;
-    }
-    if (shifted) moved += 1;
+    const { run, index } = runAround(node);
+    if (run.length === 0) continue;
+    const slot = figureSlot(
+      run.map((sibling) => ({ depth: depthOf(sibling) ?? 0, foot: footOf(sibling) })),
+      { depth, feet: { x: walker.at.x + 0.5, y: walker.at.y + 0.5 } },
+    );
+    // Already there: nothing to do this frame.
+    if (slot === index) continue;
+    const after = run[slot];
+    if (after !== undefined) parent.insertBefore(node, after);
+    else parent.insertBefore(node, (run[run.length - 1] as Element).nextSibling);
+    moved += 1;
   }
   return moved;
 }

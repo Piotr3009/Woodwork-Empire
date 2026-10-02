@@ -118,10 +118,10 @@ describe('kit that is bought and still on the road', () => {
     placeEquipment(state, 'tableSaw', { variantId: 'budget', x: 2, y: 1 });
     state.onOrder = [];
     expect(hallBlock(state, firstJob(state))).toBe('');
-    // The saw's one place, and the cutting at its pace: the job's one pace rises from 0.7273 by
-    // hand to 0.8000, the edging and the moulding still by hand with neither machine in the hall
-    // (v53, v55).
-    expect(hallPlaces(state, 'tableSaw')).toBe(1);
+    // The saw's two places, its capacity from Turn 26 (T26 2.1), and the cutting at its pace: the
+    // job's one pace rises from 0.7273 by hand to 0.8000, the edging and the moulding still by hand
+    // with neither machine in the hall (v53, v55).
+    expect(hallPlaces(state, 'tableSaw')).toBe(2);
     expect(stageSpeed(state, firstJob(state), 'cutting')).toEqual({ speed: 1, byHand: false });
     expect(jobPace(state, firstJob(state))).toBeCloseTo(1 / (0.25 + 0.5 * 1.5 + 0.25), 10);
   });
