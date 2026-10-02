@@ -3527,16 +3527,18 @@ export const DUCT_SYSTEMS = ['dustSystem', 'flexiSystem'];
  *  one metre each way (CLAUDE.md T13 3.21). The man unloading it stands in front of it on the hall
  *  side, never outside (PIOTR, 16.09; CLAUDE.md T16 2.1). */
 export const PALLET_LAYOUT = { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y, width: 1, depth: 1, height: 1 };
-/** How fast a man walks the floor, in cells of real time a second [TUNE]. One cell a second was
- *  chosen on 17.09 because 1.6 read as a trot (CLAUDE.md T18 2.1); a quarter more from v44
- *  (PIOTR, 21.09: "walking is too slow, speed it up by 25 percent"). */
-export const WALK_CELLS_PER_SECOND = 1.25;
-/** His pace while the clock runs faster than x1, in cells of real time a second [TUNE]: half as
- *  fast again as the x1 pace of 17.09 and not the clock's own multiple, so the figures keep up
- *  with a hurried day without flying across the hall (PIOTR, 21.09: "when I speed up time, speed
- *  them up by 50 percent, not too much"; v44). Until v44 a man did not walk faster at x10 at all
- *  (docs/art/SPRITES.md 10.4; CLAUDE.md T16 2.2). */
-export const WALK_CELLS_PER_SECOND_FAST = 1.5;
+/** How fast a man walks the floor, in cells of real time a second. One cell a second was chosen on
+ *  17.09 because 1.6 read as a trot (CLAUDE.md T18 2.1); a quarter more from v44 (PIOTR, 21.09:
+ *  "walking is too slow, speed it up by 25 percent"); 1.5 from v63 [PIOTR, 02.10: "a bit
+ *  faster"] (CLAUDE.md T26 2.5). */
+export const WALK_CELLS_PER_SECOND = 1.5;
+/** His pace while the clock runs faster than x1, in cells of real time a second: half as fast
+ *  again as the x1 pace of 17.09 and not the clock's own multiple, so the figures keep up with a
+ *  hurried day without flying across the hall (PIOTR, 21.09: "when I speed up time, speed them up
+ *  by 50 percent, not too much"; v44). Until v44 a man did not walk faster at x10 at all
+ *  (docs/art/SPRITES.md 10.4; CLAUDE.md T16 2.2). 1.8 from v63, the x1 pace's own fifth more
+ *  [TUNE] beside Piotr's 1.5 for it (CLAUDE.md T26 2.5). */
+export const WALK_CELLS_PER_SECOND_FAST = 1.8;
 /** How far a man travels in one full cycle of the walk sheet, in metres [TUNE]. The sheets give a
  *  frame count and an fps and no stride at all (docs/art/SPRITES.md 10.5), so one is chosen here:
  *  1.4 m is a 1.8 m man's stride over two steps at an unhurried pace. The renderer plays the walk

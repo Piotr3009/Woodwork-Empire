@@ -122,3 +122,8 @@ axes), the thing he is behind winning a conflict; the scene places its figures b
 `resortFigures` does a full insertion by it every frame, the kits carrying `data-foot`. A stepped
 walker behind the moulder is before it on every frame he is behind it (it failed at frame 6 with
 the v62 re-sort); the T20 walk past the saw moves him on two frames now and not one.
+
+**T26-C5 A shade quicker.** `WALK_CELLS_PER_SECOND` 1.25 to 1.5 [PIOTR] and
+`WALK_CELLS_PER_SECOND_FAST` 1.5 to 1.8 [TUNE, the x1 pace's own fifth more]; the walk sheet plays
+at `frames * pace / WALK_STRIDE_METRES` as before, so the feet stay planted. The staircase test's
+frame count is restated for the shorter walk (479 frames at 60 a second for twelve cells).
