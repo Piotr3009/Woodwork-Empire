@@ -1,4 +1,4 @@
-// Isometric projection helpers. Pure geometry, no SVG and no DOM, so the same numbers can feed a
+// Isometric projection functions. Pure geometry, no SVG and no DOM, so the same numbers can feed a
 // sprite renderer later (CLAUDE.md 10.3).
 //
 // 2:1 dimetric. One grid cell is 48 by 24 pixels on screen and, from Turn 5 on, one metre by one

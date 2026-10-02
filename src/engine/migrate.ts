@@ -23,7 +23,8 @@ import { receive } from './economy';
 import { canPlace, firstFreeCell } from './layout';
 import { isSold } from './machines';
 import { planPlaces } from './production';
-import type { GameState, Orientation, WorkerTier } from './types';
+import { rolesForTask } from './tasks';
+import type { GameState, Orientation, TaskKind, WorkerRole, WorkerTier } from './types';
 
 /** The weeks in a month that the Turn 20 build converted a monthly wage with, thirty days over
  *  seven. Turn 21 deleted `WEEKS_PER_MONTH` from the constants because nothing in the game converts
@@ -921,6 +922,48 @@ function liftToVersion33(state: Raw): void {
   state.version = 33;
 }
 
+/** Version 33 to 34 (v63): one kind of man on the floor (PIOTR, 02.10; CLAUDE.md T26 2.6 to 2.9,
+ *  section 4). A sprayer becomes a joiner of his own grade at the joiner's wage for it; an
+ *  estimator and a purchasing clerk become office admins at the admin's wage; the draftsman takes
+ *  the first of his three grades and its wage. A job of work in the hands of a man whose new trade
+ *  does not do it is put down, so the day's own pass hands it to whoever does it now. The agency
+ *  is off, and no job and no enquiry wants free joiners. Written against the plain JSON of a save,
+ *  like every other lift, and the roles that went are named here and nowhere else. */
+function liftToVersion34(state: Raw): void {
+  const wageOf = (role: string, tier: string | null): number | null =>
+    HIRING_SPECS.find((entry) => entry.role === role && entry.tier === tier)?.monthlyWage ?? null;
+  const tasks = records(state.tasks);
+  for (const worker of records(state.workers)) {
+    const was = worker.role;
+    if (was === 'sprayer') {
+      const tier = typeof worker.tier === 'string' && worker.tier in WORKER_RATES ? (worker.tier as WorkerTier) : 'novice';
+      worker.role = 'joiner';
+      worker.tier = tier;
+      worker.rate = WORKER_RATES[tier];
+      worker.monthlyWage = wageOf('joiner', tier) ?? worker.monthlyWage;
+    } else if (was === 'estimator' || was === 'purchasingClerk') {
+      worker.role = 'officeAdmin';
+      worker.tier = null;
+      worker.rate = 0;
+      worker.monthlyWage = wageOf('officeAdmin', null) ?? worker.monthlyWage;
+    } else if (was === 'draftsman') {
+      worker.tier = 'experienced';
+      worker.rate = WORKER_RATES.experienced;
+      worker.monthlyWage = wageOf('draftsman', 'experienced') ?? worker.monthlyWage;
+    }
+    if (was === worker.role || typeof worker.taskId !== 'string') continue;
+    const task = tasks.find((entry) => entry.id === worker.taskId);
+    const kind = typeof task?.kind === 'string' ? (task.kind as TaskKind) : null;
+    if (kind !== null && rolesForTask(kind).eligible.includes(worker.role as WorkerRole)) continue;
+    if (task !== undefined && task.doneBy === worker.id) task.doneBy = null;
+    worker.taskId = null;
+  }
+  state.agency = { on: false, sinceMonth: null };
+  for (const job of records(state.jobs)) job.joinersWanted = 0;
+  for (const enquiry of records(state.enquiries)) enquiry.joinersWanted = 0;
+  state.version = 34;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -943,6 +986,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   30: liftToVersion31,
   31: liftToVersion32,
   32: liftToVersion33,
+  33: liftToVersion34,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

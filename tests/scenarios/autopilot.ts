@@ -11,7 +11,7 @@ import {
   applyAction,
   canBuild,
   contractPiece,
-  helperOnDuty,
+  labourerOnDuty,
   joiners,
   shortfallOf,
   startTaskCheck,
@@ -36,7 +36,7 @@ export function answer(state: GameState, policy?: Policy): string {
   }
   // He has taken somebody on to do the unloading: he lets him do it (CLAUDE.md T11 3.4). The
   // button that sends the owner instead is still there and he simply does not press it.
-  if (event.kind === 'deliveryArrived' && helperOnDuty(state) && ids.includes('later')) {
+  if (event.kind === 'deliveryArrived' && labourerOnDuty(state) && ids.includes('later')) {
     return 'later';
   }
   // The scripted owner is a careful one: he picks the phone up (CLAUDE.md T4 3.3), and he takes

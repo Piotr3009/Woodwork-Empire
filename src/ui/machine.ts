@@ -5,7 +5,7 @@
 // the effects (output, dust, what it needs of the air, its life, and anything its class alone
 // does), a gap, the costs (price, delivery, power, the insurance it adds a year, the floor), a
 // gap, and the description in the body font (PIOTR; CLAUDE.md T13 3.1). Every signed figure goes
-// through the one sign helper, and every card wears the badge and the frame colour of its class
+// through the one sign function, and every card wears the badge and the frame colour of its class
 // from the one `CLASS_BADGE` table, the same across families (CLAUDE.md T13 3.12).
 
 import {
@@ -69,7 +69,7 @@ export function isMachineFamily(spec: EquipmentSpec): boolean {
 }
 
 /** One line of figures on a class card. A line with a signed value is coloured by its sign
- *  through the one helper; a line without one is printed in the body colour (CLAUDE.md T13 1). */
+ *  through the one function; a line without one is printed in the body colour (CLAUDE.md T13 1). */
 interface Line {
   text: string;
   value: number | null;
@@ -311,7 +311,7 @@ export function classFrame(variantId: string): { className: string; style: strin
   };
 }
 
-/** The lines of a block, one paragraph each, the signed ones through the sign helper. */
+/** The lines of a block, one paragraph each, the signed ones through the sign function. */
 function figureLines(lines: Line[]): string {
   return lines
     .filter((entry) => entry.text !== '')

@@ -50,7 +50,7 @@ export function days(value: number): string {
 }
 
 /** The class a signed figure is written in: the game's green above nothing, its red below it
- *  and the body colour at nothing. The one helper for every plus and minus line on a card, so the
+ *  and the body colour at nothing. The one labourer for every plus and minus line on a card, so the
  *  sign decides the colour everywhere (PIOTR, CLAUDE.md T12 3.1). */
 export function signClass(value: number): string {
   if (value > 0) return 'good';
@@ -66,7 +66,7 @@ export function signedMoney(value: number): string {
   return money(rounded);
 }
 
-/** A signed figure as a span in the class its sign gives it: the one helper for a coloured
+/** A signed figure as a span in the class its sign gives it: the one function for a coloured
  *  plus or minus in the body of a card, a modal or a tooltip (CLAUDE.md T13 3.1). */
 export function signedFigure(text: string, value: number): string {
   const tone = signClass(value);

@@ -10,7 +10,7 @@
 // clicks (PIOTR, 18.09).
 //
 // The card is a folder card like a machine's: the game's own paper, the one cross, the one button
-// helpers. Nothing here is a second version of anything in src/ui/modal.ts.
+// functions. Nothing here is a second version of anything in src/ui/modal.ts.
 
 import { bankruptcyFloor } from '../engine/economy';
 import { canAfford, dropReputationCost } from '../engine/index';

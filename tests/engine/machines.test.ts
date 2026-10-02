@@ -17,7 +17,7 @@ import {
   SERVICE_INTERVAL_DAYS,
   EXTRACTOR_REPAIR_COST,
   REPAIR_MINUTES,
-  NO_HELPER_DUST_MULTIPLIER,
+  NO_LABOURER_DUST_MULTIPLIER,
   GATE_OUTPUT_BONUS,
   GATE_PRICE,
 } from '../../src/engine/constants';
@@ -266,7 +266,7 @@ describe('dust', () => {
       });
     }
     expect(dustGainPerMinute(state)).toBeCloseTo(
-      DUST_PER_PRODUCTION_MINUTE * NO_HELPER_DUST_MULTIPLIER,
+      DUST_PER_PRODUCTION_MINUTE * NO_LABOURER_DUST_MULTIPLIER,
       10,
     );
   });

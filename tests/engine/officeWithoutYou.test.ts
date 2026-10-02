@@ -2,8 +2,8 @@
 // CLAUDE.md T21 2.5). Two of the three things this section takes off his list are here: the material
 // a job's finished drawings call for, ordered by whoever in the office is there to order it, and the
 // emails and calls, which are the admin's the minute they arrive and not at the next pass over the
-// crew. The third, the site measure, is in tests/engine/estimatorSiteMeasure.test.ts, where the
-// measure already lived.
+// crew. The third, the site measure, is in tests/engine/draftsmanSurvey.test.ts, the draftsman's
+// from Turn 26 (CLAUDE.md T26 2.8).
 //
 // Each of the three is asked twice: with the person on the books and without him, because without
 // him the job's card has to ask the owner exactly as it always did.
@@ -31,8 +31,8 @@ function officeManOn(state: GameState, role: Worker['role'], name: string): Work
     id: `office-${role}`,
     name,
     role,
-    tier: role === 'estimator' ? 'experienced' : null,
-    rate: role === 'estimator' ? 0.8 : 0,
+    tier: null,
+    rate: 0,
     monthlyWage: 2000,
     startDay: 1,
     leavesOnDay: null,
@@ -93,12 +93,12 @@ function orderLineOf(state: GameState): string | null {
 }
 
 describe('the material a job is short of', () => {
-  it('is ordered by the purchasing clerk the minute the drawings are done', () => {
+  it('is ordered by the office admin the minute the take off is done', () => {
     const state = drawnAndShort();
-    const clerk = officeManOn(state, 'purchasingClerk', 'Percy');
+    const admin = officeManOn(state, 'officeAdmin', 'Ann');
     const cash = state.cash;
-    // The owner does the take off himself here: the clerk is not eligible for one, so this is the
-    // ordinary case of a workshop with a clerk in the office.
+    // The owner does the take off himself here, pressing it before she is handed it, so this is
+    // the order on its own: hers, the material list being hers (CLAUDE.md T26 2.9).
     const after = clearEvents(doTask(state, 'materialTakeOff'));
     const job = firstJob(after);
     // Nobody opened the job's card and nobody pressed anything: the lorry is on its way.
@@ -106,28 +106,21 @@ describe('the material a job is short of', () => {
     expect(after.deliveries.filter((delivery) => delivery.jobId === job.id)).toHaveLength(1);
     expect(after.cash).toBeLessThan(cash);
     // And the ledger says who ordered it, because a ledger line has no field for a man.
-    expect(orderLineOf(after)).toBe(`Material for ${job.name}, ordered by ${clerk.name}`);
+    expect(orderLineOf(after)).toBe(`Material for ${job.name}, ordered by ${admin.name}`);
     // The ordering costs the owner nothing: it is not his and it is not on his meter.
     expect(after.owner.currentTaskId).toBeNull();
   });
 
-  it('is the estimator s when there is no clerk, and the admin s when there is neither', () => {
-    // The order the section names: the clerk, then the man who read the drawing and counted the
-    // sheets, then the admin who covers for a specialist the company has not taken on
-    // (CLAUDE.md T21 2.5.2).
-    expect(MATERIAL_ORDER_ROLES).toEqual(['purchasingClerk', 'estimator', 'officeAdmin']);
-    const withEstimator = drawnAndShort();
-    const estimator = officeManOn(withEstimator, 'estimator', 'Ed');
-    // He takes the take off off the owner, as he has since Turn 20, and then orders what it found.
-    const done = untilTakeOffDone(withEstimator);
-    expect(firstJob(done).stage).toBe('materialOrdered');
-    expect(orderLineOf(done)).toBe(`Material for ${firstJob(done).name}, ordered by ${estimator.name}`);
-
+  it('is the admin s and nobody else s, and she does the take off before it', () => {
+    // The material list and its order are the admin's from Turn 26: the two desk trades that took
+    // them before her went (PIOTR, 02.10; CLAUDE.md T21 2.5.2, T26 2.9).
+    expect(MATERIAL_ORDER_ROLES).toEqual(['officeAdmin']);
     const withAdmin = drawnAndShort();
     const admin = officeManOn(withAdmin, 'officeAdmin', 'Ann');
-    const after = clearEvents(doTask(withAdmin, 'materialTakeOff'));
-    expect(firstJob(after).stage).toBe('materialOrdered');
-    expect(orderLineOf(after)).toBe(`Material for ${firstJob(after).name}, ordered by ${admin.name}`);
+    // She takes the take off off the owner, at his own speed, and then orders what it found.
+    const done = untilTakeOffDone(withAdmin);
+    expect(firstJob(done).stage).toBe('materialOrdered');
+    expect(orderLineOf(done)).toBe(`Material for ${firstJob(done).name}, ordered by ${admin.name}`);
   });
 
   it('waits for the owner s own click when there is nobody in the office at all', () => {
@@ -146,7 +139,7 @@ describe('the material a job is short of', () => {
     // the office has nothing to order with and orders nothing. The job stays short and the player is
     // told by the material line, which is the same answer his own click gets (CLAUDE.md T21 2.5.2).
     const state = drawnAndShort();
-    officeManOn(state, 'purchasingClerk', 'Percy');
+    officeManOn(state, 'officeAdmin', 'Ann');
     state.cash = state.finance.overdraftLimit + 10;
     const after = clearEvents(doTask(state, 'materialTakeOff'));
     expect(firstJob(after).stage).toBe('materialPending');

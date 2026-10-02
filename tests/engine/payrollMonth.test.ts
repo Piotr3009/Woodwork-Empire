@@ -1,5 +1,5 @@
-// Everybody is paid by the month, on the last working day of it: the sprayer, the estimator, the
-// office and the manager with the joiners (PIOTR, 19.09: "I wanted everyone monthly";
+// Everybody is paid by the month, on the last working day of it: the draftsman, the office and the
+// manager with the joiners (PIOTR, 19.09: "I wanted everyone monthly";
 // CLAUDE.md T21 2.10). There is one wage field and one pay day, so the month end's salary line is
 // nothing but that one day of the month, and the Friday payroll of Turn 8 and Turn 20 is gone from
 // the calendar with the weekly wage it paid.
@@ -49,26 +49,24 @@ function payDaysOf(state: GameState): Array<{ day: number; paid: number; labels:
 }
 
 describe('pay by the month, everybody', () => {
-  it('puts a sprayer, an estimator and the office into the one monthly wage line', () => {
+  it('puts a manager, a draftsman and the office into the one monthly wage line', () => {
     let state = known();
     state = onTheBooks(state, 'officeAdmin', null);
-    state = onTheBooks(state, 'estimator', 'experienced');
-    state = onTheBooks(state, 'sprayer', 'experienced');
-    const sprayer = state.workers.find((worker) => worker.role === 'sprayer');
-    const estimator = state.workers.find((worker) => worker.role === 'estimator');
+    state = onTheBooks(state, 'draftsman', 'experienced');
+    state = onTheBooks(state, 'productionManager', 'experienced');
+    const manager = state.workers.find((worker) => worker.role === 'productionManager');
+    const draftsman = state.workers.find((worker) => worker.role === 'draftsman');
     const admin = state.workers.find((worker) => worker.role === 'officeAdmin');
-    if (!sprayer || !estimator || !admin) throw new Error('nobody on the books');
+    if (!manager || !draftsman || !admin) throw new Error('nobody on the books');
     // Nobody has a wage of his own kind any more: one field, and it is the month.
-    expect(sprayer.monthlyWage).toBeGreaterThan(0);
-    expect(estimator.monthlyWage).toBeGreaterThan(0);
+    expect(manager.monthlyWage).toBeGreaterThan(0);
+    expect(draftsman.monthlyWage).toBeGreaterThan(0);
     expect(admin.monthlyWage).toBeGreaterThan(0);
-    expect(monthlyWageBill(state)).toBe(
-      sprayer.monthlyWage + estimator.monthlyWage + admin.monthlyWage,
-    );
-    // An experienced sprayer is on 2,700, an experienced estimator and an experienced joiner both
-    // on 2,600, and the office admin on 1,900: Piotr's own figures, whole (CLAUDE.md T21 2.9).
-    // The sprayer and the estimator by the v38 ladder (PIOTR, 21.09): 2,565 and 2,470.
-    expect(monthlyWageBill(state)).toBe(2565 + 2470 + 1900);
+    expect(monthlyWageBill(state)).toBe(manager.monthlyWage + draftsman.monthlyWage + admin.monthlyWage);
+    // The experienced manager on Piotr's 3,400 (CLAUDE.md T23 2.4), the experienced draftsman on
+    // 2,400 (CLAUDE.md T26 2.8) and the office admin on 1,900. Until Turn 26 this month was a
+    // booth's own trade and the take off man beside the admin, two trades that went.
+    expect(monthlyWageBill(state)).toBe(3400 + 2400 + 1900);
     // One pay day in the month, and it is its last working day. The ledger calls it what the
     // player reads on the Accounting page.
     const days = payDaysOf(state);
@@ -87,9 +85,9 @@ describe('pay by the month, everybody', () => {
     state = onTheBooks(state, 'officeAdmin', null);
     const bill = monthlyWageBill(state);
     expect(bill).toBeGreaterThan(0);
-    state = hireNow(state, 'purchasingClerk', null);
-    const clerk = state.workers.find((worker) => worker.role === 'purchasingClerk');
-    if (!clerk) throw new Error('no clerk on the books');
+    state = hireNow(state, 'salesman', null);
+    const clerk = state.workers.find((worker) => worker.role === 'salesman');
+    if (!clerk) throw new Error('no salesman on the books');
     expect(clerk.startDay).toBeGreaterThan(state.clock.day);
     expect(monthlyWageBill(state)).toBe(bill);
     // The morning he starts, his month is in the bill and nothing else has changed.
@@ -99,7 +97,7 @@ describe('pay by the month, everybody', () => {
 
   it('makes the month end salary line the one pay day of that month and nothing else', () => {
     let state = known();
-    state = onTheBooks(state, 'sprayer', 'experienced');
+    state = onTheBooks(state, 'productionManager', 'experienced');
     const days = payDaysOf(state);
     const line = monthReport(state, 1).lines.find((entry) => entry.id === 'salariesDay');
     const total = days.reduce((sum, entry) => sum + entry.paid, 0);
@@ -107,9 +105,9 @@ describe('pay by the month, everybody', () => {
     expect(line?.costs).toBeCloseTo(total, 2);
     // And a month of one man is his wage and no arithmetic at all: the week it used to be worked
     // out of is gone, and `monthlyWageOf` is the field (CLAUDE.md T21 2.10).
-    const sprayer = state.workers[0];
-    if (!sprayer) throw new Error('no sprayer');
-    expect(monthlyWageOf(sprayer)).toBe(sprayer.monthlyWage);
-    expect(total).toBe(sprayer.monthlyWage);
+    const manager = state.workers[0];
+    if (!manager) throw new Error('no manager');
+    expect(monthlyWageOf(manager)).toBe(manager.monthlyWage);
+    expect(total).toBe(manager.monthlyWage);
   });
 });

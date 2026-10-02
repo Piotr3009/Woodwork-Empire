@@ -444,7 +444,7 @@ function pipeLine(state: GameState, item: Equipment): string {
     : `${run.metres} m of pipe to the extraction`;
 }
 
-/** What the gate does once it is on: the signed line, through the one helper (CLAUDE.md T13 1).
+/** What the gate does once it is on: the signed line, through the one function (CLAUDE.md T13 1).
  *  It says the second half of what a gate is for as well from Turn 23, because the output is the
  *  small half of it and the duct is the large one [PIOTR, 20.09] (CLAUDE.md T23 2.15). */
 function gateLine(state: GameState, item: Equipment): string {

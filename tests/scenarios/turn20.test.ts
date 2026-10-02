@@ -24,7 +24,7 @@ import {
   dustBand,
   formatMoney,
   formatTime,
-  helperOnDuty,
+  labourerOnDuty,
   isWorkingDay,
   jobPace,
   joiners,
@@ -432,7 +432,7 @@ const DD = helperDay();
 
 describe('(dd) the helper s dirty hall day, with a lorry in the yard', () => {
   it('opens with him on duty, a pallet at the gate and a hall nobody has dirtied yet', () => {
-    expect(helperOnDuty(DD.morning)).toBe(true);
+    expect(labourerOnDuty(DD.morning)).toBe(true);
     expect(isWorkingDay(DD.morning.clock.day)).toBe(true);
     expect(DD.morning.deliveries.some((delivery) => delivery.arrived && !delivery.unloaded)).toBe(
       true,

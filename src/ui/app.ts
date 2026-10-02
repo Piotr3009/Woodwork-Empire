@@ -770,7 +770,7 @@ function renderWhy(): string {
   const left = Math.max(8, Math.min(open.left, Math.max(8, width - 340)));
   return (
     `<div class="why-pop" data-popover="why" style="left:${left}px;top:${open.top + 16}px">` +
-    // The one cross, the same helper every modal and every list calls: the bubble used to be shut
+    // The one cross, the same function every modal and every list calls: the bubble used to be shut
     // by a "Right" button of its own, which was a second way out of a popover
     // (PIOTR, 18.09; CLAUDE.md T20 2.15, T18 2.5).
     closeButton('closeWhy') +

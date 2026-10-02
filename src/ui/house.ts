@@ -15,7 +15,7 @@ import { escapeHtml } from './modal';
 export const HOUSE_LINE = 'Resting at home now. See you at the workshop in the morning.';
 
 /** The picture is the width of the day end card; the art request asks for 900 by 300 at 1x, so
- *  1800 by 600 in the file (docs/art/REQUESTS-HOUSE.md 5). Until it lands the placeholder helper
+ *  1800 by 600 in the file (docs/art/REQUESTS-HOUSE.md 5). Until it lands the placeholder function
  *  draws the card. */
 export const HOUSE_PICTURE_SIZE = { width: 900, height: 300 };
 

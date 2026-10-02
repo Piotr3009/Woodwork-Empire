@@ -280,7 +280,7 @@ export function officeFigure(state: GameState, files: readonly string[]): string
 function liveText(state: GameState, files: readonly string[]): string {
   const clock = OFFICE_TEXTS.clock;
   const company = OFFICE_TEXTS.company;
-  // Shrink to fit before cutting, the same helper the hall letters its wall with. The board is
+  // Shrink to fit before cutting, the same function the hall letters its wall with. The board is
   // 22 px at scale 1 and never smaller than 12, which is readable on the artwork (T6 3.10).
   const fitted = fitName(state.companyName, company.width, {
     max: company.fontSize,

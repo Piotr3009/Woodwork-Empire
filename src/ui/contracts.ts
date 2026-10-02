@@ -243,7 +243,7 @@ export function renderContracts(state: GameState): string {
 
 /** The list the contract's blue button opens: the joiners who are free, in today, on no job and
  *  on no contract, with the one click that puts each on, and nobody else (PIOTR, 02.10: "only
- *  free people"; v62). Until v62 it listed everybody on the books, the helper and the admin told
+ *  free people"; v62). Until v62 it listed everybody on the books, the labourer and the admin told
  *  they do not go on a contract and a man on another contract or a job offered all the same. */
 function contractAssignList(state: GameState, contract: Contract): string {
   const free = state.workers.filter(

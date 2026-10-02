@@ -29,7 +29,6 @@ import {
 import {
   BENCH,
   OWNER,
-  SPRAY_BOOTH,
   accumulateMachineMinute,
   addDust,
   bookOutputMinute,
@@ -95,7 +94,6 @@ import {
   pacePoints,
   stageLeft,
   stagePlanFor,
-  tradeFactor,
 } from './stages';
 import type {
   Contract,
@@ -107,7 +105,6 @@ import type {
   Shift,
   Worker,
   WorkerIdleReason,
-  WorkerRole,
 } from './types';
 
 /** One man who could put a minute into a job right now. */
@@ -147,8 +144,7 @@ export function hands(
   if (options.staff === false) return list;
   const away = staffOutputFactor(state);
   for (const worker of state.workers) {
-    // A joiner and a sprayer both stand at a job: the helper and the desks do not
-    // (CLAUDE.md T19 2.5, 2.6).
+    // A joiner stands at a job: the labourer and the desks do not (CLAUDE.md T19 2.5, T26 2.6).
     if (!BUILDING_ROLES.includes(worker.role) || !isWorkingToday(state, worker, shift)) continue;
     if (worker.taskId !== null || worker.jobId === null) continue;
     // The contract fills the day first: a man it still wants today is not among the job's hands
@@ -273,12 +269,6 @@ export function familiesFor(state: GameState, job: Job, who: string): string[] {
   return families;
 }
 
-/** A man's trade, or null for the owner, who is a joiner by trade. */
-function roleOf(state: GameState, who: string): WorkerRole | null {
-  if (who === OWNER) return null;
-  return state.workers.find((worker) => worker.id === who)?.role ?? null;
-}
-
 /** The families a man on a standing contract may take a place at: his piece's own, then a bench
  *  (v53). */
 function familiesForContract(state: GameState, contract: Contract): string[] {
@@ -392,10 +382,6 @@ export function dayPlan(
     if (families.length === 0) {
       entries.push({ ...candidate, family: null, working: true, machine: tool, place: 0 });
       continue;
-    }
-    // A sprayer goes to the booth first when his work has one: it is his trade (CLAUDE.md T19 2.6).
-    if (roleOf(state, candidate.who) === 'sprayer' && families.includes(SPRAY_BOOTH)) {
-      families = [SPRAY_BOOTH, ...families.filter((entry) => entry !== SPRAY_BOOTH)];
     }
     const family = families.find((entry) => placesLeft(entry) > 0);
     if (family === undefined) {
@@ -562,11 +548,9 @@ export function placeHand(state: GameState, hand: Hand, entry: PlaceEntry | unde
   const book = currentStage(state, hand.job);
   const stage = stageAtFamily(state, hand.job, entry.family);
   if (book === null || stage === null) return { work: null, lost: null, noMaterial: false };
-  // The job's one pace, and what his own trade is worth where he stands: the booth is the
-  // sprayer's, and he is a pair of hands anywhere else; a joiner is slower at the booth
-  // (CLAUDE.md T19 2.6; v53).
-  const role = hand.who === OWNER ? null : (state.workers.find((worker) => worker.id === hand.who)?.role ?? null);
-  const pace = pacePoints(jobPace(state, hand.job), tradeFactor(role, entry.family));
+  // The job's one pace, the booth's included: one kind of man is on the floor and nothing about
+  // his trade changes what a stage is worth (PIOTR, 02.10; CLAUDE.md T26 2.6; v53).
+  const pace = jobPace(state, hand.job);
   return { work: { stage, book, pace, machine: entry.machine }, lost: null, noMaterial: false };
 }
 
@@ -753,7 +737,7 @@ export function workMinute(
     atWork.push({ hand, ...place.work });
   }
   if (atWork.length === 0) return report;
-  // The hall as it is with those machines running: the dust band, the missing helper, the crowded
+  // The hall as it is with those machines running: the dust band, the missing labourer, the crowded
   // gate, the broken extractor, the extraction sum and the saws too few for the crew, all through
   // the one breakdown.
   const hall = hallProductivityFactor(state, shift);

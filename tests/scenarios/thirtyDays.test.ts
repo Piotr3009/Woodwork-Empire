@@ -77,7 +77,7 @@ import {
 } from '../../src/engine/constants';
 import {
   DAY_CATEGORIES,
-  HELPER_ONLY_KINDS,
+  LABOURER_ONLY_KINDS,
   STATION_IDLE,
   STATION_DOOR,
   hallPlaces,
@@ -85,7 +85,7 @@ import {
   bagStore,
   dayPercentages,
   dropReputationCost,
-  helperOnDuty,
+  labourerOnDuty,
   homeCellOf,
   extractionCheck,
   madeInADustyWorkshop,
@@ -1458,7 +1458,7 @@ describe('a month with a helper, where the owner never unloads', () => {
     expect(state.clock.day).toBe(31);
     const helper = state.workers.find((worker) => worker.role === 'helper');
     expect(helper).toBeDefined();
-    expect(helperOnDuty(state)).toBe(true);
+    expect(labourerOnDuty(state)).toBe(true);
     // He is on the painted floor and out of the office block (CLAUDE.md T11 3.4).
     const home = helper === undefined ? { x: -1, y: -1 } : homeCellOf(state, helper);
     expect(home.x).toBeGreaterThanOrEqual(0);
@@ -1467,7 +1467,7 @@ describe('a month with a helper, where the owner never unloads', () => {
 
   it('never put the owner on an unload, a bag or the cleaning all month', () => {
     const helper = state.workers.find((worker) => worker.role === 'helper');
-    const chores = state.tasks.filter((task) => HELPER_ONLY_KINDS.includes(task.kind));
+    const chores = state.tasks.filter((task) => LABOURER_ONLY_KINDS.includes(task.kind));
     expect(chores.length).toBeGreaterThan(0);
     // Both of the labourer's own jobs of work came up in the month and both were his: measured,
     // twelve loads off the lorry and thirty two sweeps of the hall (CLAUDE.md T17 2.3, section 7).
@@ -1620,7 +1620,7 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
       expect(state.equipment.some((item) => item.specId === specId), specId).toBe(true);
     }
     expect(bagStore(state)).toMatchObject({ exists: true, bags: 1, capacityM3: 1 });
-    expect(helperOnDuty(state)).toBe(true);
+    expect(labourerOnDuty(state)).toBe(true);
     // Until v57 the month took an oak table off the board. The board offers no timber until the
     // timber branch [PIOTR, 25.09], so the machines stand for it and the month is sheet work: ten
     // jobs out of the door [measured].

@@ -3,8 +3,8 @@
 // points, which add and never multiply, floored at 0.25, and the sheet and the top bar call it
 // Pace, the one number of the bar; the men who work at a desk are behind the office door and
 // never drawn on the hall; a machine on order locks nothing open on the board until it is
-// delivered; the material take off is the office admin's when there is no estimator, at the
-// owner's own speed; the clock runs at 1, 4, 10, 30 and 100.
+// delivered; the material take off is the office admin's, at the owner's own speed (and from
+// Turn 26 hers and nobody else's); the clock runs at 1, 4, 10, 30 and 100.
 
 import { describe, expect, it } from 'vitest';
 import { PACE_FLOOR, PRODUCT_TEMPLATES, SPEEDS, WORKER_RATES } from '../../src/engine/constants';
@@ -125,17 +125,17 @@ describe('the desk staff', () => {
     state.cash = 200000;
     state.reputation = 40;
     state = hireJoiner(state);
-    state.workers.push(deskMan('officeAdmin', 'admin-1'), deskMan('estimator', 'estimator-1', 'experienced'));
+    state.workers.push(deskMan('officeAdmin', 'admin-1'), deskMan('draftsman', 'draftsman-1', 'experienced'));
     for (const worker of state.workers) worker.startDay = state.clock.day;
     state = runClock(state, 2);
     const admin = state.workers.find((worker) => worker.id === 'admin-1');
-    const estimator = state.workers.find((worker) => worker.id === 'estimator-1');
+    const draftsman = state.workers.find((worker) => worker.id === 'draftsman-1');
     // Nothing on either desk yet: the office is where they are, not the canteen door.
     expect(admin?.station).toBe(STATION_OFFICE);
-    expect(estimator?.station).toBe(STATION_OFFICE);
+    expect(draftsman?.station).toBe(STATION_OFFICE);
     const svg = renderHall(state);
     expect(svg).not.toContain('data-worker="admin-1"');
-    expect(svg).not.toContain('data-worker="estimator-1"');
+    expect(svg).not.toContain('data-worker="draftsman-1"');
     // The joiner, who has nothing to do either, is on the hall at the canteen door as before.
     const joiner = state.workers.find((worker) => worker.role === 'joiner');
     expect(joiner?.station).toBe(STATION_IDLE);
@@ -144,14 +144,16 @@ describe('the desk staff', () => {
 });
 
 describe('the material take off', () => {
-  it('is the estimator s first and the admin s behind him, at the owner s own speed', () => {
+  it('is the admin s and nobody else s, at the owner s own speed', () => {
+    // Until Turn 26 a second desk trade had it ahead of her; from tonight it is hers (CLAUDE.md T26
+    // 2.9).
     expect(rolesForTask('materialTakeOff')).toEqual({
-      eligible: ['estimator', 'officeAdmin'],
-      auto: ['estimator', 'officeAdmin'],
+      eligible: ['officeAdmin'],
+      auto: ['officeAdmin'],
     });
     const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const admin = deskMan('officeAdmin', 'admin-1');
-    const estimator = deskMan('estimator', 'estimator-1', 'novice');
+    const draftsman = deskMan('draftsman', 'draftsman-1', 'experienced');
     const task: TaskInstance = {
       id: 'task-take-off',
       kind: 'materialTakeOff',
@@ -170,12 +172,10 @@ describe('the material take off', () => {
       orders: [],
     };
     state.clock.minute = 60;
-    // Both in: the estimator's. The admin alone: hers, a minute a minute where the estimator's is
-    // his tier's.
-    expect(bestTakerOf(state, [admin, estimator], task)?.id).toBe('estimator-1');
-    expect(bestTakerOf(state, [admin], task)?.id).toBe('admin-1');
+    // The draftsman beside her takes none of it: hers, a minute a minute.
+    expect(bestTakerOf(state, [admin, draftsman], task)?.id).toBe('admin-1');
+    expect(bestTakerOf(state, [draftsman], task)).toBeNull();
     expect(taskWorkRate(admin, task)).toBe(1);
-    expect(taskWorkRate(estimator, task)).toBe(WORKER_RATES.novice);
   });
 });
 

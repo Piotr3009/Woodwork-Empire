@@ -199,11 +199,10 @@ describe('the office admin covering for a specialist', () => {
     expect(done.workers[1]?.minutesWorked).toBe(CLIENT_CALL_ANSWER_MINUTES);
   });
 
-  it('takes the material take off off the owner, at his own speed, when there is no estimator', () => {
-    // The take off was the estimator's job and the owner's until one was hired (CLAUDE.md T13
-    // 3.8); from v60 the admin does it as well, behind the estimator and at the owner's own speed,
-    // a minute a minute (PIOTR, 30.09: "create list of materials should go under the admin; the
-    // admin does it normally"). Until v60 she left it on the owner's desk.
+  it('takes the material take off off the owner, at his own speed', () => {
+    // The take off is the admin's and the owner's, nobody else's, at the owner's own speed, a
+    // minute a minute (PIOTR, 30.09: "create list of materials should go under the admin; the
+    // admin does it normally"; 02.10; CLAUDE.md T26 2.9). Until v60 she left it on the owner's desk.
     let state = onlyJobOf(4000);
     state.workers.push(staff('officeAdmin', 'admin-1'));
     state = doTask(state, 'design');
@@ -221,13 +220,15 @@ describe('the office admin covering for a specialist', () => {
     expect(done.owner.minutesByCategory.admin).toBe(0);
   });
 
-  it('gives the take off to the estimator the day he is taken on', () => {
+  it('keeps the take off the admin s with a draftsman on the books beside her', () => {
+    // Until Turn 26 a second desk trade took it the day he was hired; from tonight it is the
+    // admin's and nobody else's (CLAUDE.md T26 2.9).
     let state = onlyJobOf(4000);
     state.workers.push(staff('officeAdmin', 'admin-1'));
-    state.workers.push(staff('estimator', 'est-1'));
+    state.workers.push(staff('draftsman', 'draft-1'));
     state = doTask(state, 'design');
     state = clearEvents(tick(state, 1));
     const takeOff = state.tasks.find((task) => task.kind === 'materialTakeOff');
-    expect(takeOff?.doneBy).toBe('est-1');
+    expect(takeOff?.doneBy).toBe('admin-1');
   });
 });

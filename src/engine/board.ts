@@ -4,7 +4,6 @@
 import {
   ANSWER_MAX,
   ANSWER_MIN,
-  ANSWER_SKEW_ESTIMATOR,
   ANSWER_SKEW_MAX,
   ANSWER_SKEW_PER_REPUTATION_TIER,
   ANSWER_SKEW_SALESMAN,
@@ -106,17 +105,13 @@ function drawKind(state: GameState): EnquiryKind {
 }
 
 /** The skew the team puts on the client's answer: a quarter for every reputation tier over the
- *  neutral one and a quarter off for every tier under it, a quarter for an estimator on the books
- *  and a quarter for the salesman (one tier tonight), capped either side (CLAUDE.md T13 3.24).
- *  It shifts the odds and never the band. */
+ *  neutral one and a quarter off for every tier under it, and a quarter for the salesman (one tier
+ *  tonight), capped either side (CLAUDE.md T13 3.24). The quarter of the man who counted the
+ *  sheets went with his trade (CLAUDE.md T26 2.6). It shifts the odds and never the band. */
 export function answerSkew(state: GameState): number {
-  const estimator = state.workers.some((worker) => worker.role === 'estimator') ? 1 : 0;
   const salesman = state.workers.some((worker) => worker.role === 'salesman') ? 1 : 0;
   const tiers = reputationTier(effectiveReputation(state)) - ANSWER_SKEW_NEUTRAL_TIER;
-  const skew =
-    tiers * ANSWER_SKEW_PER_REPUTATION_TIER +
-    estimator * ANSWER_SKEW_ESTIMATOR +
-    salesman * ANSWER_SKEW_SALESMAN;
+  const skew = tiers * ANSWER_SKEW_PER_REPUTATION_TIER + salesman * ANSWER_SKEW_SALESMAN;
   return Math.max(-ANSWER_SKEW_MAX, Math.min(ANSWER_SKEW_MAX, skew));
 }
 
@@ -184,6 +179,7 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
     price: budget,
     basePrice: scaledBase,
     kind,
+    joinersWanted: 0,
     budget,
     offer: null,
     finish,

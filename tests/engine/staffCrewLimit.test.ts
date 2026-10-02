@@ -125,7 +125,7 @@ describe('the floor limit', () => {
     expect(crewCount(state)).toBe(1);
     state.workers.push(manager());
     expect(crewCount(state)).toBe(2);
-    state.workers.push({ ...manager('e1'), role: 'estimator', tier: 'experienced' });
+    state.workers.push({ ...manager('e1'), role: 'draftsman', tier: 'experienced' });
     expect(crewCount(state)).toBe(2);
     state.workers.push({ ...manager('a1'), role: 'officeAdmin' });
     expect(crewCount(state)).toBe(2);

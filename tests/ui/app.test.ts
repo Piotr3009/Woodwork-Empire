@@ -323,6 +323,7 @@ describe('the order board as tiles', () => {
           price: 12000,
           basePrice: 12000,
           kind: 'residential',
+          joinersWanted: 0,
           budget: 12000,
           offer: null,
           finish: 'laminate',

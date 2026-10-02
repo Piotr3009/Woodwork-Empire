@@ -25,10 +25,8 @@ const ROLES = [
   'joiner',
   'helper',
   'officeAdmin',
-  'purchasingClerk',
   'salesman',
   'draftsman',
-  'estimator',
   'productionManager',
 ];
 

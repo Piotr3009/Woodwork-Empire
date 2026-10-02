@@ -205,7 +205,7 @@ describe('the sprite check page', () => {
 
   it('lists every role of the game with every frame key, the two of Turn 13 among them', () => {
     // Every state the character system can be in has a key, home included (CLAUDE.md T13 3.23).
-    // Sweep joined them in Turn 20, for the helper with a broom (CLAUDE.md T20 2.8).
+    // Sweep joined them in Turn 20, for the labourer with a broom (CLAUDE.md T20 2.8).
     expect([...ANIMATIONS]).toEqual([
       'walk',
       'bench',
@@ -215,7 +215,17 @@ describe('the sprite check page', () => {
       'home',
       'sweep',
     ]);
-    expect(CHARACTER_ROLES).toContain('estimator');
+    // The owner and the six roles of Turn 26, and none of the three trades that went (CLAUDE.md
+    // T26 2.6).
+    expect(CHARACTER_ROLES).toEqual([
+      'owner',
+      'joiner',
+      'helper',
+      'officeAdmin',
+      'salesman',
+      'draftsman',
+      'productionManager',
+    ]);
     expect(CHARACTER_ROLES).toContain('productionManager');
     const page = parse(renderSpriteCheck());
     const cells = Array.from(page.querySelectorAll('[data-character-key]')).map((cell) =>
@@ -223,7 +233,7 @@ describe('the sprite check page', () => {
     );
     expect(cells).toHaveLength(CHARACTER_ROLES.length * ANIMATIONS.length);
     expect(cells).toContain('character.productionManager.phone');
-    expect(cells).toContain('character.estimator.idle');
+    expect(cells).toContain('character.draftsman.idle');
     expect(cells).toContain('character.owner.home');
   });
 

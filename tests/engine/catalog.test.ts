@@ -43,6 +43,7 @@ function job(partial: Partial<Job>): Job {
     sheetsUsed: 0,
     sheetsReserved: 0,
     kind: 'residential',
+    joinersWanted: 0,
     budget: 400,
     nightMinutes: 0,
     needsSpindle: false,

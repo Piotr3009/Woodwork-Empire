@@ -11,7 +11,7 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BAGS_HELPER_EMPTY_AT } from '../../src/engine/constants';
+import { BAGS_LABOURER_EMPTY_AT } from '../../src/engine/constants';
 import {
   bagStore,
   bagsWantEmptying,
@@ -94,7 +94,7 @@ describe('the day 128 save (PIOTR, 22.09; v46)', () => {
   it('has the helper start on the bags at 80%, before they are full', () => {
     let state = day128();
     const store = bagStore(state);
-    expect(store.fillM3).toBeGreaterThan(store.capacityM3 * BAGS_HELPER_EMPTY_AT);
+    expect(store.fillM3).toBeGreaterThan(store.capacityM3 * BAGS_LABOURER_EMPTY_AT);
     expect(store.full).toBe(false);
     expect(bagsWantEmptying(state)).toBe(true);
     state = runClock(state, 2);

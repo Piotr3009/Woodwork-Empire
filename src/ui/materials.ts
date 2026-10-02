@@ -18,7 +18,7 @@ import { button, emptyLine, escapeHtml, lockedButton, money, plural } from './mo
 import { materialLine } from './jobCard';
 
 /** The thumbnail, a flat coloured board in a fake photo frame, one per material kind, drawn
- *  through the one placeholder helper: the art side owes nothing for it (CLAUDE.md T13 9.8). */
+ *  through the one placeholder function: the art side owes nothing for it (CLAUDE.md T13 9.8). */
 const THUMB_SIZE = { width: 64, height: 48 };
 
 function thumbnail(line: StockLine): string {

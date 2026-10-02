@@ -259,7 +259,7 @@ export function objectArt(art: {
       : '';
     return shadow + spriteImage(url, at, mirror.trim());
   }
-  // A Turn 13 picture the art side has not painted yet is drawn by the one placeholder helper,
+  // A Turn 13 picture the art side has not painted yet is drawn by the one placeholder function,
   // in the hall's 2:1 dimetric, where its file will go (CLAUDE.md T13 1, 3.13, 3.21).
   const kind = placeholderKindFor(art.spriteKey, art.tier);
   if (kind !== null) {
@@ -296,7 +296,7 @@ function withDepth(svg: string, depth: number): string {
 // ---------------------------------------------------------------------------
 // The central system (PIOTR, CLAUDE.md T10 3.4; T16 2.3). The plant itself stands outside on the
 // apron by the shutter, like the van; what the player sees in the hall is one run along the rear
-// wall and a drop to every machine that wants extraction, drawn by the same vector helper as the
+// wall and a drop to every machine that wants extraction, drawn by the same vector function as the
 // pipes the game routes, because with a central system every machine is connected and that is
 // what the drawing has to say.
 // ---------------------------------------------------------------------------
@@ -791,7 +791,7 @@ const CATEGORY_SHADE: Record<string, string> = {
 /** Grey sawdust piles near the machines, one per ten points of dust, in a fixed pattern so the
  *  view never jitters (CLAUDE.md 10.3). */
 function sawdust(state: GameState): Drawable[] {
-  // One figure for the piles that are drawn and for the dirt the helper answers, so he picks up a
+  // One figure for the piles that are drawn and for the dirt the labourer answers, so he picks up a
   // broom for the dirt the player is looking at (CLAUDE.md T20 2.8).
   const piles = sawdustPiles(state.dust);
   const drawables: Drawable[] = [];
@@ -896,7 +896,7 @@ export function stationCell(
   // A man at his bench stands AT it and not on it (PIOTR, 17.09; CLAUDE.md T19 2.4). The bench
   // station names no bench, because every joiner has one, and the cell the engine keeps for him is
   // his bench's own anchor cell, which is a cell the bench stands on: this fall-through used to put
-  // his feet on the bench top, and the depth order painted him over it. The helper's own cell is
+  // his feet on the bench top, and the depth order painted him over it. The labourer's own cell is
   // the fan's anchor and was the same bug. Whatever item his cell belongs to, the station table
   // says where to stand at it; a cell that belongs to nothing is the middle of the floor as before.
   const under = itemAtCell(state, bench);
@@ -1019,7 +1019,7 @@ const CAPSULE_PARTS = {
 /** The man a role with no character sheet is drawn as, until the art side delivers one
  *  (CLAUDE.md T17 2.1). He was a 12 by 26 rounded rect, a third of the height of a delivered
  *  sheet and a fifth of its width: beside a joiner he read as a stroke on the floor, which is
- *  what Piotr saw of his yellow shirted helper. He is sized off the projection instead, at
+ *  what Piotr saw of his yellow shirted labourer. He is sized off the projection instead, at
  *  TILE_RISE pixels to the metre of a 1.8 m man, and given a head, a trunk, legs and feet so he
  *  reads as a person. */
 function capsuleBody(fill: string): string {
@@ -1254,7 +1254,7 @@ export function pinBoard(count: number): string {
 }
 
 /** The key the pallet of sheets is drawn from once the art side paints it; until then the
- *  placeholder helper draws it (CLAUDE.md T13 3.21; docs/art/REQUESTS-T13.md 4). */
+ *  placeholder function draws it (CLAUDE.md T13 3.21; docs/art/REQUESTS-T13.md 4). */
 export const PALLET_SPRITE = 'pallet';
 /** The placeholder kind of the pallet, a pallet of sheets one metre each way. */
 export const PALLET_PLACEHOLDER = 'pallet.sheets';
@@ -1582,7 +1582,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // The welfare kit, drawn where it stands: inside the canteen, on the block's own cells, lifted
   // to the roof so the player can see what is in there through it. No hall cell, no data-kit and
   // no drag: it is placed by count and that is all (PIOTR, 17.09; CLAUDE.md T17 2.2). The art
-  // side has no seat and no locker yet, so this is the one placeholder helper's box
+  // side has no seat and no locker yet, so this is the one placeholder function's box
   // (docs/art/REQUESTS-T17.md 2).
   const canteen = ROOM_LAYOUT.find((room) => room.id === 'canteen');
   for (const item of welfare) {
@@ -1678,7 +1678,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
     const away = worker.absentDaysRemaining > 0;
-    // Where he stands when the hall has nothing else for him. The helper's own corner is the fan
+    // Where he stands when the hall has nothing else for him. The labourer's own corner is the fan
     // or the gate lane, never the inside of the office block (CLAUDE.md T11 3.4).
     const bench = homeCellOf(state, worker);
     // The dinner hour is the canteen, and the station says so: `stationNow` is the one place the
@@ -1911,7 +1911,7 @@ export function hallProblems(state: GameState): HallProblem[] {
     });
   }
   if (bagStore(state).full) {
-    // The bags are the helper's, like the unloading and the sweeping, so once he has them in hand
+    // The bags are the labourer's, like the unloading and the sweeping, so once he has them in hand
     // the chip says so and asks the player nothing (PIOTR, 18.09; CLAUDE.md T20 2.8).
     const man = manOnOpenTask(state, 'emptyBags');
     list.push(
@@ -1973,7 +1973,7 @@ export function hallProblems(state: GameState): HallProblem[] {
   // 9.7: from the dirty band on, the player is warned that somebody can get hurt.
   const band = dustBand(state.dust);
   if (band.label !== 'clean') {
-    // With a helper on the books the hall makes the job of work itself and he takes it, so the
+    // With a labourer on the books the hall makes the job of work itself and he takes it, so the
     // chip says who is on it and asks the player nothing (PIOTR, 17.09; CLAUDE.md T19 2.7).
     const cleaner = cleanerAtWork(state);
     if (cleaner !== null) {

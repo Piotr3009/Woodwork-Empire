@@ -18,7 +18,7 @@ import {
   DAY_END_MINUTE,
   DIFFICULTIES,
   GATE_LANE,
-  HELPER_CLEAN_WEEKDAY,
+  LABOURER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
   GATE_PRICE,
   HOLIDAY_MAX_DAYS,
@@ -256,8 +256,8 @@ import {
   crewHasGoneHome,
   freeToolSlots,
   hasWorkingDay,
-  helperOnDuty,
-  helpers,
+  labourerOnDuty,
+  labourers,
   hire,
   isWorkingToday,
   joiners,
@@ -285,7 +285,7 @@ import {
   equipmentUnloadMinutes,
   findTask,
   interruptOwnerWith,
-  isHelperTask,
+  isLabourerTask,
   movePending,
   movingMachines,
   ownerOutTask,
@@ -432,6 +432,7 @@ export function createGame(options: NewGameOptions): GameState {
     insurance: { property: false, liability: false, insuredValue: 0, payouts: [] },
     security: { level: 0, lastBurglaryDay: null },
     website: { level: WEBSITE_START_LEVEL, lastUpkeepDay: null },
+    agency: { on: false, sinceMonth: null },
     contracts: [],
     ownerDraw: { tier: 0 },
     pipes: [],
@@ -505,7 +506,7 @@ function resumeMove(state: GameState): void {
     return;
   }
   const hand =
-    availableJoiners(state)[0] ?? helpers(state).find((worker) => isWorkingToday(state, worker));
+    availableJoiners(state)[0] ?? labourers(state).find((worker) => isWorkingToday(state, worker));
   if (hand) assignWorkerTask(state, hand.id, move.id);
 }
 
@@ -582,7 +583,7 @@ function startDay(state: GameState): void {
   runOverdueBreakdowns(state);
   checkLowStock(state);
   runAccidentRoll(state);
-  runHelperClean(state);
+  runLabourerClean(state);
   // What he started yesterday is his again, before anybody else is given anything (T17 2.14).
   resumeStartedTask(state);
   delegateTasks(state);
@@ -690,7 +691,7 @@ function collectSoldMachines(state: GameState): void {
 }
 
 /** The same question the sheets ask: unload it now, or leave it standing at the gate
- *  (CLAUDE.md T8 3.2). A helper takes it off the list without being asked, as he always does, and
+ *  (CLAUDE.md T8 3.2). A labourer takes it off the list without being asked, as he always does, and
  *  the van is then never a question the owner is put: it is his job of work and he has done it
  *  before anybody is asked about it (CLAUDE.md T11 3.4). */
 function queueKitDeliveryEvents(state: GameState, arriving: readonly OnOrderItem[]): void {
@@ -832,14 +833,14 @@ function runAccidentRoll(state: GameState): void {
   hurtWorker(state, worker);
 }
 
-/** A helper cleans every Friday at no cost to the owner (CLAUDE.md 9.7), and the moment the hall
+/** A labourer cleans every Friday at no cost to the owner (CLAUDE.md 9.7), and the moment the hall
  *  stops being clean he sweeps it without being asked, whatever day it is: that is what a
  *  labourer is for, and the owner is never put the question (PIOTR, 16.09; CLAUDE.md T17 2.3).
  *  Asked at the start of the day and again every minute, and idempotent either way: one open
  *  cleaning is one open cleaning. */
-function runHelperClean(state: GameState): void {
-  if (!helperOnDuty(state)) return;
-  if (weekday(state.clock.day) === HELPER_CLEAN_WEEKDAY) {
+function runLabourerClean(state: GameState): void {
+  if (!labourerOnDuty(state)) return;
+  if (weekday(state.clock.day) === LABOURER_CLEAN_WEEKDAY) {
     ensureTask(state, 'cleaning', 'Weekly clean', null);
     return;
   }
@@ -852,16 +853,16 @@ function runHelperClean(state: GameState): void {
 }
 
 /** True while the lorry at the gate is not the owner's question to answer: the unloading is the
- *  helper's, which is the same selector his own queue refuses him with, or somebody already has
+ *  labourer's, which is the same selector his own queue refuses him with, or somebody already has
  *  it in hand (PIOTR, 14.09; CLAUDE.md T11 3.4, T17 2.3). */
 function unloadIsNotTheOwners(state: GameState, task: TaskInstance): boolean {
-  if (isHelperTask(state, task)) return true;
+  if (isLabourerTask(state, task)) return true;
   return task.doneBy !== null && task.doneBy !== OWNER;
 }
 
 /** A lorry at the gate is a decision: unload now, or leave it standing there (CLAUDE.md 10.1).
  *  Clicking the van in the hall asks the same question again. It is the owner's decision and
- *  nobody else's, so a load the helper has already taken on is never put to him: he sees it being
+ *  nobody else's, so a load the labourer has already taken on is never put to him: he sees it being
  *  carried in instead (PIOTR, 14.09; CLAUDE.md T11 3.4, T17 2.3). */
 function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
   for (const delivery of arriving) {
@@ -1281,12 +1282,12 @@ function startTheMove(state: GameState): void {
     minutes: state.movedItems.length * MOVE_MINUTES_PER_ITEM,
   });
   // The owner moved the kit, so the owner shifts it, whatever else he was holding. A joiner or
-  // the helper can be sent instead while the owner is not in.
+  // the labourer can be sent instead while the owner is not in.
   if (ownerIsAvailable(state)) {
     interruptOwnerWith(state, task);
   } else {
     const hand =
-      availableJoiners(state)[0] ?? helpers(state).find((worker) => isWorkingToday(state, worker));
+      availableJoiners(state)[0] ?? labourers(state).find((worker) => isWorkingToday(state, worker));
     if (hand) assignWorkerTask(state, hand.id, task.id);
   }
   startSkip(state, task.id);
@@ -1417,7 +1418,7 @@ function updateStations(state: GameState): void {
   }
   for (const worker of state.workers) {
     // A desk man is behind the office door whether he has a task in hand or not: the admin, the
-    // clerk, the draftsman, the salesman and the estimator work at desks, and one with nothing to
+    // draftsman and the salesman work at desks, and one with nothing to
     // do waits at his desk and not at the canteen door with the crew [PIOTR, 30.09] (v60). The
     // dinner hour and a day off are the canteen's, as they are for everybody.
     const desk = !FLOOR_ROLES.includes(worker.role);
@@ -1480,9 +1481,9 @@ function settle(state: GameState): void {
   // Skip ahead run now, which the player asks for on the confirm (CLAUDE.md T8 3.4).
   // The clock the player asked to be run for him, until the task he asked about is over.
   runSkip(state);
-  // A hall that has gone past clean is the helper's to sweep, the minute it does (T17 2.3).
-  runHelperClean(state);
-  // The helper takes his break like everybody else, and the list is there for him when he is
+  // A hall that has gone past clean is the labourer's to sweep, the minute it does (T17 2.3).
+  runLabourerClean(state);
+  // The labourer takes his break like everybody else, and the list is there for him when he is
   // back: nobody is sent at a bag change in the middle of his dinner. The week's meters take the
   // dinner hour off with him: they are a sample of the minute that has just gone, and the hour in
   // the canteen is neither worked nor paid for (CLAUDE.md T20 2.7). The sampler rode in on the top
@@ -1524,15 +1525,11 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
   worker.minutesWorked += 1;
   bookMonthMinute(worker);
   // His own day meter: the production manager's shows the assigning (CLAUDE.md T13 3.9) and the
-  // helper's shows the unloading and the cleaning he does (CLAUDE.md T17 2.3).
+  // labourer's shows the unloading and the cleaning he does (CLAUDE.md T17 2.3).
   if (booksTaskMinutes(worker.role)) logDayMinute(worker.dayLog, dayCategoryOf(task.kind));
   // An office admin covering for a specialist takes twice as long over it (CLAUDE.md T7 3.12).
   if (advanceTask(task, taskWorkRate(worker, task), state.clock.day)) {
     worker.taskId = null;
-    // So many take offs a day for an estimator (CLAUDE.md T13 3.8).
-    if (task.kind === 'materialTakeOff' && worker.role === 'estimator') {
-      worker.ordersToday += 1;
-    }
     applyTaskCompletion(state, task);
   }
   return true;
@@ -1678,7 +1675,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     tallyEfficiency(state, 0, lost);
     return;
   }
-  // The hall as it is with those machines running: the dust band, the missing helper, the crowded
+  // The hall as it is with those machines running: the dust band, the missing labourer, the crowded
   // gate, the broken extractor and the extraction sum, all through the one breakdown.
   const hall = hallProductivityFactor(state);
   const dusty = underExtracted(state);
@@ -1812,7 +1809,7 @@ function ensureBagsTask(state: GameState): TaskInstance {
   });
 }
 
-/** The bags after a minute of dust: a helper on duty starts on them at `BAGS_HELPER_EMPTY_AT` of
+/** The bags after a minute of dust: a labourer on duty starts on them at `BAGS_LABOURER_EMPTY_AT` of
  *  the store, before anything stops (PIOTR, 22.09; v46), and the brim is the workshop's own
  *  event as it always was. One reading for the day's minute, the night's and the contract's. */
 function checkBags(state: GameState, full: boolean): void {
@@ -1820,21 +1817,21 @@ function checkBags(state: GameState, full: boolean): void {
     raiseBagsFull(state);
     return;
   }
-  if (helperOnDuty(state) && bagsWantEmptying(state)) {
+  if (labourerOnDuty(state) && bagsWantEmptying(state)) {
     ensureBagsTask(state);
     delegateTasks(state);
   }
 }
 
 /** The hall's bags are full: every machine that makes dust stops until they are emptied. One
- *  event for the workshop, never one per machine. A helper deals with it for nothing, otherwise
+ *  event for the workshop, never one per machine. A labourer deals with it for nothing, otherwise
  *  somebody has to give up the minutes (CLAUDE.md T12 2.3). */
 function raiseBagsFull(state: GameState): void {
   const task = ensureBagsTask(state);
-  // The helper takes it, free and without asking, while he is actually in the hall. A man on the
+  // The labourer takes it, free and without asking, while he is actually in the hall. A man on the
   // books who is off today takes nothing, and the question is put to the owner as it always was
   // (CLAUDE.md T11 3.4).
-  if (helperOnDuty(state)) {
+  if (labourerOnDuty(state)) {
     delegateTasks(state);
     return;
   }
@@ -2043,7 +2040,7 @@ function resolveEvent(state: GameState, choiceId: string): void {
       break;
     case 'deliveryArrived':
       if (choiceId === 'unload') {
-        // "Unload it yourself" is the override, so it lands even with a helper in the hall.
+        // "Unload it yourself" is the override, so it lands even with a labourer in the hall.
         const taskId = event.data.taskId;
         if (typeof taskId === 'string') startTask(state, taskId, true);
       }
@@ -2216,8 +2213,8 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       if (bagsFull(next)) raiseBagsFull(next);
       break;
     case 'START_CLEANING': {
-      // The Clean up button under the hall is the player saying he will do it himself, helper or
-      // no helper (CLAUDE.md T11 3.4).
+      // The Clean up button under the hall is the player saying he will do it himself, labourer or
+      // no labourer (CLAUDE.md T11 3.4).
       const task = ensureTask(next, 'cleaning', 'Clean the hall', null);
       startTask(next, task.id, true);
       break;

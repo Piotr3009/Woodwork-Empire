@@ -3,8 +3,9 @@
 //
 // Workshop is the men on the floor, with the owner's own card at the top of it: what he pays
 // himself, the house it has bought him, and the holiday a production manager lets him take
-// (CLAUDE.md T13 3.9, 3.18). Office is the desks, Technical is the estimator, and Management is
-// the production manager, who runs the second shift from here (CLAUDE.md T13 3.8, 3.9). The crew
+// (CLAUDE.md T13 3.9, 3.18). Office is the desks, Technical is the draftsman in his three grades
+// (CLAUDE.md T26 2.8), and Management is the production manager, who runs the second shift from
+// here (CLAUDE.md T13 3.9). The crew
 // the company already has is a frame on the roles it holds, with the count, exactly as the Owned
 // tab frames a machine, and the floor says how many more it has room for (CLAUDE.md T13 3.10).
 
@@ -59,8 +60,8 @@ const TABS: Array<[TeamTab, string]> = [
   ['ourTeam', 'Our team'],
   ['workshop', 'Workshop'],
   ['office', 'Office'],
-  // The estimator's tab: in this game the price arrives with the enquiry and this person only
-  // makes the list (CLAUDE.md T13 3.8).
+  // The drawing board's tab: the draftsman in his three grades and the software (CLAUDE.md T13 3.8,
+  // T26 2.8).
   ['technical', 'Technical'],
   ['management', 'Management'],
 ];
@@ -71,8 +72,8 @@ export function teamTabFrom(value: string): TeamTab {
 }
 
 /** What a role is called on a crew row: plain English, never the engine key (CLAUDE.md 3). The
- *  one table: Our team, the hiring tiles and the job's Assign list all read it, so a sprayer is
- *  called a sprayer wherever he is drawn (CLAUDE.md T19 2.5, 2.6). It moved into
+ *  one table: Our team, the hiring tiles and the job's Assign list all read it, so a labourer is
+ *  called a labourer wherever he is drawn (CLAUDE.md T19 2.5, T26 2.7). It moved into
  *  `src/engine/staff.ts` tonight, because the hire card's refusal is written there and names the
  *  trade ("excellent joiners come from reputation 60"; CLAUDE.md T20 2.5, T21 2.9). This is
  *  the same table, handed on, so every screen that already read it here still does.  */
@@ -85,12 +86,11 @@ const TRADE_OF_ROLE: Record<WorkerRole, TeamTab> = {
   joiner: 'workshop',
   helper: 'workshop',
   officeAdmin: 'office',
-  purchasingClerk: 'office',
   salesman: 'office',
-  draftsman: 'office',
-  estimator: 'technical',
+  // At the drawing: the Technical tab was the take off man's, who went with Turn 26, and the
+  // draftsman's three grades are its tiles from tonight (CLAUDE.md T26 2.6, 2.8).
+  draftsman: 'technical',
   productionManager: 'management',
-  sprayer: 'workshop',
 };
 
 export function tradeOf(role: WorkerRole): TeamTab {
@@ -309,16 +309,12 @@ function ownerCard(state: GameState): string {
 }
 
 /** The Technical tab's software line: Joinery Core and its extensions, bought here beside the
- *  man whose day they lengthen (CLAUDE.md T13 3.8). */
+ *  drawings the take off reads (CLAUDE.md T13 3.8). */
 function joineryCoreLines(state: GameState): string {
   const offer = joineryCoreOffer(state);
-  // Whose day the figures are. A take off is half an hour of his desk at his own rate, so the
-  // man at the desk is the man they are worked out for, and with nobody there they are the
-  // experienced man's and the line says as much (CLAUDE.md T20 2.3).
-  const whose =
-    offer.estimator === null
-      ? 'for an experienced man'
-      : `for ${offer.estimator}, ${TIER_WORDS[offer.tier]}`;
+  // Whose day the figures are: the office admin's, at the owner's own speed, or the owner's own
+  // while there is no admin (CLAUDE.md T26 2.9).
+  const whose = offer.admin === null ? 'at your own desk' : `for ${offer.admin}, the office admin`;
   // What the software buys him is a shorter half hour and a longer pile.
   const held = offer.held
     ? `On the laptop${offer.extensions > 0 ? `, with ${plural(offer.extensions, 'extension', 'extensions')}` : ''}: ` +

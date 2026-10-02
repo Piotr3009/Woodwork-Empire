@@ -3,19 +3,19 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  HELPER_ONLY_KINDS,
-  WAITING_FOR_HELPER,
+  LABOURER_ONLY_KINDS,
+  WAITING_FOR_LABOURER,
   dayMinutesByCategory,
-  helperOnDuty,
+  labourerOnDuty,
   homeCellOf,
-  isHelperTask,
+  isLabourerTask,
   startTaskCheck,
 } from '../../src/engine/index';
 import {
   CLEANING_MINUTES,
   DUST_BANDS,
-  HELPER_CLEAN_DUST_BAND,
-  HELPER_HOME_CELL,
+  LABOURER_CLEAN_DUST_BAND,
+  LABOURER_HOME_CELL,
   LAPTOP_BOOT_MINUTES,
   ROOM_LAYOUT,
   WORKER_RATES,
@@ -72,26 +72,26 @@ function onTheFloor(state: GameState, cell: { x: number; y: number }): boolean {
 
 describe('the three jobs of work that are the helper s', () => {
   it('is the unloading, the bags and the cleaning, and nothing else', () => {
-    expect([...HELPER_ONLY_KINDS]).toEqual(['unload', 'emptyBags', 'cleaning']);
+    expect([...LABOURER_ONLY_KINDS]).toEqual(['unload', 'emptyBags', 'cleaning']);
   });
 
   it('belongs to nobody in particular while there is no helper in the hall', () => {
     const state = quietHall();
-    expect(helperOnDuty(state)).toBe(false);
-    for (const kind of HELPER_ONLY_KINDS) {
-      expect(isHelperTask(state, taskOfKind(state, kind)), kind).toBe(false);
+    expect(labourerOnDuty(state)).toBe(false);
+    for (const kind of LABOURER_ONLY_KINDS) {
+      expect(isLabourerTask(state, taskOfKind(state, kind)), kind).toBe(false);
     }
   });
 
   it('is the helper s the moment he is in the hall', () => {
     const state = withHelper();
-    expect(helperOnDuty(state)).toBe(true);
-    for (const kind of HELPER_ONLY_KINDS) {
-      expect(isHelperTask(state, taskOfKind(state, kind)), kind).toBe(true);
+    expect(labourerOnDuty(state)).toBe(true);
+    for (const kind of LABOURER_ONLY_KINDS) {
+      expect(isLabourerTask(state, taskOfKind(state, kind)), kind).toBe(true);
     }
     // Everything else is still the owner's to pick up.
-    expect(isHelperTask(state, taskOfKind(state, 'repair'))).toBe(false);
-    expect(isHelperTask(state, taskOfKind(state, 'emails'))).toBe(false);
+    expect(isLabourerTask(state, taskOfKind(state, 'repair'))).toBe(false);
+    expect(isLabourerTask(state, taskOfKind(state, 'emails'))).toBe(false);
   });
 });
 
@@ -101,7 +101,7 @@ describe('the owner s own queue with a helper in the hall', () => {
     const unload = taskOfKind(state, 'unload');
     const check = startTaskCheck(state, unload.id);
     expect(check.ok).toBe(false);
-    expect(check.reason).toBe(WAITING_FOR_HELPER);
+    expect(check.reason).toBe(WAITING_FOR_LABOURER);
     // And the explicit button the player presses himself is still an override.
     expect(startTaskCheck(state, unload.id, true).ok).toBe(true);
   });
@@ -184,8 +184,8 @@ describe('a helper who is on the books but not in the hall today', () => {
     if (helper === undefined) throw new Error('no helper');
     // He starts tomorrow, so today he is on the books and nowhere near the hall.
     expect(helper.startDay).toBeGreaterThan(hired.clock.day);
-    expect(helperOnDuty(hired)).toBe(false);
-    expect(isHelperTask(hired, taskOfKind(hired, 'emptyBags'))).toBe(false);
+    expect(labourerOnDuty(hired)).toBe(false);
+    expect(isLabourerTask(hired, taskOfKind(hired, 'emptyBags'))).toBe(false);
     // The bags fill: the question is put, because there is nobody to take it (T12 2.3).
     const asked = act(hired, { type: 'ASK_EMPTY_BAGS' });
     expect(asked.activeEvent).toBeNull();
@@ -200,7 +200,7 @@ describe('a joiner with a helper in the hall', () => {
     const joiner = addJoiner(state);
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper');
-    for (const kind of HELPER_ONLY_KINDS) {
+    for (const kind of LABOURER_ONLY_KINDS) {
       const task = taskOfKind(state, kind);
       expect(assignWorkerTask(state, joiner.id, task.id), kind).toBe(false);
       // Never the joiner's, whoever else has it. The helper on duty takes his own work the minute
@@ -238,7 +238,7 @@ describe('the helper you can see', () => {
     const next = hireNow(state, 'helper', null);
     const helper = next.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper');
-    expect(homeCellOf(next, helper)).toEqual(HELPER_HOME_CELL);
+    expect(homeCellOf(next, helper)).toEqual(LABOURER_HOME_CELL);
     expect(onTheFloor(next, homeCellOf(next, helper))).toBe(true);
   });
 
@@ -337,7 +337,7 @@ describe('the labourer does the labourer s work (CLAUDE.md T17 2.3)', () => {
     const state = withHelper();
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper');
-    expect(dustAtLeast(state.dust, HELPER_CLEAN_DUST_BAND)).toBe(false);
+    expect(dustAtLeast(state.dust, LABOURER_CLEAN_DUST_BAND)).toBe(false);
     expect(state.tasks.some((task) => task.kind === 'cleaning' && !task.done)).toBe(false);
     // The hall goes past clean in the middle of the week.
     state.dust = DUST_BANDS[0] ? DUST_BANDS[0].max + 1 : 41;
@@ -367,7 +367,7 @@ describe('the labourer does the labourer s work (CLAUDE.md T17 2.3)', () => {
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper');
     state.dust = (DUST_BANDS[1]?.max ?? 70) + 1;
-    expect(dustAtLeast(state.dust, HELPER_CLEAN_DUST_BAND)).toBe(true);
+    expect(dustAtLeast(state.dust, LABOURER_CLEAN_DUST_BAND)).toBe(true);
     const evening = nextDay(state);
     // Nothing of the player's went into it: he was never asked, and the owner spent no minute.
     expect(evening.dust).toBeLessThan(DUST_BANDS[0]?.max ?? 40);

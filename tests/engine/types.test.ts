@@ -46,7 +46,9 @@ describe('GameState', () => {
     // v55 is 31: one stage a machine, and the bags of the stages that are gone emptied.
     // v56 is 32: the booths at their pictures' size, stood again where they fit (PIOTR, 25.09).
     // v57 is 33: the timber offers taken off the board until the timber branch (PIOTR, 25.09).
-    expect(STATE_VERSION).toBe(33);
+    // v63 is 34: one kind of man on the floor, the draftsman's grades and the agency (CLAUDE.md T26
+    // section 4).
+    expect(STATE_VERSION).toBe(34);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

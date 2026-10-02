@@ -6,8 +6,8 @@
 // standing in a doorway; the hall asks this file which of its figures have gone through before it
 // draws them.
 //
-// From Turn 21 that is everybody and not the owner alone: an estimator at a take off, an admin at
-// the emails, a clerk at his orders and a draftsman at his drawings all go through the office door,
+// From Turn 21 that is everybody and not the owner alone: an admin at the emails or a take off, a
+// salesman at his calls and a draftsman at his drawings all go through the office door,
 // and at the dinner hour the whole hall goes through the canteen's (CLAUDE.md T21 2.11, 2.12). What
 // decides is the station and not the man, which is `roomBehindStation` in `src/engine/stations.ts`:
 // the question was never really who he is but where he has gone.

@@ -285,7 +285,7 @@ export const STATION_TABLE: Record<string, StationRow> = {
     second: { side: 'back', along: 'middle' },
   },
   sprayBooth: {
-    // The same, and it is the cell 2.6 puts the sprayer on.
+    // The same, and it is the cell the man at the booth stands on (CLAUDE.md T19 2.6).
     operator: { side: 'front', along: 'middle', out: 1 },
     second: null,
   },

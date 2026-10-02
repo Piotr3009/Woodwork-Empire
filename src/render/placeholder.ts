@@ -1,4 +1,4 @@
-// The one placeholder helper (CLAUDE.md T13 1). Sprites and pictures are the art side's job on
+// The one placeholder function (CLAUDE.md T13 1). Sprites and pictures are the art side's job on
 // art/sprites; where a new picture is needed before it lands, the code draws a flat shape in the
 // game's palette from here and nowhere else: the house cards, the pipe tiles, the gate collar,
 // the pallet and the pallet truck, the two new characters and the stock thumbnails. Every request

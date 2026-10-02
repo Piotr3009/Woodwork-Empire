@@ -126,9 +126,10 @@ describe('a fresh game in this build', () => {
     // (PIOTR, 25.09). v58 is state 33 as well: the machines' capacities of 24.09 back, which is no
     // change to the save (PIOTR, 25.09). v59 and v60 are state 33 too: the canteen door, the two
     // Jacks, the pace as a sum and the admin's take off touch no field of the save (PIOTR, 30.09).
-    // v61 and v62 are state 33 as well; v63 is too until Turn 26's phase A bumps it.
+    // v61 and v62 are state 33 as well. v63 is state 34: one kind of man on the floor, the
+    // draftsman's three grades and the agency, off (CLAUDE.md T26 section 4).
     expect(APP_VERSION).toBe('v63');
-    expect(STATE_VERSION).toBe(33);
+    expect(STATE_VERSION).toBe(34);
   });
 
   it('saves through the store, the file and the cloud row on day 1, and loads back three ways', async () => {

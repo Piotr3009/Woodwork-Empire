@@ -25,3 +25,17 @@ headless Chromium, and the Pace sheet's head and the agency's card as HTML in th
 classes. The tree has no day 53 save, so `day53Hall` in `tests/helpers.ts` stands Piotr's hall of
 01.10 up from his words (six joiners, a CNC, a pro saw, two edgebanders, a moulder, a booth, the
 labourer, the office, and Nathan on a contract); it is the day 53 fixture wherever the brief names it.
+
+**T26-A3 One kind of man, the labourer's name, the draftsman's grades, the admin's desk, STATE_VERSION
+34.** The three trades are gone from `WorkerRole`, `HIRING_SPECS`, the tabs, the task tables, the
+Output sheet and the answer skew, with `tradeFactor` and the three spray rates: a booth minute is
+the man's grade times the hall's points. The site survey is the draftsman's (and the owner's), the
+meeting his then the salesman's, the drawings his at 0.8, 1.0 or 1.2 by grade on his own gate
+(15, 50, 90) and wages (2,400, 2,900, 3,400 [TUNE]); the take off and the orders are the admin's
+at the owner's speed, Joinery Core's line counted for her. Two rules this needed and the brief did
+not write: a draftsman takes a job's drawing only once its meeting and survey are done, and the
+survey is created before the drawing, or he had the drawing in hand and no hand free for the
+survey; and the draftsman moved to the Technical tab, which would otherwise hire nobody. Every
+word a player reads says labourer (`helperOnDuty` and the `HELPER_*` names renamed too; the id
+`helper` and the sheets stay). `liftToVersion34` does section 4. The three month playthrough now
+goes to the bank on day 89 (no take off man's site measures, no quarter of answer skew).

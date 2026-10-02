@@ -406,14 +406,14 @@ describe('the owner at his desk (PIOTR, 17.09; CLAUDE.md T19 2.2)', () => {
   });
 
   it('draws him and nobody else, whoever else of the crew is at a desk (CLAUDE.md T21 2.11)', () => {
-    // Turn 21 sends the office staff through the office door, so an estimator at a take off, an admin
-    // at the emails, a clerk at his orders and a draftsman at his drawings are all off the hall. The
+    // Turn 21 sends the office staff through the office door, so a salesman at his calls, an admin
+    // at the emails and a draftsman at his drawings are all off the hall. The
     // office view is not where they turn up: it is one box, measured for the owner (CLAUDE.md T19 2.2),
     // and the crew's own places in it are a drawing nobody has made (PIOTR, 18.09: nothing visual
     // without a mockup). What says where they are is the bubble at the door (CLAUDE.md T21 2.6).
     const state = furnished();
     state.owner.station = STATION_OFFICE;
-    state.workers.push(...['estimator', 'officeAdmin', 'draftsman'].map((role, index) => ({
+    state.workers.push(...['salesman', 'officeAdmin', 'draftsman'].map((role, index) => ({
       ...deskMan(role, `staff-${index + 1}`),
     })));
     const holder = room({ width: 1280, height: 800 }, SHEETS, state);

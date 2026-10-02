@@ -6,15 +6,15 @@
 // asked for a broom until the dust was past 40, so a hall the player could see the dirt in was a
 // hall the labourer had nothing to do about.
 //
-// The one line that fixes it is in `runHelperClean`, in `src/engine/game.ts`, which was frozen
+// The one line that fixes it is in `runLabourerClean`, in `src/engine/game.ts`, which was frozen
 // for phase B: `hallLooksDirty(state.dust)` in place of the messy band. It was applied in T20-C1,
 // and the expectations that were marked FLIP are flipped here with it: the helper picks up a
 // broom at 10:00 and the hall is clean by the time the men go home.
 
 import { describe, expect, it } from 'vitest';
-import { HELPER_CLEAN_DUST_BAND } from '../../src/engine/constants';
+import { LABOURER_CLEAN_DUST_BAND } from '../../src/engine/constants';
 import { dustAtLeast, dustBand, hallLooksDirty, sawdustPiles } from '../../src/engine/machines';
-import { helperOnDuty } from '../../src/engine/staff';
+import { labourerOnDuty } from '../../src/engine/staff';
 import { renderHall } from '../../src/render/hall';
 import type { GameState, Worker } from '../../src/engine/index';
 import { buyStartingKit, clearEvents, fillRack, hireNow, newGame, nextDay, runClock } from '../helpers';
@@ -94,11 +94,11 @@ describe('why the helper stands beside the dirt (CLAUDE.md T20 2.8)', () => {
     expect(sawdustPiles(state.dust)).toBe(1);
     expect(hallLooksDirty(state.dust)).toBe(true);
     expect(dustBand(state.dust).label).toBe('clean');
-    expect(dustAtLeast(state.dust, HELPER_CLEAN_DUST_BAND)).toBe(false);
+    expect(dustAtLeast(state.dust, LABOURER_CLEAN_DUST_BAND)).toBe(false);
     // And at the band he does answer, the floor has been dirty to the eye for a long time.
     state.dust = 41;
     expect(pilesDrawn(state)).toBe(4);
-    expect(dustAtLeast(state.dust, HELPER_CLEAN_DUST_BAND)).toBe(true);
+    expect(dustAtLeast(state.dust, LABOURER_CLEAN_DUST_BAND)).toBe(true);
   });
 
   it('leaves a hall that dirties at 10:00 clean by the time the men go home', () => {
@@ -108,7 +108,7 @@ describe('why the helper stands beside the dirt (CLAUDE.md T20 2.8)', () => {
     expect(atTen.dust).toBe(DIRTIED_TO);
     expect(pilesDrawn(atTen)).toBe(3);
     expect(hallLooksDirty(atTen.dust)).toBe(true);
-    expect(dustAtLeast(atTen.dust, HELPER_CLEAN_DUST_BAND)).toBe(false);
+    expect(dustAtLeast(atTen.dust, LABOURER_CLEAN_DUST_BAND)).toBe(false);
     // He picks up a broom on the dirt and the hall is clean by the evening.
     expect(evening.tasks.some((task) => task.kind === 'cleaning' && task.done)).toBe(true);
     expect(pilesDrawn(evening)).toBe(0);
@@ -127,8 +127,8 @@ describe('why the helper stands beside the dirt (CLAUDE.md T20 2.8)', () => {
     // `settle`, so it is read one minute of the clock on from the dirt.
     expect(theHelper(runClock(atTen, 2)).taskId).not.toBeNull();
     // (b) He is on duty, all day.
-    expect(helperOnDuty(atTen)).toBe(true);
-    expect(helperOnDuty(evening)).toBe(true);
+    expect(labourerOnDuty(atTen)).toBe(true);
+    expect(labourerOnDuty(evening)).toBe(true);
     // (d) The cleaning is not made for the owner: past the band it is made for nobody and the
     // helper takes it off the list himself, and the owner never spends a minute on it.
     const dirty = { ...atTen, dust: 55 };

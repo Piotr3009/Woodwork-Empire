@@ -11,7 +11,7 @@ import {
   callsTaken,
   canBuild,
   formatCalendarDay,
-  helpers,
+  labourers,
   isOnJob,
   jobLabourCost,
   jobMen,
@@ -59,7 +59,7 @@ const STAGE_LABELS: Record<Job['stage'], string> = {
 };
 
 /** The five steps of the job, so the card answers "what am I waiting for" at a glance. One
- *  helper, used by every card in the game (CLAUDE.md T3 3.1). */
+ *  function, used by every card in the game (CLAUDE.md T3 3.1). */
 export function jobLifecycleRow(state: GameState, job: Job): string {
   const steps = lifecycleSteps(state, job)
     .map((step) => `<span class="step is-${step.state}">${escapeHtml(step.label)}</span>`)
@@ -90,9 +90,9 @@ function assigneeName(state: GameState, who: string): string {
   return workerById(state, who)?.name ?? who;
 }
 
-/** The trade under a name in the list: "experienced joiner", "no experience sprayer", "owner".
+/** The trade under a name in the list: "experienced joiner", "no experience joiner", "owner".
  *  The words of a tier are TIER_WORDS and nowhere else (CLAUDE.md T20 2.5). The tier is his
- *  standing and the role is his trade, so a sprayer is plainly not a joiner (CLAUDE.md T19 2.6).
+ *  standing and the role is his trade (CLAUDE.md T19 2.6).
  *  The mockup's own words for the tiers were "ok" and "good"; the game says no experience,
  *  super since Turn 6 and Our team still does, so one vocabulary is kept and not two. */
 function assigneeTrade(state: GameState, who: string): string {
@@ -138,7 +138,7 @@ function assignRow(
 }
 
 /** Who the list offers, in the order it draws them: the owner, then the men who build, then the
- *  helpers, who are on it only to be told they do not build (CLAUDE.md T19 2.5). */
+ *  labourers, who are on it only to be told they do not build (CLAUDE.md T19 2.5). */
 function assignCandidates(state: GameState): string[] {
   // A man on a standing contract is the contract's and is not offered for a job: with twenty men
   // on the books nobody remembers that Eddie is on the shop's cabinets, so the list says only who
@@ -151,8 +151,8 @@ function assignCandidates(state: GameState): string[] {
       BUILDING_ROLES.includes(worker.role) &&
       !onContracts.includes(worker.id),
   );
-  const labourers = helpers(state).filter((worker) => onTheBooksToday(state, worker));
-  return [OWNER, ...crew.map((worker) => worker.id), ...labourers.map((worker) => worker.id)];
+  const carriers = labourers(state).filter((worker) => onTheBooksToday(state, worker));
+  return [OWNER, ...crew.map((worker) => worker.id), ...carriers.map((worker) => worker.id)];
 }
 
 /** The people on the job, as chips with a cross apiece, and the one blue button that opens the

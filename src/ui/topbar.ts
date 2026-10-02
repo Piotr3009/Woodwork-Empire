@@ -376,7 +376,7 @@ export function renderMenu(state: GameState, cloud: MenuCloud): string {
   return (
     '<div class="menu-pop" data-popover="menu">' +
     // The menu shuts on a click outside it and on this cross; it did neither before (PIOTR;
-    // CLAUDE.md T13 3.1). The cross is the one cross, the same helper every modal calls
+    // CLAUDE.md T13 3.1). The cross is the one cross, the same function every modal calls
     // (CLAUDE.md T18 2.5).
     closeButton('closeMenu') +
     '<button class="btn" data-do="endDay">End day</button>' +

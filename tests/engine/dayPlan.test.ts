@@ -15,7 +15,7 @@
 // the saw (v55).
 
 import { describe, expect, it } from 'vitest';
-import { dayPlan, hands, planPlaces, workMinute } from '../../src/engine/production';
+import { dayPlan, hands, planPlaces, turnFamily, workMinute } from '../../src/engine/production';
 import {
   OWNER,
   hallPlaces,
@@ -421,7 +421,7 @@ describe('the CNC and the booth in the day plan (v53)', () => {
     expect(state.owner.station).toBe(machineStation('workbench'));
   });
 
-  it('sends a sprayer on a lacquered job to the booth first, while the saw still has a place', () => {
+  it('sends a joiner on a lacquered job round its machines like any job, and not to the booth first', () => {
     const state = withAir(
       withExtraction(
         fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'standard' }), 60),
@@ -434,19 +434,18 @@ describe('the CNC and the booth in the day plan (v53)', () => {
     const job = next.jobs[0];
     if (!job) throw new Error('a job is wanted');
     job.stage = 'ready';
-    const sprayer = testJoiner('staff-1', 'Sam');
-    sprayer.role = 'sprayer';
-    next.workers.push(sprayer);
+    next.workers.push(testJoiner('staff-1', 'Sam'));
     next = act(next, { type: 'WORK_HERE', jobId: job.id });
     next = act(next, { type: 'ADD_TO_JOB', jobId: job.id, workerId: 'staff-1' });
     next = tick(next, 1);
     const lacquered = next.jobs[0];
     if (!lacquered) throw new Error('a job is wanted');
-    // The bar stands at the cutting and the standard saw has two places, one of them free, and
-    // still the sprayer goes to the booth: it is his trade (CLAUDE.md T19 2.6; v53).
+    // The bar stands at the cutting, and the joiner goes to the machine his round has him at this
+    // half hour, as on every job: the booth is nobody's trade first from Turn 26 (CLAUDE.md T26
+    // 2.6; it was the booth's own trade's, T19 2.6).
     expect(currentStage(next, lacquered)?.id).toBe('cutting');
-    expect(menAtMachine(next, saw(next))).toEqual([OWNER]);
-    expect(next.workers[0]?.station).toBe(machineStation('sprayBooth'));
-    expect(menAtPlaces(next).find((entry) => entry.who === 'staff-1')?.item.id).toBe('kit-booth');
+    const turn = turnFamily(next, 'staff-1', lacquered);
+    expect(turn).not.toBe('sprayBooth');
+    expect(next.workers[0]?.station).toBe(machineStation(turn ?? 'workbench'));
   });
 });

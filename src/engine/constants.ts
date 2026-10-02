@@ -146,8 +146,14 @@ import type {
  *
  *  Version 33 is v57 (PIOTR, 25.09): the board offers no timber work until the timber branch. Every
  *  v25 to v32 save loads, with the timber offers standing on its board taken off it; a timber job
- *  already taken stays on the books. */
-export const STATE_VERSION = 33;
+ *  already taken stays on the books.
+ *
+ *  Version 34 is v63, Turn 26 (PIOTR, 02.10): one kind of man on the floor. The booth's own man
+ *  becomes a joiner of his grade, the two desk trades that went become office admins, and the
+ *  draftsman takes the first of his three grades; the advertising agency is added, off, and a job
+ *  and an enquiry say how many free joiners they want, nought for all of them. Every v25 to v33
+ *  save loads. */
+export const STATE_VERSION = 34;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -577,7 +583,7 @@ export const MACHINE_STAGES: StageSpec[] = [
   { id: 'assembly', label: 'Assembly', share: 0.25 },
 ];
 
-/** A lacquered job's Finishing: the booth's own stage and the sprayer's own work, 15% of the job,
+/** A lacquered job's Finishing: the booth's own stage, a joiner's like every other, 15% of the job,
  *  and the four machine stages share the rest between them [PIOTR, 24.09] (v55). A job that is not
  *  lacquered has no Finishing stage at all. */
 export const FINISHING_STAGE: StageSpec = { id: 'finishing', label: 'Finishing', share: 0.15 };
@@ -632,11 +638,11 @@ export const UNREACHABLE_MAX = 3;
 export const ENQUIRIES_PER_DAY_BY_REPUTATION_TIER: readonly number[] = [1, 1, 2];
 /** The client's answer: the budget times a factor drawn in this band (PIOTR: minus 10% to plus
  *  15%), skewed by the team and never leaving it. The skew is a quarter each for the reputation
- *  tier, an estimator on the books and the salesman [TUNE] (CLAUDE.md T13 3.24). */
+ *  tier and the salesman [TUNE] (CLAUDE.md T13 3.24); the quarter of the man who counted the
+ *  sheets went with his trade (CLAUDE.md T26 2.6). */
 export const ANSWER_MIN = 0.9;
 export const ANSWER_MAX = 1.15;
 export const ANSWER_SKEW_PER_REPUTATION_TIER = 0.25;
-export const ANSWER_SKEW_ESTIMATOR = 0.25;
 export const ANSWER_SKEW_SALESMAN = 0.25;
 export const ANSWER_SKEW_MAX = 1;
 /** Commercial enquiries: two to three times the residential budget [TUNE], a standing above 20
@@ -750,28 +756,6 @@ export const JOINERY_CORE_MAX_EXTENSIONS = 2;
  *  month like every other subscription (CLAUDE.md T13 3.8). */
 export const JOINERY_CORE_PRICE_YEARLY = 1200;
 export const JOINERY_CORE_EXTENSION_PRICE_YEARLY = 600;
-/** What an experienced estimator costs a month [PIOTR's own 2,600, which Turn 20 divided into a
- *  week and Turn 21 hands back whole]. The four tiers come off it by the one ladder in 9.3, and
- *  what each tier is worth against the owner at the take off is WORKER_RATES: an estimator is a
- *  man with a rate like any other, so he has no rate table of his own any more
- *  (CLAUDE.md T21 2.10). The standing each tier answers from is TIER_MIN_REPUTATION. */
-export const ESTIMATOR_MONTHLY_WAGE_EXPERIENCED = 2470;
-/** What an experienced sprayer costs a month [his own 2,700, back whole]. He is paid by the month
- *  like everybody else: there is one unit of pay in the game and it is the month (PIOTR, 19.09:
- *  "I wanted everyone monthly"; CLAUDE.md T21 2.10). His four tiers come off this by the one
- *  ladder in 9.3, and the standing each answers from is TIER_MIN_REPUTATION, the same gate every
- *  tiered role passes (CLAUDE.md T21 2.9). */
-export const SPRAYER_MONTHLY_WAGE_EXPERIENCED = 2565;
-/** What a joiner gets through in a minute of a lacquered job's finishing, against a sprayer's 1.0
- *  [TUNE]. A workshop without a sprayer is slower at the booth, never stuck
- *  (CLAUDE.md T19 2.6). */
-export const JOINER_SPRAY_RATE = 0.7;
-/** What a sprayer gets through in a minute of the finishing he is there for: his own trade, at
- *  the full rate (CLAUDE.md T19 2.6). */
-export const SPRAYER_SPRAY_RATE = 1.0;
-/** What a sprayer gets through in a minute of anything that is not spraying [TUNE]. He can stand
- *  at a bench and help, and he is not a joiner (CLAUDE.md T19 2.6). */
-export const SPRAYER_BENCH_RATE = 0.6;
 
 /** The production manager, in four grades from tonight, because without one on duty nobody takes
  *  a job by himself and the player has to see what a better man is for (PIOTR, 20.09;
@@ -850,18 +834,38 @@ export const MEETING_PRICE_THRESHOLD = 20000;
 export const CLIENT_MEETING_MINUTES = 240;
 export const MEETING_SALESMAN_REPUTATION = 40;
 
-/** An office admin covering for a specialist the company has not taken on takes twice as long
- *  over the work: a client call is 30 minutes of his day and a per job material order is two of
- *  the clerk's, which is about eight a day (PIOTR, CLAUDE.md T7 3.12). */
+/** An office admin covering for the salesman the company has not taken on takes twice as long over
+ *  a client call: 30 minutes of his day (PIOTR, CLAUDE.md T7 3.12, T26 2.9). */
 export const ADMIN_COVER_RATE = 0.5;
 
-/** What a draftsman is worth against the owner at his own screen, and what he costs [TUNE]. The
- *  minutes of a drawing already carry the software's own factor, so his rate is the 0.8 and
- *  nothing else: the licence is counted once, where it is written down (CLAUDE.md T10 3.6). */
-export const DRAFTSMAN_RATE = 0.8;
-/** Paid by the month like everybody else, at his own 2,400 (CLAUDE.md T21 2.10). */
-export const DRAFTSMAN_MONTHLY_WAGE = 2400;
-export const DRAFTSMAN_REPUTATION = 15;
+/** The draftsman's three grades: there is no novice at a drawing board (PIOTR, 02.10; CLAUDE.md
+ *  T26 2.8). */
+export type DraftsmanTier = 'experienced' | 'senior' | 'master';
+export const DRAFTSMAN_TIERS: readonly DraftsmanTier[] = ['experienced', 'senior', 'master'];
+/** What a draftsman of each grade is worth against the owner at his three jobs of work, the
+ *  drawings, the site survey and the client meeting [TUNE: 0.8 / 1.0 / 1.2, the 0.8 being Turn
+ *  10's]. The minutes of a drawing already carry the software's own factor, so his rate is the
+ *  ladder and nothing else: the licence is counted once, where it is written down
+ *  (CLAUDE.md T10 3.6, T26 2.8). */
+export const DRAFTSMAN_RATE: Record<DraftsmanTier, number> = {
+  experienced: 0.8,
+  senior: 1.0,
+  master: 1.2,
+};
+/** Paid by the month like everybody else [TUNE: 2,400 / 2,900 / 3,400, the 2,400 being his own
+ *  of Turn 21] (CLAUDE.md T21 2.10, T26 2.8). */
+export const DRAFTSMAN_MONTHLY_WAGE: Record<DraftsmanTier, number> = {
+  experienced: 2400,
+  senior: 2900,
+  master: 3400,
+};
+/** The standing each grade answers an advert from [PIOTR, 02.10: 15, 50, 90]. His own table: the
+ *  joiner's rungs stay 15, 35, 60 (CLAUDE.md T26 2.8). */
+export const DRAFTSMAN_MIN_REPUTATION: Record<DraftsmanTier, number> = {
+  experienced: 15,
+  senior: 50,
+  master: 90,
+};
 
 /** A call is 15 minutes of whoever takes it, whatever the job is worth (PIOTR, T4 3.3). */
 export const CLIENT_CALL_ANSWER_MINUTES = 15;
@@ -881,8 +885,6 @@ export const MATERIAL_ORDER_MINUTES_LOW = 30;
 export const MATERIAL_ORDER_PRICE_LOW = 10000;
 export const MATERIAL_ORDER_MINUTES_HIGH = 200;
 export const MATERIAL_ORDER_PRICE_HIGH = 100000;
-/** A purchasing clerk handles about 16 job orders per day (PIOTR). */
-export const CLERK_ORDERS_PER_DAY = 16;
 /** Half a day on site (PIOTR). */
 export const SITE_MEASURE_MINUTES = 240;
 /** [TUNE] taxi to the site while there is no van. */
@@ -1446,12 +1448,13 @@ const ENDURANCE_BY_CLASS: Record<string, number> = {
   industrial: 2,
 };
 
-/** The roles that may be put on a job at all, and so the roles that take a place at a bench. A
- *  helper never builds: he carries, cleans and empties bags, and the Assign list says so rather
- *  than offering him (PIOTR, 17.09; CLAUDE.md T19 2.5, 2.6). It lives here from Turn 23 because
- *  machines.ts has to fill the benches with these men and cannot reach jobs.ts, which reads it
- *  and re-exports it under the name every caller has always used (CLAUDE.md T23 2.17). */
-export const BUILDING_ROLES: readonly WorkerRole[] = ['joiner', 'sprayer'];
+/** The roles that may be put on a job at all, and so the roles that take a place at a bench: the
+ *  joiner, who does everything physical, the booth included (PIOTR, 02.10; CLAUDE.md T26 2.6). A
+ *  labourer never builds: he carries, cleans and empties bags, and the Assign list leaves him off
+ *  (PIOTR, 17.09; CLAUDE.md T19 2.5). It lives here from Turn 23 because machines.ts has to fill
+ *  the benches with these men and cannot reach jobs.ts, which reads it and re-exports it under the
+ *  name every caller has always used (CLAUDE.md T23 2.17). */
+export const BUILDING_ROLES: readonly WorkerRole[] = ['joiner'];
 
 /** How many men can work at one machine of this class at once: a machine is not a thing one man
  *  takes, it is a number of places to work [PIOTR, 21.09; TUNE, Piotr's own for the saw]
@@ -1521,8 +1524,7 @@ export const MACHINE_CAPACITY: Record<string, Record<string, number>> = {
 };
 
 /** Who a machine's capacity is counted against, beside the owner: the joiners [PIOTR, 25.09: "we do
- *  not count the helpers or the people in the office, only me plus the joiners"]. The sprayer is left
- *  out with them: the booth is his own trade (v57). */
+ *  not count the labourers or the people in the office, only me plus the joiners"] (v57). */
 export const CAPACITY_ROLES: ReadonlyArray<WorkerRole> = ['joiner'];
 
 /** The five classes of workbench. Prices, places and footprints are Piotr's table; the endurance
@@ -3469,10 +3471,10 @@ export const GATE_LAYOUT = { x: 0, y: SHUTTER.y, width: 2, depth: 2, height: 1 }
  *  hundred cells (docs/art/SPRITES.md 9.3). */
 export const GATE_LANE = { x: 0, y: SHUTTER.y, width: 2, depth: 4 };
 
-/** Where the helper stands when the hall has nothing for him and there is no fan to stand by: in
+/** Where the labourer stands when the hall has nothing for him and there is no fan to stand by: in
  *  the gate lane, where the van and the bags are. Inside the painted floor and out of the office
  *  block, which is where every man who is not a joiner used to be put (CLAUDE.md T11 3.4). */
-export const HELPER_HOME_CELL = { x: 2, y: 8 };
+export const LABOURER_HOME_CELL = { x: 2, y: 8 };
 /** How far into the hall the lane reaches. */
 export const GATE_LANE_CELLS = GATE_LANE.width;
 
@@ -3553,9 +3555,8 @@ export const TIER_WORDS: Record<WorkerTier, string> = {
  *  owner and the **excellent** one beats him: a workshop is meant to grow past the man who started
  *  it. These are Piotr's own four figures and not a ladder derived from them
  *  [PIOTR, 19.09: 0.6, 0.8, 1.0, 1.2]. Turn 20 ran a ladder one step higher all the way up, which
- *  was Claude's reading and not his. One table for every role that has a rate, so an
- *  estimator's tier is worth at his desk exactly what a joiner's is at his bench
- *  (CLAUDE.md T21 2.9). */
+ *  was Claude's reading and not his. One table for every role that has a rate (CLAUDE.md T21
+ *  2.9). */
 export const WORKER_RATES: Record<WorkerTier, number> = {
   novice: 0.6,
   experienced: 0.8,
@@ -3581,8 +3582,7 @@ export const TIER_MIN_REPUTATION: Record<WorkerTier, number> = {
 /** v38 (PIOTR, 21.09): what a unit of a man's work costs falls about 5% a grade, so the better man
  *  is the cheaper one per hour of work done and not the dearer (it was 3,250 / 3,250 / 3,500 /
  *  3,608 a unit, novice to master, which paid a shop to keep only novices). The rates are Piotr's
- *  ladder and do not move; the wages move: 1,950 / 2,470 / 2,940 / 3,350 for a joiner, and the
- *  sprayer's and the estimator's by the same four factors off their own experienced man. */
+ *  ladder and do not move; the wages move: 1,950 / 2,470 / 2,940 / 3,350 for a joiner. */
 export const JOINER_MONTHLY_WAGE_EXPERIENCED = 2470;
 export const TIER_WAGE_FACTOR: Record<WorkerTier, number> = {
   novice: 1950 / 2470,
@@ -3608,7 +3608,6 @@ export function tierMonthlyWages(experiencedMonthly: number): Record<WorkerTier,
 }
 
 export const JOINER_MONTHLY_WAGE = tierMonthlyWages(JOINER_MONTHLY_WAGE_EXPERIENCED);
-export const SPRAYER_MONTHLY_WAGE = tierMonthlyWages(SPRAYER_MONTHLY_WAGE_EXPERIENCED);
 
 export interface HiringSpec {
   role: WorkerRole;
@@ -3637,16 +3636,30 @@ function tieredSpecs(
   roleLabel: string,
   experiencedMonthly: number,
   duties: (tier: WorkerTier) => string,
-  wages?: Record<WorkerTier, number>,
+  wages?: Partial<Record<WorkerTier, number>>,
+  ladder: { tiers: readonly WorkerTier[]; minReputation: Partial<Record<WorkerTier, number>> } = {
+    tiers: TIERS,
+    minReputation: TIER_MIN_REPUTATION,
+  },
 ): HiringSpec[] {
-  return TIERS.map((tier) => ({
+  return ladder.tiers.map((tier) => ({
     role,
     tier,
     label: `${roleLabel}, ${TIER_WORDS[tier]}`,
-    monthlyWage: wages ? wages[tier] : tierMonthlyWage(experiencedMonthly, tier),
-    minReputation: TIER_MIN_REPUTATION[tier],
+    monthlyWage: wages?.[tier] ?? tierMonthlyWage(experiencedMonthly, tier),
+    minReputation: ladder.minReputation[tier] ?? TIER_MIN_REPUTATION[tier],
     duties: duties(tier),
   }));
+}
+
+/** What a draftsman of this grade does, at his grade's speed (CLAUDE.md T26 2.8). Written beside
+ *  the tables, so the card and the hire card say the same sentence. */
+export function draftsmanDuties(tier: WorkerTier): string {
+  const rate = DRAFTSMAN_RATE[tier as DraftsmanTier] ?? DRAFTSMAN_RATE.experienced;
+  return (
+    `The drawings, the site survey and the client meeting, at ${rate.toFixed(1)} of your own ` +
+    'speed, in the order the laptop has them.'
+  );
 }
 
 /** What a manager of this grade does, in the three figures his grade is: how many men he carries,
@@ -3660,12 +3673,12 @@ export function productionManagerDuties(tier: WorkerTier): string {
   );
 }
 
-/** The trades that make something: the men whose minutes come out of the hall as work. An
- *  estimator has a rate at his desk and a draftsman has one at his, and neither of them is a
- *  production rate, so neither is on the Company board's list of the men who act where they are
- *  (PIOTR; CLAUDE.md T20 2.3). A table and not behaviour, so it lives here and both
- *  `src/engine/staff.ts` and `src/engine/machines.ts` read it. */
-export const PRODUCING_ROLES: ReadonlyArray<WorkerRole> = ['joiner', 'sprayer'];
+/** The trades that make something: the men whose minutes come out of the hall as work. A
+ *  draftsman has a rate at his desk, and it is not a production rate, so he is not on the Company
+ *  board's list of the men who act where they are (PIOTR; CLAUDE.md T20 2.3). A table and not
+ *  behaviour, so it lives here and both `src/engine/staff.ts` and `src/engine/machines.ts` read
+ *  it. One trade from Turn 26 (CLAUDE.md T26 2.6). */
+export const PRODUCING_ROLES: ReadonlyArray<WorkerRole> = ['joiner'];
 
 /** The notice a man let go works out, in days [TUNE, Piotr's decision is open: he said a week's
  *  wage]. Seven days from the click, so exactly one Friday falls inside them and the week he works
@@ -3681,12 +3694,14 @@ export const HIRING_SPECS: HiringSpec[] = [
     'joiner',
     'Joiner',
     JOINER_MONTHLY_WAGE_EXPERIENCED,
-    () => 'Production at the bench and at the machines, by day or on the second shift.',
+    () =>
+      'Production at the bench and at every machine, the booth included, by day or on the ' +
+      'second shift.',
   ),
   {
     role: 'helper',
     tier: null,
-    label: 'Helper',
+    label: 'Labourer',
     // [TUNE: 420 a week was his Turn 20 figure and he never had a monthly one; 1,800 is that week
     // over the month and a round figure, which is what the hire card now prints.]
     monthlyWage: 1800,
@@ -3699,53 +3714,30 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Office admin',
     monthlyWage: 1900,
     minReputation: 5,
+    // Everything of the office that is not the drawing board's or the phone's, in one sentence
+    // (PIOTR, 02.10; CLAUDE.md T26 2.9).
     duties:
-      'Emails, bookkeeping, the consumables and materials chore, the material take off at your ' +
-      'own speed until an estimator is taken on, and the client calls at double time until a ' +
-      'salesman is.',
+      'Emails, bookkeeping, the consumables and materials chore, the material list and its order ' +
+      'at your own speed, and the client calls at half speed while there is no salesman.',
   },
-  {
-    role: 'purchasingClerk',
-    tier: null,
-    label: 'Purchasing clerk',
-    monthlyWage: 1700,
-    minReputation: 10,
-    duties: 'The daily consumables and materials chore, ahead of the office admin.',
-  },
-  {
-    role: 'draftsman',
-    tier: null,
-    label: 'Draftsman',
-    monthlyWage: DRAFTSMAN_MONTHLY_WAGE,
-    minReputation: DRAFTSMAN_REPUTATION,
-    duties: 'The drawings, at 0.8 of your own speed, in the order the laptop has them.',
-  },
+  // The draftsman in three grades on his own gate, the drawings, the site survey and the client
+  // meeting at his grade's speed (PIOTR, 02.10; CLAUDE.md T26 2.8).
+  ...tieredSpecs(
+    'draftsman',
+    'Draftsman',
+    DRAFTSMAN_MONTHLY_WAGE.experienced,
+    draftsmanDuties,
+    DRAFTSMAN_MONTHLY_WAGE,
+    { tiers: DRAFTSMAN_TIERS, minReputation: DRAFTSMAN_MIN_REPUTATION },
+  ),
   {
     role: 'salesman',
     tier: null,
     label: 'Salesman',
     monthlyWage: 2200,
     minReputation: 15,
-    duties: 'Client calls, and the meeting a big job starts with.',
+    duties: 'Client calls, and the meeting a big job starts with while there is no draftsman.',
   },
-  // The estimator and the finishing man, four tiers each like the joiner (CLAUDE.md T13 3.8,
-  // T19 2.6, T20 2.5).
-  ...tieredSpecs(
-    'estimator',
-    'Estimator',
-    ESTIMATOR_MONTHLY_WAGE_EXPERIENCED,
-    () =>
-      'Reads the drawing and counts the sheets: the material take off, as many a day as his ' +
-      'minutes allow, and the site measure when you are not free for it.',
-  ),
-  ...tieredSpecs(
-    'sprayer',
-    'Sprayer',
-    SPRAYER_MONTHLY_WAGE_EXPERIENCED,
-    () =>
-      'The finishing of a lacquered job, which is his trade, and a pair of hands at the bench ' +
-      'on anything else. A joiner can spray, slower.',
-  ),
   // The manager is a tiered role from Turn 23, four grades and four cards like the joiner, on his
   // own wage table (PIOTR, 20.09; CLAUDE.md T23 2.4).
   ...tieredSpecs(
@@ -3775,12 +3767,12 @@ export const JOINER_PREREQUISITES = [
 export const TOOL_CABINET = TOOL_CABINET_ID;
 /** [TUNE] a new hire starts the next working day. */
 export const HIRE_START_DELAY_DAYS = 1;
-/** From five joiners a helper is required (PIOTR). */
-export const HELPER_REQUIRED_FROM_JOINERS = 5;
-/** Without the required helper, dust rises twice as fast (PIOTR). */
-export const NO_HELPER_DUST_MULTIPLIER = 2;
+/** From five joiners a labourer is required (PIOTR). */
+export const LABOURER_REQUIRED_FROM_JOINERS = 5;
+/** Without the required labourer, dust rises twice as fast (PIOTR). */
+export const NO_LABOURER_DUST_MULTIPLIER = 2;
 /** [TUNE] and productivity drops. */
-export const NO_HELPER_PRODUCTIVITY_FACTOR = 0.9;
+export const NO_LABOURER_PRODUCTIVITY_FACTOR = 0.9;
 /** [TUNE] names for generated staff. */
 /** The two men who were there at the start of Piotr's own shop, and are there at the start of
  *  every game: the first two joiners taken on, and the first two production managers, are Jack T
@@ -3857,12 +3849,12 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   compressor: 0,
 };
 
-/** How full the hall's bags are when a helper on duty starts emptying them, as a fraction of
+/** How full the hall's bags are when a labourer on duty starts emptying them, as a fraction of
  *  the store [PIOTR, 22.09: "let him empty them at 80 percent"; v46]. Until v46 the chore was
- *  raised at the brim only, and the machines stood while he carried the bags out; with a helper
+ *  raised at the brim only, and the machines stood while he carried the bags out; with a labourer
  *  in the hall they need never stop. Without one the store still fills to the brim and the
  *  question is put to the owner as it always was (CLAUDE.md T12 2.3). */
-export const BAGS_HELPER_EMPTY_AT = 0.8;
+export const BAGS_LABOURER_EMPTY_AT = 0.8;
 
 /** The bags on each class of extractor, off the descriptions that were on the shelf already: a
  *  single bag, a single bag, twin bags, four bags and ten (PIOTR, CLAUDE.md T12 2.3). The hall's
@@ -3900,13 +3892,13 @@ export const DUST_PER_SAWDUST_PILE = 10;
 /** [TUNE] accident chance per day in the dangerous band, and days the joiner is off. */
 export const ACCIDENT_CHANCE_PER_DAY = 0.02;
 export const ACCIDENT_DAYS_OFF = 3;
-/** A helper cleans every Friday at no owner cost (PIOTR). */
-export const HELPER_CLEAN_WEEKDAY = 4;
-/** [TUNE] The band of dust the Turn 17 rule waited for before the helper picked up a brush
+/** A labourer cleans every Friday at no owner cost (PIOTR). */
+export const LABOURER_CLEAN_WEEKDAY = 4;
+/** [TUNE] The band of dust the Turn 17 rule waited for before the labourer picked up a brush
  *  (PIOTR, 16.09; CLAUDE.md T17 2.3). Turn 20 2.8 found that this was four days behind the dirt
  *  the player can see and put `hallLooksDirty` in its place, so nothing in the game reads this any
  *  more: it is kept as the old band the tests of 2.8 measure the new rule against. */
-export const HELPER_CLEAN_DUST_BAND = 'messy';
+export const LABOURER_CLEAN_DUST_BAND = 'messy';
 
 // ---------------------------------------------------------------------------
 // Housekeeping
@@ -4331,7 +4323,7 @@ export const ANSWER_SKEW_NEUTRAL_TIER = 1;
 export const HOLIDAY_OPTIONS_DAYS: readonly number[] = [1, 3, 5, HOLIDAY_MAX_DAYS];
 
 // ---------------------------------------------------------------------------
-// Turn 19: the sprayer, the drawings, the sound
+// Turn 19: the booth, the drawings, the sound
 // ---------------------------------------------------------------------------
 // The swing's two figures (DOOR_SWING_MS, DOOR_CLOSE_MS) went with the swing itself, and
 // STAND_IN_GAIN with the synthesised stand ins: a door is drawn closed and the hall is silent

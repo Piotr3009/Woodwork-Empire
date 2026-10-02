@@ -425,6 +425,7 @@ export function placeEnquiry(state: GameState, partial: Partial<Enquiry> = {}): 
     price,
     basePrice: price,
     kind: 'residential',
+    joinersWanted: 0,
     budget: price,
     offer: null,
     finish: 'laminate',

@@ -2,7 +2,7 @@
 //
 // One mark over a man's head, and only while something is wrong with him: the hall has no place
 // for him at the machine his work wants, his job has no sheets on the rack, his bench has no air,
-// or he is standing with nothing to do at all. A man working, a helper at his chore, a man at his
+// or he is standing with nothing to do at all. A man working, a labourer at his chore, a man at his
 // lunch, in the office or out measuring gets nothing: no mark, no words, no paper
 // [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"].
 //
