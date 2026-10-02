@@ -112,3 +112,13 @@ has no way at all, and the straight line only for a boxed in cell; standing cell
 too. Over every pair of figures on the fixtures: day 53 90 floor, 20 overhang, 0 straight; day 128
 20, 0, 0; day 149 20, 0, 0. The 20 are the moulder's corner of my day 53 stand-in, sealed by the
 saw's and the booth's half cells.
+
+**T26-C4 Hidden by what he walks behind.** The keys are what they were, and honouring them alone
+could not do it: the moulder's key is the back corner of its zone (18 on the day 53 hall) and a
+man on the row behind its table has 18.2, so a sort by key paints him over it whatever the re-sort.
+`figureSlot` (src/render/iso.ts) puts a figure after everything he is in front of and before every
+thing whose drawn footprint he stands behind (`standsBehind`: his feet short of its front on both
+axes), the thing he is behind winning a conflict; the scene places its figures by it once and
+`resortFigures` does a full insertion by it every frame, the kits carrying `data-foot`. A stepped
+walker behind the moulder is before it on every frame he is behind it (it failed at frame 6 with
+the v62 re-sort); the T20 walk past the saw moves him on two frames now and not one.

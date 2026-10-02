@@ -90,6 +90,7 @@ import type {
 } from '../engine/types';
 import {
   type BoxFaces,
+  type FloorBox,
   type Point,
   type Polygon,
   TILE_RISE,
@@ -97,6 +98,7 @@ import {
   boxPolygons,
   centreOf,
   depthKey,
+  figureSlot,
   footprintPolygon,
   gridBounds,
   pointInPolygon,
@@ -285,6 +287,25 @@ export function objectArt(art: {
 interface Drawable {
   depth: number;
   svg: string;
+  /** The floor a thing with a footprint stands on, which a figure is placed against (T26 2.4). */
+  foot?: FloorBox;
+  /** Where a figure's feet are, for the same. */
+  feet?: { x: number; y: number };
+}
+
+/** Puts every figure among the sorted drawables where `figureSlot` says: before every thing he
+ *  stands behind and after everything he is in front of, the keys being what they were (CLAUDE.md
+ *  T26 2.4). The walker does the same every frame for a man on his way (`resortFigures`). */
+function placeFigures(drawables: Drawable[]): void {
+  const figures = drawables.filter((entry) => entry.feet !== undefined);
+  for (const figure of figures) {
+    drawables.splice(drawables.indexOf(figure), 1);
+    const at = figureSlot(
+      drawables.map((entry) => ({ depth: entry.depth, foot: entry.foot ?? null })),
+      { depth: figure.depth, feet: figure.feet ?? { x: 0, y: 0 } },
+    );
+    drawables.splice(at, 0, figure);
+  }
 }
 
 /** Writes the depth a drawable was sorted at on to its own element, so the live layer says what
@@ -1270,6 +1291,7 @@ function figure(
     (art === null ? null : characterTop(art.role, rest, art.options)) ?? CAPSULE_HEAD_TOP;
   return {
     depth: depthKey(tile.x, tile.y) + FIGURE_DEPTH_OFFSET,
+    feet: { x: tile.x + 0.5, y: tile.y + 0.5 },
     svg:
       `<g class="figure" data-figure="${key}" ` +
       `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ` +
@@ -1601,10 +1623,13 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const marked = markedMachines.get(item.id);
     const top = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
     const fx = machineFx(state, item, spec);
+    const foot: FloorBox = { x: stands.x, y: stands.y, width: stands.width, depth: stands.depth };
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
+      foot,
       svg:
         `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
+        `data-foot="${round(foot.x)},${round(foot.y)},${round(foot.width)},${round(foot.depth)}" ` +
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
         `class="clickable${fx.className}">` +
         `<title>${escapeText(tooltip)}</title>` +
@@ -1839,6 +1864,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
 
   drawables.push(...sawdust(state));
   drawables.sort((left, right) => left.depth - right.depth);
+  placeFigures(drawables);
   // Everything from here on is the live part: it changes with the state, minute by minute.
   const live: string[] = [];
 
