@@ -16,7 +16,7 @@ import { OWNER, isSold, itemStandsInTheHall, sheetCapacityOf, sheetsStrandedBySa
 import { plural } from './text';
 import type { Cell } from './pipes';
 import type { Equipment, GameState, TaskInstance } from './types';
-import { covers, footprintCells, isFree } from './walk';
+import { covers, footprintCells, isFree, isWalkable } from './walk';
 
 export const STATION_BENCH = 'bench';
 export const STATION_RACK = 'rack';
@@ -478,7 +478,8 @@ export function ringCells(
 }
 
 /** The first `count` cells of `anchors`, in their order, that a man can stand on (no footprint, no
- *  room, the unit's own floor) and that no other figure has taken this minute; each one taken goes
+ *  machine's picture, no room, the unit's own floor; T26 2.3) and that no other figure has taken
+ *  this minute; each one taken goes
  *  into `taken`, so the next man asked passes it over. When the anchors run out the cells round the
  *  first of them are taken a ring at a time. A cell is never handed out twice: two figures on one
  *  cell is the thing this is for [PIOTR, 02.10] (CLAUDE.md T26 2.2). The places at a machine, the
@@ -493,7 +494,7 @@ export function standingCellsFor(
   const take = (cell: Cell): void => {
     if (found.length >= count) return;
     const key = cellKey(cell);
-    if (taken.has(key) || !isFree(state, cell)) return;
+    if (taken.has(key) || !isWalkable(state, cell)) return;
     taken.add(key);
     found.push({ x: cell.x, y: cell.y });
   };

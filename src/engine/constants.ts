@@ -1503,6 +1503,11 @@ export const MACHINE_PACE: Record<string, number> = {
 
 
 
+/** How much of a floor cell a machine's drawn footprint has to cover for the cell to be the
+ *  picture's and not the walkway's: half of it, which is what a footprint centred half a cell into
+ *  the cell beside it covers [TUNE] (CLAUDE.md T26 2.3). */
+export const PICTURE_COVER_SHARE = 0.5;
+
 /** How long a man's turn at a machine holds before he moves on to the next of his job's: half an
  *  hour, so the men move about the hall the way a shop's do and the figures do not flicker [TUNE]
  *  (v55). */

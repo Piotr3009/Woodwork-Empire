@@ -100,3 +100,15 @@ pass (places machine by machine, then the owner and the crew in order, the door'
 `doorQueueCell`, the gate and the home cells through the same call), and a man going into a room
 walks through its door and stands on no cell. Asserted on the day 53, 128 and 149 halls and a door
 queue of four; the bench's fifth place is now its end and not a second row in front of it.
+
+**T26-C3 Walking between the machines.** Every delivered front picture of a floor class is the
+canvas its footprint gives, to a pixel (62 files measured on 02.10, six of them a pixel off), so the
+overhang is what a footprint
+centred in its zone reaches into the cells round `footprintCells`: `pictureCovers` counts a cell a
+machine's drawn footprint covers half of or more (`PICTURE_COVER_SHARE` 0.5 [TUNE]), a machine's
+and not a bench's or a rack's, whose fronts are where men stand. `walkRoute` walks the floor with no
+footprint and no picture, the long way when it has to, then through an overhang only when the floor
+has no way at all, and the straight line only for a boxed in cell; standing cells avoid pictures
+too. Over every pair of figures on the fixtures: day 53 90 floor, 20 overhang, 0 straight; day 128
+20, 0, 0; day 149 20, 0, 0. The 20 are the moulder's corner of my day 53 stand-in, sealed by the
+saw's and the booth's half cells.
