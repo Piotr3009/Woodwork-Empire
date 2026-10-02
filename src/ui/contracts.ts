@@ -31,6 +31,7 @@ import {
 // Straight off their own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import {
   acceptContractCheck,
+  renewContractCheck,
   contractAssignCheck,
   contractCandidates,
   contractMachineTip,
@@ -109,6 +110,15 @@ function expiryLine(state: GameState, contract: Contract): string {
 function acceptButton(state: GameState, contract: Contract, take: string): string {
   const check = acceptContractCheck(state, contract.id);
   return check.ok ? take : reasonLabel(check.reason);
+}
+
+/** The button that takes another term, or, while the shop already runs as many contracts as it
+ *  may, the one line that says so in its place: the ended term stays on the page with its offer
+ *  until it is let go or another contract ends (CLAUDE.md T26 2.12; v65). */
+function renewButton(state: GameState, contract: Contract, offered: number): string {
+  const check = renewContractCheck(state, contract.id, true);
+  if (!check.ok) return reasonLabel(check.reason);
+  return primaryButton('renewContract', `Renew at ${money(offered)}`, `data-id="${contract.id}" data-accept="1"`);
 }
 
 function offerTile(state: GameState, contract: Contract): string {
@@ -221,7 +231,7 @@ function endedBlock(state: GameState, contract: Contract): string {
     `${plural(contract.termWeeks, 'week', 'weeks')}, ${signedMoney(offered - contract.pricePerPiece)} on ` +
     `${money(contract.pricePerPiece)}.</p>` +
     `<div class="row"><span class="row-main"></span><span class="row-action">` +
-    `${primaryButton('renewContract', `Renew at ${money(offered)}`, `data-id="${contract.id}" data-accept="1"`)}` +
+    `${renewButton(state, contract, offered)}` +
     `${button('renewContract', 'Let it go', `data-id="${contract.id}" data-accept="0"`)}</span></div>` +
     '</div>'
   );

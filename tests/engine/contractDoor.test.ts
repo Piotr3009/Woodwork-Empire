@@ -110,14 +110,16 @@ describe('a contract man the contract cannot use', () => {
     expect(mark?.text).toBe(`no sheets for ${contract.name}`);
   });
 
-  it('is back at the saw the minute a delivery lands, with nothing over his head', () => {
+  it('is back at his place the minute a delivery lands, with nothing over his head', () => {
     const { state, man } = onAContract(0);
     expect(contractStationFor(state, man)).toBe(STATION_DOOR);
     state.stock.sheets = 60;
     expect(contractMenPlaced(state)).toEqual(['staff-1']);
     contractMinute(state);
     man.station = contractStationFor(state, man) ?? 'idle';
-    expect(man.station).toBe('machine:tableSaw');
+    // His turn this half hour is the bench his piece is finished at: from v65 a man on a contract
+    // goes round his piece's machines, the saw and then the bench (the saw's all day until then).
+    expect(man.station).toBe('machine:workbench');
     expect(bubbleFor(state, man.id)).toBe(null);
   });
 

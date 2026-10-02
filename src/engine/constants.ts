@@ -157,7 +157,7 @@ export const STATE_VERSION = 34;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v64';
+export const APP_VERSION = 'v65';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1059,6 +1059,20 @@ export const AGENCY_JOB_REPUTATION = 50;
  *  slope] (`bigJobJoinersFor`). */
 export const BIG_JOB_JOINERS_MIN = 4;
 export const BIG_JOB_JOINERS_MAX = 8;
+/** The grade the client of a big job reckons its wanted crew at when he sets the deadline: the
+ *  very experienced man, whose minute is the owner's own [TUNE] (v65). */
+export const BIG_JOB_REFERENCE_RATE = 1;
+/** The working days a big job's paperwork and sheets are given in front of the crew's own days:
+ *  the meeting, the survey, the drawings at their cap, the material list and the lorry [TUNE]
+ *  (v65). */
+export const BIG_JOB_LEAD_DAYS = 10;
+/** The most a big job's drawing takes at the owner's own speed: five working days. Two hundred
+ *  bookcases are drawn once and not two hundred times, and at the ordinary 24 minutes a thousand
+ *  pounds a job of a million was fifty days at the board [PIOTR, 02.10; TUNE] (v65). */
+export const BIG_JOB_DESIGN_MINUTES_MAX = 5 * MINUTES_PER_WORKING_DAY;
+/** The price a big job's emails are counted at, at the most: one more email for every ten
+ *  thousand pounds was a hundred of them on a job of a million [TUNE] (v65). */
+export const BIG_JOB_EMAIL_PRICE_MAX = 100000;
 
 // ---------------------------------------------------------------------------
 // T13 3.7 The company website, five levels
@@ -1508,9 +1522,11 @@ export const MACHINE_PACE: Record<string, number> = {
  *  the cell beside it covers [TUNE] (CLAUDE.md T26 2.3). */
 export const PICTURE_COVER_SHARE = 0.5;
 
-/** How long a man's turn at a machine holds before he moves on to the next of his job's: half an
+/** How long a man's turn at a machine holds before he moves on to the next of his work's: half an
  *  hour, so the men move about the hall the way a shop's do and the figures do not flicker [TUNE]
- *  (v55). */
+ *  (v55). From v65 the men on a standing contract take their turns by it too (PIOTR, 02.10:
+ *  "every hour, say, each to another machine"; the half hour was kept, being more movement and
+ *  the rule the job men already had). */
 export const DRAW_BLOCK_MINUTES = 30;
 
 /** How many men one machine of a class keeps busy before the hall is short of that family, which is

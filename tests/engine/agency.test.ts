@@ -1,7 +1,8 @@
 // The advertising agency and its big one off jobs (PIOTR, 02.10; CLAUDE.md T26 2.13): a monthly
 // fee charged on the 1st while it is on, one big job on the board at a time from a standing of 50,
-// worth 100,000 to 1,000,000, wanting four to eight free joiners before it can be taken, and the
-// Take it click putting them on it.
+// worth 100,000 to 1,000,000, wanting four to eight free joiners before it can be taken. From v65
+// the joiners free the minute it is ready go on it, its deadline is its crew's own days with no cap
+// of thirty, and its drawing and its emails are capped (PIOTR, 02.10).
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -10,22 +11,38 @@ import {
   AGENCY_JOB_VALUE_MIN,
   AGENCY_JOB_VALUE_STEP,
   AGENCY_MONTHLY_FEE,
+  BIG_JOB_DESIGN_MINUTES_MAX,
+  BIG_JOB_EMAIL_PRICE_MAX,
   BIG_JOB_JOINERS_MAX,
   BIG_JOB_JOINERS_MIN,
+  BIG_JOB_LEAD_DAYS,
+  BIG_JOB_REFERENCE_RATE,
+  DEADLINE_DAYS_MAX,
+  DEADLINE_SLACK_PERCENT_MAX,
+  DEADLINE_SLACK_PERCENT_MIN,
+  MINUTES_PER_WORKING_DAY,
 } from '../../src/engine/constants';
 import {
   agencyCheck,
   arriveBigJob,
   bigJobJoinersFor,
-  crewStandsBy,
+  bigJobDeadlineDays,
   isBigJob,
   setAgency,
 } from '../../src/engine/agency';
 import { canAccept } from '../../src/engine/board';
 import { isWorkingDay } from '../../src/engine/clock';
 import { MONTH_LINE_OF } from '../../src/engine/economy';
-import { acceptEnquiry, freeJoiners, refreshJob, resolveClientOffer } from '../../src/engine/jobs';
-import { jobTasks } from '../../src/engine/tasks';
+import {
+  acceptEnquiry,
+  freeJoiners,
+  labourValueFor,
+  refreshJob,
+  resolveClientOffer,
+  stagedJob,
+} from '../../src/engine/jobs';
+import { jobMinutesFor } from '../../src/engine/stages';
+import { designMinutes, emailsForPrice, jobTasks } from '../../src/engine/tasks';
 import type { GameState } from '../../src/engine/index';
 import {
   buyStartingKit,
@@ -118,7 +135,7 @@ describe('the big job on the board', () => {
     expect(low.enquiries).toHaveLength(0);
   });
 
-  it('is refused with two free joiners, taken with four, and the four go on it with the click', () => {
+  it('is refused with two free joiners, taken with four, and the four stay free until there is something to cut', () => {
     const state = shop(2);
     setAgency(state, true);
     const enquiry = bigJobOn(state);
@@ -137,22 +154,19 @@ describe('the big job on the board', () => {
     const job = taken.job;
     if (job === null) throw new Error('a job is wanted');
     expect(job.joinersWanted).toBe(4);
-    expect(job.assignees).toEqual(['staff-1', 'staff-2', 'staff-3', 'staff-4']);
-    for (const id of job.assignees) {
-      expect(state.workers.find((worker) => worker.id === id)?.jobId).toBe(job.id);
-    }
-    expect(freeJoiners(state)).toHaveLength(0);
-    // They stand by it through its paperwork: an hour of the clock leaves them on it.
+    // Until v65 the click put the four on it and they stood by it, paid and idle, through its
+    // drawings. They are free for other work until its paperwork and its sheets are in (PIOTR,
+    // 02.10).
     expect(job.stage).toBe('accepted');
-    expect(crewStandsBy(job)).toBe(true);
+    expect(job.assignees).toEqual([]);
+    expect(freeJoiners(state)).toHaveLength(4);
     const later = runClock(clearEvents(state), 60);
-    const after = later.jobs.find((entry) => entry.id === job.id);
-    expect(after?.assignees).toHaveLength(4);
-    expect(later.workers.filter((worker) => worker.jobId === job.id)).toHaveLength(4);
+    expect(later.jobs.find((entry) => entry.id === job.id)?.assignees).toEqual([]);
+    expect(freeJoiners(later)).toHaveLength(4);
   });
 
-  it('goes into production with its crew the minute its paperwork and its sheets are in', () => {
-    const state = shop(4);
+  it('takes the joiners who are free the minute it is ready, as many as it wants, and goes into production', () => {
+    const state = shop(5);
     setAgency(state, true);
     const enquiry = bigJobOn(state);
     acceptEnquiry(state, enquiry.id, false);
@@ -167,8 +181,74 @@ describe('the big job on the board', () => {
     job.sheetsReserved = job.sheets;
     refreshJob(state, job);
     expect(job.stage).toBe('inProduction');
-    expect(job.assignees).toHaveLength(4);
-    expect(crewStandsBy(job)).toBe(false);
+    // Four of the five: the first four taken on, and the fifth is left free.
+    expect(job.assignees).toEqual(['staff-1', 'staff-2', 'staff-3', 'staff-4']);
+    for (const id of job.assignees) {
+      expect(state.workers.find((worker) => worker.id === id)?.jobId).toBe(job.id);
+    }
+    expect(freeJoiners(state)).toHaveLength(1);
+  });
+
+  it('waits on the list like any job when nobody is free the minute it is ready', () => {
+    const state = shop(4);
+    setAgency(state, true);
+    const enquiry = bigJobOn(state);
+    acceptEnquiry(state, enquiry.id, false);
+    const offer = state.eventQueue.find((event) => event.kind === 'clientOffer');
+    if (offer === undefined) throw new Error('the client answers');
+    const job = resolveClientOffer(state, 'accept', offer.data).job;
+    if (job === null) throw new Error('a job is wanted');
+    // Every joiner is on other work by the time the sheets are in.
+    for (const worker of state.workers) worker.jobId = 'job-elsewhere';
+    for (const task of jobTasks(state, job.id)) {
+      task.done = true;
+      task.minutesRemaining = 0;
+    }
+    job.sheetsReserved = job.sheets;
+    refreshJob(state, job);
+    expect(job.stage).toBe('ready');
+    expect(job.assignees).toEqual([]);
+  });
+
+  it('gives the wanted crew its days and its paperwork ten more, with no cap of thirty', () => {
+    // The ordinary rule stops at thirty working days, so every big job had about thirty three
+    // whatever it was worth. A big job's deadline is the days its wanted crew needs at the very
+    // experienced man's grade, the lead days in front of them, and the ordinary slack (v65).
+    const state = shop(4);
+    const draw = { rng: state.rng };
+    const small = stagedJob(labourValueFor(100000), 'sheet', false);
+    const large = stagedJob(labourValueFor(1000000), 'sheet', false);
+    const crewDays = (work: typeof small, men: number): number =>
+      jobMinutesFor(state, work, Array.from({ length: men }, () => BIG_JOB_REFERENCE_RATE)) / MINUTES_PER_WORKING_DAY;
+    for (const [work, men] of [[small, 4], [large, 8]] as const) {
+      const base = Math.ceil(crewDays(work, men)) + BIG_JOB_LEAD_DAYS;
+      const days = bigJobDeadlineDays(state, draw, work, men);
+      expect(days).toBeGreaterThanOrEqual(base + Math.round((base * DEADLINE_SLACK_PERCENT_MIN) / 100));
+      expect(days).toBeLessThanOrEqual(base + Math.round((base * DEADLINE_SLACK_PERCENT_MAX) / 100));
+    }
+    // A million is five times the labour of a hundred thousand a man: far past the old thirty.
+    expect(bigJobDeadlineDays(state, draw, large, 8)).toBeGreaterThan(DEADLINE_DAYS_MAX * 2);
+    // Reading the draw twice gives the same figure and moves nothing.
+    expect(bigJobDeadlineDays(state, draw, large, 8)).toBe(bigJobDeadlineDays(state, draw, large, 8));
+  });
+
+  it('caps its drawing at five days at the board and its emails at a hundred thousand pounds of them', () => {
+    const state = shop(4);
+    setAgency(state, true);
+    const enquiry = bigJobOn(state);
+    enquiry.budget = 1000000;
+    enquiry.price = 1000000;
+    enquiry.basePrice = 1000000;
+    acceptEnquiry(state, enquiry.id, false);
+    const offer = state.eventQueue.find((event) => event.kind === 'clientOffer');
+    if (offer === undefined) throw new Error('the client answers');
+    const job = resolveClientOffer(state, 'accept', offer.data).job;
+    if (job === null) throw new Error('a job is wanted');
+    expect(designMinutes(1000000, state.software.tier)).toBeGreaterThan(BIG_JOB_DESIGN_MINUTES_MAX);
+    expect(job.designMinutesRemaining).toBe(BIG_JOB_DESIGN_MINUTES_MAX);
+    const tasks = jobTasks(state, job.id);
+    expect(tasks.find((task) => task.kind === 'design')?.minutesTotal).toBe(BIG_JOB_DESIGN_MINUTES_MAX);
+    expect(tasks.filter((task) => task.kind === 'emails')).toHaveLength(emailsForPrice(BIG_JOB_EMAIL_PRICE_MAX));
   });
 });
 

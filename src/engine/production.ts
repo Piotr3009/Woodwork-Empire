@@ -61,7 +61,7 @@ import {
   staffOutputFactor,
 } from './owner';
 import {
-  contractFamilyOf,
+  contractRoundOf,
   contractStageFamilyOf,
   contractHands,
   contractOfWorker,
@@ -246,9 +246,29 @@ function roundFor(state: GameState, job: Job): string[] {
  *  the clock and the hiring order, never the game's own cursor, so a replay is the same replay
  *  and it moves nothing else. Null while the job wants no place at all. */
 export function turnFamily(state: GameState, who: string, job: Job): string | null {
-  const round = roundFor(state, job);
+  return turnIn(state, roundFor(state, job), who);
+}
+
+/** The family of a round whose turn it is for this man this half hour: the block of the day and his
+ *  place in the hiring order, so every man starts one family further on than the man before him.
+ *  The one reading for a job's round and for a contract piece's (v55, v65). */
+function turnIn(state: GameState, round: readonly string[], who: string): string | null {
   if (round.length === 0) return null;
   return round[(turnBlock(state) + manIndex(state, who)) % round.length] ?? null;
+}
+
+/** The families a man may take a place at, in the order he is sent to them, off the round his
+ *  work goes: the one whose turn it is for him, then every other family of the round in its
+ *  order, and a bench last of all. Empty for work that wants no place at all. */
+function familiesOfRound(state: GameState, round: readonly string[], who: string): string[] {
+  if (round.length === 0) return [];
+  const turn = turnIn(state, round, who);
+  const families: string[] = turn === null ? [] : [turn];
+  for (const family of round) {
+    if (family !== BENCH && !families.includes(family)) families.push(family);
+  }
+  if (!families.includes(BENCH)) families.push(BENCH);
+  return families;
 }
 
 /** The families a man on this job may take a place at, in the order he is sent to them: the one
@@ -258,23 +278,15 @@ export function turnFamily(state: GameState, who: string, job: Job): string | nu
  *  keeps in a cabinet, is worked by hand or with the tool and wants none. Empty for a job that
  *  wants no place at all. */
 export function familiesFor(state: GameState, job: Job, who: string): string[] {
-  const round = roundFor(state, job);
-  if (round.length === 0) return [];
-  const turn = turnFamily(state, who, job);
-  const families: string[] = turn === null ? [] : [turn];
-  for (const family of round) {
-    if (family !== BENCH && !families.includes(family)) families.push(family);
-  }
-  if (!families.includes(BENCH)) families.push(BENCH);
-  return families;
+  return familiesOfRound(state, roundFor(state, job), who);
 }
 
-/** The families a man on a standing contract may take a place at: his piece's own, then a bench
- *  (v53). */
-function familiesForContract(state: GameState, contract: Contract): string[] {
-  const own = contractFamilyOf(state, contractPiece(contract), true);
-  if (own === null) return [];
-  return own === BENCH ? [BENCH] : [own, BENCH];
+/** The families a man on a standing contract may take a place at: the family of his piece's round
+ *  whose turn it is for him this half hour, then the rest of the round, and a bench last. Until v65 he
+ *  had his piece's own machine and nothing else, so six men on contracts cut on a CNC stood at the
+ *  CNC all day [PIOTR, 02.10] (v53, v65). */
+export function familiesForContract(state: GameState, contract: Contract, who: string): string[] {
+  return familiesOfRound(state, contractRoundOf(state, contractPiece(contract)), who);
 }
 
 /** The stage of the job a man at a place of this family is doing: the stage the bar stands at when
@@ -374,7 +386,7 @@ export function dayPlan(
     } else if (candidate.contract !== null) {
       const piece = contractPiece(candidate.contract);
       tool = sharedTool(state, contractStageFamilyOf(state, piece, true));
-      families = familiesForContract(state, candidate.contract);
+      families = familiesForContract(state, candidate.contract, candidate.who);
     } else {
       continue;
     }

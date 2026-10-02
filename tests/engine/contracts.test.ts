@@ -399,6 +399,11 @@ describe('people, not machines', () => {
 describe('the piece work', () => {
   it('advances the piece at his rate and the hall s pace at the saw, and books each piece', () => {
     const state = joinerHall();
+    // 09:30, the half hour his turn is the saw's: from v65 a man on a contract goes round his
+    // piece's machines a half hour at a time, as a man on a job does, and at 09:00 his turn is
+    // the bench the piece is finished at (PIOTR, 02.10). This helper's clock stands still, so the
+    // whole 200 minutes are his turn at the saw, which is what the test is about.
+    state.clock.minute = 90;
     const contract = running(state);
     const piece = contractPiece(contract);
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
@@ -500,16 +505,19 @@ describe('the piece work', () => {
       ['staff-3', false, STATION_HOME],
     ]);
     const cid = state.workers[2] as Worker;
-    expect(cid.noPlaceFor).toBe('tableSaw');
+    // The place he was sent to first is his turn's this half hour, a bench, and both are taken
+    // (v65; the saw's until the men on a contract took turns).
+    expect(cid.noPlaceFor).toBe('workbench');
     expect(contractStationFor(state, cid)).toBe(STATION_HOME);
     expect(bubbleFor(state, cid.id)?.text).toBe('no free machines');
-    // Mended, the saw's one place is the first man's and the two benches are the other two's:
-    // every man works, one to a place, and nobody is at another's.
+    // Mended, the saw's one place is the man's whose turn it is this half hour, the second's, and
+    // the two benches are the other two's: every man works, one to a place, and nobody is at
+    // another's (v65; the first man's until the men on a contract took turns).
     saw.broken = false;
     const before = contract.labourMinutes;
     minutes(state, 10);
     expect(contract.labourMinutes).toBe(before + 30);
-    expect(menAtMachine(state, saw)).toEqual(['staff-1']);
+    expect(menAtMachine(state, saw)).toEqual(['staff-2']);
     const places = menAtPlaces(state).map((entry) => `${entry.item.id}:${entry.place}`);
     expect(places).toHaveLength(3);
     expect(new Set(places).size).toBe(3);

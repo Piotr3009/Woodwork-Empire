@@ -1,7 +1,7 @@
 // The Turn 26 scenario of CLAUDE.md T26 D2: (tt), the advertising agency and its big one off jobs
 // (PIOTR, 02.10; CLAUDE.md T26 2.13). The letters follow Turn 25's (ss).
 //
-// (tt) One big job taken and made, or the report says why not. The three month playthrough of
+// (tt) One big job taken and made. The three month playthrough of
 //      tests/scenarios/playthrough.test.ts asks for the agency from month 2 and is refused every
 //      morning: its standing never comes near the 50 the agency takes a shop on from. So the
 //      question is asked here of a shop that has the name and the men: the day 53 hall of
@@ -11,6 +11,13 @@
 //      residential and worth no more than `REACH` the moment he has the free joiners it wants,
 //      takes no other work, puts every joiner who comes free on it once it is in production, and
 //      answers every question with its first choice (`runDays`). Measured, not tuned.
+//
+//      Turn 26 measured this job made three weeks late and the bank closing the company: every big
+//      job had the ordinary rule's thirty three days whatever it was worth, its drawings were three
+//      weeks at the board, and its four men stood by it through them. From v65 its deadline is its
+//      wanted crew's own days with the paperwork's ten in front, its drawing is capped at five days
+//      and its joiners are free until there is something to cut (PIOTR, 02.10), and the same job
+//      in the same shop is made inside its deadline and paid for.
 
 import { describe, expect, it } from 'vitest';
 import { isBigJob, setAgency } from '../../src/engine/agency';
@@ -19,9 +26,8 @@ import { acceptEnquiry, freeJoiners, resolveClientOffer } from '../../src/engine
 import type { GameState, Job } from '../../src/engine/index';
 import { act, day53Hall, runDays } from '../helpers';
 
-/** The most a big job may be worth for the scripted player to take it: about what the crew of
- *  this hall can make inside the ordinary deadline of 34 working days (docs/notes-t26.md 4)
- *  [TUNE]. */
+/** The most a big job may be worth for the scripted player to take it: the reach Turn 26 gave him,
+ *  kept so the job taken is the one Turn 26 measured (docs/notes-t26.md 4) [TUNE]. */
 const REACH = 300000;
 /** How many mornings the run is played for at the most. */
 const MORNINGS = 140;
@@ -96,47 +102,46 @@ function play(): Run {
 const RUN = play();
 
 describe('(tt) a big job in a shop with the name and the men', () => {
-  it('is taken the morning one in reach is on the board, and the four free joiners go on it', () => {
+  it('is taken the morning one in reach is on the board, with a deadline past the old thirty three days', () => {
     const taken = RUN.taken;
     if (taken === null) throw new Error('no big job in reach came');
     // Bookcases for a developer, 210,000, wanting four, on day 106: the first residential one of
     // no more than the reach the agency's stream drew for this hall [measured].
     expect(taken.value).toBeLessThanOrEqual(REACH);
-    expect(taken.crew).toBe(4);
+    // Nobody is put on it by the click from v65: the four it wanted free are free still.
+    expect(taken.crew).toBe(0);
+    // Its wanted crew's own days and the paperwork's ten: 87 days on the calendar here, where the
+    // ordinary rule gave every big job about 47 [measured].
+    expect(taken.due - taken.day).toBeGreaterThan(60);
     console.log('TT_TAKEN', JSON.stringify(taken));
   });
 
-  it('stands its crew by it through the drawings and the sheets, and then puts every joiner on it', () => {
+  it('goes into production when its capped drawing and its sheets are in, and every joiner goes on it', () => {
     const taken = RUN.taken;
     if (taken === null || RUN.productionFrom === null) throw new Error('it never went into production');
-    // The drawings of a job of 210,000 are 5,040 minutes at the draftsman's 0.8: two and a half
-    // weeks of the four standing by before the first cut [measured].
-    expect(RUN.productionFrom - taken.day).toBeGreaterThan(10);
+    // The drawing of a job of 210,000 is capped at five days at the board, 2,400 minutes at the
+    // draftsman's 0.8: ten days on the calendar to the first cut, where the uncapped 5,040 minutes
+    // were three weeks [measured; a range, the exact day says nothing about the rule].
+    expect(RUN.productionFrom - taken.day).toBeGreaterThanOrEqual(5);
+    expect(RUN.productionFrom - taken.day).toBeLessThanOrEqual(14);
     expect(RUN.mostOnIt).toBeGreaterThanOrEqual(7);
     console.log('TT_PRODUCTION', RUN.productionFrom, RUN.mostOnIt);
   });
 
-  it('is made three weeks late, and the bank closes the company with it standing at the gate', () => {
-    // Why it is not made, measured: its labour is 0.4 of its value like any job's, 84,000 here, and
-    // the eight men of the hall put in about 11,000 of it a week, so it wants about eight weeks of
-    // production after the drawings against the 33 working days the client gives. Half of it is
-    // still to make on its due day. No other work comes in while it is made and nothing of it is
-    // paid until it is delivered, so the wages, the agency and the material empty the account: the
-    // last of it is made on day 180, 22 working days late, the bank pulls the overdraft on day 181
-    // with the piece at the gate, and the late days would have taken the whole of the balance
-    // (docs/notes-t26.md 4).
-    const due = RUN.atDue;
+  it('is made inside its deadline and paid for, and the company trades on', () => {
+    // Eight men of the hall on a job that wanted four: made on day 169 against a due day of 193,
+    // delivered the day after, rated and paid its balance of 108,310, and nobody at the bank has
+    // anything to say [measured]. On Turn 26's rules the same job was made 22 working days late
+    // and the bank closed the company with it at the gate.
     const job = RUN.job;
-    if (due === null || job === null) throw new Error('the run never reached its due day');
-    expect(due.stage).toBe('inProduction');
-    expect(due.labourLeft).toBeGreaterThan(job.labourValue / 3);
+    if (job === null) throw new Error('no big job was taken');
+    expect(job.stage).toBe('completed');
     expect(job.finishedDay).not.toBeNull();
-    expect(job.finishedDay ?? 0).toBeGreaterThan(job.dueDay);
-    const over = RUN.state.gameOver;
-    if (over === null) throw new Error('the company was still trading');
-    expect(over.day).toBeGreaterThanOrEqual(job.finishedDay ?? 0);
-    expect(over.day).toBeLessThan(job.completedDay ?? Infinity);
-    expect(job.balancePaid).toBe(0);
-    console.log('TT_END', job.finishedDay, job.daysLate, over.day, job.completedDay, Math.round(job.penalty), job.rating);
+    expect(job.finishedDay ?? Infinity).toBeLessThanOrEqual(job.dueDay);
+    expect(job.daysLate).toBe(0);
+    expect(job.penalty).toBe(0);
+    expect(job.balancePaid).toBeGreaterThan(0);
+    expect(RUN.state.gameOver).toBeNull();
+    console.log('TT_END', job.finishedDay, job.dueDay, job.completedDay, Math.round(job.balancePaid), job.rating);
   });
 });

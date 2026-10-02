@@ -454,15 +454,17 @@ const ENDS_OF: Record<Side, readonly Side[]> = {
 /** The cells round a footprint one ring out at a time, from ring `first` (ring 0 touches it), in a
  *  fixed order: the side it is worked from first, then its two ends, then the far side, then the
  *  next ring (CLAUDE.md T26 2.2). The worked side and the far side carry the ring's corners. The
- *  rings run out as far as the unit is wide, which is further than any hall can need. */
+ *  rings run out as far as the unit is wide, which is further than any hall can need, or for
+ *  `rings` of them when the caller wants so many and no more. */
 export function ringCells(
   state: GameState,
   box: { x: number; y: number; width: number; depth: number },
   worked: Side,
   first = 0,
+  rings = Number.POSITIVE_INFINITY,
 ): Cell[] {
   const cells: Cell[] = [];
-  const reach = Math.max(state.unit.widthCells, state.unit.depthCells);
+  const reach = Math.min(Math.max(state.unit.widthCells, state.unit.depthCells), first + rings - 1);
   const extentOf = (side: Side): number => (side === 'front' || side === 'back' ? box.width : box.depth);
   for (let out = first; out <= reach; out += 1) {
     for (const side of [worked, ...ENDS_OF[worked], ACROSS[worked]]) {
@@ -489,6 +491,8 @@ export function standingCellsFor(
   anchors: readonly Cell[],
   count: number,
   taken: Set<string>,
+  /** False for a caller that goes on to its own next cells when these run out (`placeCellsAt`). */
+  spread = true,
 ): Cell[] {
   const found: Cell[] = [];
   const take = (cell: Cell): void => {
@@ -500,7 +504,7 @@ export function standingCellsFor(
   };
   for (const cell of anchors) take(cell);
   const centre = anchors[0];
-  if (centre !== undefined && found.length < count) {
+  if (spread && centre !== undefined && found.length < count) {
     for (const cell of ringCells(state, { x: centre.x, y: centre.y, width: 1, depth: 1 }, 'front')) {
       if (found.length >= count) break;
       take(cell);
@@ -509,14 +513,57 @@ export function standingCellsFor(
   return found;
 }
 
+/** The four ways a man steps off a cell. */
+const STEPS: readonly Cell[] = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+];
+
+/** The floor a man reaches from these cells a step at a time, nearest first and never through a
+ *  footprint or across a machine's picture, as many as `limit` of them: where the men who do not
+ *  fit beside a machine stand, in the next row on its own side of whatever else is on the floor.
+ *  The rings of Turn 26 were drawn round the footprint with a compass, so the fourth man at a CNC
+ *  with a dust collector at its end stood on the far side of the collector, by the canteen door
+ *  [PIOTR, 02.10] (v65). The seeds themselves are not listed. */
+export function floorFrom(state: GameState, seeds: readonly Cell[], limit: number): Cell[] {
+  const seen = new Set<string>();
+  const queue: Cell[] = [];
+  for (const seed of seeds) {
+    const key = cellKey(seed);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (isWalkable(state, seed)) queue.push(seed);
+  }
+  const found: Cell[] = [];
+  for (let head = 0; head < queue.length && found.length < limit; head += 1) {
+    const cell = queue[head] as Cell;
+    for (const step of STEPS) {
+      const next = { x: cell.x + step.x, y: cell.y + step.y };
+      const key = cellKey(next);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!isWalkable(state, next)) continue;
+      queue.push(next);
+      found.push(next);
+      if (found.length >= limit) return found;
+    }
+  }
+  return found;
+}
+
 /** The cells of an item's places, the first `count` of them: the operator's cell, the second
  *  place where the family's row names one, the side it is worked from at the operator's distance,
- *  then the cells round its footprint a ring at a time from that distance, the worked side first,
- *  then the ends, then the far side (CLAUDE.md T26 2.2). A bench's places are a row along its front,
- *  one to a column of its own footprint (T24 2.5), and a machine's run along the side its operator
- *  stands on; it is one list for every family, benches included (CLAUDE.md T19 2.5, T25 2.6). A
- *  cell is never repeated, and none another figure has taken this minute (`taken`) is handed out:
- *  the list is shorter than `count` only in a hall with no floor left at all. */
+ *  then the rest of the ring round its footprint at that distance, the worked side first, then the
+ *  ends, then the far side (CLAUDE.md T26 2.2). When more men are at it than stand beside it, the
+ *  rest stand on the floor reached from those cells a step at a time (`floorFrom`; v65), and only
+ *  a machine with no floor beside it at all falls back on the rings further out. A bench's places
+ *  are a row along its front, one to a column of its own footprint (T24 2.5), and a machine's run
+ *  along the side its operator stands on; it is one list for every family, benches included
+ *  (CLAUDE.md T19 2.5, T25 2.6). A cell is never repeated, and none another figure has taken this
+ *  minute (`taken`) is handed out: the list is shorter than `count` only in a hall with no floor
+ *  left at all. */
 export function placeCellsAt(
   state: GameState,
   item: Equipment,
@@ -534,8 +581,16 @@ export function placeCellsAt(
   const out = row.operator === 'freeSide' ? 1 : (row.operator.out ?? 0);
   const extent = side === 'front' || side === 'back' ? box.width : box.depth;
   for (let along = 0; along < extent; along += 1) anchors.push(cellAt(box, { side, along, out }));
-  anchors.push(...ringCells(state, box, side, out));
-  return standingCellsFor(state, anchors, count, taken);
+  anchors.push(...ringCells(state, box, side, out, 1));
+  const cells = standingCellsFor(state, anchors, count, taken, false);
+  if (cells.length >= count) return cells;
+  // More men than stand beside it: the next rows, reached from beside it. Enough of them to pass
+  // over every cell another figure has this minute.
+  const further = floorFrom(state, anchors, count + taken.size + 8);
+  cells.push(...standingCellsFor(state, further, count - cells.length, taken, false));
+  if (cells.length >= count) return cells;
+  cells.push(...standingCellsFor(state, ringCells(state, box, side, out + 1), count - cells.length, taken, false));
+  return cells;
 }
 
 /** Where the man unloading the pallet stands: in front of it on the hall side, the cell east of

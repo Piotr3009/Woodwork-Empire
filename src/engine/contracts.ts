@@ -744,6 +744,15 @@ export function acceptContractCheck(state: GameState, contractId: string): Contr
   return OK;
 }
 
+/** Why another term cannot be taken, or that it can: letting a contract go is always allowed, and
+ *  another term wants the shop to run fewer standing contracts than it may (CLAUDE.md T26 2.12;
+ *  v65). The page asks this before it draws the button and the action asks it again. */
+export function renewContractCheck(state: GameState, contractId: string, accept: boolean): ContractCheck {
+  if (!findContract(state, contractId)) return { ok: false, reason: 'No such contract' };
+  if (accept && contractsFull(state)) return { ok: false, reason: contractsFullLine() };
+  return OK;
+}
+
 export function declineContract(state: GameState, contractId: string): ContractCheck {
   const contract = findContract(state, contractId);
   if (!contract) return { ok: false, reason: 'No such contract' };
@@ -871,6 +880,29 @@ export function contractFamilyOf(state: GameState, piece: ContractPieceSpec, cnc
   if (family === null || family === 'workbench') return 'workbench';
   if (!has(state, family) || machineIsShared(state, family)) return null;
   return family;
+}
+
+/** The families a man on this piece goes round, in the order of its stages: the one it is cut on
+ *  (`contractFamilyOf`) and then the family of every stage after it, which is a bench for a stage
+ *  done at one, with nothing but hands, or on a machine the hall has not got or keeps in a
+ *  cabinet. He takes his turn at each, a half hour at a time, the way a man on a job goes round his
+ *  job's machines [PIOTR, 02.10: "they stand in one place"] (v55, v65). Empty for a piece that
+ *  wants no place at all. What his minute is worth is his piece's own pace wherever he stands
+ *  (`runContractMinute`), so the round moves the men and not the money. */
+export function contractRoundOf(state: GameState, piece: ContractPieceSpec): string[] {
+  const own = contractFamilyOf(state, piece, true);
+  if (own === null) return [];
+  const staged = stagedJob(0, 'sheet', false);
+  const round = [own];
+  for (const stage of piece.stages.slice(1)) {
+    const family = familyForStage(staged, stage);
+    const place =
+      family === null || family === 'workbench' || !has(state, family) || machineIsShared(state, family)
+        ? 'workbench'
+        : family;
+    if (!round.includes(place)) round.push(place);
+  }
+  return round;
 }
 
 /** What one stage of a piece is worth of its work, off the game's own table. A CNC does the cutting
@@ -1254,6 +1286,12 @@ export function renewContract(state: GameState, contractId: string, accept: bool
   if (contract.status !== 'ended' || contract.renegotiatedPrice === null) {
     return { ok: false, reason: 'The term is not over' };
   }
+  // Another term is another contract running: a shop that runs as many as it may is refused in
+  // words, and the ended term stays on the page with its offer until it is let go or another
+  // contract ends. Until v65 the renewal was taken off the books and then refused, so a shop that
+  // came into Turn 26 with four lost one without a word (CLAUDE.md T26 2.12).
+  const check = renewContractCheck(state, contractId, accept);
+  if (!check.ok) return check;
   state.contracts = state.contracts.filter((entry) => entry.id !== contractId);
   if (!accept) return OK;
   // The same piece, quantity and term at the new price, on the books as a fresh offer that is

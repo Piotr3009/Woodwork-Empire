@@ -3,6 +3,8 @@
 // in production, completed, paid and rated (CLAUDE.md 9.5).
 
 import {
+  BIG_JOB_DESIGN_MINUTES_MAX,
+  BIG_JOB_EMAIL_PRICE_MAX,
   BUILDING_ROLES,
   COURIER_COST,
   MEETING_PRICE_THRESHOLD,
@@ -37,7 +39,7 @@ import {
   WORKER_MINUTE_RATE_DIVISOR,
   type VanClass,
 } from './constants';
-import { putCrewOnBigJob } from './agency';
+import { isBigJob, putCrewOnBigJob } from './agency';
 import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
@@ -444,7 +446,10 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     deliverOnDay: null,
     calls: [],
     callsMissed: 0,
-    designMinutesRemaining: designMinutes(enquiry.basePrice, state.software.tier),
+    // A big job's drawing is capped: two hundred bookcases are drawn once (v65).
+    designMinutesRemaining: isBigJob(enquiry)
+      ? Math.min(designMinutes(enquiry.basePrice, state.software.tier), BIG_JOB_DESIGN_MINUTES_MAX)
+      : designMinutes(enquiry.basePrice, state.software.tier),
     assignees: [],
     stageRuns: [],
     completedDay: null,
@@ -470,8 +475,6 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
   // Reserved from the free stock at once; what it could not have is its shortfall (T13 3.3).
   reserveSheetsFor(state, job);
   createJobTasks(state, job);
-  // A big job takes the free joiners it wants with it (CLAUDE.md T26 2.13).
-  putCrewOnBigJob(state, job);
   return { ok: true, reason: '', job };
 }
 
@@ -510,7 +513,9 @@ export function createJobTasks(state: GameState, job: Job): void {
     });
   }
   // Emails ride with the job, in any order with the drawing, and hold nothing up.
-  const emails = emailsForPrice(job.price);
+  // A big job's emails are counted at a capped price: one more for every ten thousand pounds was a
+  // hundred of them on a job of a million (v65).
+  const emails = emailsForPrice(isBigJob(job) ? Math.min(job.price, BIG_JOB_EMAIL_PRICE_MAX) : job.price);
   for (let index = 0; index < emails; index += 1) {
     createTask(state, {
       kind: 'emails',
@@ -588,8 +593,10 @@ export function refreshJob(state: GameState, job: Job): void {
   // Anything free that has come onto the rack since it was taken is held for it now.
   reserveSheetsFor(state, job);
   if (shortfallOf(job) === 0) {
-    // A big job has had its crew on it since the Take it click, and goes into production with
-    // them the minute it is ready (CLAUDE.md T26 2.13); every other job waits on the list.
+    // A big job takes the joiners who are free this minute, as many as it wants, and goes into
+    // production with them (CLAUDE.md T26 2.13; v65); with nobody free, and for every other job,
+    // it waits on the list.
+    if (isBigJob(job) && job.assignees.length === 0) putCrewOnBigJob(state, job);
     job.stage = job.assignees.length > 0 ? 'inProduction' : 'ready';
     return;
   }

@@ -2,8 +2,10 @@
 // subscription like the software's, on and off at any time from the Office beside the website,
 // charged on the 1st of every month it is on (economy.ts). While it is on, the board draws, beside
 // the ordinary enquiries, one big job at a time: a job like any other, the one `Job` record, the
-// one card, the one deadline rule, the deposit and the balance as today, with two things of its
-// own. It wants free joiners before it can be taken, and the Take it click puts them on it.
+// one card, the deposit and the balance as today, with three things of its own from v65. It wants
+// free joiners before it can be taken, and the ones that are free the minute it is ready go on it;
+// its deadline is read off the days that crew needs and not off the ordinary rule's cap of thirty;
+// and its drawing and its emails are capped, because two hundred bookcases are drawn once.
 
 import {
   AGENCY_JOB_REPUTATION,
@@ -12,18 +14,26 @@ import {
   AGENCY_JOB_VALUE_STEP,
   BIG_JOB_JOINERS_MAX,
   BIG_JOB_JOINERS_MIN,
+  BIG_JOB_LEAD_DAYS,
+  BIG_JOB_REFERENCE_RATE,
   COMMERCIAL_PROBABILITY,
+  DEADLINE_SLACK_PERCENT_MAX,
+  DEADLINE_SLACK_PERCENT_MIN,
   EXPIRY_STANDARD_DAYS,
+  MINUTES_PER_WORKING_DAY,
   NO_INSURANCE_REASON,
 } from './constants';
 import { availableFinishes, lockReasonFor, templatesForReputation } from './catalog';
 import { enquiryQualityTier, offeredOnTheBoard, qualifiesForCommercial } from './board';
 import { isWorkingDay, monthOfDay } from './clock';
 import { coversHeld } from './insurance';
-import { deadlineDaysFrom, drawDeadline, freeJoiners, labourValueFor, ownerDaysFor } from './jobs';
+import { drawDeadline, freeJoiners, labourValueFor, stagedJob } from './jobs';
+import type { DeadlineDraw } from './jobs';
 import { effectiveReputation } from './reputation';
 import { chance, int, makeId, pickWeighted } from './rng';
 import type { RngCarrier } from './rng';
+import { jobMinutesFor } from './stages';
+import type { StagedJob } from './stages';
 import type { Enquiry, GameState, Job } from './types';
 
 export interface AgencyCheck {
@@ -83,9 +93,12 @@ export function bigJobCheck(state: GameState, enquiry: Enquiry): AgencyCheck {
   return OK;
 }
 
-/** Puts the free joiners a big job wants on it, in the order they were taken on: the Take it
- *  click does it, so the player sees the crew go (CLAUDE.md T26 2.13). They stand by it until its
- *  paperwork and its sheets are in, and it goes into production with them on it (`refreshJob`). */
+/** Puts the joiners who are free this minute on a big job, in the order they were taken on and no
+ *  more of them than it wants: the minute its paperwork and its sheets are in, so it goes into
+ *  production with them on it (`refreshJob`). Until v65 the Take it click put them on it and they
+ *  stood by it, paid and idle, through two weeks of drawings; they are free for other work until
+ *  there is something to cut [PIOTR, 02.10] (CLAUDE.md T26 2.13). With nobody free that minute it
+ *  waits on the list like any job, for the player to put men on. */
 export function putCrewOnBigJob(state: GameState, job: Job): void {
   if (!isBigJob(job)) return;
   for (const worker of freeJoiners(state).slice(0, job.joinersWanted)) {
@@ -94,19 +107,25 @@ export function putCrewOnBigJob(state: GameState, job: Job): void {
   }
 }
 
-/** The stages a big job's crew stands by it through, from the Take it click until it goes into
- *  production. */
-const BEFORE_PRODUCTION: ReadonlyArray<Job['stage']> = [
-  'accepted',
-  'materialPending',
-  'materialOrdered',
-  'materialInYard',
-  'ready',
-];
-
-/** True while the men on this big job stand by it for its paperwork and its sheets. */
-export function crewStandsBy(job: Job): boolean {
-  return isBigJob(job) && BEFORE_PRODUCTION.includes(job.stage);
+/** How long the client of a big job gives, in working days: the days its wanted crew needs at the
+ *  very experienced man's grade with the machines the hall has now, the days its paperwork and its
+ *  sheets take in front of them, and the ordinary rule's own slack on top, read off the one draw
+ *  the way `deadlineDaysFrom` reads it. There is no cap: the ordinary rule stops at thirty days, so
+ *  every big job had about thirty three whatever it was worth, and from a quarter of a million up
+ *  no crew the unit holds made it [PIOTR, 02.10] (CLAUDE.md T26 2.13; v65). */
+export function bigJobDeadlineDays(
+  state: GameState,
+  draw: DeadlineDraw,
+  work: StagedJob,
+  joinersWanted: number,
+): number {
+  const crew = Array.from({ length: Math.max(1, joinersWanted) }, () => BIG_JOB_REFERENCE_RATE);
+  const crewDays = jobMinutesFor(state, work, crew) / MINUTES_PER_WORKING_DAY;
+  const base = Math.ceil(crewDays) + BIG_JOB_LEAD_DAYS;
+  // A copy: reading the draw twice gives the same figure and moves nothing.
+  const cursor = { rng: draw.rng };
+  const slack = Math.round((base * int(cursor, DEADLINE_SLACK_PERCENT_MIN, DEADLINE_SLACK_PERCENT_MAX)) / 100);
+  return base + slack;
 }
 
 /** The agency's own draws, on a side stream of the day, so a shop with it on and a shop with it
@@ -117,8 +136,8 @@ function agencyCarrier(state: GameState): RngCarrier {
 
 /** One big job, drawn as the board draws an enquiry: a template the hall can make at this
  *  standing, residential, or commercial for a shop that qualifies, at a value between the two
- *  figures of 2.13, with the ordinary deadline rule read off its labour. Null when no template
- *  can be drawn. */
+ *  figures of 2.13, with its own deadline read off its labour and its crew (`bigJobDeadlineDays`).
+ *  Null when no template can be drawn. */
 export function drawBigJob(state: GameState, carrier: RngCarrier = agencyCarrier(state)): Enquiry | null {
   const tier = enquiryQualityTier(state);
   const candidates = templatesForReputation(effectiveReputation(state))
@@ -134,11 +153,19 @@ export function drawBigJob(state: GameState, carrier: RngCarrier = agencyCarrier
   const commercial = chance(carrier, COMMERCIAL_PROBABILITY) && qualifiesForCommercial(state);
   const kind = commercial ? 'commercial' : 'residential';
   const count = Math.max(2, Math.round(value / entry.basePrice));
-  const deadlineDays = deadlineDaysFrom(drawDeadline(carrier), {
-    ownerDays: ownerDaysFor(state, labourValueFor(value), entry.material),
-    price: value,
-    express: false,
-  });
+  const joinersWanted = bigJobJoinersFor(value);
+  const deadlineDays = bigJobDeadlineDays(
+    state,
+    drawDeadline(carrier),
+    stagedJob(
+      labourValueFor(value),
+      entry.material,
+      false,
+      finish,
+      entry.requiredEquipment.includes('spindleMoulder'),
+    ),
+    joinersWanted,
+  );
   const outOfReach = commercial && !coversHeld(state);
   return {
     id: makeId(state, 'enq'),
@@ -148,7 +175,7 @@ export function drawBigJob(state: GameState, carrier: RngCarrier = agencyCarrier
     price: value,
     basePrice: value,
     kind,
-    joinersWanted: bigJobJoinersFor(value),
+    joinersWanted,
     budget: value,
     offer: null,
     finish,
