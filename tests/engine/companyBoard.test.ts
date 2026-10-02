@@ -9,6 +9,8 @@ import {
   GATE_CROWD_FACTOR,
   PACE_FLOOR,
   RATING_ON_TIME,
+  RATING_PER_DAY_LATE,
+  REPUTATION_GAIN_FACTOR,
   UNDER_EXTRACTION_OUTPUT_PENALTY,
 } from '../../src/engine/constants';
 import { monthOfDay } from '../../src/engine/clock';
@@ -36,15 +38,51 @@ function hall(): GameState {
 }
 
 describe('the reputation log', () => {
-  it('writes down the day, the reason and the points of every change', () => {
+  it('writes down the day, the reason and the points booked of every change', () => {
+    // A gain is booked at half from Turn 26 and a loss at its whole, and the line says what was
+    // booked (PIOTR, 02.10: "we reached 100 far too quickly"; CLAUDE.md T26 2.11).
     const state = hall();
     expect(state.reputationLog).toEqual([]);
+    expect(REPUTATION_GAIN_FACTOR).toBe(0.5);
     const before = state.reputation;
     changeReputation(state, 3, 'Bookcase: on time');
-    expect(state.reputation).toBe(before + 3);
+    expect(state.reputation).toBe(before + 1.5);
+    changeReputation(state, -2, 'Bookcase: dusty workshop');
+    expect(state.reputation).toBe(before - 0.5);
     expect(state.reputationLog).toEqual([
-      { day: state.clock.day, reason: 'Bookcase: on time', points: 3 },
+      { day: state.clock.day, reason: 'Bookcase: on time', points: 1.5 },
+      { day: state.clock.day, reason: 'Bookcase: dusty workshop', points: -2 },
     ]);
+  });
+
+  it('books a month of ratings at half the gains it did and the losses what they were', () => {
+    // The cross check of CLAUDE.md T26 7: eight jobs on time and two late, rated one by one as the
+    // month brings them in. Before Turn 26 the month was 8 times 3 less 2 and 5, 17 points.
+    let state = hall();
+    state.enquiries = [];
+    const enquiry = placeEnquiry(state, { price: 1200, deadlineDays: 40 });
+    state = clearEvents(acceptNow(state, enquiry.id, false));
+    const landed = firstJob(state);
+    state.reputation = 10;
+    state.reputationLog = [];
+    const before = state.reputation;
+    const late = [0, 0, 2, 0, 0, 0, 5, 0, 0, 0];
+    for (const [index, days] of late.entries()) {
+      applyRating(state, {
+        ...landed,
+        name: `Job ${index}`,
+        daysLate: days,
+        callsMissed: 0,
+        emailsUnanswered: 0,
+      });
+    }
+    const gains = 8 * RATING_ON_TIME;
+    const losses = (2 + 5) * RATING_PER_DAY_LATE;
+    expect(gains + losses).toBe(17);
+    expect(state.reputation).toBe(before + gains * REPUTATION_GAIN_FACTOR + losses);
+    const booked = state.reputationLog.map((line) => line.points);
+    expect(booked.filter((points) => points > 0)).toEqual(Array(8).fill(RATING_ON_TIME * REPUTATION_GAIN_FACTOR));
+    expect(booked.filter((points) => points < 0)).toEqual([2 * RATING_PER_DAY_LATE, 5 * RATING_PER_DAY_LATE]);
   });
 
   it('writes down what the company actually moved, not what was asked for', () => {
@@ -68,10 +106,11 @@ describe('the reputation log', () => {
     job.emailsUnanswered = 0;
     const before = state.reputation;
     applyRating(state, job);
-    expect(state.reputation).toBe(before + RATING_ON_TIME);
+    // Booked at half from Turn 26 (CLAUDE.md T26 2.11).
+    expect(state.reputation).toBe(before + RATING_ON_TIME * REPUTATION_GAIN_FACTOR);
     const line = state.reputationLog[state.reputationLog.length - 1];
     expect(line?.reason).toBe(`${job.name}: on time`);
-    expect(line?.points).toBe(RATING_ON_TIME);
+    expect(line?.points).toBe(RATING_ON_TIME * REPUTATION_GAIN_FACTOR);
     expect(line?.day).toBe(state.clock.day);
   });
 

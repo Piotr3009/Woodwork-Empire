@@ -60,10 +60,12 @@ function ruleBody(selector: string): string {
 function traded(): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy', companyName: 'Joinery Core' })), 40);
   state.clock.day = 3;
-  changeReputation(state, 3, 'Bookcase: on time');
+  // A gain is booked at half from Turn 26 (CLAUDE.md T26 2.11), so the two gains are asked at twice
+  // the +3 and +5 the sheet is read for below.
+  changeReputation(state, 6, 'Bookcase: on time');
   changeReputation(state, -1, 'Bookcase: calls not answered');
   state.clock.day = 9;
-  changeReputation(state, 5, 'Wardrobe: express, on time');
+  changeReputation(state, 10, 'Wardrobe: express, on time');
   state.clock.day = 11;
   changeReputation(state, -10, 'Dropped: Garage shelves');
   state.owner.dayLog = [

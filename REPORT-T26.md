@@ -48,3 +48,11 @@ Two things the brief did not settle and this left as they were: the unit's bench
 very easy, four on easy and hard) refuse a seventh joiner at the hire card before the eight is
 reached, and the eight lockers still hold eight joiners and labourers between them; T23's (nn),
 nine men under a novice, is reachable through the hire card from tonight and is flipped to say so.
+
+**T26-B2 Reputation is earned slower.** `changeReputation` books a gain at `REPUTATION_GAIN_FACTOR`
+0.5 [TUNE] and a loss at its whole, and nowhere else; the log line is the points booked, and the
+client's own rating on the delivery card is what he said. A month of eight on time jobs and two
+late ones books 5 where it booked 17. Moved figures, one line each in the tests: thirty days on Easy
+ends at 11.5 (23 at half), its lowest balance 2,741 (2,746) and the short handed month's -680 (-862);
+the fan month is read by the value delivered, the big fan's standing taking bigger jobs; the three
+month playthrough trades to day 92 again (months 7,350, 398, -12,999, an experienced manager on day 65).

@@ -1022,6 +1022,10 @@ export const SOFTWARE_TURN1_TIER: SoftwareTier = 'basic';
 export const REPUTATION_START = 0;
 export const REPUTATION_MIN = -50;
 export const REPUTATION_MAX = 100;
+/** What a gain of reputation is worth when it is booked: every point the company earns goes on the
+ *  board at half, and a loss at its whole (PIOTR, 02.10: "we reached 100 far too quickly"; CLAUDE.md
+ *  T26 2.11) [TUNE]. */
+export const REPUTATION_GAIN_FACTOR = 0.5;
 /** Rating changes at job completion, ten times the Turn 1 weights (PIOTR). */
 export const RATING_ON_TIME = 3;
 export const RATING_EXPRESS_ON_TIME = 5;
