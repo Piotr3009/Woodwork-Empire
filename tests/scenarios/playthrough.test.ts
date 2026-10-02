@@ -66,6 +66,10 @@ function marginOf(state: GameState, event: GameEvent): number {
 
 let holidayTaken = false;
 
+/** Every morning from month 2 the scripted player asks for the advertising agency, and what the
+ *  switch said: the scenario (tt) of CLAUDE.md T26 2.13 and D2. */
+let agencyAsks: Array<{ day: number; reputation: number; on: boolean }> = [];
+
 const PLAYTHROUGH: Policy = {
   maxOpenJobs: 3,
   buyKit: true,
@@ -103,6 +107,12 @@ const PLAYTHROUGH: Policy = {
       freeSheets(next) < RESTOCK_WHEN_UNDER
     ) {
       next = act(next, { type: 'RESTOCK', sheets: RESTOCK_SHEETS });
+    }
+    // (tt) The agency on from month 2: asked for every working morning until it is on
+    // (CLAUDE.md T26 2.13). It is taken on from a standing of 50.
+    if (day >= 31 && isWorkingDay(day) && !next.agency.on) {
+      next = act(next, { type: 'SET_AGENCY', on: true });
+      agencyAsks.push({ day, reputation: next.reputation, on: next.agency.on });
     }
     if (day === 31) {
       next = act(next, { type: 'SET_OWNER_DRAW', tier: 1 });
@@ -158,8 +168,15 @@ interface MonthLog {
   houseTier: number;
 }
 
-function play(difficulty: 'easy' | 'veryEasy'): { state: GameState; days: GameState[]; events: GameEvent[]; months: MonthLog[] } {
+function play(difficulty: 'easy' | 'veryEasy'): {
+  state: GameState;
+  days: GameState[];
+  events: GameEvent[];
+  months: MonthLog[];
+  agencyAsks: Array<{ day: number; reputation: number; on: boolean }>;
+} {
   holidayTaken = false;
+  agencyAsks = [];
   const events: GameEvent[] = [];
   const days: GameState[] = [];
   let state = newGame({ seed: SEED, difficulty });
@@ -191,7 +208,7 @@ function play(difficulty: 'easy' | 'veryEasy'): { state: GameState; days: GameSt
       deliveredBefore = delivered;
     }
   }
-  return { state, days, events, months };
+  return { state, days, events, months, agencyAsks };
 }
 
 const played = play('easy');
@@ -612,3 +629,27 @@ describe('the same script on Very easy, the control', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// (tt) The three months with the advertising agency asked for from month 2 (CLAUDE.md T26 2.13,
+// D2). One big job taken and made, or why not. Why not: the agency takes on a shop from a standing
+// of 50 and its big jobs come from 50, and this company's standing, every gain booked at half from
+// tonight (2.11), never comes near it in three months. The scripted player asks every working
+// morning from day 31 and is refused every time, so nothing of the run moves for it. What a big job
+// does to a shop that has the name and the men is scenario (tt) of tests/scenarios/turn26.test.ts.
+// ---------------------------------------------------------------------------
+
+describe('(tt) the three month playthrough with the agency asked for from month 2', () => {
+  it('is refused every morning, the standing far under 50, so no fee is charged and no big job comes', () => {
+    for (const run of [played, control]) {
+      expect(run.agencyAsks.length).toBeGreaterThan(20);
+      expect(run.agencyAsks.every((ask) => !ask.on)).toBe(true);
+      expect(Math.max(...run.agencyAsks.map((ask) => ask.reputation))).toBeLessThan(50);
+      expect(run.state.agency.on).toBe(false);
+      expect(run.state.ledger.some((entry) => entry.category === 'agency')).toBe(false);
+      expect(run.state.enquiries.some((enquiry) => enquiry.joinersWanted > 0)).toBe(false);
+      expect(run.state.jobs.some((job) => job.joinersWanted > 0)).toBe(false);
+    }
+    // The figures for the report: the standing on day 91 (Easy, then Very easy).
+    console.log('TT_PLAYTHROUGH', played.state.reputation, control.state.reputation);
+  });
+});

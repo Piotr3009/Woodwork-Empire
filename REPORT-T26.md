@@ -133,3 +133,12 @@ front of the crew limit, the draftsman's tab and order of work, the agency's rea
 measured workload of a big job (from about 250,000 no crew the unit holds makes the deadline), the
 overhang as measured, the depth keys against the order, the dust on machine minutes, and what is
 left for Piotr.
+
+**T26-D2 Scenarios.** The figures that moved were restated where they moved, one line each: B2's
+(thirty days on Easy 11.5, 2,741 and -680, the fan month by value, the playthrough 7,350, 398 and
+-12,999 trading to day 92) and nothing in phase C. (tt) is new: the playthrough asks for the agency
+every morning from day 31 and is refused (standing 3 on Easy, 4 on Very easy, on day 91), so no
+fee and no big job; and in `tests/scenarios/turn26.test.ts` the day 53 hall at a standing of 60
+takes Bookcases x 233 (210,000, wanting four) on day 106, stands its four by for the drawings to
+day 127, puts eight men on it, makes it on day 180, 22 working days late, and the bank closes the
+company on day 181 with it at the gate (the late days would have taken the whole 108,310 balance).
