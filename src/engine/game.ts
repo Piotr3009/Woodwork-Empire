@@ -1675,7 +1675,6 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   }
   // The men on a standing contract put their minute in beside the jobs (CLAUDE.md T13 3.16).
   const contract = runContractMinute(state, plan);
-  checkBags(state, contract.bagsFilled);
   if (atWork.length === 0 && contract.worked === 0) {
     tallyEfficiency(state, 0, lost);
     return;
@@ -1706,8 +1705,10 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     return;
   }
   // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
-  // it out and what fills the hall's bags (CLAUDE.md T7 2, T12 2.3).
-  const used = new Map<string, number>();
+  // it out and what fills the hall's bags (CLAUDE.md T7 2, T12 2.3). The contract's machines are
+  // in it from the start, so a machine a contract man and a job man share books its minute once
+  // (CLAUDE.md T26 2.1).
+  const used = new Map<string, number>(contract.machineIds.map((id) => [id, 1]));
   for (const { hand, stage, book, pace, machine } of running) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
     if (worker) {
@@ -1721,9 +1722,11 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     // ones, which is what the client sees when it lands (CLAUDE.md T10 3.1).
     hand.job.productionMinutes += 1;
     if (dusty) hand.job.dustyMinutes += 1;
-    // A machine books an hour for every hour a man works at one of its places (PIOTR, 21.09:
-    // "keep the hours"; CLAUDE.md T25 section 6).
-    if (machine !== null) used.set(machine.id, (used.get(machine.id) ?? 0) + 1);
+    // A machine books an hour for every clock hour at least one man works at one of its places,
+    // however many do (PIOTR, 21.09: "keep the hours"; CLAUDE.md T25 section 6, T26 2.1) [TUNE]:
+    // with the places at the capacity, eight men at a CNC would otherwise book it eight hours an
+    // hour.
+    if (machine !== null) used.set(machine.id, 1);
     // The pace is the job's, one figure for the whole of it: every stage at the hall's pace for its
     // family and his trade's worth at it, whichever machine his place is at (T25 2.4; v53).
     let speed = pace;
@@ -1758,7 +1761,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // duct run wears out on them.
   if (extractionRunning(state)) {
     for (const fan of extractionKit(state)) {
-      if (isServiced(fan.specId)) used.set(fan.id, (used.get(fan.id) ?? 0) + 1);
+      if (isServiced(fan.specId)) used.set(fan.id, 1);
     }
   }
   // What the owner's absence took off every staff minute this minute is the owner away line of

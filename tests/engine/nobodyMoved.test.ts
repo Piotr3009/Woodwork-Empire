@@ -7,7 +7,7 @@
 // starting one further on than the man hired before him; v55) and a bench last, and he stands at
 // his own home cell with `no free machines` over his head only when every one of them is taken.
 // Every minute of work is written on the stage the job's bar stands at, so the bar fills in
-// order. Nobody is sent to another job. On this hall, a budget saw and the hand bander out of the
+// order. Nobody is sent to another job. On this hall, a used saw and the hand bander out of the
 // cabinet, a job's round is the saw and a bench: in the first half hour the second man hired has
 // the saw and the other three are at the benches.
 //
@@ -42,12 +42,13 @@ function bagged(state: GameState, job: Job, shares: Partial<Record<string, numbe
   job.labourRemaining = job.labourValue - done;
 }
 
-/** Four men, one budget saw of one place, two jobs: two men on a job at its cutting stage, which
+/** Four men, one used saw of one place (a budget saw has two from Turn 26, its capacity; CLAUDE.md
+ *  T26 2.1), two jobs: two men on a job at its cutting stage, which
  *  wants the saw, and two on a job at its assembly, which wants a bench. The other four jobs and
  *  the two men left over are taken out of the hall, so what is asserted is these four men and
  *  nothing else. */
 function fourMenTwoJobs(): { state: GameState; cutting: Job; bench: Job } {
-  let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
+  let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'used' });
   const first = state.jobs[0];
   const second = state.jobs[1];
   if (!first || !second) throw new Error('two jobs are wanted');

@@ -783,9 +783,11 @@ export function workMinute(
       hand.job.nightMinutes += 1;
       state.dayStats.nightMinutes += 1;
     }
-    // A machine books an hour for every hour a man works at one of its places (PIOTR, 21.09:
-    // "keep the hours"; CLAUDE.md T25 section 6).
-    if (machine !== null) used.set(machine.id, (used.get(machine.id) ?? 0) + 1);
+    // A machine books an hour for every clock hour at least one man works at one of its places,
+    // however many do (PIOTR, 21.09: "keep the hours"; CLAUDE.md T25 section 6, T26 2.1) [TUNE]:
+    // with the places at the capacity, eight men at a CNC would otherwise book it eight hours an
+    // hour.
+    if (machine !== null) used.set(machine.id, 1);
     // The pace is the job's, one figure for the whole of it: every stage at the hall's pace for its
     // family and his trade's worth at it, whichever machine his place is at (T25 2.4; v53).
     let speed = pace;
@@ -819,7 +821,7 @@ export function workMinute(
   // duct run wears out on them.
   if (extractionRunning(state)) {
     for (const fan of extractionKit(state)) {
-      if (isServiced(fan.specId)) used.set(fan.id, (used.get(fan.id) ?? 0) + 1);
+      if (isServiced(fan.specId)) used.set(fan.id, 1);
     }
   }
   // What the owner's absence took off every staff minute this minute is the owner away line of

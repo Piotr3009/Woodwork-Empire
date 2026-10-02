@@ -58,14 +58,14 @@ import {
 import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/index';
 import {
   crewAtFamily,
-  hallCapacity,
+  hallPlaces,
   machineShortWord,
   placeShortages,
   serviceCallCheck,
   serviceDueIn,
   toolSlotsLine,
 } from '../engine/machines';
-import { BY_HAND_DURATION_FACTOR, MACHINE_CAPACITY, VAN_CLASSES } from '../engine/constants';
+import { BY_HAND_DURATION_FACTOR, CAPACITY_FAMILIES, VAN_CLASSES } from '../engine/constants';
 import { slotsInUseIn } from '../engine/staff';
 import { nextSpriteOrientation } from '../render/sprites';
 import { orderName, orderProgress } from '../engine/orders';
@@ -574,8 +574,8 @@ function specBlock(state: GameState, item: Equipment): string {
  *  6 and 7 men red, and the words one man works at 67 per cent"] (v54, v55). A family with no
  *  capacity rule says nothing. */
 function capacityBlock(state: GameState, item: Equipment): string {
-  if (MACHINE_CAPACITY[item.specId] === undefined) return '';
-  const capacity = hallCapacity(state, item.specId);
+  if (!CAPACITY_FAMILIES.includes(item.specId)) return '';
+  const capacity = hallPlaces(state, item.specId);
   const crew = crewAtFamily(state, item.specId);
   const word = machineShortWord(item.specId);
   const title = `${word.charAt(0).toUpperCase()}${word.slice(1)}`;

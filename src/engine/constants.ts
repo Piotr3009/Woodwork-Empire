@@ -1481,23 +1481,6 @@ const ENDURANCE_BY_CLASS: Record<string, number> = {
  *  name every caller has always used (CLAUDE.md T23 2.17). */
 export const BUILDING_ROLES: readonly WorkerRole[] = ['joiner'];
 
-/** How many men can work at one machine of this class at once: a machine is not a thing one man
- *  takes, it is a number of places to work [PIOTR, 21.09; TUNE, Piotr's own for the saw]
- *  (CLAUDE.md T25 2.1). Every floor family men work at has its row, the bench's being Turn 23's
- *  `WORKBENCH_PLACES` folded in (T23 2.17). The CNC and the booth have no used or budget class in
- *  Piotr's table ("n/a"), but the catalogue sells both, so each of those has the one place a
- *  machine cannot have fewer of [TUNE]. `placesOf` in src/engine/machines.ts is the one reader, and
- *  a family that is not here has no places at all: nobody works at it. */
-export const MACHINE_PLACES: Record<string, Record<string, number>> = {
-  tableSaw: { used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 },
-  spindleMoulder: { used: 1, budget: 1, standard: 1, pro: 2, industrial: 2 },
-  edgebander: { used: 1, budget: 1, standard: 1, pro: 2, industrial: 2 },
-  thicknesser: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 2 },
-  cnc: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 2 },
-  sprayBooth: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 2 },
-  workbench: { used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 },
-};
-
 /** The hall's pace at a stage, by the best class of the stage's family standing unbroken in the
  *  hall and not away for its service, whatever machine of it the man is at [PIOTR, 21.09: "the
  *  machine's class should add to the efficiency, that is easy to count"; TUNE, Piotr's figures]
@@ -1518,9 +1501,7 @@ export const MACHINE_PACE: Record<string, number> = {
   industrial: 1.12,
 };
 
-/** The families whose class is a pace: every family of the places table (CLAUDE.md T25 2.4). Every
- *  other family's class is its capacity, its air or its store, and never a speed. */
-export const PACED_FAMILIES: readonly string[] = Object.keys(MACHINE_PLACES);
+
 
 /** How long a man's turn at a machine holds before he moves on to the next of his job's: half an
  *  hour, so the men move about the hall the way a shop's do and the figures do not flicker [TUNE]
@@ -1538,7 +1519,11 @@ export const DRAW_BLOCK_MINUTES = 30;
  *  (`crewAtFamily`, `CAPACITY_ROLES`; v57); a man past the capacity still works, somewhere else, at
  *  the by hand pace, `1 / BY_HAND_DURATION_FACTOR`, which is what the Output sheet's line for it
  *  prints (v53). A family that is not here is never short: its quarter of the work is by hand
- *  already. The two hand edgebanders live in a cabinet and have no capacity to be short of. */
+ *  already. The two hand edgebanders live in a cabinet and have no capacity to be short of.
+ *
+ *  From Turn 26 it is the places too: a machine draws as many men as it keeps busy, one table
+ *  [PIOTR, 02.10] (CLAUDE.md T26 2.1). `placesOf` in src/engine/machines.ts is its one reader, and
+ *  a family that is not here has no places at all: nobody works at it. */
 export const MACHINE_CAPACITY: Record<string, Record<string, number>> = {
   tableSaw: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
   edgebander: { used: 2, budget: 4, standard: 4, pro: 6, industrial: 8 },
@@ -1546,7 +1531,20 @@ export const MACHINE_CAPACITY: Record<string, Record<string, number>> = {
   cnc: { used: 4, budget: 5, standard: 6, pro: 8, industrial: 10 },
   sprayBooth: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
   thicknesser: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
+  // The bench's own row, Turn 23's places as they stand (T23 2.17): a bench is a place to work and
+  // not a machine a hall can be short of, so it is off `CAPACITY_FAMILIES` below.
+  workbench: { used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 },
 };
+
+/** The families a hall can be short of: every row of the table but the bench's, whose places
+ *  have their own gate in the hire (CLAUDE.md T24 2.2). */
+export const CAPACITY_FAMILIES: readonly string[] = Object.keys(MACHINE_CAPACITY).filter(
+  (family) => family !== 'workbench',
+);
+
+/** The families whose class is a pace: every family of the table, the bench's included
+ *  (CLAUDE.md T25 2.4). Every other family's class is its air or its store, and never a speed. */
+export const PACED_FAMILIES: readonly string[] = Object.keys(MACHINE_CAPACITY);
 
 /** Who a machine's capacity is counted against, beside the owner: the joiners [PIOTR, 25.09: "we do
  *  not count the labourers or the people in the office, only me plus the joiners"] (v57). */

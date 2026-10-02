@@ -81,3 +81,12 @@ own figure is gone, and the hall's total of its lines is the sum under `What mov
 above it. A man on a standing contract takes his `machines` from `contractPieceSpeed`, the figure
 `runContractMinute` books him at, and his place's machine in the words (Nathan `CNC, pro ... 0.80 ×
 (1.00 + n machines ...)`), so the row multiplies out to its figure; a job man's row is v61's.
+
+**T26-C1 Places are the capacity.** `MACHINE_PLACES` is deleted; `placesOf` reads `MACHINE_CAPACITY`,
+which takes the bench's row as it stood, and `capacityOf` and `hallCapacity` went with it, the same
+reading twice (`hallPlaces` is the one); `CAPACITY_FAMILIES` is the table less the bench, so the
+shortage lines (`Too few saws: capacity 2, 4 men`) keep their arithmetic and no bench line appears.
+A machine books one minute a clock minute however many men are at it, the dust on the same minutes
+(collapsing both is my reading [TUNE]: eight men at a CNC is one CNC running), and a contract's wear
+is charged on its own `machineMinutes` (lifted from its man minutes). No scenario figure moved; the
+unit tests that wanted "a saw of one place" stand a used saw now, and the day 128 and 149 places are re-pinned.

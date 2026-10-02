@@ -732,8 +732,6 @@ export {
   paceLines,
   placesLine,
   crewAtFamily,
-  hallCapacity,
-  capacityOf,
   fullCrew,
   familyRuns,
   placeShortages,

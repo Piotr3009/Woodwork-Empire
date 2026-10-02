@@ -409,13 +409,14 @@ describe('the places at the saw', () => {
     return bossAssigns(clearEvents(runToDay(state, 2).state));
   }
 
-  it('lets one man cut at the budget saw s one place and works the other three at their benches', () => {
+  it('lets two men cut at the budget saw s two places and works the other two at their benches', () => {
     const state = fourAtTheCutting();
     expect(state.jobs.filter((job) => job.stage === 'inProduction')).toHaveLength(4);
     const before = state.jobs.map((job) => job.labourRemaining);
     const worked = tick(state, 60);
     const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
-    // One saw, one place, one man at it. Until v53 the other three stood with no place and put
+    // One saw, two places from Turn 26, its capacity, two men at it (CLAUDE.md T26 2.1); one place
+    // and one man until then. Until v53 the other three stood with no place and put
     // nothing in; now nobody waits for the saw: they work their wardrobes at their benches, and
     // every job gets the same hour (PIOTR, 24.09; v53). The hall's line for the four men at work
     // and a budget saw that keeps two busy, (2 + 2 / 1.5) / 4 = 0.8333, is on every minute, and
@@ -428,14 +429,21 @@ describe('the places at the saw', () => {
     const worth = manPace(WORKER_RATES.experienced, pace, (2 + 2 / 1.5) / 4);
     for (const value of done) expect(value).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * worth, 6);
     expect(done[0]).toBeCloseTo(23.1111, 4);
-    expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(1);
-    expect(worked.workers.filter((worker) => worker.station === 'machine:workbench')).toHaveLength(3);
+    expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(2);
+    expect(worked.workers.filter((worker) => worker.station === 'machine:workbench')).toHaveLength(2);
     expect(worked.workers.filter((worker) => worker.station === STATION_HOME)).toHaveLength(0);
     for (const man of worked.workers) expect(man.noPlaceFor, man.id).toBe('');
   });
 
   it('puts a second man on the saw the moment a second saw is bought', () => {
-    const state = buyNow(fourAtTheCutting(), 'tableSaw');
+    // The hall's saw a used one of one place, so the second saw is what makes the second place
+    // (CLAUDE.md T26 2.1).
+    const hall = fourAtTheCutting();
+    const first = hall.equipment.find((item) => item.specId === 'tableSaw');
+    if (first === undefined) throw new Error('a saw is wanted');
+    first.variantId = 'used';
+    expect(tick(hall, 60).workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(1);
+    const state = buyNow(hall, 'tableSaw');
     const worked = tick(state, 60);
     expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(2);
   });

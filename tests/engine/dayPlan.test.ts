@@ -129,7 +129,7 @@ describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
   });
 
   it('puts the owner first, whoever was hired before him', () => {
-    const state = fourAtOneSaw('budget');
+    const state = fourAtOneSaw('used');
     const first = state.jobs[0];
     if (!first) throw new Error('a job is wanted');
     first.assignees = [...first.assignees, OWNER];
@@ -150,10 +150,11 @@ describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
   });
 
   it('hands the saw s place to the next man the minute a man is taken off his job', () => {
-    let state = fourAtOneSaw('budget');
+    let state = fourAtOneSaw('used');
     state = tick(state, 1);
-    // One place at a budget saw: the second man hired has it, the fourth, whose turn it is too,
-    // finds it taken and works at a bench, and so do the other two (v55).
+    // One place at a used saw (a budget saw has two from Turn 26, its capacity): the second man
+    // hired has it, the fourth, whose turn it is too, finds it taken and works at a bench, and so
+    // do the other two (v55; CLAUDE.md T26 2.1).
     expect(workingMen(state)).toEqual(['staff-1', 'staff-2', 'staff-3', 'staff-4']);
     expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
     const job = state.jobs.find((entry) => entry.assignees.includes('staff-2'));
@@ -169,10 +170,10 @@ describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
   });
 
   it('gives a second saw s places out the minute it stands in the hall', () => {
-    let state = fourAtOneSaw('budget');
+    let state = fourAtOneSaw('used');
     state = tick(state, 1);
     expect(stationsOf(state, 4)).toEqual([AT_A_BENCH, AT_THE_SAW, AT_A_BENCH, AT_A_BENCH]);
-    placeEquipment(state, 'tableSaw', { variantId: 'budget', x: 14, y: 1, id: 'kit-saw-second' });
+    placeEquipment(state, 'tableSaw', { variantId: 'used', x: 14, y: 1, id: 'kit-saw-second' });
     state = tick(state, 1);
     // The fourth man hired, whose turn the saw is, goes from his bench to the second saw's one
     // place.
@@ -237,7 +238,7 @@ describe('who stands where (CLAUDE.md T25 2.3; v53)', () => {
   });
 
   it('wants no saw place in a hall with no saw: the cutting goes by hand and every man works at a bench', () => {
-    const state = fourAtOneSaw('budget');
+    const state = fourAtOneSaw('used');
     state.equipment = state.equipment.filter((item) => item.specId !== 'tableSaw');
     const plan = planPlaces(state);
     // The saw is not one of the families his job is made on here, so the bench is the one place
@@ -295,12 +296,14 @@ describe('four men on one job and one saw of one place (PIOTR, 24.09; v53)', () 
     expect(places.filter((entry) => entry.item.specId === 'tableSaw').map((entry) => entry.who)).toEqual([
       OWNER,
     ]);
-    // The owner at the saw, the first joiner at the edgebander, the other two at the benches.
+    // The owner at the saw, the first joiner at the edgebander, the second at a bench, and the
+    // third, whose turn is the edging too, at the bander's second place: a standard bander keeps
+    // four busy and has four places from Turn 26 (CLAUDE.md T26 2.1).
     expect(places.map((entry) => `${entry.who} ${entry.item.specId}`)).toEqual([
       'owner tableSaw',
       'staff-1 edgebander',
       'staff-2 workbench',
-      'staff-3 workbench',
+      'staff-3 edgebander',
     ]);
     const cells = places.map((entry) => `${entry.item.id}#${entry.place}`);
     expect(new Set(cells).size).toBe(4);
@@ -321,10 +324,10 @@ describe('four men on one job and one saw of one place (PIOTR, 24.09; v53)', () 
 });
 
 describe('a man with every place taken (CLAUDE.md T25 2.3; v53)', () => {
-  /** The four at a budget saw of one place with one bench left in the hall: two places for four
+  /** The four at a used saw of one place with one bench left in the hall: two places for four
    *  men, the saw's and the bench's, and the hand edgebander wants none. */
   function twoPlacesForFour(): GameState {
-    const state = fourAtOneSaw('budget');
+    const state = fourAtOneSaw('used');
     const keep = state.equipment.find((item) => item.specId === 'workbench');
     state.equipment = state.equipment.filter((item) => item.specId !== 'workbench' || item === keep);
     return state;

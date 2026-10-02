@@ -927,7 +927,8 @@ function liftToVersion33(state: Raw): void {
  *  estimator and a purchasing clerk become office admins at the admin's wage; the draftsman takes
  *  the first of his three grades and its wage. A job of work in the hands of a man whose new trade
  *  does not do it is put down, so the day's own pass hands it to whoever does it now. The agency
- *  is off, and no job and no enquiry wants free joiners. Written against the plain JSON of a save,
+ *  is off, no job and no enquiry wants free joiners, and a contract's machine minutes start at the
+ *  man minutes its wear was charged on (T26 2.1). Written against the plain JSON of a save,
  *  like every other lift, and the roles that went are named here and nowhere else. */
 function liftToVersion34(state: Raw): void {
   const wageOf = (role: string, tier: string | null): number | null =>
@@ -961,6 +962,11 @@ function liftToVersion34(state: Raw): void {
   state.agency = { on: false, sinceMonth: null };
   for (const job of records(state.jobs)) job.joinersWanted = 0;
   for (const enquiry of records(state.enquiries)) enquiry.joinersWanted = 0;
+  // A contract's machine minutes were its man minutes until tonight, one man to a machine place
+  // or near it, so the minutes it carries are the ones its wear was charged on (T26 2.1).
+  for (const contract of records(state.contracts)) {
+    contract.machineMinutes = typeof contract.labourMinutes === 'number' ? contract.labourMinutes : 0;
+  }
   state.version = 34;
 }
 

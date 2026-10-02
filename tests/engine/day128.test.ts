@@ -50,7 +50,7 @@ describe('the day 128 save (PIOTR, 22.09; v46)', () => {
     expect(hallHasABench(state)).toBe(true);
   });
 
-  it('spreads the four men over the kitchen s four machines, one each, and nobody stands', () => {
+  it('spreads the four men over the kitchen s machines, and nobody stands', () => {
     let state = day128();
     const job = state.jobs.find((entry) => entry.stage === 'inProduction');
     if (!job) throw new Error('the job is wanted');
@@ -67,11 +67,12 @@ describe('the day 128 save (PIOTR, 22.09; v46)', () => {
     expect(before - (after?.labourRemaining ?? before)).toBeCloseTo(71.671, 3);
     // The kitchen's round is its four machines, the saw, the edgebander, the spindle moulder and
     // the bench, and the four men go round them one each, moving on every half hour: at 9:53,
-    // the second half hour of the day, the owner is at the edgebander and Pete at the saw's one
-    // place (v55).
+    // the second half hour of the day, the owner is at the edgebander and Pete at the saw (v55).
+    // The budget saw has two places from Turn 26, its capacity, and Callum, whose turn is the
+    // edging too, takes the bander's second where until then it had one (CLAUDE.md T26 2.1).
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('the saw is wanted');
-    expect(hallPlaces(state, 'tableSaw')).toBe(1);
+    expect(hallPlaces(state, 'tableSaw')).toBe(2);
     expect(state.clock.minute).toBe(53);
     expect(state.owner.station).toBe('machine:edgebander');
     // Nobody stands and nobody has a mark over his head; each of them worked the whole half hour.
@@ -79,7 +80,7 @@ describe('the day 128 save (PIOTR, 22.09; v46)', () => {
     expect(joiners.map((worker) => `${worker.name} ${worker.station}`)).toEqual([
       'Eddie machine:workbench',
       'Pete machine:tableSaw',
-      'Callum machine:spindleMoulder',
+      'Callum machine:edgebander',
     ]);
     expect(menAtMachine(state, saw)).toEqual([joiners[1]?.id]);
     for (const worker of joiners) {
@@ -124,8 +125,9 @@ describe('the day 149 save (PIOTR, 22.09; v47)', () => {
     if (!kitchen) throw new Error('the kitchen is wanted');
     expect(kitchen.assignees).toEqual([OWNER]);
     expect(benchOf(state, OWNER)).toBe(null);
-    // Two saws, a budget one of one place and a pro one of two: three places at the saw.
-    expect(hallPlaces(state, 'tableSaw')).toBe(3);
+    // Two saws, a budget one of two places and a pro one of three, their capacities from Turn 26
+    // (CLAUDE.md T26 2.1): five places at the saw.
+    expect(hallPlaces(state, 'tableSaw')).toBe(5);
     const before = kitchen.labourRemaining;
     state = runClock(state, 5);
     const after = state.jobs.find((job) => job.id === kitchen.id);

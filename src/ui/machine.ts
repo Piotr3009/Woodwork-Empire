@@ -12,7 +12,6 @@ import {
   airDemandOf,
   bagsOf,
   classPaceOf,
-  capacityOf,
   placesOf,
   compressorAirOf,
   compressors,
@@ -34,6 +33,7 @@ import {
   zoneOf,
 } from '../engine/index';
 import {
+  CAPACITY_FAMILIES,
   CENTRAL_EXTRACTION_SPECS,
   CLASS_BADGE,
   CLASS_LADDER_FAMILIES,
@@ -139,7 +139,8 @@ function powerLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
  *  (v54, v55). Past it the men work on at the by hand pace, which the owned card says. The bench
  *  says its places in its own line with its pace. */
 function atOnceLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
-  const men = capacityOf({ specId: spec.id, variantId: variant.id });
+  if (!CAPACITY_FAMILIES.includes(spec.id)) return '';
+  const men = placesOf({ specId: spec.id, variantId: variant.id });
   if (men <= 0) return '';
   return `Keeps up to ${men} ${men === 1 ? 'man' : 'men'} busy`;
 }

@@ -79,6 +79,8 @@ describe('the wear a contract charges', () => {
   it('closes the term on the same rule as the card', () => {
     const { state, contract } = hallWith('wardrobeFront');
     contract.labourMinutes = 6000;
+    // One man on it the whole term: a machine minute for every minute of his (CLAUDE.md T26 2.1).
+    contract.machineMinutes = 6000;
     contract.piecesMade = 25;
     contract.revenue = 25 * contract.pricePerPiece;
     contract.materialCost = 25 * contractPiece(contract).material;

@@ -23,13 +23,14 @@ import {
   runClock,
   sixJoinersOnSheetWork, withOnlyCuttingLeft } from '../helpers';
 
-/** Three men on one job at its cutting stage, one budget saw of one place and the day one kit's one
+/** Three men on one job at its cutting stage, one used saw of one place (a budget saw has two from
+ *  Turn 26, its capacity; CLAUDE.md T26 2.1) and the day one kit's one
  *  bench, the five other benches taken out: the saw and that bench are every place the hall has.
  *  Nobody waits for the saw, so the first man cuts, the second takes the bench, and the third and
  *  the three men on the other jobs stand with every place they could take taken
  *  (PIOTR, 24.09; v53). Until v53 the one saw alone stood the second man. */
 function everyPlaceTaken(): { state: GameState; job: Job } {
-  let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
+  let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'used' });
   const first = state.jobs[0];
   if (!first) throw new Error('a job is wanted');
   state = act(state, { type: 'ADD_TO_JOB', jobId: first.id, workerId: 'staff-2' });

@@ -1009,6 +1009,9 @@ export interface Contract {
   revenue: number;
   materialCost: number;
   labourMinutes: number;
+  /** Clock minutes a machine ran for this contract, one a machine however many of its men stood at
+   *  it: what its wear is charged on (CLAUDE.md T24 2.4, T26 2.1). */
+  machineMinutes: number;
   /** The price the client offers at the end of the term, from the delivery history. Null until
    *  the term ends. */
   renegotiatedPrice: number | null;

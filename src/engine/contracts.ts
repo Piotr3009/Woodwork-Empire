@@ -48,7 +48,6 @@ import { isOnJob, stagedJob, takeOffJob, workerMinuteCost } from './jobs';
 import { freeSheets } from './materials';
 import {
   OWNER,
-  accumulateMachineMinute,
   bestMachineOf,
   classPaceOf,
   bookOutputMinute,
@@ -686,6 +685,7 @@ export function drawContract(state: GameState, carrier: RngCarrier = state): Con
     revenue: 0,
     materialCost: 0,
     labourMinutes: 0,
+    machineMinutes: 0,
     renegotiatedPrice: null,
     endedBy: 'term',
   };
@@ -923,8 +923,10 @@ export function contractStationFor(state: GameState, worker: Worker): string | n
 export interface ContractMinute {
   /** Staff minutes put in, at the owner away factor, for the efficiency tally. */
   worked: number;
-  /** True the minute the hall's bag store fills on a contract's saw. */
-  bagsFilled: boolean;
+  /** The machines a contract man worked at this minute, each once however many of them were at
+   *  it: the day's minute books their hours and their dust with the jobs' own, so a machine two
+   *  trades share books the minute once (CLAUDE.md T26 2.1). */
+  machineIds: string[];
 }
 
 /** A piece is done: the revenue goes through the ledger, one growing line a day, the sheets in it
@@ -956,7 +958,7 @@ export function runContractMinute(
   state: GameState,
   places: ReadonlyMap<string, { working: boolean; machine: Equipment | null }>,
 ): ContractMinute {
-  const result: ContractMinute = { worked: 0, bagsFilled: false };
+  const result: ContractMinute = { worked: 0, machineIds: [] };
   const active = activeContracts(state);
   if (active.length === 0) return result;
   const minute = state.clock.minute;
@@ -964,9 +966,12 @@ export function runContractMinute(
   // The men on a contract go home at five with everybody else (CLAUDE.md T17 2.12).
   if (crewHasGoneHome(state)) return result;
   const away = staffOutputFactor(state);
-  const used = new Map<string, number>();
+  const used = new Set<string>();
   let hall: number | null = null;
   for (const contract of active) {
+    // The machines this contract's men were at this minute: its wear is charged on these, one
+    // minute a machine however many of its men stood at it (CLAUDE.md T24 2.4, T26 2.1).
+    const atMachines = new Set<string>();
     const piece = contractPiece(contract);
     // The contract has the whole day of every man on it (PIOTR, 21.09; v42): its hands are its
     // own this minute, first to last, with no job of work to give them back to.
@@ -1005,14 +1010,19 @@ export function runContractMinute(
       state.dayStats.workMinutes += 1;
       bookOutputMinute(state, worker.id, worth);
       result.worked += away;
-      // A machine books an hour for every hour a man works at one of its places (T25 section 6).
-      if (place.machine !== null) used.set(place.machine.id, (used.get(place.machine.id) ?? 0) + 1);
+      // A machine books an hour for every clock hour at least one man works at one of its places
+      // (T25 section 6, T26 2.1).
+      if (place.machine !== null) {
+        used.add(place.machine.id);
+        atMachines.add(place.machine.id);
+      }
       while (contract.pieceMinutes >= piece.minutes) {
         if (!finishPiece(state, contract, piece)) break;
       }
     }
+    contract.machineMinutes += atMachines.size;
   }
-  if (used.size > 0 && accumulateMachineMinute(state, used)) result.bagsFilled = true;
+  result.machineIds = [...used];
   return result;
 }
 
@@ -1088,8 +1098,9 @@ export function closingReport(state: GameState, contract: Contract): ClosingRepo
   const labourCost = pence(contract.labourMinutes * labourMinuteCost(state));
   const piece = contractPiece(contract);
   const machine = pieceMachine(state, piece);
-  // The same rule as the card's: the minutes at the machine and no others (CLAUDE.md T24 2.4).
-  const machineMinutes = contract.labourMinutes * pieceMachineShare(state, piece);
+  // The same rule as the card's: the minutes at the machine and no others (CLAUDE.md T24 2.4), and
+  // one a clock minute a machine however many of the contract's men stood at it (T26 2.1).
+  const machineMinutes = contract.machineMinutes * pieceMachineShare(state, piece);
   const machineWear = pence(machineMinutes * (machine === null ? 0 : machineWearPerMinute(machine)));
   return {
     pieces: contract.piecesMade,
@@ -1267,6 +1278,7 @@ export function renewContract(state: GameState, contractId: string, accept: bool
     revenue: 0,
     materialCost: 0,
     labourMinutes: 0,
+    machineMinutes: 0,
     renegotiatedPrice: null,
     endedBy: 'term',
   };

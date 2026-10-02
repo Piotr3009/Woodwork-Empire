@@ -28,8 +28,8 @@ import {
   MACHINE_HOURS_PER_MONTH,
   TIER_WORDS,
   MACHINE_PACE,
+  CAPACITY_FAMILIES,
   MACHINE_CAPACITY,
-  MACHINE_PLACES,
   PACED_FAMILIES,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
@@ -360,11 +360,11 @@ export function cabinetTools(state: GameState, specId: string): Equipment[] {
   return owned(state, specId).filter((item) => !itemStandsInTheHall(item) && !isSold(item));
 }
 
-/** How many men can work at this machine at once: its class's row of `MACHINE_PLACES`, and
- *  nought for anything that is not a floor family men work at. The one reader of the table
- *  (PIOTR, 21.09; CLAUDE.md T25 2.1). */
+/** How many men can work at this machine at once, which is how many it keeps busy: its class's
+ *  row of `MACHINE_CAPACITY`, and nought for anything that is not a floor family men work at. The
+ *  one reader of the table (PIOTR, 21.09 and 02.10; CLAUDE.md T25 2.1, T26 2.1). */
 export function placesOf(item: { specId: string; variantId: string }): number {
-  return MACHINE_PLACES[item.specId]?.[item.variantId] ?? 0;
+  return MACHINE_CAPACITY[item.specId]?.[item.variantId] ?? 0;
 }
 
 /** True while at least one machine of this family can be worked at this minute: one of them is
@@ -484,18 +484,6 @@ export function fullCrew(state: GameState): number {
   return men + 1;
 }
 
-/** How many men this one machine keeps busy: its class's figure in `MACHINE_CAPACITY`, or nought
- *  for a family with no capacity rule (v55). */
-export function capacityOf(item: { specId: string; variantId: string }): number {
-  return MACHINE_CAPACITY[item.specId]?.[item.variantId] ?? 0;
-}
-
-/** The men the hall's running machines of this family keep busy between them: two budget saws
- *  are four men (v55). */
-export function hallCapacity(state: GameState, family: string): number {
-  return placedMachines(state, family).reduce((total, item) => total + capacityOf(item), 0);
-}
-
 /** The men at work this minute whose work goes through a machine of this family: a man on a job
  *  with a stage of the family in its plan, and a man on a standing contract whose piece is done on
  *  it [PIOTR, 24.09: "only the men whose work goes through the machine"] (v55). A job cut on a
@@ -541,7 +529,7 @@ export interface PlaceShortage {
   factor: number;
 }
 
-/** Every family of `MACHINE_CAPACITY` whose machines keep fewer men busy than want them [PIOTR,
+/** Every family of `CAPACITY_FAMILIES` whose machines keep fewer men busy than want them [PIOTR,
  *  24.09: "with three places at the saw and four men, too few saws for the men"]. Nobody waits for
  *  the saw: the men past its capacity work elsewhere, slower, at the by hand pace, and the hall's
  *  output falls by what they lose (v53). Only the men whose work goes through the family count
@@ -554,8 +542,10 @@ export function placeShortages(
   count: (family: string) => number = (family) => crewAtFamily(state, family, shift),
 ): PlaceShortage[] {
   const found: PlaceShortage[] = [];
-  for (const family of Object.keys(MACHINE_CAPACITY)) {
-    const capacity = hallCapacity(state, family);
+  for (const family of CAPACITY_FAMILIES) {
+    // The men the hall's running machines of the family keep busy between them, which is its
+    // places: two budget saws are four men (v55; CLAUDE.md T26 2.1).
+    const capacity = hallPlaces(state, family);
     if (capacity <= 0) continue;
     const men = count(family);
     if (men <= capacity) continue;
