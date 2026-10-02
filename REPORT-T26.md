@@ -142,3 +142,14 @@ fee and no big job; and in `tests/scenarios/turn26.test.ts` the day 53 hall at a
 takes Bookcases x 233 (210,000, wanting four) on day 106, stands its four by for the drawings to
 day 127, puts eight men on it, makes it on day 180, 22 working days late, and the bank closes the
 company on day 181 with it at the gate (the late days would have taken the whole 108,310 balance).
+
+**T26-D3 Cross check.** Section 7, point by point, each asserted: the two greps (kept as
+`tests/engine/turn26CrossCheck.test.ts`; the trades are named in the migration and its test alone,
+`helper` is the id and the sheets); no two figures on a cell, every man at his family, and the CNC
+holding the men whose turn it is up to its places on the day 53, 128 and 149 halls
+(`tests/render/noSharedCells.test.ts`); the walk from the bench to the saw and the stepped walker
+behind the moulder (`walkBetween`, `depthBehind`); one machine hour a clock hour with three and more
+at the CNC (`placesAreCapacity`); the ninth joiner and nobody else (`staffCrewLimit`); the draftsman's
+grades (`draftsmanSurvey`, `team`); a month of ratings at half (`companyBoard`); the fourth contract
+(`contractsMax`); the agency (`agency`, `agencyCard`); the Pace head and Nathan's `machines`
+(`paceHead`); every scenario green; `git diff main --stat -- src/ui/styles.css` empty.
