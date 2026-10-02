@@ -128,17 +128,15 @@ const OFFICE_ROLES: WorkerRole[] = ['officeAdmin', 'salesman', 'draftsman', 'pro
  *  admin's specialist work. */
 const BEHIND_THE_ADMIN: WorkerRole[] = ['salesman', 'draftsman'];
 
-/** The roles that stand on the hall floor: the joiners, the labourer and the production manager,
- *  who runs it (CLAUDE.md T13 3.10). The office is in the office block, behind its door. */
-export const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager'];
+/** The roles that stand on the hall floor: the joiners and the labourer, and nobody else
+ *  [PIOTR, 02.10] (CLAUDE.md T13 3.10, T26 1). The office and the production manager are behind
+ *  the office door. They are the men the canteen keeps a locker and a plate for too [PIOTR, 02.10:
+ *  "the same as the crew"] (CLAUDE.md T26 2.10). */
+export const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper'];
 
-/** The men the canteen keeps a locker and a plate for: the men on the floor, the joiners and the
- *  labourer, and nobody else [PIOTR, 02.10: "the same as the crew"] (CLAUDE.md T26 2.10). */
-export const LOCKER_ROLES: WorkerRole[] = ['joiner', 'helper'];
-
-/** The men of the canteen's lockers, in the order they were taken on. */
+/** The men of the canteen's lockers, the men on the floor, in the order they were taken on. */
 export function lockerMen(state: GameState): Worker[] {
-  return state.workers.filter((worker) => LOCKER_ROLES.includes(worker.role));
+  return state.workers.filter((worker) => FLOOR_ROLES.includes(worker.role));
 }
 
 /** The crew the unit limits: its joiners and nobody else, the owner, the labourer, the manager and
@@ -512,7 +510,7 @@ export function hiringOptions(state: GameState): HiringOption[] {
       // The floor limits the crew: one person per so many square metres of free floor
       // (PIOTR; CLAUDE.md T13 3.10).
       blockReason = crewLine(state);
-    } else if (LOCKER_ROLES.includes(spec.role) && lockerMen(state).length >= CANTEEN_LOCKERS) {
+    } else if (FLOOR_ROLES.includes(spec.role) && lockerMen(state).length >= CANTEEN_LOCKERS) {
       // And so does the canteen: it was built with eight compartments, every man on the books
       // keeps his things in one of them, and the owner needs none. This comes before the
       // shortfall below, because a ninth locker cannot be bought either and "Buy first: Locker"

@@ -41,6 +41,8 @@ import {
   contractResultFor,
   contractShortfall,
   contractWorkerOf,
+  contractsFull,
+  contractsFullLine,
   endContractCheck,
   endedLine,
   sheetsForPieces,
@@ -221,7 +223,9 @@ function endedBlock(state: GameState, contract: Contract): string {
     `${plural(contract.termWeeks, 'week', 'weeks')}, ${signedMoney(offered - contract.pricePerPiece)} on ` +
     `${money(contract.pricePerPiece)}.</p>` +
     `<div class="row"><span class="row-main"></span><span class="row-action">` +
-    `${primaryButton('renewContract', `Renew at ${money(offered)}`, `data-id="${contract.id}" data-accept="1"`)}` +
+    // A renewal is a fourth running contract while three others run: the line in its place
+    // (CLAUDE.md T26 2.12).
+    `${contractsFull(state) ? reasonLabel(contractsFullLine()) : primaryButton('renewContract', `Renew at ${money(offered)}`, `data-id="${contract.id}" data-accept="1"`)}` +
     `${button('renewContract', 'Let it go', `data-id="${contract.id}" data-accept="0"`)}</span></div>` +
     '</div>'
   );

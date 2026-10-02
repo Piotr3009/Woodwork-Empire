@@ -12,10 +12,12 @@ import {
   crewFull,
   crewLine,
   joiners,
+  FLOOR_ROLES,
   missingForHire,
 } from '../../src/engine/staff';
+import { STATION_OFFICE } from '../../src/engine/stations';
 import type { GameState, Worker } from '../../src/engine/index';
-import { buyNow, buyStartingKit, hireNow, newGame } from '../helpers';
+import { buyNow, buyStartingKit, hireNow, newGame, runClock } from '../helpers';
 
 /** Buys exactly what the engine says is missing for one more joiner. */
 function withJoinerKit(state: GameState): GameState {
@@ -147,5 +149,16 @@ describe('the floor limit', () => {
     expect(crewCount(state)).toBe(0);
     state.workers.push({ ...manager('j1'), role: 'joiner', tier: 'novice' });
     expect(crewCount(state)).toBe(1);
+  });
+
+  it('keeps the production manager off the floor, behind the office door', () => {
+    // On the floor there are joiners and the labourer, and nobody else [PIOTR, 02.10] (CLAUDE.md
+    // T26 1): a manager with nothing in hand waits at his desk and not at the canteen door.
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    state.workers.push(manager());
+    state.clock.minute = 60;
+    state = runClock(state, 1);
+    expect(FLOOR_ROLES).toEqual(['joiner', 'helper']);
+    expect(state.workers.find((worker) => worker.id === 'pm-1')?.station).toBe(STATION_OFFICE);
   });
 });

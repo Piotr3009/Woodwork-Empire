@@ -214,6 +214,13 @@ paragraph of a tile, so the colour went on a span inside the line (no new style)
 floor, and a hall that looks like a workshop`, not merged. Nothing was left running: the pictures
 were shot from a static server inside the shooting script, which stops it before it exits.
 
+**T26 review.** Three findings of the PR's review bot, each verified and fixed: a yes to a renewal
+while three contracts run is refused before the ended one is taken off the books, and its renew
+question says `3 contracts running` where the button was (`contractsMax`); the owner's own drawing
+waits for the client meeting and the site survey as the draftsman's does (`draftsmanSurvey`); the
+production manager is desk staff and off the floor and the lockers, `FLOOR_ROLES` being the joiner and
+the labourer (`staffCrewLimit`).
+
 ## The ten pictures
 
 The third column is the nearest existing picture of the same screen, and what each pair differs by

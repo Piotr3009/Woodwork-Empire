@@ -1421,9 +1421,10 @@ function updateStations(state: GameState): void {
   }
   for (const worker of state.workers) {
     // A desk man is behind the office door whether he has a task in hand or not: the admin, the
-    // draftsman and the salesman work at desks, and one with nothing to
-    // do waits at his desk and not at the canteen door with the crew [PIOTR, 30.09] (v60). The
-    // dinner hour and a day off are the canteen's, as they are for everybody.
+    // draftsman, the salesman and from Turn 26 the production manager, the floor being the
+    // joiners' and the labourer's alone (CLAUDE.md T26 1); one with nothing to do waits at his desk
+    // and not at the canteen door with the crew [PIOTR, 30.09] (v60). The dinner hour and a day off
+    // are the canteen's, as they are for everybody.
     const desk = !FLOOR_ROLES.includes(worker.role);
     if (dinner || !isWorkingToday(state, worker)) {
       worker.station = STATION_IDLE;

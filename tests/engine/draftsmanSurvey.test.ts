@@ -11,7 +11,7 @@ import {
   DRAFTSMAN_TIERS,
   SITE_MEASURE_MINUTES,
 } from '../../src/engine/constants';
-import { rolesForTask } from '../../src/engine/tasks';
+import { rolesForTask, startTaskCheck } from '../../src/engine/tasks';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
   acceptNow,
@@ -178,5 +178,18 @@ describe('the site survey', () => {
       const spent = later.workers.find((entry) => entry.id === worker.id)?.minutesWorked ?? 0;
       expect(meeting?.minutesRemaining, tier).toBeCloseTo(CLIENT_MEETING_MINUTES - spent * DRAFTSMAN_RATE[tier], 6);
     }
+  });
+
+  it('comes before the drawing when the owner starts it himself, as it does for the draftsman', () => {
+    // The one order of the brief's work, the meeting and the survey before the drawing, holds for
+    // the owner's own click as it holds for the draftsman's day (CLAUDE.md T26 2.8).
+    const state = withAMeasure();
+    const design = state.tasks.find((task) => task.kind === 'design' && !task.done);
+    const survey = state.tasks.find((task) => task.kind === 'siteMeasure' && !task.done);
+    if (design === undefined || survey === undefined) throw new Error('a drawing and a survey are wanted');
+    expect(startTaskCheck(state, design.id)).toMatchObject({ ok: false, reason: 'The site survey comes first' });
+    survey.done = true;
+    survey.minutesRemaining = 0;
+    expect(startTaskCheck(state, design.id).ok).toBe(true);
   });
 });

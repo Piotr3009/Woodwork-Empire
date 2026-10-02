@@ -1254,6 +1254,9 @@ export function renewContract(state: GameState, contractId: string, accept: bool
   if (contract.status !== 'ended' || contract.renegotiatedPrice === null) {
     return { ok: false, reason: 'The term is not over' };
   }
+  // A yes is a fourth running contract while three others run: refused before anything moves, so
+  // the ended one and its history stay on the books (CLAUDE.md T26 2.12).
+  if (accept && contractsFull(state)) return { ok: false, reason: contractsFullLine() };
   state.contracts = state.contracts.filter((entry) => entry.id !== contractId);
   if (!accept) return OK;
   // The same piece, quantity and term at the new price, on the books as a fresh offer that is

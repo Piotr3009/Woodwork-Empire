@@ -933,13 +933,16 @@ export function startTaskCheck(
     return refused(`Busy with ${held ? held.label : 'something else'}`, current);
   }
   // No drawing without a licence for the software (CLAUDE.md 9.2), and none before the client
-  // has been sat down with on a job that wants a meeting (CLAUDE.md T7 3.11).
+  // has been sat down with on a job that wants a meeting (CLAUDE.md T7 3.11), nor before the site
+  // has been surveyed on one that wants a survey: the one order the draftsman works to too
+  // (`briefOutstandingFor`; CLAUDE.md T26 2.8).
   if (task.kind === 'design') {
     if (!softwareActive(state)) return refused('No software licence');
-    const open = state.tasks.some(
+    const meeting = state.tasks.some(
       (entry) => entry.kind === 'clientMeeting' && entry.jobId === task.jobId && !entry.done,
     );
-    if (open) return refused('The client meeting comes first');
+    if (meeting) return refused('The client meeting comes first');
+    if (briefOutstandingFor(state, task.jobId)) return refused('The site survey comes first');
   }
   // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
   if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) {
