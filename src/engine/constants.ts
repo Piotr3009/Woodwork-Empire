@@ -329,6 +329,7 @@ export const SPEND_WARNING_CATEGORIES = [
   'loanInterest',
   'overdraftInterest',
   'software',
+  'agency',
 ] as const;
 /** The two lines a margin is read against, on the client's answer and anywhere else the game
  *  colours one (PIOTR accepted, 17.09; CLAUDE.md T18 2.9) [TUNE]. A fifth of the price left after
@@ -1038,6 +1039,26 @@ export const LOW_REPUTATION_PRICE_FACTOR = 0.85;
 /** Reputation tier thresholds for the board and the template weights (PIOTR: below 0, 0 to 20,
  *  above 20). The hiring pool has its own gate per role in 9.3. */
 export const REPUTATION_TIERS = [REPUTATION_MIN, 0, 20] as const;
+
+// ---------------------------------------------------------------------------
+// T26 2.13 The advertising agency and the big one off jobs
+// ---------------------------------------------------------------------------
+
+/** [PIOTR, 02.10] What the agency costs, charged on the 1st of every month it is on, like the
+ *  software's subscription (CLAUDE.md T26 2.13). */
+export const AGENCY_MONTHLY_FEE = 5000;
+/** [PIOTR, 02.10] What a big one off job is worth, the least and the most. */
+export const AGENCY_JOB_VALUE_MIN = 100000;
+export const AGENCY_JOB_VALUE_MAX = 1000000;
+/** The step the value is drawn in, uniformly between the two [TUNE]. */
+export const AGENCY_JOB_VALUE_STEP = 10000;
+/** The standing the agency's big jobs come from, and the agency is taken on from [TUNE]. */
+export const AGENCY_JOB_REPUTATION = 50;
+/** [PIOTR, 02.10: "at least four free joiners"] The free joiners a big job wants before it can
+ *  be taken: four at the least value, rising in a straight line to eight at the most [TUNE the
+ *  slope] (`bigJobJoinersFor`). */
+export const BIG_JOB_JOINERS_MIN = 4;
+export const BIG_JOB_JOINERS_MAX = 8;
 
 // ---------------------------------------------------------------------------
 // T13 3.7 The company website, five levels

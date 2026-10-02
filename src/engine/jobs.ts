@@ -37,6 +37,7 @@ import {
   WORKER_MINUTE_RATE_DIVISOR,
   type VanClass,
 } from './constants';
+import { putCrewOnBigJob } from './agency';
 import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
@@ -81,6 +82,7 @@ import {
 } from './stages';
 import { applyRating, changeReputation } from './reputation';
 import { float, int, makeId, next } from './rng';
+import type { RngCarrier } from './rng';
 import { plural } from './text';
 import {
   AD_HOC_TASK_MINUTES,
@@ -103,6 +105,7 @@ import type {
   JsonValue,
   MaterialKind,
   StageId,
+  Worker,
   WorkerRole,
 } from './types';
 
@@ -177,10 +180,10 @@ export interface DeadlineDraw {
   rng: number;
 }
 
-export function drawDeadline(state: GameState): DeadlineDraw {
-  const draw = { rng: state.rng };
+export function drawDeadline(carrier: RngCarrier): DeadlineDraw {
+  const draw = { rng: carrier.rng };
   // The one draw the deadline takes, whatever the size of the job.
-  float(state, 0, 1);
+  float(carrier, 0, 1);
   return draw;
 }
 
@@ -467,6 +470,8 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
   // Reserved from the free stock at once; what it could not have is its shortfall (T13 3.3).
   reserveSheetsFor(state, job);
   createJobTasks(state, job);
+  // A big job takes the free joiners it wants with it (CLAUDE.md T26 2.13).
+  putCrewOnBigJob(state, job);
   return { ok: true, reason: '', job };
 }
 
@@ -583,7 +588,9 @@ export function refreshJob(state: GameState, job: Job): void {
   // Anything free that has come onto the rack since it was taken is held for it now.
   reserveSheetsFor(state, job);
   if (shortfallOf(job) === 0) {
-    job.stage = 'ready';
+    // A big job has had its crew on it since the Take it click, and goes into production with
+    // them the minute it is ready (CLAUDE.md T26 2.13); every other job waits on the list.
+    job.stage = job.assignees.length > 0 ? 'inProduction' : 'ready';
     return;
   }
   const coming = state.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded);
@@ -1063,6 +1070,13 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
  *  that machines.ts can fill the benches with these men without reaching into this module; every
  *  caller still reads it from here, where it has always been (CLAUDE.md T19 2.5, 2.6, T23 2.17). */
 export { BUILDING_ROLES };
+
+/** The joiners on no job and no contract this minute: a man on a contract carries its marker as
+ *  his job, so one test answers both. What a big job of the agency's counts before it can be taken
+ *  (CLAUDE.md T26 2.13). */
+export function freeJoiners(state: GameState): Worker[] {
+  return state.workers.filter((worker) => worker.role === 'joiner' && worker.jobId === null);
+}
 
 /** True while this man could be put on a job at all: a joiner, on the books, not off
  *  sick and not on a standing contract. The owner is always able, if he is about.

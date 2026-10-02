@@ -826,6 +826,8 @@ export type LedgerCategory =
   | 'wagesNight'
   | 'salaries'
   | 'software'
+  /** The advertising agency's month, on the 1st while it is on (CLAUDE.md T26 2.13). */
+  | 'agency'
   | 'waste'
   | 'equipment'
   | 'material'
@@ -1425,6 +1427,7 @@ export type GameAction =
   | { type: 'BUY_JOINERY_CORE_EXTENSION' }
   // Orders and stock:
   | { type: 'SET_WEBSITE_LEVEL'; level: number }
+  | { type: 'SET_AGENCY'; on: boolean }
   // Machines and the hall:
   | { type: 'CONNECT_EXTRACTION'; equipmentId: string }
   | { type: 'BUY_GATE'; equipmentId: string }

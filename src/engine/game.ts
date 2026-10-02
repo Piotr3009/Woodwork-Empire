@@ -44,6 +44,7 @@ import {
   WELFARE_IN_THE_CANTEEN,
   SOUND_VOLUME_DEFAULT,
 } from './constants';
+import { arriveBigJob, crewStandsBy, setAgency } from './agency';
 import { arriveEnquiries, refreshBoard, refreshLocks } from './board';
 import {
   acceptContract,
@@ -560,6 +561,8 @@ function startDay(state: GameState): void {
   // and the day's new enquiries arrive with it (CLAUDE.md T13 3.4).
   refreshBoard(state);
   arriveEnquiries(state);
+  // And the agency's big job beside them, while it is on (CLAUDE.md T26 2.13).
+  arriveBigJob(state);
   offerContract(state);
   runContractDay(state);
   runInsuranceDay(state);
@@ -1590,7 +1593,9 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
     if (!BUILDING_ROLES.includes(worker.role) || worker.jobId === null) continue;
     const job = findJob(state, worker.jobId);
     if (!job || job.stage !== 'inProduction') {
-      worker.jobId = null;
+      // A big job's crew stands by it until it is ready: the Take it click put them on it
+      // (CLAUDE.md T26 2.13). Any other man on a job that is not in production is free again.
+      if (!job || !crewStandsBy(job)) worker.jobId = null;
       continue;
     }
     // His own rate, what the hall does to it, and what the manager over him adds. The night
@@ -2352,6 +2357,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'SET_WEBSITE_LEVEL':
       setWebsiteLevel(next, action.level);
+      break;
+    case 'SET_AGENCY':
+      setAgency(next, action.on);
       break;
     case 'CONNECT_EXTRACTION':
       connectExtraction(next, action.equipmentId);

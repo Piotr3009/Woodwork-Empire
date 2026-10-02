@@ -62,3 +62,15 @@ nothing while three run, the weekly offer owed or not, and `acceptContractCheck`
 already on the board, the Contracts tab's card and the laptop's tile showing `3 contracts running:
 the most the shop takes on` where the take button was (the one click of `takeContract` asks it
 first). No scenario moved: none of them runs more than one contract.
+
+**T26-B4 The advertising agency and the big jobs.** `src/engine/agency.ts`: the switch on the
+Website page under the ladder, in the software card's classes, taken on from a standing of 50 (the
+lock is mine, so a shop never pays for a board it cannot be shown [TUNE]); `AGENCY_MONTHLY_FEE`
+5,000 on the 1st as the software's, ledger `agency` on the `Software, website and advertising`
+month line, no sales; one big job on the board at a time, on a side stream of the day, from 50
+[TUNE], 100,000 to 1,000,000 in steps of 10,000 [PIOTR range, TUNE step], a template the hall can
+make, standard sheets [TUNE], the ordinary deadline rule; `bigJobJoinersFor` 4 to 8 [PIOTR, TUNE
+slope]; `canAccept` says `Wants 4 joiners free: you have 2` (red on the card, green once there),
+and the client's yes puts the first free joiners on it, who stand by it until it is ready and it
+goes into production with them. Note: at the deadline cap of 30 days the top of the range cannot
+be made on time (D2 measures it).

@@ -7,6 +7,7 @@
 // (PIOTR, 19.09; CLAUDE.md T22 2.1, 2.2).
 
 import {
+  AGENCY_MONTHLY_FEE,
   BANKRUPTCY_DAYS_BELOW_LIMIT,
   BANKRUPTCY_LIMIT_FACTOR,
   DAYS_PER_MONTH,
@@ -453,6 +454,9 @@ function runMonthlyItems(state: GameState): void {
   }
   const joineryCore = joineryCoreMonthly(state);
   if (joineryCore > 0) chargeUnavoidable(state, 'software', 'Joinery Core', joineryCore);
+  // The advertising agency, on the 1st of every month it is on, as the software is (CLAUDE.md T26
+  // 2.13).
+  if (state.agency.on) chargeUnavoidable(state, 'agency', 'Advertising agency', AGENCY_MONTHLY_FEE);
   if (hasCentralExtraction(state) && !has(state, 'pelletiser')) {
     chargeUnavoidable(state, 'waste', 'Dust waste collection', DUST_WASTE_MONTHLY);
   }
@@ -651,7 +655,7 @@ export const MONTH_LINES: ReadonlyArray<{ id: MonthLineId; label: string }> = [
   { id: 'contract', label: 'Contract work, revenue and material' },
   { id: 'waste', label: 'Waste collection' },
   { id: 'equipment', label: 'Equipment, pipes and repairs' },
-  { id: 'software', label: 'Software and website' },
+  { id: 'software', label: 'Software, website and advertising' },
   { id: 'other', label: 'Everything else' },
 ];
 
@@ -686,6 +690,7 @@ export const MONTH_LINE_OF: Record<LedgerCategory, MonthLineId> = {
   repair: 'equipment',
   software: 'software',
   website: 'software',
+  agency: 'software',
   accounts: 'other',
   pellets: 'other',
   other: 'other',

@@ -14,6 +14,8 @@ import {
   websiteReputationBonus,
 } from '../engine/index';
 import { NO_INSURANCE_REASON } from '../engine/constants';
+// Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
+import { bigJobCheck, bigJobLine, isBigJob } from '../engine/agency';
 import { effectiveReputation } from '../engine/index';
 import type { Enquiry, GameState } from '../engine/index';
 import {
@@ -94,6 +96,12 @@ function tile(state: GameState, enquiry: Enquiry): string {
           `data-id="${enquiry.id}" data-byhand="${byHand ? '1' : '0'}"`,
         )
       : '';
+  // A big job of the agency's says what it wants of the crew, red until the hall has the free
+  // joiners and green once it has (CLAUDE.md T26 2.13).
+  const crewLine = isBigJob(enquiry)
+    ? `<p class="tile-figures ${bigJobCheck(state, enquiry).ok ? 'good' : 'bad'}" data-big-job="crew">` +
+      `${escapeHtml(bigJobLine(state, enquiry))}</p>`
+    : '';
   const lockLine = enquiry.unreachable
     ? `<p class="lock">Cannot take this: ${escapeHtml(enquiry.blockReason)}</p>`
     : enquiry.lockReason === null
@@ -114,6 +122,7 @@ function tile(state: GameState, enquiry: Enquiry): string {
     `${plural(ownerDays, 'owner day', 'owner days')}</p>` +
     `<p class="tile-figures">Needs ${escapeHtml(toolsLine(enquiry))}</p>` +
     `<p class="badges">${badges}</p>` +
+    crewLine +
     lockLine +
     `<div class="tile-action">${action}</div>` +
     '</div>'

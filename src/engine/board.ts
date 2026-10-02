@@ -33,6 +33,7 @@ import {
   WORKING_DAYS_PER_WEEK,
   ANSWER_SKEW_NEUTRAL_TIER,
 } from './constants';
+import { bigJobCheck, isBigJob } from './agency';
 import { findSpec, has } from './machines';
 import {
   availableFinishes,
@@ -234,7 +235,8 @@ export function unreachableEnquiries(state: GameState): Enquiry[] {
 /** Adds one enquiry if the board has room for it. The one place the board grows. */
 function drawInto(state: GameState): boolean {
   const [, max] = boardSizeRange(state);
-  if (reachableEnquiries(state).length >= max) return false;
+  // The agency's big job stands beside the band and is not counted into it (CLAUDE.md T26 2.13).
+  if (reachableEnquiries(state).filter((enquiry) => !isBigJob(enquiry)).length >= max) return false;
   const enquiry = generateEnquiry(state);
   if (!enquiry) return false;
   state.enquiries.push(enquiry);
@@ -445,8 +447,11 @@ export function removeEnquiry(state: GameState, enquiryId: string): void {
  *  A greyed one never can: it is on the board to be read (CLAUDE.md T10 3.7). */
 export function canAccept(state: GameState, enquiry: Enquiry): { ok: boolean; reason: string } {
   if (enquiry.unreachable) return { ok: false, reason: enquiry.blockReason };
+  // A big job of the agency's wants its free joiners at the minute it is taken (CLAUDE.md T26
+  // 2.13).
+  const crew = bigJobCheck(state, enquiry);
+  if (!crew.ok) return crew;
   if (enquiry.lockReason === null) return { ok: true, reason: '' };
   if (enquiry.byHandAvailable) return { ok: true, reason: '' };
-  void state;
   return { ok: false, reason: enquiry.lockReason };
 }

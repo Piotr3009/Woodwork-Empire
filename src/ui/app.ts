@@ -1602,6 +1602,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         on: element.dataset.on === '1',
       });
       return;
+    case 'setAgency':
+      // The Office's switch for the advertising agency (CLAUDE.md T26 2.13).
+      dispatch({ type: 'SET_AGENCY', on: id === 'on' });
+      return;
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
       return;
