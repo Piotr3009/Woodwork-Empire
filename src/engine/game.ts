@@ -289,6 +289,7 @@ import {
   assignStaffTasks,
   assignWorkerTask,
   bookWeekMinutes,
+  cleaningMinutes,
   createDailyTasks,
   createTask,
   dayCategoryOf,
@@ -1079,7 +1080,8 @@ function ensureTask(
   return createTask(state, {
     kind,
     label,
-    minutes: AD_HOC_TASK_MINUTES[kind],
+    // A sweep is as long as the crew is big (v75); a repair and a service are what they were.
+    minutes: kind === 'cleaning' ? cleaningMinutes(state) : AD_HOC_TASK_MINUTES[kind],
     equipmentId,
   });
 }

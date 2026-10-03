@@ -3,7 +3,7 @@
 
 import {
   applyAction,
-  CLEANING_MINUTES,
+  cleaningMinutes,
   createGame,
   ductingDue,
   findSpec,
@@ -678,11 +678,11 @@ function hallChip(text: string, action = ''): string {
 
 /** The button that puts a chip's problem right: the same actions the machine's own card calls, so
  *  there is one way to clean the hall, empty the bags, fix a machine and service one. */
-function chipAction(problem: HallProblem): string {
+function chipAction(state: GameState, problem: HallProblem): string {
   // Somebody is already on it: the chip tells him so and asks him nothing (CLAUDE.md T19 2.7).
   if (problem.inHand === true) return '';
   if (problem.kind === 'dirty') {
-    return `<button class="btn" data-do="startCleaning">Clean up · ${minutes(CLEANING_MINUTES)}</button>`;
+    return `<button class="btn" data-do="startCleaning">Clean up · ${minutes(cleaningMinutes(state))}</button>`;
   }
   if (problem.kind === 'bags') {
     return '<button class="btn" data-do="emptyBags">Empty bags</button>';
@@ -721,7 +721,7 @@ function hallControls(current: GameState): string {
         : hallChip(`Cannot work here, ${check.reason}`),
     );
   }
-  for (const problem of hallProblems(current)) chips.push(hallChip(problem.text, chipAction(problem)));
+  for (const problem of hallProblems(current)) chips.push(hallChip(problem.text, chipAction(current, problem)));
   chips.push(hallChip('', setupButton(current)));
   return `<div class="hall-chips">${chips.join('')}</div>`;
 }

@@ -5,7 +5,7 @@
 // class. This module owns the third of them. The queries are pure; the two writes that need the
 // rest of the world, standing the thing in the hall and giving the money back, live in game.ts.
 
-import { DAY_ONE_KIT, DAY_ONE_SOFTWARE } from './constants';
+import { DAY_ONE_KIT, DAY_ONE_SOFTWARE, DAY_ONE_STAND_INS } from './constants';
 import { addWorkingDays } from './clock';
 import { deliveryDaysFor, findSpec, findVariant, itemStandsInTheHall } from './machines';
 import { makeId } from './rng';
@@ -106,10 +106,13 @@ export function dayOneKit(state: GameState): DayOneItem[] {
         software: true,
       };
     }
+    // The thing itself, or what a grown workshop has in its place: a flexi system is the hall's
+    // extraction and a high rack is its rack (v74).
+    const families = [id, ...(DAY_ONE_STAND_INS[id] ?? [])];
     return {
       id,
       label: findSpec(id)?.name ?? id,
-      done: hasOrOnOrder(state, id),
+      done: families.some((family) => hasOrOnOrder(state, family)),
       software: false,
     };
   });

@@ -16,7 +16,9 @@ import {
   BOOKKEEPING_MINUTES,
   EMAIL_MINUTES,
   OWN_DELIVERY_MINUTES,
+  CLEANING_JOINERS_INCLUDED,
   CLEANING_MINUTES,
+  CLEANING_MINUTES_PER_EXTRA_JOINER,
   CLIENT_CALL_ANSWER_MINUTES,
   EQUIPMENT_UNLOAD_MINUTES,
   DAILY_ORDERING_MINUTES,
@@ -40,6 +42,8 @@ import {
   SITE_MEASURE_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   UNLOAD_BASE_MINUTES,
+  UNLOAD_EXTRA_MINUTES_PER_STEP,
+  UNLOAD_SHEETS_PER_STEP,
   WEEK_JOBS_KEPT,
   WORK_EPSILON,
 } from './constants';
@@ -292,10 +296,39 @@ function unloadFactor(state: GameState): number {
   return bare > 0 ? best / bare : 1;
 }
 
+/** What every hundred sheets past the first costs at the gate with the kit this hall has: thirty
+ *  minutes by hand [PIOTR], shortened as the first hundred is (v75). */
+export function unloadExtraMinutes(state: GameState): number {
+  return unloadExtraMinutesFor(handlingIn(state));
+}
+
+/** The same figure for a class of handling kit, `none` for bare hands: what the catalogue prints
+ *  on the class's card and what the hall with that class as its best pays (v75). */
+export function unloadExtraMinutesFor(handling: string): number {
+  const bare = UNLOAD_MINUTES_BY_HANDLING.none ?? UNLOAD_BASE_MINUTES;
+  const first = UNLOAD_MINUTES_BY_HANDLING[handling] ?? bare;
+  return bare > 0 ? (UNLOAD_EXTRA_MINUTES_PER_STEP * first) / bare : UNLOAD_EXTRA_MINUTES_PER_STEP;
+}
+
 /** Unloading a load of sheets: 45 by hand, about 30 with a pallet truck, about 15 with a forklift
- *  (PIOTR; CLAUDE.md T13 3.21). */
-export function unloadMinutes(state: GameState): number {
-  return Math.round(UNLOAD_MINUTES_BY_HANDLING[handlingIn(state)] ?? UNLOAD_BASE_MINUTES);
+ *  (PIOTR; CLAUDE.md T13 3.21), which is the first hundred of them. Every hundred started past
+ *  that is `unloadExtraMinutes` more (PIOTR, 03.10; v75), so 1,811 sheets by hand are 45 and
+ *  eighteen times 30. A caller that names no load is asking for the first hundred. */
+export function unloadMinutes(state: GameState, sheets = 0): number {
+  const first = UNLOAD_MINUTES_BY_HANDLING[handlingIn(state)] ?? UNLOAD_BASE_MINUTES;
+  const steps = Math.max(0, Math.ceil(sheets / UNLOAD_SHEETS_PER_STEP) - 1);
+  return Math.round(first + steps * unloadExtraMinutes(state));
+}
+
+/** One sweep of the hall: `CLEANING_MINUTES` with up to four joiners on the books, and fifteen
+ *  minutes more for every joiner past the fourth (PIOTR, 03.10; v75). The joiners are the ones
+ *  who have started; the owner and the office make no more mess than they did. */
+export function cleaningMinutes(state: GameState): number {
+  const joiners = state.workers.filter(
+    (worker) => worker.role === 'joiner' && worker.startDay <= state.clock.day,
+  ).length;
+  const extra = Math.max(0, joiners - CLEANING_JOINERS_INCLUDED);
+  return CLEANING_MINUTES + extra * CLEANING_MINUTES_PER_EXTRA_JOINER;
 }
 
 /** Getting a heavy machine off the lorry: two hours by hand [TUNE], shortened by the same handling

@@ -161,7 +161,7 @@ export const STATE_VERSION = 38;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v73';
+export const APP_VERSION = 'v75';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -950,8 +950,14 @@ export const NO_DUCTING_SPECS = ['compressor'];
 /** The one speed the game ever takes the clock to for the player: through a trip out or a move of
  *  the hall. It is the fastest chip there is (CLAUDE.md T8 3.3, T9 3.11). */
 export const SKIP_SPEED = 10;
-/** Weekly clean (PIOTR). */
+/** Weekly clean (PIOTR): what one sweep of the hall takes with up to
+ *  `CLEANING_JOINERS_INCLUDED` joiners making the mess. */
 export const CLEANING_MINUTES = 120;
+/** More men make more of it (PIOTR, 03.10: "more men, the labourer should have more work"; v75):
+ *  a sweep is the 120 minutes up to four joiners and fifteen more for every joiner past the
+ *  fourth, so the hall of twelve is four hours of it [PIOTR]. `cleaningMinutes` is the one sum. */
+export const CLEANING_JOINERS_INCLUDED = 4;
+export const CLEANING_MINUTES_PER_EXTRA_JOINER = 15;
 /** Fetch from temporary storage the next morning (PIOTR). */
 export const FETCH_STORAGE_MINUTES = TEMP_STORAGE_FETCH_MINUTES;
 /** Repairing anything takes 90 minutes [TUNE]. */
@@ -1315,6 +1321,12 @@ export const UNLOAD_MINUTES_BY_HANDLING: Record<string, number> = {
   pro: 10,
   industrial: 5,
 };
+/** A lorry of a thousand sheets is not a lorry of fifty (PIOTR, 03.10; v75): the table above is
+ *  the first `UNLOAD_SHEETS_PER_STEP` sheets, and every hundred started past them is another
+ *  thirty minutes by hand [PIOTR], shortened by the handling kit in the proportion the table
+ *  shortens the first hundred. `unloadMinutes` is the one sum. */
+export const UNLOAD_SHEETS_PER_STEP = 100;
+export const UNLOAD_EXTRA_MINUTES_PER_STEP = 30;
 /** Sheets carried per trip between the pallet and the rack [TUNE] (CLAUDE.md T13 3.21). */
 export const SHEETS_PER_TRIP = 2;
 /** The hand pallet truck [TUNE] (CLAUDE.md T13 3.21). */
@@ -4168,6 +4180,15 @@ export const DAY_ONE_KIT: readonly string[] = [
   'toolCabinet',
   'sheetRack',
 ];
+
+/** What ticks a line of the day one list beside the thing itself (PIOTR, 03.10; v74): the kit a
+ *  grown workshop has in its place. A hall on a central or a flexi system has its extraction and a
+ *  hall on high racks has its rack, so the list stays ticked when the first extractor and the
+ *  first rack are sold, and no longer says to buy what the hall has outgrown. */
+export const DAY_ONE_STAND_INS: Record<string, readonly string[]> = {
+  extractor: CENTRAL_EXTRACTION_SPECS,
+  sheetRack: [SHEET_RACK_HIGH],
+};
 
 /** How many end of day summaries the state carries: three months of working days [TUNE]. */
 export const DAY_SUMMARIES_MAX = 90;

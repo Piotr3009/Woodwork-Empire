@@ -393,6 +393,7 @@ export {
   findTask,
   jobTasks,
   materialOrderMinutes,
+  cleaningMinutes,
   equipmentUnloadMinutes,
   finishTimeFor,
   movePending,
@@ -408,6 +409,8 @@ export {
   startTaskCheck,
   taskWorkRate,
   tasksOfKind,
+  unloadExtraMinutes,
+  unloadExtraMinutesFor,
   unloadMinutes,
 } from './tasks';
 export type { TaskStartCheck } from './tasks';

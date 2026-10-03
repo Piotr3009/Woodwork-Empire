@@ -98,14 +98,20 @@ describe('the fallback of a missing frame', () => {
 
   it('draws nothing for a role with no sheet at all, and the caller stands the capsule', () => {
     // The owner, the joiner and, since v28, the helper have their sheets (the helper's from
-    // Piotr's GPT pack, 18.09); every other role is the capsule until his own lands.
-    const drawn = ['owner', 'joiner', 'helper'];
+    // Piotr's GPT pack, 18.09), and from v75 the production manager his two, the joiner's in a
+    // white shirt (scripts/manager-shirt.py). The office's own three have none, and from v75 the
+    // hall draws no figure for them at all.
+    const drawn = ['owner', 'joiner', 'helper', 'productionManager'];
     for (const role of ROLES.filter((entry) => !drawn.includes(entry))) {
       for (const animation of ANIMATIONS) {
         expect(playableAnimation(role, animation), `${role} ${animation}`).toBeNull();
         expect(characterArt(role, animation, 'sw'), `${role} ${animation}`).toBeNull();
       }
     }
+    // The manager walks and stands, and anything else he is asked to play is his standing.
+    expect(playableAnimation('productionManager', 'walk')).toEqual({ animation: 'walk', frozen: false });
+    expect(playableAnimation('productionManager', 'idle')).toEqual({ animation: 'idle', frozen: false });
+    expect(playableAnimation('productionManager', 'bench')).toEqual({ animation: 'idle', frozen: false });
   });
 
   it('needs both halves of a sheet: numbers without a picture draw nothing', () => {

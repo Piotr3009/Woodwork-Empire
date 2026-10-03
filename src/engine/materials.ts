@@ -376,7 +376,8 @@ export function arriveDeliveries(state: GameState): Delivery[] {
     createTask(state, {
       kind: 'unload',
       label: `Unload ${plural(delivery.sheets, 'sheet', 'sheets')}`,
-      minutes: unloadMinutes(state),
+      // By the size of the load: the first hundred sheets and every hundred past them (v75).
+      minutes: unloadMinutes(state, delivery.sheets),
       deliveryId: delivery.id,
       jobId: delivery.jobId,
     });

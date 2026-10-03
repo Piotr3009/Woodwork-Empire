@@ -78,16 +78,14 @@ describe('the helper on the floor', () => {
     expect(group.querySelector('[data-character]')).not.toBeNull();
   });
 
-  it('stands a man of full height for a role the art side has not drawn', () => {
+  it('stands a man of full height where the art side has delivered no sheet', () => {
     const state = hallWithA('helper');
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper on the books');
-    // The draftsman has no sheets (he is drawn on the floor only when he is out of the office), so
-    // he is the placeholder, and the placeholder is what this measures. It was the booth's own
-    // trade until Turn 26, whose sheets were never made.
-    const id = 'staff-draftsman';
-    state.workers.push({ ...helper, id, name: 'draftsman', role: 'draftsman' as WorkerRole, station: 'bench' });
-    const group = groupOf(renderHall(state), `[data-worker="${id}"]`);
+    // From v75 every role the hall draws has its sheets (the office's own three are not drawn at
+    // all), so the placeholder is asked for the way a test asks for the hall before the art
+    // arrived: with no character sheets handed to it.
+    const group = groupOf(renderHall(state, { characters: {} }), `[data-worker="${helper.id}"]`);
     expect(group.querySelector('[data-character]')).toBeNull();
     const body = bodyOf(group);
     // As tall as the 1.8 m man the sheets declare, give or take the rounding, where the old
@@ -102,34 +100,29 @@ describe('the helper on the floor', () => {
   });
 });
 
-describe('every role the art side has not drawn yet', () => {
-  it('stands the same man, and only the owner, the joiner and the helper have sheets', () => {
+describe('every role of the game, on the hall or behind the office door (v75)', () => {
+  it('draws the manager from his own sheets, and no figure for the office s own three', () => {
     const state = hallWithA('helper');
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper on the books');
-    // One of each role on the floor at once: the office ones are hired behind an admin and a
-    // desk, and this is about how a man is drawn and not about who may be taken on.
-    const drawn: string[] = [];
+    // The owner and the joiner from the start, the helper since the v28 patch, and the production
+    // manager from v75: the joiner's sheets in a white shirt (PIOTR, 03.10).
+    const sheeted = ['owner', 'joiner', 'helper', 'productionManager'];
     for (const role of CHARACTER_ROLES) {
-      // Three men are drawn now: the owner and the joiner from the start, and the helper since
-      // the v28 patch (REPORT-T19, "Patch v28").
-      if (role === 'owner' || role === 'joiner' || role === 'helper') {
-        expect(characterArt(role, 'idle', 'sw'), role).not.toBeNull();
-        continue;
-      }
-      expect(characterArt(role, 'idle', 'sw'), role).toBeNull();
-      const id = `staff-${role}`;
-      state.workers.push({ ...helper, id, name: role, role: role as WorkerRole });
-      drawn.push(id);
+      if (sheeted.includes(role)) expect(characterArt(role, 'idle', 'sw'), role).not.toBeNull();
+      else expect(characterArt(role, 'idle', 'sw'), role).toBeNull();
+    }
+    expect(CHARACTER_ROLES.filter((role) => !sheeted.includes(role))).toEqual(['officeAdmin', 'salesman', 'draftsman']);
+    // One of each of the office's roles with nothing to do, which is when they were seen on the
+    // hall: the manager is still there, in his shirt, and the other three are behind the door.
+    for (const role of ['officeAdmin', 'salesman', 'draftsman', 'productionManager']) {
+      state.workers.push({ ...helper, id: `staff-${role}`, name: role, role: role as WorkerRole, station: 'idle' });
     }
     const svg = renderHall(state);
-    for (const id of drawn) {
-      const group = groupOf(svg, `[data-worker="${id}"]`);
-      expect(group.querySelector('[data-character]'), id).toBeNull();
-      const body = bodyOf(group);
-      expect(-body.top, id).toBeGreaterThan(MAN * 0.9);
-      expect(body.width, id).toBeGreaterThan(TILE_RISE / 3);
+    const manager = groupOf(svg, '[data-worker="staff-productionManager"]');
+    expect(manager.querySelector('[data-character]')?.getAttribute('data-character')).toBe('productionManager');
+    for (const role of ['officeAdmin', 'salesman', 'draftsman']) {
+      expect(svg, role).not.toContain(`data-worker="staff-${role}"`);
     }
-    expect(drawn).toHaveLength(CHARACTER_ROLES.length - 3);
   });
 });

@@ -710,6 +710,74 @@
       }
     }
   },
+  "character.productionManager.idle": {
+    "cellWidth": 112,
+    "cellHeight": 151,
+    "anchorX": 56,
+    "anchorY": 143,
+    "frames": 2,
+    "fps": 1,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.productionManager",
+    "animation": "idle",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "character.joiner.idle.sheet.png",
+      "by": "scripts/manager-shirt.py"
+    }
+  },
+  "character.productionManager.walk": {
+    "cellWidth": 112,
+    "cellHeight": 151,
+    "anchorX": 56,
+    "anchorY": 143,
+    "frames": 8,
+    "fps": 3.4286,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.productionManager",
+    "animation": "walk",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "character.joiner.walk.sheet.png",
+      "by": "scripts/manager-shirt.py"
+    }
+  },
   "character.suit.spray": {
     "cellWidth": 112,
     "cellHeight": 151,

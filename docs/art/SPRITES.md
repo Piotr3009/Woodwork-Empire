@@ -413,6 +413,23 @@ one long side (the camera side as delivered, the right hand side in its `.r` pic
 stands half a cell inside that side, facing the filter wall, one man to a cell from the second
 cell of the doorway on. A repaint that moves the opening has to move that rule with it.
 
+### 10.7 The production manager's white shirt (v75, PIOTR 03.10.2026: "in a white shirt, not green like the rest")
+
+| Sheet | Rows | Frames | fps | Cell | Anchor |
+|---|---|---|---|---|---|
+| `character.productionManager.idle` | sw, se, nw, ne | 2 | 1 | 112 × 151 | 56, 143 |
+| `character.productionManager.walk` | sw, se, nw, ne | 8 | as the joiner's | 112 × 151 | 56, 143 |
+
+The production manager is the one man of the office the hall draws (`isSeenOnTheHall` in
+`src/engine/staff.ts`); the admin, the salesman and the draftsman are behind the office door all
+day and have no figure. He is told from the crew by his shirt.
+
+The two sheets are not painted. `scripts/manager-shirt.py` makes them from `character.joiner.idle`
+and `character.joiner.walk`, cell for cell: the green of the shirt goes to a shaded white and
+everything else stays the joiner's. A painted manager delivered under the same four file names
+replaces them with no change to the code. He has no bench, carry or phone sheet and needs none:
+anything else he is asked to play falls back to idle, as section 10.4 says.
+
 
 ---
 

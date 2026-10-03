@@ -81,7 +81,7 @@ import {
   stationMachine,
 } from '../engine/stations';
 import { ownerIsAvailable } from '../engine/owner';
-import { crewHasGoneHome, homeCellOf } from '../engine/staff';
+import { crewHasGoneHome, homeCellOf, isSeenOnTheHall } from '../engine/staff';
 import { plural } from '../engine/text';
 import { FIGURE_DEPTH_OFFSET } from '../engine/constants';
 import type { RoomBlock, RoomId } from '../engine/constants';
@@ -1056,6 +1056,8 @@ function figuresNow(state: GameState): Array<{ who: string; station: string; ben
   }
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
+    // The office's own three are behind its door all day: no figure, and no cell held for one (v75).
+    if (!isSeenOnTheHall(worker.role)) continue;
     figures.push({ who: worker.id, station: stationNow(state, worker.id), bench: homeCellOf(state, worker) });
   }
   return figures;
@@ -1904,6 +1906,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const drawn = new Map(drawnPlaces(state).map((entry) => [entry.who, entry.item.specId]));
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
+    // The admin, the salesman and the draftsman are never drawn on the hall (PIOTR, 03.10; v75).
+    if (!isSeenOnTheHall(worker.role)) continue;
     const away = worker.absentDaysRemaining > 0;
     // Where he stands when the hall has nothing else for him. The labourer's own corner is the fan
     // or the gate lane, never the inside of the office block (CLAUDE.md T11 3.4).

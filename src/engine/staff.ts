@@ -242,6 +242,17 @@ export function countMonthDaysOff(state: GameState): void {
   }
 }
 
+/** The office's own people, who work behind its door all day and are never drawn on the hall
+ *  (PIOTR, 03.10; v75). They were seen out there only with nothing to do, which read as men
+ *  standing about, and how much of each is used is on Our team. The production manager is not on
+ *  the list: the hall is his job, and he is seen on it in his white shirt. */
+const NEVER_ON_THE_HALL: WorkerRole[] = ['officeAdmin', 'salesman', 'draftsman'];
+
+/** True for a role the hall draws a figure for: everybody but the office's own three. */
+export function isSeenOnTheHall(role: WorkerRole): boolean {
+  return !NEVER_ON_THE_HALL.includes(role);
+}
+
 export function officeStaff(state: GameState): Worker[] {
   return state.workers.filter((worker) => hasWorkingDay(worker.role));
 }

@@ -30,6 +30,7 @@ import {
   orderEquipmentCheck,
   sheetCapacityOf,
   toolSlotsLine,
+  unloadExtraMinutesFor,
   zoneOf,
 } from '../engine/index';
 import {
@@ -47,7 +48,9 @@ import {
   EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
   MILES_PER_TRIP,
+  UNLOAD_EXTRA_MINUTES_PER_STEP,
   UNLOAD_MINUTES_BY_HANDLING,
+  UNLOAD_SHEETS_PER_STEP,
   VAN_CLASSES,
   bagsToM3,
 } from '../engine/constants';
@@ -123,7 +126,13 @@ function tripLines(spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
     const minutes = UNLOAD_MINUTES_BY_HANDLING[variant.id];
     const bare = UNLOAD_MINUTES_BY_HANDLING.none;
     if (minutes === undefined) return [];
-    return [line(`A load of sheets off the lorry in ${minutes} min, ${bare ?? minutes} by hand`)];
+    // The first hundred sheets, and every hundred past them, each beside what it is by hand: the
+    // class shortens both in the one proportion (v75).
+    const more = Math.round(unloadExtraMinutesFor(variant.id));
+    return [
+      line(`${UNLOAD_SHEETS_PER_STEP} sheets off the lorry in ${minutes} min, ${bare ?? minutes} by hand`),
+      line(`Every ${UNLOAD_SHEETS_PER_STEP} more in ${more} min, ${UNLOAD_EXTRA_MINUTES_PER_STEP} by hand`),
+    ];
   }
   return [];
 }
