@@ -396,7 +396,7 @@ describe('the line that counts the days below the bank s limit (CLAUDE.md T22 2.
 });
 
 describe('the order of urgency', () => {
-  it('is bags, past the limit, nobody assigned, overdue, no insurance, below zero, spending over earning, crew full, first steps', () => {
+  it('is bags, past the limit, nobody assigned, overdue, drawing done, no insurance, below zero, spending over earning, crew full, first steps', () => {
     expect(WARNING_ORDER).toEqual([
       'bagsFull',
       // Turn 21: above everything but the bags. The bags stop every machine in the hall this
@@ -404,6 +404,8 @@ describe('the order of urgency', () => {
       'pastTheLimit',
       'nobodyAssigned',
       'deadlineAtRisk',
+      // v78 (PIOTR, 03.10): the drawing is done and the material list is next.
+      'drawingDone',
       'noInsurance',
       'belowZero',
       'spendingOverEarning',
@@ -413,8 +415,9 @@ describe('the order of urgency', () => {
   });
 
   it('puts every problem in that order when the hall has them all at once', () => {
-    // Eight of the nine at once. The first steps line cannot be one of them: it is only said
+    // Eight of the ten at once. The first steps line cannot be one of them: it is only said
     // while production has never started, and "a started job nobody is on" is production started.
+    // Nor the drawing line of v78: no job of this hall is waiting for its material list.
     let state = tradedWeek(0, 500);
     state = withStartedJobNobodyOn(state);
     state = withDeadlineAtRisk(state);
@@ -426,7 +429,7 @@ describe('the order of urgency', () => {
     // -15,000 the bank allows is the Turn 21 line (CLAUDE.md T21 2.1).
     state.cash = -16000;
     expect(warnings(state).map((warning) => warning.key)).toEqual(
-      WARNING_ORDER.filter((key) => key !== 'firstSteps'),
+      WARNING_ORDER.filter((key) => key !== 'firstSteps' && key !== 'drawingDone'),
     );
   });
 

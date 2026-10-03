@@ -28,10 +28,12 @@ import {
 } from './constants';
 import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
+import { takeOffOutstanding } from './jobs';
 import { bagStore } from './machines';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
-import { crewFull, crewLine } from './staff';
+import { crewFull, crewLine, hasOfficeAdmin } from './staff';
+import { designOutstandingFor } from './tasks';
 import type { GameState, LedgerCategory } from './types';
 
 export type WarningKey =
@@ -41,6 +43,8 @@ export type WarningKey =
   | 'pastTheLimit'
   | 'nobodyAssigned'
   | 'deadlineAtRisk'
+  /** The drawing is finished and the material list is the next thing to do (PIOTR, 03.10; v78). */
+  | 'drawingDone'
   | 'noInsurance'
   /** The money speaks before the month end (PIOTR accepted, 17.09; CLAUDE.md T18 2.6). */
   | 'belowZero'
@@ -67,6 +71,10 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   'pastTheLimit',
   'nobodyAssigned',
   'deadlineAtRisk',
+  // Under the deadlines and above the standing lines: the job's calendar is running and nothing
+  // can be ordered for it until the list is made, where the lines below can stand for weeks and
+  // would keep this one from ever being read (v78).
+  'drawingDone',
   'noInsurance',
   'belowZero',
   'spendingOverEarning',
@@ -129,6 +137,25 @@ function deadlineWarning(state: GameState): Warning | null {
     text: row.overdue
       ? `${row.name} will miss its deadline at this rate`
       : `${row.name} has to start now to make its deadline`,
+  };
+}
+
+/** The drawing of a job is done and its material list is not: the strip says what comes next
+ *  (PIOTR, 03.10: "when the drawings are finished, a line: now make the material list and order
+ *  the material"; v78). The first such job, by name. Said only while the list is the owner's own
+ *  to make: with an office admin on the books it is his, and he takes it without being told. */
+function drawingDoneWarning(state: GameState): Warning | null {
+  if (hasOfficeAdmin(state)) return null;
+  const waiting = state.jobs.find(
+    (job) =>
+      job.stage === 'accepted' &&
+      !designOutstandingFor(state, job.id) &&
+      takeOffOutstanding(state, job),
+  );
+  if (waiting === undefined) return null;
+  return {
+    key: 'drawingDone',
+    text: `${waiting.name}: the drawing is done. Now make the material list and order the material.`,
   };
 }
 
@@ -235,6 +262,7 @@ const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   pastTheLimit: pastTheLimitWarning,
   nobodyAssigned: nobodyAssignedWarning,
   deadlineAtRisk: deadlineWarning,
+  drawingDone: drawingDoneWarning,
   noInsurance: noInsuranceWarning,
   belowZero: belowZeroWarning,
   spendingOverEarning: spendingOverEarningWarning,

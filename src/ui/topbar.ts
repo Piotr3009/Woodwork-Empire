@@ -34,14 +34,18 @@ import { closeButton, escapeHtml, minutes, money, signedFigure, signedMoney } fr
 /** The five speed knobs. One place builds them, whatever else the top bar has to say. The Pause
  *  knob pulses once when the player asks for something stopped time will not give him
  *  (CLAUDE.md T7 3.10). */
+/** What a speed chip says under the mouse: the keys that do the same (PIOTR, 03.10; v78). The
+ *  keys themselves are `SPEED_KEYS` and P in app.ts. */
+const SPEED_HINT = 'Keys 1 to 5 set the speed. P pauses.';
+
 function speedChips(state: GameState, pulse: boolean): string {
   return SPEEDS.map((speed) => {
     const label = speed === 0 ? 'Pause' : `${speed}x`;
     const active = state.speed === speed ? ' is-on' : '';
     const beat = speed === 0 && pulse ? ' is-pulse' : '';
     return (
-      `<button class="chip knob${active}${beat}" data-do="setSpeed" data-speed="${speed}">` +
-      `${escapeHtml(label)}</button>`
+      `<button class="chip knob${active}${beat}" data-do="setSpeed" data-speed="${speed}" ` +
+      `title="${SPEED_HINT}">${escapeHtml(label)}</button>`
     );
   }).join('');
 }
