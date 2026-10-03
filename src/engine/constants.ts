@@ -161,7 +161,7 @@ export const STATE_VERSION = 35;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v68';
+export const APP_VERSION = 'v69';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1344,6 +1344,9 @@ export const MACHINE_ENDURANCE_HOURS: Record<string, number> = {
   edgebander: 4000,
   thicknesser: 2500,
   spindleMoulder: 3500,
+  // The high capacity rack's own figure [PIOTR, 03.10] (v69). A rack books no hours, so it is what
+  // the card prints and nothing wears it down.
+  sheetRackHigh: 100000,
 };
 
 /** The five classes every ladder in this game has, in order: class 5 is always the industrial one
@@ -1756,6 +1759,32 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     description:
       'Four metres of bolted steel rated for a full pack of board. A hundred and sixty sheets ' +
       'means buying by the pack, which is where the material price actually falls.',
+  },
+];
+
+/** The high capacity rack: the industrial rack's own four metres of floor holding twice its sheets,
+ *  because in a full hall it is the racks that eat the room [PIOTR, 03.10: "the racks take too much
+ *  of our space"] (v69). One class, bought off its own line beside the Racks folder, so the five
+ *  classes of the ladder stay five. The price, the capacity, the wait and the life are his; the
+ *  footprint and the pound a day are the industrial rack's. */
+export const SHEET_RACK_HIGH = 'sheetRackHigh';
+export const SHEET_RACK_HIGH_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'High capacity rack',
+    price: 20000,
+    width: 4,
+    depth: 1,
+    height: 2.2,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    sheetCapacity: 320,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'The industrial rack with its bays packed twice as tight, in red so nobody takes it for ' +
+      'the other one. Three hundred and twenty sheets on the four metres of floor that used to ' +
+      'hold a hundred and sixty.',
   },
 ];
 
@@ -2734,6 +2763,7 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   tableSaw: TABLE_SAW_VARIANTS,
   workbench: WORKBENCH_VARIANTS,
   sheetRack: SHEET_RACK_VARIANTS,
+  [SHEET_RACK_HIGH]: SHEET_RACK_HIGH_VARIANTS,
   edgebander: EDGEBANDER_VARIANTS,
   extractor: EXTRACTOR_VARIANTS,
   compressor: COMPRESSOR_VARIANTS,
@@ -2998,6 +3028,25 @@ const SPEC_DRAFTS: SpecDraft[] = [
     effect:
       'Holds sheets on edge, thirty to a hundred and sixty by its class. Nothing can be ' +
       'unloaded without somewhere to put it.',
+  },
+  {
+    ...BASE_SPEC,
+    id: SHEET_RACK_HIGH,
+    // Fifteen working days: it is built to order [PIOTR, 03.10] (v69).
+    deliveryDays: 15,
+    folder: 'High capacity rack',
+    tab: 'storage',
+    name: 'High capacity rack',
+    price: 20000,
+    category: 'storage',
+    width: 4,
+    depth: 1,
+    height: 2.2,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    spriteKey: SHEET_RACK_HIGH,
+    sheetCapacity: 320,
+    effect: 'Holds 320 sheets on the floor an industrial rack takes for 160.',
   },
   {
     ...BASE_SPEC,

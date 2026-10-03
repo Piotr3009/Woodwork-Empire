@@ -202,7 +202,8 @@ describe('the file on disk and the footprint in the engine', () => {
     // file is the used forklift's from v54, the same picture under the name of its class. Sixty two
     // from v56: the five spray booths of the pack of 24.09, at the size the pictures were drawn at
     // (PIOTR, 25.09), the used one stood at the front of its 3 by 2 on the canvas that owes.
-    expect(checked).toBe(62);
+    // Sixty three from v69: the high capacity rack, on the industrial rack's own canvas.
+    expect(checked).toBe(63);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }
@@ -236,7 +237,8 @@ describe('the file on disk and the footprint in the engine', () => {
     // booths' turns, and the turns of the five CNCs with their tool changers. Sixty seven while
     // `palletTruck.standard.r.png`, renamed `forklift.used.r.png` in v54 and listed for deletion
     // in v61's DELETED.txt, is still on disk, which is what the build's manifest counts (T26-A0).
-    expect(turnedFiles).toHaveLength(67);
+    // Sixty eight from v69, with the high capacity rack's turn.
+    expect(turnedFiles).toHaveLength(68);
   });
 
   it('draws the CNC with its tool changer on the CNC s own canvas, both ways round (v56)', () => {

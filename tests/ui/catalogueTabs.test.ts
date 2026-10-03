@@ -196,6 +196,8 @@ describe('the tabs', () => {
     expect(folders('storage')).toEqual([
       'workbench',
       'sheetRack',
+      // The high capacity rack, a line of its own beside the Racks folder (PIOTR, 03.10; v69).
+      'sheetRackHigh',
       'toolCabinet',
       'locker',
     ]);

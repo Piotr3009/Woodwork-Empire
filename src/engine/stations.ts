@@ -301,6 +301,8 @@ export const STATION_TABLE: Record<string, StationRow> = {
     second: null,
   },
   sheetRack: { operator: 'freeSide', second: null },
+  // The high capacity rack is stood at the way every rack is (v69).
+  sheetRackHigh: { operator: 'freeSide', second: null },
   extractor: { operator: 'freeSide', second: null },
 };
 
