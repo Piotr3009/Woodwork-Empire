@@ -205,7 +205,9 @@ describe('the file on disk and the footprint in the engine', () => {
     // Sixty three from v69: the high capacity rack, on the industrial rack's own canvas.
     // Sixty eight from v76: the four vans and the electric pallet truck the pack of 22.09 already
     // held, which the game had no classes for the day it landed (PIOTR, 03.10).
-    expect(checked).toBe(68);
+    // Seventy five from v80, the pack of 03.10: the two better forklifts, the air dryer, and the
+    // desk, the chair, the laptop and the locker the catalogue shows.
+    expect(checked).toBe(75);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }
@@ -240,8 +242,9 @@ describe('the file on disk and the footprint in the engine', () => {
     // `palletTruck.standard.r.png`, renamed `forklift.used.r.png` in v54 and listed for deletion
     // in v61's DELETED.txt, is still on disk, which is what the build's manifest counts (T26-A0).
     // Sixty eight from v69, with the high capacity rack's turn. Seventy three from v76: the turns
-    // of the four vans and of the electric pallet truck.
-    expect(turnedFiles).toHaveLength(73);
+    // of the four vans and of the electric pallet truck. Seventy six from v80: the two better
+    // forklifts' and the air dryer's.
+    expect(turnedFiles).toHaveLength(76);
   });
 
   it('draws the CNC with its tool changer on the CNC s own canvas, both ways round (v56)', () => {

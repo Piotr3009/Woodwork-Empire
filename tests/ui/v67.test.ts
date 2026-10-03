@@ -2,15 +2,15 @@
 // v67 (PIOTR, 03.10): what the player sees of the extension. The Premises page of the laptop in
 // the words of the mockup he said yes to (makieta-premises-przed.png, makieta-premises-po.png),
 // the hall of forty metres painted with the extended background, the canteen block at four by
-// four with its door where it was, and the canteen room showing sixteen lockers eight at a time.
+// four with its door where it was, and the canteen room showing sixteen lockers: eight at a time
+// until v80, and all sixteen at once on its own picture since (delivered 03.10).
 
 import { describe, expect, it } from 'vitest';
 import { roomsOf } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import {
-  CANTEEN_PAGE_REGION,
   canteenCounterLine,
-  canteenPages,
+  canteenLayersOf,
   canteenPlateNames,
   canteenRegionsOf,
   renderCanteen,
@@ -235,28 +235,34 @@ describe('the canteen room of an enlarged canteen', () => {
     return state;
   }
 
-  it('is one page of eight as it was built, with the line it always had', () => {
+  it('is eight plates as it was built, with the line it always had', () => {
     const state = extended();
-    expect(canteenPages(state)).toBe(1);
-    expect(canteenRegionsOf(state).map((region) => region.id)).not.toContain(CANTEEN_PAGE_REGION);
+    expect(canteenPlateNames(state)).toHaveLength(8);
+    expect(canteenRegionsOf(state).map((region) => region.id)).toEqual(['door', 'lockers', 'kitchen', 'table']);
+    expect(canteenLayersOf(state).map((layer) => layer.key)).toContain('canteenLockers');
     expect(canteenCounterLine(state)).toBe('0 of 8 lockers in use');
   });
 
-  it('shows sixteen lockers eight at a time, and the line over the banks turns the page', () => {
+  it('shows all sixteen lockers at once on its own picture, with nothing to turn', () => {
+    // Eight at a time and a line that turned the page until v80: the enlarged room now has a
+    // picture of its own with sixteen doors on it (PIOTR, 03.10).
     const state = canteen(11, 10);
-    expect(canteenPages(state)).toBe(2);
-    expect(canteenPlateNames(state, 0)).toEqual(['Man1', 'Man2', 'Man3', 'Man4', 'Man5', 'Man6', 'Man7', 'Man8']);
-    expect(canteenPlateNames(state, 1)).toEqual(['Man9', 'Man10', '', '', '', '', '', '']);
-    expect(canteenCounterLine(state, 0)).toBe('Lockers 1 to 8 · 10 of 16 in use ›');
-    expect(canteenCounterLine(state, 1)).toBe('Lockers 9 to 16 · 10 of 16 in use ›');
-    // A page the room does not have is its first.
-    expect(canteenPlateNames(state, 7)).toEqual(canteenPlateNames(state, 0));
-    const room = dom(renderCanteen(state, { width: 1672, height: 941 }, spriteFiles(), 1));
-    const line = room.querySelector(`[data-do="officeRegion"][data-office="${CANTEEN_PAGE_REGION}"]`);
-    expect(line).not.toBeNull();
-    expect(room.querySelector('[data-canteen-text="counter"]')?.textContent).toBe(
-      'Lockers 9 to 16 · 10 of 16 in use ›',
-    );
-    expect(room.querySelector('[data-canteen-plate="0"]')?.textContent).toBe('Man9');
+    expect(canteenPlateNames(state)).toEqual([
+      'Man1', 'Man2', 'Man3', 'Man4', 'Man5', 'Man6', 'Man7', 'Man8',
+      'Man9', 'Man10', '', '', '', '', '', '',
+    ]);
+    expect(canteenCounterLine(state)).toBe('10 of 16 lockers in use');
+    expect(canteenRegionsOf(state).map((region) => region.id)).toEqual(['door', 'lockers', 'kitchen', 'table']);
+    expect(canteenLayersOf(state).map((layer) => layer.key)).toEqual([
+      'canteenBackgroundWide',
+      'canteenKitchenWide',
+      'canteenLockersWide',
+      'canteenTableWide',
+    ]);
+    const room = dom(renderCanteen(state, { width: 1672, height: 941 }, spriteFiles()));
+    expect(room.querySelectorAll('[data-canteen-plate]')).toHaveLength(16);
+    expect(room.querySelector('[data-canteen-text="counter"]')?.textContent).toBe('10 of 16 lockers in use');
+    expect(room.querySelector('[data-canteen-plate="8"]')?.textContent).toBe('Man9');
+    expect(room.innerHTML).toContain('/sprites/canteenLockersWide.png');
   });
 });

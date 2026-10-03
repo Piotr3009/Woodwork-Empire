@@ -165,7 +165,7 @@ export const STATE_VERSION = 39;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v79';
+export const APP_VERSION = 'v80';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -3600,19 +3600,51 @@ export const CANTEEN_PLATES: readonly RoomRect[] = [
  *  eight men, until there is a bigger canteen [PIOTR, 20.09; CLAUDE.md T23 2.10]. */
 export const CANTEEN_LOCKERS = CANTEEN_PLATES.length;
 
-/** How many compartments the enlarged canteen has: a second pair of banks the same as the first,
- *  sixteen in all [PIOTR, 03.10] (v67). The room is painted with one pair, so it shows them eight
- *  at a time. */
-export const CANTEEN_LOCKERS_WIDE = CANTEEN_LOCKERS * 2;
+/** The enlarged canteen is a room of its own, painted for it (delivered 03.10; v80): five layers
+ *  on the same 1672 by 941 canvas, one wall of sixteen doors in two rows of eight. Every figure
+ *  is the art side's own measurement, copied from docs/art/canteen-regions-wide.json and typed
+ *  nowhere else. */
+export const CANTEEN_REGIONS_WIDE: Record<'door' | 'lockers' | 'kitchen' | 'table', RoomRect> = {
+  door: { x: 1390, y: 0, w: 282, h: 941 },
+  lockers: { x: 370, y: 185, w: 1019, h: 386 },
+  kitchen: { x: 0, y: 201, w: 371, h: 466 },
+  table: { x: 0, y: 576, w: 802, h: 365 },
+};
+
+/** The sixteen door plates of the enlarged canteen, the way the wall is read: the top row from
+ *  the left, then the bottom row from the left (docs/art/canteen-regions-wide.json; v80). */
+export const CANTEEN_PLATES_WIDE: readonly RoomRect[] = [
+  // The top row.
+  { x: 385, y: 236, w: 103, h: 30 },
+  { x: 509, y: 236, w: 102, h: 30 },
+  { x: 634, y: 236, w: 103, h: 30 },
+  { x: 762, y: 236, w: 104, h: 30 },
+  { x: 889, y: 236, w: 103, h: 30 },
+  { x: 1014, y: 236, w: 103, h: 30 },
+  { x: 1141, y: 236, w: 103, h: 30 },
+  { x: 1265, y: 236, w: 106, h: 30 },
+  // The bottom row.
+  { x: 386, y: 411, w: 101, h: 30 },
+  { x: 509, y: 413, w: 102, h: 28 },
+  { x: 635, y: 413, w: 100, h: 28 },
+  { x: 763, y: 412, w: 103, h: 29 },
+  { x: 888, y: 413, w: 103, h: 28 },
+  { x: 1015, y: 411, w: 103, h: 30 },
+  { x: 1140, y: 412, w: 104, h: 29 },
+  { x: 1265, y: 412, w: 105, h: 29 },
+];
+
+/** How many compartments the enlarged canteen has: the sixteen doors its own picture is painted
+ *  with [PIOTR, 03.10] (v67, v80). Until v80 the room had one picture, of eight doors, and showed
+ *  the sixteen eight at a time. */
+export const CANTEEN_LOCKERS_WIDE = CANTEEN_PLATES_WIDE.length;
 
 /** The counter over the banks, where the room says how many of the eight are in use [PIOTR]. */
 export const CANTEEN_COUNTER: RoomRect = { x: 95, y: 35, w: 450, h: 65 };
 
-/** The same strip in an enlarged canteen, where the line says which eight of the sixteen the
- *  room is showing and is the control that turns to the other eight: longer, so it runs on along
- *  the clear wall over the far bank and stops short of the window, with room at its end for the
- *  name the pointer brings up, clear of the line itself (v67). */
-export const CANTEEN_COUNTER_WIDE: RoomRect = { x: 95, y: 35, w: 660, h: 65 };
+/** The same strip in the enlarged canteen: the clear wall over its sixteen doors, off the art
+ *  side's measurement (docs/art/canteen-regions-wide.json; v80). */
+export const CANTEEN_COUNTER_WIDE: RoomRect = { x: 450, y: 95, w: 870, h: 75 };
 
 /** The plate's hand: 18 px, centred, and a name longer than eight characters is cut to fit the
  *  plate, because the plate is the size the picture painted it [PIOTR]. */

@@ -206,11 +206,14 @@ describe('the sprite check page', () => {
       expect(cell?.textContent, name).toContain('2 of 4 orientations drawn');
       expect(cell?.textContent, name).toContain('the rest mirrored or the base picture');
     }
-    // A key with no file at all says none, and still says it: the better forklift, which the art
-    // side has not drawn yet (v54). The budget class, the electric pallet truck, landed in v76.
+    // A key with no file at all says none, and still says it: the pallet at the gate, which the
+    // art side has not drawn. It was the better forklift until v80, when the pack of 03.10 brought
+    // the two better forklifts with their turns.
+    const pallet = page.querySelector('[data-sprite-target="pallet"] [data-turns]');
+    expect(pallet?.getAttribute('data-turns')).toBe('');
+    expect(pallet?.textContent).toContain('0 of 4 orientations drawn: none');
     const truck = page.querySelector('[data-sprite-target="forklift.pro"] [data-turns]');
-    expect(truck?.getAttribute('data-turns')).toBe('');
-    expect(truck?.textContent).toContain('0 of 4 orientations drawn: none');
+    expect(truck?.getAttribute('data-turns')).toBe('0,1');
   });
 
   it('lists every role of the game with every frame key, the two of Turn 13 among them', () => {

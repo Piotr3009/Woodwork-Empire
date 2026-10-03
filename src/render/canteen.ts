@@ -8,14 +8,21 @@
 // The art side left a blank label plate on each of the eight doors and a clear strip of wall over
 // the banks, and the game letters them, as the office letters its clock and its company name
 // (docs/mockups/t23/README.md).
+//
+// The enlarged canteen is a second room on the same machinery, with a picture of its own
+// (delivered 03.10; v80): the same four layers and the lit lockers under the names the art side
+// gave them, one wall of sixteen doors and sixteen plates, all of them on the screen at once.
+// Until v80 it was the first room's picture showing its sixteen lockers eight at a time.
 
 import {
   CANTEEN_COUNTER,
   CANTEEN_COUNTER_TEXT,
   CANTEEN_COUNTER_WIDE,
   CANTEEN_PLATES,
+  CANTEEN_PLATES_WIDE,
   CANTEEN_PLATE_TEXT,
   CANTEEN_REGIONS,
+  CANTEEN_REGIONS_WIDE,
   type RoomRect,
 } from '../engine/constants';
 import { canteenLockers } from '../engine/layout';
@@ -61,84 +68,93 @@ export const CANTEEN_LIT_LAYERS: RoomLitLayer[] = [
   },
 ];
 
-/** The lit overlays the art side has delivered. */
-export function canteenLitLayersOf(files: readonly string[]): RoomLitLayer[] {
-  return CANTEEN_LIT_LAYERS.filter((layer) => pickSprite(files, layer.key) !== null);
+/** The enlarged canteen, back to front: the same four layers, of its own picture (v80). */
+export const CANTEEN_LAYERS_WIDE: RoomLayer[] = [
+  { key: 'canteenBackgroundWide', name: 'Canteen background', needs: null },
+  { key: 'canteenKitchenWide', name: 'Canteen kitchenette', needs: null },
+  { key: 'canteenLockersWide', name: 'Canteen lockers', needs: null },
+  { key: 'canteenTableWide', name: 'Canteen table', needs: null },
+];
+
+/** Its wall of lockers painted as if lit. It takes the place of the wall under the pointer and
+ *  is never laid beside it: the two files have the one outline (v80). */
+export const CANTEEN_LIT_LAYERS_WIDE: RoomLitLayer[] = [
+  {
+    key: 'canteenLockersLitWide',
+    name: 'Canteen lockers, lit',
+    region: 'lockers',
+    over: 'canteenLockersWide',
+  },
+];
+
+/** The layers of this unit's canteen: the room as it was built, or the enlarged one. */
+export function canteenLayersOf(state: GameState): RoomLayer[] {
+  return state.unit.canteenWide ? CANTEEN_LAYERS_WIDE : CANTEEN_LAYERS;
+}
+
+/** The lit overlays the art side has delivered, of this unit's canteen. */
+export function canteenLitLayersOf(state: GameState, files: readonly string[]): RoomLitLayer[] {
+  const lit = state.unit.canteenWide ? CANTEEN_LIT_LAYERS_WIDE : CANTEEN_LIT_LAYERS;
+  return lit.filter((layer) => pickSprite(files, layer.key) !== null);
 }
 
 /** The four regions of the room, off the art side's own measurement. The door goes back to the
  *  hall and the lockers open the team page, because the lockers are the men's; the kitchenette
  *  and the table do nothing yet, so they are quiet rectangles like the office's clock
  *  (CLAUDE.md T23 2.9). */
-export const CANTEEN_ROOM_REGIONS: RoomRegion[] = [
-  { id: 'door', name: 'To the hall', ...onTheCanvas(CANTEEN_REGIONS.door), opens: true },
-  { id: 'lockers', name: 'The lockers', ...onTheCanvas(CANTEEN_REGIONS.lockers), opens: true },
-  { id: 'kitchen', name: 'Kitchenette', ...onTheCanvas(CANTEEN_REGIONS.kitchen), opens: false },
-  { id: 'table', name: 'The table', ...onTheCanvas(CANTEEN_REGIONS.table), opens: false },
-];
-
-/** The region over the banks of an enlarged canteen: the line that says which eight lockers the
- *  room is showing, and the click that turns to the other eight (PIOTR, 03.10; v67). */
-export const CANTEEN_PAGE_REGION = 'lockerPage';
-
-/** The regions of this unit's canteen: the four, and the page line of an enlarged one. */
-export function canteenRegionsOf(state: GameState): RoomRegion[] {
-  if (!state.unit.canteenWide) return CANTEEN_ROOM_REGIONS;
+function roomRegions(
+  regions: Record<'door' | 'lockers' | 'kitchen' | 'table', RoomRect>,
+): RoomRegion[] {
   return [
-    ...CANTEEN_ROOM_REGIONS,
-    {
-      id: CANTEEN_PAGE_REGION,
-      name: 'The other eight',
-      ...onTheCanvas(CANTEEN_COUNTER_WIDE),
-      opens: true,
-    },
+    { id: 'door', name: 'To the hall', ...onTheCanvas(regions.door), opens: true },
+    { id: 'lockers', name: 'The lockers', ...onTheCanvas(regions.lockers), opens: true },
+    { id: 'kitchen', name: 'Kitchenette', ...onTheCanvas(regions.kitchen), opens: false },
+    { id: 'table', name: 'The table', ...onTheCanvas(regions.table), opens: false },
   ];
+}
+
+export const CANTEEN_ROOM_REGIONS: RoomRegion[] = roomRegions(CANTEEN_REGIONS);
+
+/** The same four in the enlarged canteen, where its own picture has them (v80). */
+export const CANTEEN_ROOM_REGIONS_WIDE: RoomRegion[] = roomRegions(CANTEEN_REGIONS_WIDE);
+
+/** The regions of this unit's canteen: the four, where its picture has them. */
+export function canteenRegionsOf(state: GameState): RoomRegion[] {
+  return state.unit.canteenWide ? CANTEEN_ROOM_REGIONS_WIDE : CANTEEN_ROOM_REGIONS;
+}
+
+/** The door plates of this unit's canteen: the eight of the room as it was built, or the sixteen
+ *  of the enlarged one, every one of them on the screen at once (v80). */
+export function canteenPlatesOf(state: GameState): readonly RoomRect[] {
+  return state.unit.canteenWide ? CANTEEN_PLATES_WIDE : CANTEEN_PLATES;
 }
 
 /** The catalogue line a compartment is bought under. The office view names its own layers the
  *  same way, with the id the catalogue knows them by. */
 const LOCKER = 'locker';
 
-/** How many pages of eight plates this canteen's lockers come to: one as it was built, two once
- *  it is enlarged, because the room is painted with one pair of banks (v67). */
-export function canteenPages(state: GameState): number {
-  return Math.max(1, Math.ceil(canteenLockers(state) / CANTEEN_PLATES.length));
-}
-
-/** The page the room shows: the one asked for, where the canteen has it, and the first otherwise. */
-function pageOf(state: GameState, page: number): number {
-  return Number.isInteger(page) && page >= 0 && page < canteenPages(state) ? page : 0;
-}
-
 /** How many of the canteen's lockers have a man: the lockers bought, up to the men there are. */
 function lockersInUse(state: GameState): number {
   return Math.min(countOf(state, LOCKER), lockerMen(state).length, canteenLockers(state));
 }
 
-/** Whose locker each of the eight is, in the order they were bought: the first locker the company
+/** Whose locker each plate is, in the order they were bought: the first locker the company
  *  bought is the first man's, and a plate with no locker behind it or no man in front of it stays
  *  blank (CLAUDE.md T23 2.9). The owner is not on the books and needs no locker (2.10), and from
  *  Turn 26 the office and the manager have none either: the lockers are the men on the floor's,
- *  the joiners' and the labourer's (PIOTR, 02.10; CLAUDE.md T26 2.10). An enlarged canteen has
- *  sixteen and the room shows them eight at a time: `page` 1 is the ninth to the sixteenth (v67). */
-export function canteenPlateNames(state: GameState, page = 0): string[] {
+ *  the joiners' and the labourer's (PIOTR, 02.10; CLAUDE.md T26 2.10). Eight names in the room as
+ *  it was built and sixteen in the enlarged one, a name for every plate of its picture (v80). */
+export function canteenPlateNames(state: GameState): string[] {
   const men = lockerMen(state);
   const inUse = lockersInUse(state);
-  const first = pageOf(state, page) * CANTEEN_PLATES.length;
-  return CANTEEN_PLATES.map((_plate, index) =>
-    first + index < inUse ? men[first + index]?.name ?? '' : '',
+  return canteenPlatesOf(state).map((_plate, index) =>
+    index < inUse ? men[index]?.name ?? '' : '',
   );
 }
 
-/** The line over the banks: how many of the lockers are in use, and in an enlarged canteen which
- *  eight the room is showing, with the mark that says the line turns the page (v67). */
-export function canteenCounterLine(state: GameState, page = 0): string {
-  const inUse = lockersInUse(state);
-  const total = canteenLockers(state);
-  if (!state.unit.canteenWide) return `${inUse} of ${total} lockers in use`;
-  const first = pageOf(state, page) * CANTEEN_PLATES.length + 1;
-  const last = first + CANTEEN_PLATES.length - 1;
-  return `Lockers ${first} to ${last} \u00b7 ${inUse} of ${total} in use \u203a`;
+/** The line over the lockers: how many of them are in use. */
+export function canteenCounterLine(state: GameState): string {
+  return `${lockersInUse(state)} of ${canteenLockers(state)} lockers in use`;
 }
 
 /** The plate is the size the picture painted it, so a longer name is cut to the characters that
@@ -149,12 +165,12 @@ function onAPlate(name: string): string {
     : name.slice(0, CANTEEN_PLATE_TEXT.maxCharacters);
 }
 
-/** The eight names and the counter, drawn by the game over the blank plates and the blank strip
- *  of wall the artwork leaves for them. A plate with nobody behind it is still drawn, empty: the
+/** The names and the counter, drawn by the game over the blank plates and the blank strip of wall
+ *  the artwork leaves for them. A plate with nobody behind it is still drawn, empty: the
  *  compartment is there whether or not it has been bought. */
-function liveText(state: GameState, page: number): string {
-  const names = canteenPlateNames(state, page);
-  const plates = CANTEEN_PLATES.map((plate, index) => {
+function liveText(state: GameState): string {
+  const names = canteenPlateNames(state);
+  const plates = canteenPlatesOf(state).map((plate, index) => {
     const name = onAPlate(names[index] ?? '');
     return (
       `<span class="canteen-plate" data-canteen-plate="${index}" ` +
@@ -165,27 +181,25 @@ function liveText(state: GameState, page: number): string {
   const counter = onTheCanvas(state.unit.canteenWide ? CANTEEN_COUNTER_WIDE : CANTEEN_COUNTER);
   return (
     plates +
-    `<span class="canteen-counter" data-canteen-text="counter" ` +
+    `<span class="canteen-counter${state.unit.canteenWide ? ' is-centred' : ''}" data-canteen-text="counter" ` +
     `style="${boxStyle(counter)};font-size:${CANTEEN_COUNTER_TEXT.fontSize}px">` +
-    `${escapeText(canteenCounterLine(state, page))}</span>`
+    `${escapeText(canteenCounterLine(state))}</span>`
   );
 }
 
-/** The canteen, in the two pieces the page needs it in. `page` is which eight lockers of an
- *  enlarged canteen the plates show; the room as it was built has the one (v67). */
+/** The canteen, in the two pieces the page needs it in: the room this unit has. */
 export function canteenScene(
   state: GameState,
   viewport: Viewport,
   files: readonly string[] = spriteFiles(),
-  page = 0,
 ): Scene {
   return roomScene(
     {
       name: 'canteen',
-      layers: CANTEEN_LAYERS,
-      lit: canteenLitLayersOf(files),
+      layers: canteenLayersOf(state),
+      lit: canteenLitLayersOf(state, files),
       regions: canteenRegionsOf(state),
-      live: liveText(state, page),
+      live: liveText(state),
     },
     viewport,
     files,
@@ -197,7 +211,6 @@ export function renderCanteen(
   state: GameState,
   viewport: Viewport,
   files: readonly string[] = spriteFiles(),
-  page = 0,
 ): string {
-  return renderRoom(canteenScene(state, viewport, files, page));
+  return renderRoom(canteenScene(state, viewport, files));
 }

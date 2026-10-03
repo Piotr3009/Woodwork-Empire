@@ -1659,6 +1659,14 @@ input.num {
   opacity: 1;
 }
 
+/* The enlarged canteen's lit wall of lockers takes the place of the wall and is not laid on it:
+   the two pictures have the one outline, and the soft shadow under the doors would be painted
+   twice (the art side's note with the pack of 03.10; v80). The wall goes once the lit one is in. */
+.office-stack:has(.office-region[data-office="lockers"]:hover) .office-layer[data-layer="canteenLockersWide"] {
+  opacity: 0;
+  transition: opacity 0s linear 120ms;
+}
+
 /* The label: a handwritten pill at the top right of the region with the region's name, on the
    pointer and nothing else. It is a child of the region every time, hidden until then, so the
    room's markup never changes with the pointer (T14 2.2) [TUNE: the pill]. */
@@ -1735,8 +1743,10 @@ input.num {
   white-space: nowrap;
 }
 
-/* The plate is a label with a name on it, so the name sits in the middle of it. */
-.canteen-plate {
+/* The plate is a label with a name on it, so the name sits in the middle of it. The line over the
+   enlarged canteen's one wall of lockers sits in the middle of that wall too (v80). */
+.canteen-plate,
+.canteen-counter.is-centred {
   justify-content: center;
 }
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // v67 (PIOTR, 03.10) on the page itself: the Premises tile of the laptop, the Extend click, the
 // hall the morning after, the Enlarge click once the floor beside the canteen is clear, and the
-// canteen room turning to its other eight lockers. What each rule is, is held by
+// canteen room with its sixteen lockers (eight at a time until v80). What each rule is, is held by
 // tests/engine/v67.test.ts and tests/ui/v67.test.ts; this file is the clicks.
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -177,24 +177,20 @@ describe('the enlarged canteen, clicked', () => {
     expect(root().querySelector('[data-room-view="canteen"]')).not.toBeNull();
   });
 
-  it('shows its sixteen lockers eight at a time, and the line over the banks turns the page', () => {
-    expect(root().querySelectorAll('[data-canteen-plate]')).toHaveLength(8);
-    expect(counter()).toBe('Lockers 1 to 8 · 0 of 16 in use ›');
-    click('[data-office="lockerPage"]');
-    expect(counter()).toBe('Lockers 9 to 16 · 0 of 16 in use ›');
-    click('[data-office="lockerPage"]');
-    expect(counter()).toBe('Lockers 1 to 8 · 0 of 16 in use ›');
+  it('shows its sixteen lockers at once, with no line that turns a page', () => {
+    // Eight at a time until v80, when the enlarged room got a picture of its own (PIOTR, 03.10).
+    expect(root().querySelectorAll('[data-canteen-plate]')).toHaveLength(16);
+    expect(counter()).toBe('0 of 16 lockers in use');
+    expect(root().querySelector('[data-office="lockerPage"]')).toBeNull();
   });
 
-  it('is walked into at its first eight again, whichever it was left at', () => {
-    click('[data-office="lockerPage"]');
-    expect(counter()).toContain('Lockers 9 to 16');
+  it('goes back to the hall by its door and is walked into again', () => {
     click('[data-office="door"]');
     expect(root().querySelector('.hall-view')).not.toBeNull();
     toTheHall();
     const built = roomById('canteen');
     clickTheHallAt(built.x + built.width / 2, built.y + built.depth, built.height / 2);
     expect(root().querySelector('[data-room-view="canteen"]')).not.toBeNull();
-    expect(counter()).toContain('Lockers 1 to 8');
+    expect(counter()).toBe('0 of 16 lockers in use');
   });
 });

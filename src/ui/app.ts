@@ -69,7 +69,7 @@ import {
   roomsOf,
 } from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
-import { CANTEEN_PAGE_REGION, canteenPages, canteenScene } from '../render/canteen';
+import { canteenScene } from '../render/canteen';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderContracts } from './contracts';
@@ -196,9 +196,6 @@ interface Ui {
   /** The house card is up at the end of the day, since this real time (CLAUDE.md T13 3.18). */
   houseCardSince: number | null;
   houseCardDone: boolean;
-  /** Which eight of an enlarged canteen's sixteen lockers the room is showing: 0 for the first,
-   *  1 for the ninth to the sixteenth (v67). */
-  canteenPage: number;
   /** Which page of the laptop is on its screen. It opens on home every time, with no memory of
    *  the last page (CLAUDE.md T14 2.1). */
   laptopPage: LaptopPage;
@@ -390,7 +387,6 @@ function freshUi(): Ui {
     contractMan: null,
     houseCardSince: null,
     houseCardDone: false,
-    canteenPage: 0,
     laptopPage: 'home',
     teamTab: 'workshop',
     teamTrade: 'joiner',
@@ -936,7 +932,7 @@ function sceneFor(current: GameState): Scene | null {
     return hallScene(current, { ghost: ghostFor(current), setup: ui.setup });
   }
   if (ui.view === 'canteen') {
-    return canteenScene(current, roomViewport(), undefined, ui.canteenPage);
+    return canteenScene(current, roomViewport());
   }
   return officeScene(current, roomViewport());
 }
@@ -1524,11 +1520,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         openLaptopPage('team');
         break;
       }
-      // The line over the banks of an enlarged canteen turns to its other eight lockers (v67).
-      if (region === CANTEEN_PAGE_REGION) {
-        ui.canteenPage = (ui.canteenPage + 1) % canteenPages(game());
-        break;
-      }
       const modal = OFFICE_REGION_MODALS[region];
       if (modal !== undefined) openModal(modal);
       break;
@@ -1679,8 +1670,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'enlargeCanteen':
       dispatch({ type: 'ENLARGE_CANTEEN' });
-      // The room shows its first eight lockers again, whichever it was showing.
-      ui.canteenPage = 0;
       return;
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
@@ -2194,8 +2183,6 @@ function copyState(): void {
 function walkTo(view: 'hall' | 'office' | 'canteen'): void {
   ui.view = view;
   if (view !== 'hall') endSetup();
-  // The canteen is walked into at its first eight lockers, whichever it was left at (v67).
-  if (view === 'canteen') ui.canteenPage = 0;
   resetCamera();
   requestRender();
 }
