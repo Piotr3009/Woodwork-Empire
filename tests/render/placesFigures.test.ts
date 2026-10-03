@@ -13,7 +13,8 @@
 
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '../../src/engine/index';
-import { machineForPlace, menAtMachine, menAtPlaces } from '../../src/engine/machines';
+import { drawnPlaces } from '../../src/engine/drawn';
+import { machineForPlace, menAtMachine } from '../../src/engine/machines';
 import { planPlaces } from '../../src/engine/production';
 import { homeCellOf } from '../../src/engine/staff';
 import { STATION_HOME, machineStation } from '../../src/engine/stations';
@@ -71,7 +72,7 @@ describe('the men at their places (CLAUDE.md T25 2.6)', () => {
     expect(new Set(cells).size).toBe(2);
   });
 
-  it('sends the third man to the second saw, and stands four men at four places over the two', () => {
+  it('works the third man at the second saw, and draws the four on four cells of their own', () => {
     const state = menAtTheSaws(4, 2, 'standard');
     atTheSaw(state, ['staff-1', 'staff-2', 'staff-3', 'staff-4']);
     const [first, second] = state.equipment.filter((item) => item.specId === 'tableSaw');
@@ -84,8 +85,11 @@ describe('the men at their places (CLAUDE.md T25 2.6)', () => {
     expect(menAtMachine(state, second)).toEqual(['staff-3', 'staff-4']);
     const cells = ['staff-1', 'staff-2', 'staff-3', 'staff-4'].map((who) => cellOf(state, who));
     expect(new Set(cells.map(key)).size).toBe(4);
-    // Each man stands beside the saw that holds him, and not in a heap at the first.
-    for (const entry of menAtPlaces(state)) {
+    // Each man stands beside the machine the picture has him at, and not in a heap at the first
+    // saw. From v66 that is a machine of his own this hour and not always the saw he works at:
+    // the places above are the work, and the cells are the drawing (PIOTR, 03.10).
+    expect(new Set(drawnPlaces(state).map((entry) => entry.item.id)).size).toBe(4);
+    for (const entry of drawnPlaces(state)) {
       const cell = cellOf(state, entry.who);
       const item = entry.item;
       const near =

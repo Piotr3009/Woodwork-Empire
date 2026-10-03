@@ -42,7 +42,6 @@ import {
   itemFootprint,
   itemStandsInTheHall,
   itemZone,
-  menAtPlaces,
   placeShortages,
   placedMachines,
   placesLine,
@@ -50,6 +49,7 @@ import {
   shortageLine,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
+import { drawnPlaces } from '../engine/drawn';
 import { sheetsOnRack } from '../engine/materials';
 import {
   STATION_BENCH,
@@ -68,6 +68,7 @@ import {
   facingAtPallet,
   facingTowards,
   itemAtCell,
+  machineStation,
   palletCell,
   placeCellsAt,
   roomBehindStation,
@@ -884,7 +885,9 @@ function stationAnchor(
     // were bought, each up to its places, the one list `placeCellsAt` gives for every family,
     // benches included [PIOTR, 21.09: "with two saws let them go to the second one"]
     // (CLAUDE.md T25 2.6).
-    const placed = who === null ? undefined : menAtPlaces(state).find((entry) => entry.who === who);
+    // From v66 the place is the one the picture gives him this hour, which is not always the one
+    // he works at (src/engine/drawn.ts).
+    const placed = who === null ? undefined : drawnPlaces(state).find((entry) => entry.who === who);
     if (placed !== undefined) {
       const cell = placeCellsAt(state, placed.item, placed.place + 1)[placed.place] ?? standingCell(state, placed.item);
       return { ...cell, facing: facingAt(cell, placed.item) };
@@ -982,6 +985,15 @@ function figuresNow(state: GameState): Array<{ who: string; station: string; ben
   return figures;
 }
 
+/** The station a figure is drawn at: the machine the picture has him at this hour while the day
+ *  plan has him working at a place, and his own station for everything else, the canteen, the
+ *  door, an errand or his home cell (v66). */
+function drawnStationOf(state: GameState, drawn: ReadonlyMap<string, string>, who: string): string {
+  const station = stationNow(state, who);
+  const specId = drawn.get(who);
+  return specId !== undefined && stationMachine(station) !== null ? machineStation(specId) : station;
+}
+
 /** Where every figure on the hall stands this minute, each on a cell of his own: the one pass that
  *  hands the cells out [PIOTR, 02.10: "three of them stand in one cell"] (CLAUDE.md T26 2.2). The
  *  men at their places first, machine by machine in the order the machines were bought and each
@@ -994,7 +1006,10 @@ export function figureStandings(state: GameState): Map<string, Standing> {
   const taken = new Set<string>();
   const figures = figuresNow(state);
   const atWork = new Set(figures.filter((figure) => stationMachine(figure.station) !== null).map((figure) => figure.who));
-  const places = menAtPlaces(state).filter((entry) => atWork.has(entry.who));
+  // Where the picture has each of them this hour: a machine or a bench of his own, one man to
+  // each while there are empty ones (PIOTR, 03.10; src/engine/drawn.ts; v66). Who works where is
+  // `menAtPlaces`, and nothing here moves it.
+  const places = drawnPlaces(state).filter((entry) => atWork.has(entry.who));
   for (const item of state.equipment) {
     const men = places.filter((entry) => entry.item.id === item.id).sort((a, b) => a.place - b.place);
     if (men.length === 0) continue;
@@ -1757,6 +1772,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // The crew, and the owner, each at the station the engine put him on, each on a cell of his own
   // (CLAUDE.md T26 2.2).
   const standings = figureStandings(state);
+  // The machine each man at work is drawn at this hour: his figure's words and its pose are that
+  // machine's, so a man drawn at the saw is a man sawing (v66).
+  const drawn = new Map(drawnPlaces(state).map((entry) => [entry.who, entry.item.specId]));
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
     const away = worker.absentDaysRemaining > 0;
@@ -1765,7 +1783,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const bench = homeCellOf(state, worker);
     // The dinner hour is the canteen, and the station says so: `stationNow` is the one place the
     // hour is read (CLAUDE.md T21 2.12).
-    const station = stationNow(state, worker.id);
+    const station = drawnStationOf(state, drawn, worker.id);
     const where = stationLabel(station, worker.noPlaceFor);
     const cell = standings.get(worker.id) ?? stationCell(state, station, bench, worker.id);
     const bubble = bubbleOf(worker.id);
@@ -1791,7 +1809,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       ),
     );
   }
-  const ownerStation = stationNow(state, OWNER);
+  const ownerStation = drawnStationOf(state, drawn, OWNER);
   const ownerCell = standings.get(OWNER) ?? stationCell(state, ownerStation, ownerBenchCell(state), OWNER);
   const ownerBubble = ownerIsAvailable(state) ? bubbleOf(OWNER) : null;
   // The owner in the office is not on the hall at all: he went through the door, and the office

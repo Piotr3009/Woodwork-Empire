@@ -47,6 +47,7 @@ import {
   act,
   atAPlace,
   buyStartingKit,
+  drawnAt,
   fillRack,
   firstJob,
   newGame,
@@ -390,6 +391,8 @@ describe('the loops follow the hall', () => {
     const booth = placeEquipment(lacquered, 'sprayBooth', { x: 14, y: 7 });
     expect(hallLoops(lacquered).has('sprayBooth')).toBe(false);
     atAPlace(lacquered, 'owner', booth.specId);
+    // The hall is heard as it is drawn from v66: in the hour the picture has him at the booth.
+    drawnAt(lacquered, 'owner', booth.specId);
     expect(hallLoops(lacquered).has('sprayBooth')).toBe(true);
   });
 });

@@ -1,7 +1,8 @@
 // Shared test driver. One place clicks events away, so no test file grows its own copy.
 
 import { stagePlanFor } from '../src/engine/stages';
-import { WORKER_RATES } from '../src/engine/constants';
+import { DRAWN_TURN_MINUTES, WORKER_RATES } from '../src/engine/constants';
+import { drawnItemOf, workSpots } from '../src/engine/drawn';
 // Straight off the modules, not through the public API: these are the engine's own writes, and
 // the tests use them to stand kit in the hall without sending the owner out for it.
 import { buyEquipment, buySoftware } from '../src/engine/game';
@@ -683,6 +684,19 @@ export function testJoiner(id: string, name: string, anchorX = 6, anchorY = 6): 
     anchorX,
     anchorY,
   };
+}
+
+/** Turns the clock to an hour in which the picture has this man at a machine of this family: from
+ *  v66 a man at work is drawn at a machine of his own that changes on the hour, which is not
+ *  always the one the day plan has him working at (src/engine/drawn.ts). A test that is about
+ *  what is seen or heard at a machine says so with this; the day plan is not touched. */
+export function drawnAt(state: GameState, who: string, family: string): GameState {
+  const hours = Math.max(1, workSpots(state).length);
+  for (let hour = 0; hour < hours; hour += 1) {
+    state.clock.minute = hour * DRAWN_TURN_MINUTES;
+    if (drawnItemOf(state, who)?.specId === family) return state;
+  }
+  throw new Error(`no hour draws ${who} at ${family}`);
 }
 
 /** Stands a man at a place of this family, the way the day plan writes it on him: working, with

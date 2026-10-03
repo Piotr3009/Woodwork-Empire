@@ -157,7 +157,7 @@ export const STATE_VERSION = 34;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v65';
+export const APP_VERSION = 'v66';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1528,6 +1528,11 @@ export const PICTURE_COVER_SHARE = 0.5;
  *  "every hour, say, each to another machine"; the half hour was kept, being more movement and
  *  the rule the job men already had). */
 export const DRAW_BLOCK_MINUTES = 30;
+
+/** How long a man is drawn at one machine before he is drawn walking to the next: an hour [PIOTR,
+ *  03.10: "every hour, each to another machine"]. The drawing only: where a man works, and what
+ *  his minute is worth, is the day plan's and is not moved by it (src/engine/drawn.ts; v66). */
+export const DRAWN_TURN_MINUTES = 60;
 
 /** How many men one machine of a class keeps busy before the hall is short of that family, which is
  *  how many machines a crew of so many men wants [PIOTR, 25.09: "how many machines there must be for

@@ -12,6 +12,7 @@ import {
   atAPlace,
   buyNow,
   buyStartingKit,
+  drawnAt,
   fillRack,
   firstJob,
   newGame,
@@ -73,7 +74,7 @@ describe('the loops the hall is running', () => {
     expect(hallLoops(state).has('extractor')).toBe(false);
   });
 
-  it('hisses the booth only while somebody is at a place of one', () => {
+  it('hisses the booth only while a man is drawn at one', () => {
     let state = buyNow(quiet(), 'sprayBooth', 'standard');
     state = inProduction(state, 'lacquer');
     const booth = state.equipment.find((item) => item.specId === 'sprayBooth');
@@ -82,7 +83,12 @@ describe('the loops the hall is running', () => {
     // cannot spray at all, and must not be heard to.
     expect(hallLoops(state).has('sprayBooth')).toBe(false);
     atAPlace(state, OWNER, 'sprayBooth');
+    // From v66 the hall is heard as it is drawn: the booth hisses in the hour the picture has the
+    // man at it, and not in an hour it has him at another machine (PIOTR, 03.10).
+    drawnAt(state, OWNER, 'sprayBooth');
     expect(hallLoops(state).has('sprayBooth')).toBe(true);
+    drawnAt(state, OWNER, 'workbench');
+    expect(hallLoops(state).has('sprayBooth')).toBe(false);
   });
 
   it('sands nothing at a bench finishing something that is not lacquered, from v55', () => {

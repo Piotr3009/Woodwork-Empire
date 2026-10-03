@@ -45,6 +45,7 @@ import {
   SOUND_VOLUME_DEFAULT,
 } from './constants';
 import { arriveBigJob, setAgency } from './agency';
+import { drawnInUse } from './drawn';
 import { arriveEnquiries, refreshBoard, refreshLocks } from './board';
 import {
   acceptContract,
@@ -2427,21 +2428,24 @@ export function buyGate(state: GameState, equipmentId: string): BuyCheck {
 // ---------------------------------------------------------------------------
 
 
-/** True when somebody is at one of this machine's places this minute. The hall reads it to spin
- *  the blade and throw the dust: nothing in the engine turns on it (CLAUDE.md T3 3.7, T25 2.5). */
+/** True when a man is drawn at this machine this minute. The hall reads it to spin the blade,
+ *  throw the chips and play the saw: nothing in the engine turns on it (CLAUDE.md T3 3.7, T25
+ *  2.5). From v66 it is the man the picture has at the machine and not the man the day plan has
+ *  working at it, so what is seen and what is heard are one picture (src/engine/drawn.ts). The
+ *  extraction is the exception: it pulls for the machines that are really running. */
 export function machineInUse(state: GameState, item: Equipment): boolean {
   const spec = findSpec(item.specId);
   if (!spec || item.broken) return false;
-  const atWork = machinesAtWork(state);
   if (spec.category === 'extraction') {
     // The extraction serves whatever is running, so any machine at work sets it going.
+    const atWork = machinesAtWork(state);
     return state.equipment.some((other) => {
       const otherSpec = findSpec(other.specId);
       return otherSpec?.category === 'machine' && atWork.has(other.id) && !other.broken;
     });
   }
   if (spec.category !== 'machine') return false;
-  return atWork.has(item.id);
+  return drawnInUse(state).has(item.id);
 }
 
 export interface BuyCheck {
