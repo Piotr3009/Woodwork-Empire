@@ -33,6 +33,7 @@ import { renderMaterials } from './materials';
 import { renderPremises } from './premises';
 import { renderSecurity } from './security';
 import { type TeamTab, renderTeam } from './team';
+import type { UsageTrade } from '../engine/usage';
 import { renderWebsite } from './website';
 import {
   button,
@@ -362,6 +363,9 @@ export interface LaptopView {
   stockSheets: string;
   /** Which of the Team's tabs is on top (CLAUDE.md T10 3.6, T15 2.3, T17 2.9). */
   teamTab: TeamTab;
+  /** Which trade's people Our team lists under its tiles: the joiners when a caller names none
+   *  (v72). */
+  teamTrade?: UsageTrade;
   /** The tasks the player has ticked on the Tasks page, in the order he ticked them, waiting for
    *  Do these (CLAUDE.md T17 2.16). */
   tickedTasks: readonly string[];
@@ -377,7 +381,7 @@ function pageBody(state: GameState, page: Exclude<LaptopPage, 'home'>, view: Lap
     case 'drawings':
       return renderDrawings(state);
     case 'team':
-      return renderTeam(state, view.teamTab);
+      return renderTeam(state, view.teamTab, view.teamTrade);
     case 'website':
       return renderWebsite(state);
     case 'insurance':

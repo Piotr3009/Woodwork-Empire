@@ -143,6 +143,13 @@ function moveTheApron(state: GameState, kerb: number, by: number): void {
   for (const worker of state.workers) {
     if (worker.anchorX >= kerb) worker.anchorX += by;
   }
+  layRunsAgain(state, moved);
+}
+
+/** Lays every pipe run to or from a thing that has been moved again, at no charge and under the
+ *  ids the runs had: the hall growing moves the whole apron, and a save in which one plant stood
+ *  on another has the second of them moved off it (v67, v72). */
+export function layRunsAgain(state: GameState, moved: ReadonlySet<string>): void {
   const stale = state.pipes.filter((run) => moved.has(run.equipmentId) || moved.has(run.extractorId));
   if (stale.length === 0) return;
   state.pipes = state.pipes.filter((run) => !stale.includes(run));

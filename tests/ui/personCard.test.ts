@@ -62,15 +62,17 @@ describe('the tile and the card are one function', () => {
     const state = withAJoiner();
     const man = state.workers[0];
     if (!man) throw new Error('nobody on the books');
-    const tile = parse(renderPerson(state, man.id, 'tile'));
-    expect(tile.querySelector('[data-view]')?.getAttribute('data-view')).toBe('tile');
+    const tile = parse(renderPerson(state, man.id, 'row'));
+    expect(tile.querySelector('[data-view]')?.getAttribute('data-view')).toBe('row');
     expect(tile.querySelector('[data-portrait]')).not.toBeNull();
     expect(tile.querySelector('[data-name]')?.textContent).toBe(man.name);
     expect(tile.querySelector('[data-role]')?.textContent).toBe('joiner');
     expect(tile.querySelector('[data-grade]')?.textContent).toContain('experienced');
     expect(tile.querySelector('[data-now]')).not.toBeNull();
-    expect(tile.querySelector('[data-day-bar]')).not.toBeNull();
-    expect(tile.querySelector('[data-figures]')?.textContent).toContain('worked');
+    // His day is on his card from v72; the row carries how much of him is used.
+    expect(tile.querySelector('[data-day-bar]')).toBeNull();
+    expect(tile.querySelector('[data-usage-bar]')).not.toBeNull();
+    expect(tile.querySelector('[data-usage]')).not.toBeNull();
     expect(tile.querySelector('[data-wage]')?.textContent).toContain('a month');
     // One button on a tile, and no more.
     expect(tile.querySelectorAll('.person-actions .btn')).toHaveLength(1);
@@ -152,7 +154,7 @@ describe('the tile and the card are one function', () => {
     const man = state.workers[0];
     if (!man) throw new Error('nobody on the books');
     expect(man.jobId).toBeNull();
-    const tile = parse(renderPerson(state, man.id, 'tile'));
+    const tile = parse(renderPerson(state, man.id, 'row'));
     const now = tile.querySelector('[data-now]');
     expect(now?.textContent).toContain('waiting for the boss');
     expect(now?.classList.contains('warn')).toBe(true);
@@ -163,7 +165,7 @@ describe('the tile and the card are one function', () => {
 
   it('gives the owner Office and never Let go, on the tile and on the card', () => {
     const state = withAJoiner();
-    for (const view of ['tile', 'card'] as const) {
+    for (const view of ['row', 'card'] as const) {
       const drawn = parse(renderPerson(state, 'owner', view));
       expect(drawn.querySelector('[data-do="openOffice"]'), view).not.toBeNull();
       expect(drawn.querySelector('[data-do="letGo"]'), view).toBeNull();

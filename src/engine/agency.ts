@@ -16,6 +16,7 @@ import {
   BIG_JOB_JOINERS_MIN,
   BIG_JOB_LEAD_DAYS,
   BIG_JOB_REFERENCE_RATE,
+  BIG_JOB_SOON_DAYS,
   COMMERCIAL_PROBABILITY,
   DEADLINE_SLACK_PERCENT_MAX,
   DEADLINE_SLACK_PERCENT_MIN,
@@ -28,13 +29,14 @@ import { enquiryQualityTier, offeredOnTheBoard, qualifiesForCommercial } from '.
 import { isWorkingDay, monthOfDay } from './clock';
 import { coversHeld } from './insurance';
 import { drawDeadline, freeJoiners, labourValueFor, stagedJob } from './jobs';
+import { workPlan } from './plan';
 import type { DeadlineDraw } from './jobs';
 import { effectiveReputation } from './reputation';
 import { chance, int, makeId, pickWeighted } from './rng';
 import type { RngCarrier } from './rng';
 import { jobMinutesFor } from './stages';
 import type { StagedJob } from './stages';
-import type { Enquiry, GameState, Job } from './types';
+import type { Enquiry, GameState, Job, Worker } from './types';
 
 export interface AgencyCheck {
   ok: boolean;
@@ -78,16 +80,37 @@ export function bigJobJoinersFor(value: number): number {
   return Math.round(BIG_JOB_JOINERS_MIN + share * (BIG_JOB_JOINERS_MAX - BIG_JOB_JOINERS_MIN));
 }
 
-/** The line the enquiry card carries: `Wants 4 joiners free: you have 2`. */
+/** The joiners who are on a job now and will be off it soon: the job is one the Work Plan has
+ *  ending within `BIG_JOB_SOON_DAYS` working days. A big job counts them with the free men,
+ *  because nobody is put on it until its paperwork and its sheets are in, which is longer than
+ *  that [PIOTR, 03.10: "they should let it through five days before the job ends, so there is
+ *  time to prepare the papers"]. Jobs only: a man on a standing contract is not counted, because a
+ *  contract is nearly always renewed [PIOTR: "do not count on contracts, 99% of them we extend"]
+ *  (v72). */
+export function joinersFreeSoon(state: GameState): Worker[] {
+  const plan = workPlan(state);
+  const ending = new Set(
+    plan.rows.filter((row) => row.to - plan.now <= BIG_JOB_SOON_DAYS).map((row) => row.jobId),
+  );
+  return state.workers.filter(
+    (worker) => worker.role === 'joiner' && worker.jobId !== null && ending.has(worker.jobId),
+  );
+}
+
+/** The line the enquiry card carries: `Wants 4 joiners free: you have 2`, and with men coming off
+ *  a job soon `Wants 6 joiners free: you have 2, and 4 more within 5 days` (v72). */
 export function bigJobLine(state: GameState, enquiry: Enquiry): string {
-  return `Wants ${enquiry.joinersWanted} joiners free: you have ${freeJoiners(state).length}`;
+  const soon = joinersFreeSoon(state).length;
+  const coming = soon === 0 ? '' : `, and ${soon} more within ${BIG_JOB_SOON_DAYS} days`;
+  return `Wants ${enquiry.joinersWanted} joiners free: you have ${freeJoiners(state).length}${coming}`;
 }
 
 /** Why a big job cannot be taken this minute, or that it can: it wants so many joiners on no job
- *  and no contract. Every other enquiry passes (CLAUDE.md T26 2.13). */
+ *  and no contract, or off their job within the week (`joinersFreeSoon`). Every other enquiry
+ *  passes (CLAUDE.md T26 2.13; v72). */
 export function bigJobCheck(state: GameState, enquiry: Enquiry): AgencyCheck {
   if (!isBigJob(enquiry)) return OK;
-  if (freeJoiners(state).length < enquiry.joinersWanted) {
+  if (freeJoiners(state).length + joinersFreeSoon(state).length < enquiry.joinersWanted) {
     return { ok: false, reason: bigJobLine(state, enquiry) };
   }
   return OK;

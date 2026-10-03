@@ -11,7 +11,7 @@
 // his minute had never had them.
 
 import { describe, expect, it } from 'vitest';
-import { PRODUCTION_MANAGER_PACE, STATE_VERSION } from '../../src/engine/constants';
+import { PRODUCTION_MANAGER_PACE } from '../../src/engine/constants';
 import { acceptContract, assignContract, drawContract } from '../../src/engine/contracts';
 import { applyAction, runMinutes } from '../../src/engine/game';
 import type { GameState, Worker } from '../../src/engine/index';
@@ -52,11 +52,12 @@ describe('the Break card asked once and for all', () => {
     const answered = applyAction(state, { type: 'RESOLVE_EVENT', choiceId: 'skip' });
     expect(answered.owner.breakSkipped).toBe(true);
     expect(answered.settings.noonBreak).toBe('ask');
-    // A save of the version before is lifted to being asked.
+    // A save of the version before the tick (35) is lifted to being asked. The number is written
+    // out: `STATE_VERSION - 1` was the same thing only until the next bump.
     const old = JSON.parse(JSON.stringify(beforeNoon())) as { version: number; settings: Record<string, unknown> };
-    old.version = STATE_VERSION - 1;
+    old.version = 35;
     delete old.settings.noonBreak;
-    expect(migrateState(old, STATE_VERSION - 1)?.settings.noonBreak).toBe('ask');
+    expect(migrateState(old, 35)?.settings.noonBreak).toBe('ask');
   });
 
   it('keeps a ticked answer, and gives it at noon without raising the card', () => {

@@ -37,12 +37,14 @@ import {
 } from '../engine/staff';
 import type { DayMeter, WeekHolder } from '../engine/staff';
 import { bubbleFor } from '../engine/bubbles';
+import { usageOfMan } from '../engine/usage';
+import type { ManUsage } from '../engine/usage';
 import { characterSheet, cellBox, rowFor, sheetRoleFor } from '../render/characters';
 import { button, escapeHtml, minutes, money, plural, reasonLabel } from './modal';
 import { ownerDayLine } from './topbar';
 
 /** The two things this one function draws: the row of Our team, and the card a click opens. */
-export type PersonView = 'tile' | 'card';
+export type PersonView = 'row' | 'card';
 
 /** The owner has been here since the company's first day: nobody took him on
  *  (CLAUDE.md T17 2.9). */
@@ -257,7 +259,34 @@ function dayFigures(state: GameState, person: Person): string {
   );
 }
 
-/** The one control a tile carries: Office on the owner, Assign on a man the boss has not put on
+/** How much of him is used, as the row of Our team draws it: the bar, green for the hours he
+ *  worked and red for the hours he was paid and stood, amber once a trade the shop keeps one or
+ *  two of is near full; the figure beside it; and the line under it. All of it is `usageOfMan`'s
+ *  (PIOTR, 03.10; v72). */
+function usageCell(usage: ManUsage | null): string {
+  const percent = usage === null ? null : usage.percent;
+  const band = usage === null ? 'none' : usage.band;
+  return (
+    `<div class="usage-use" data-usage="${percent === null ? '' : percent}" data-band="${band}">` +
+    usageBar(percent, band) +
+    `<b class="usage-percent">${percent === null ? '' : `${percent}%`}</b>` +
+    `<span class="usage-words">${escapeHtml(usage === null ? '' : usage.words)}</span>` +
+    '</div>'
+  );
+}
+
+/** The bar of a share of paid hours: what was worked, then what was stood. Empty for a man or a
+ *  trade with nothing to measure yet. The one bar: a man's row and a trade's tile both draw it. */
+export function usageBar(percent: number | null, band: string): string {
+  const runs =
+    percent === null
+      ? ''
+      : `<span class="seg ${band === 'full' ? 'seg-full' : 'seg-worked'}" style="width:${percent}%"></span>` +
+        `<span class="seg seg-stood" style="width:${100 - percent}%"></span>`;
+  return `<div class="day-bar usage-bar" data-usage-bar>${runs}</div>`;
+}
+
+/** The one control a row carries: Office on the owner, Assign on a man the boss has not put on
  *  anything, and Let go on everybody else, which is the click of Turn 20's 2.4 and unchanged. */
 function tileAction(state: GameState, person: Person): string {
   if (person.id === OWNER) return button('openOffice', 'Office');
@@ -353,41 +382,49 @@ function cardActions(state: GameState, person: Person): string {
 // The one function
 // ---------------------------------------------------------------------------
 
-/** The tile and the card, drawn by the one function: the card is the tile with four more lines and
- *  a second button, in the machine card's skin (PIOTR, 20.09; CLAUDE.md T23 2.13). */
+/** The row and the card, drawn by the one function. The card is the man in full, in the machine
+ *  card's skin (PIOTR, 20.09; CLAUDE.md T23 2.13). The row is one line of Our team: who he is, what
+ *  he is at, how much of him is used, what he costs and his one button. Until v72 it was a tile a
+ *  man, with his day on it, and thirteen of them were a page nobody could read at a glance
+ *  (PIOTR, 03.10: "not everything at once, a list that is easier to read"). */
 export function renderPerson(state: GameState, who: string, view: PersonView): string {
   const person = personOf(state, who);
   if (person === null) return '<p class="empty">Nobody by that name.</p>';
   const head =
     `<h3 class="tile-name" data-name>${escapeHtml(person.name)}</h3>` + chips(person);
-  const body =
-    view === 'card'
-      ? `<p class="tile-figures" data-started>${escapeHtml(startedText(state, person.startDay))}</p>` +
-        `<p class="tile-figures person-wage" data-wage>${escapeHtml(wageLine(person))}</p>` +
-        '<hr class="person-rule" />' +
-        nowLine(state, person) +
-        dayBar(person.meter) +
-        dayFigures(state, person) +
-        weekLines(state, person) +
-        onLine(state, person) +
-        recordLine(person) +
-        cardActions(state, person)
-      : nowLine(state, person) +
-        dayBar(person.meter) +
-        dayFigures(state, person) +
-        `<p class="tile-figures person-wage" data-wage>${escapeHtml(wageLine(person))}</p>` +
-        `<div class="person-actions">${tileAction(state, person)}</div>`;
-  // The whole tile is the way onto the card, because the mockup's tile is a thing the player
-  // clicks. The buttons inside it keep their own click: `closest('[data-do]')` finds the
-  // innermost, so Let go on a tile lets him go and does not open the card under it. The card
-  // itself carries no such click: it is already open (CLAUDE.md T23 2.13).
-  const open =
-    view === 'tile' ? ` data-do="openPersonCard" data-id="${person.id}"` : '';
+  if (view === 'row') {
+    const warn = person.waiting || person.noPlaceFor !== '' ? ' warn' : '';
+    // The whole row is the way onto the card. The button inside it keeps its own click:
+    // `closest('[data-do]')` finds the innermost, so Let go on a row lets him go and does not open
+    // the card under it (CLAUDE.md T23 2.13).
+    return (
+      `<div class="usage-row" data-person="${person.id}" data-view="row" ` +
+      `data-do="openPersonCard" data-id="${person.id}">` +
+      `<div class="usage-face">${portrait(person.sheetRole)}</div>` +
+      `<div class="usage-who">${head}</div>` +
+      `<div class="usage-now${warn}" data-now>${escapeHtml(doingWords(state, person))}</div>` +
+      usageCell(usageOfMan(state, person.id)) +
+      `<div class="usage-wage person-wage" data-wage>${escapeHtml(wageLine(person))}</div>` +
+      `<div class="person-actions">${tileAction(state, person)}</div>` +
+      '</div>'
+    );
+  }
   return (
-    `<div class="tile person-tile" data-person="${person.id}" data-view="${view}"${open}>` +
+    `<div class="tile person-tile" data-person="${person.id}" data-view="card">` +
     portrait(person.sheetRole) +
-    `<div class="person-body">${head}${body}</div>` +
-    '</div>'
+    '<div class="person-body">' +
+    head +
+    `<p class="tile-figures" data-started>${escapeHtml(startedText(state, person.startDay))}</p>` +
+    `<p class="tile-figures person-wage" data-wage>${escapeHtml(wageLine(person))}</p>` +
+    '<hr class="person-rule" />' +
+    nowLine(state, person) +
+    dayBar(person.meter) +
+    dayFigures(state, person) +
+    weekLines(state, person) +
+    onLine(state, person) +
+    recordLine(person) +
+    cardActions(state, person) +
+    '</div></div>'
   );
 }
 
@@ -395,16 +432,6 @@ export function renderPerson(state: GameState, who: string, view: PersonView): s
  *  the draw he pays himself, over a month of working days. */
 function wageLine(person: Person): string {
   return `${money(person.monthlyWage)} a month`;
-}
-
-/** Everybody on the books, the owner first: Our team, as a column of these tiles
- *  (PIOTR, 20.09; CLAUDE.md T23 2.13). */
-export function renderOurTeam(state: GameState): string {
-  const tiles = [
-    renderPerson(state, OWNER, 'tile'),
-    ...state.workers.map((worker) => renderPerson(state, worker.id, 'tile')),
-  ];
-  return `<div class="person-column">${tiles.join('')}</div>`;
 }
 
 /** The head of the card, which is the man's own name and trade: "Callum, joiner". "Person" over a

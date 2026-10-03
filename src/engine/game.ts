@@ -69,12 +69,14 @@ import { burgle, rollBurglary, setSecurityLevel } from './security';
 import { setWebsiteLevel } from './website';
 import { missCall, nextDueCall, takeCall } from './calls';
 import {
+  apronPlaceFor,
   canPlaceSpec,
   canteenLockers,
   firstFreeCell,
   lockerSlots,
   lockersInWords,
   moveItem,
+  standsOnTheApron,
 } from './layout';
 import { enlargeCanteen, extendUnit, openExtension } from './premises';
 import {
@@ -2534,6 +2536,11 @@ export function canBuy(
   if (specId === 'locker' && countOf(state, 'locker') >= canteenLockers(state)) {
     return { ok: false, reason: `The canteen has ${lockersInWords(state)} lockers` };
   }
+  // The plant and the van stand outside, and the apron is three metres wide: with no clear length
+  // of it left there is nowhere for another to stand (v72).
+  if (standsOnTheApron(specId) && apronPlaceFor(state, specId, variant.id) === null) {
+    return { ok: false, reason: 'No room on the apron' };
+  }
   if (!prepaid && !canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
   // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
   // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6).
@@ -2569,8 +2576,11 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
 function anchorFor(state: GameState, specId: string, variantId: string): { x: number; y: number } {
   const spec = findSpec(specId);
   const preferred = defaultAnchor(state, specId);
-  // The office furniture and anything in the yard are not on the hall floor.
-  if (!spec || spec.category === 'furniture' || STARTING_LAYOUT[specId]?.yard === true) {
+  // Out on the apron a thing takes its own place, or the nearest clear one to it when another of
+  // its kind is on that already (PIOTR, 03.10: a second flexi system stood on the first; v72).
+  if (standsOnTheApron(specId)) return apronPlaceFor(state, specId, variantId) ?? preferred;
+  // The office furniture is not on the hall floor.
+  if (!spec || spec.category === 'furniture') {
     return preferred;
   }
   // The welfare kit stands inside the canteen by count and never on a hall cell, so it never

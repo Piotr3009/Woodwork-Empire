@@ -4495,12 +4495,6 @@ input.num {
    radius or shadow value; the two bar runs below read `--good` and `--bad`, which the game has
    said good and bad in since Turn 1 (docs/ui-style.md 4, 13).
    --------------------------------------------------------------------------- */
-.person-column {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
 .person-tile {
   align-items: flex-start;
   flex-direction: row;
@@ -4580,4 +4574,207 @@ input.num {
 
 .seg-stood {
   background: var(--bad);
+}
+
+/* Our team from v72 (PIOTR, 03.10): a tile a trade saying how much of it is used, and under the
+   tiles the people of the trade that is picked, a row a man. The bar is the day bar of the person
+   card with the same two runs, worked and stood, and one more: the game's own accent once a trade
+   the shop keeps one or two of is near full. Every colour is a token this file already has. */
+.seg-full {
+  background: var(--accent);
+}
+
+.usage-trades {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin: 8px 0 14px;
+}
+
+.usage-trade {
+  align-items: stretch;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-ui);
+  gap: 6px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.tile.usage-trade:hover {
+  border-color: var(--screen-green);
+}
+
+.tile.usage-trade.is-on {
+  border-color: var(--screen-green);
+  box-shadow: inset 0 0 0 1px var(--screen-green);
+}
+
+.usage-trade-head {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.usage-trade-name {
+  font-size: var(--fs-body);
+}
+
+.usage-percent {
+  color: var(--screen-green);
+  font-size: var(--fs-lead);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Nothing to measure: the track is there, and faint, so the tiles keep one height. */
+[data-band='none'] .usage-bar {
+  opacity: 0.25;
+}
+
+.usage-trade-head .usage-percent {
+  font-size: var(--fs-hand-small);
+}
+
+[data-band='full'] .usage-percent {
+  color: var(--close-edge);
+}
+
+[data-band='low'] .usage-percent {
+  color: var(--bad);
+}
+
+/* "none hired" is said in words where a figure would stand, and words are not a headline. */
+[data-band='none'] .usage-percent {
+  color: var(--screen-dim);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+
+.usage-trade-words {
+  color: var(--screen-dim);
+  font-size: var(--fs-tiny);
+  line-height: 1.35;
+}
+
+.usage-trade[data-band='full'] .usage-trade-words {
+  color: var(--close-edge);
+  font-weight: 600;
+}
+
+.usage-rows {
+  background: #fff;
+  border: 1px solid var(--screen-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.usage-row {
+  align-items: center;
+  border-top: 1px solid var(--screen-line);
+  cursor: pointer;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 36px minmax(300px, 1.3fr) minmax(160px, 1.3fr) minmax(200px, 280px) 120px minmax(84px, auto);
+  min-height: 46px;
+  padding: 4px 14px;
+}
+
+.usage-row:first-child {
+  border-top: 0;
+}
+
+.usage-row:hover {
+  background: var(--screen);
+}
+
+.usage-heads,
+.usage-heads:hover {
+  background: var(--screen-2);
+  color: var(--screen-dim);
+  cursor: default;
+  font-size: var(--fs-tiny);
+  letter-spacing: 0.06em;
+  min-height: 0;
+  padding: 7px 14px;
+  text-transform: uppercase;
+}
+
+.usage-face {
+  align-items: flex-end;
+  display: flex;
+  height: 42px;
+  justify-content: center;
+}
+
+.usage-face .person-portrait {
+  height: 42px;
+  width: 34px;
+}
+
+.usage-who {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-width: 0;
+}
+
+.usage-who .tile-name {
+  margin: 0;
+}
+
+.usage-now {
+  color: var(--screen-ink);
+  font-size: var(--fs-small);
+  min-width: 0;
+}
+
+.usage-use {
+  align-items: center;
+  column-gap: 10px;
+  display: grid;
+  grid-template-columns: 1fr 52px;
+}
+
+.usage-use .usage-percent {
+  text-align: right;
+}
+
+.usage-words {
+  color: var(--screen-dim);
+  font-size: var(--fs-tiny);
+  grid-column: 1 / -1;
+}
+
+.usage-wage {
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  text-align: right;
+}
+
+.usage-row .person-actions {
+  margin-top: 0;
+}
+
+.usage-legend {
+  color: var(--screen-dim);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--fs-tiny);
+  gap: 6px 16px;
+  margin: 10px 2px 0;
+}
+
+.usage-legend i {
+  border-radius: 2px;
+  display: inline-block;
+  height: 12px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  width: 12px;
 }

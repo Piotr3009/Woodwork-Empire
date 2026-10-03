@@ -5,6 +5,7 @@
 // the control is on a tile and no longer on a row, and the owner's carries Office in its place
 // (CLAUDE.md T23 2.13).
 
+import { USAGE_TRADES } from '../../src/engine/usage';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { formatCalendarDay } from '../../src/engine/index';
 import { LAPTOP_BOOT_MINUTES, LET_GO_NOTICE_DAYS } from '../../src/engine/constants';
@@ -27,8 +28,14 @@ function parse(html: string): HTMLElement {
   return holder;
 }
 
+/** A man's row on Our team, looked for a trade at a time: from v72 the page lists the people of
+ *  the trade that is picked. */
 function tile(state: GameState, id: string): HTMLElement | null {
-  return parse(renderTeam(state, 'ourTeam')).querySelector(`[data-person="${id}"]`);
+  for (const trade of USAGE_TRADES) {
+    const found = parse(renderTeam(state, 'ourTeam', trade)).querySelector<HTMLElement>(`[data-person="${id}"]`);
+    if (found !== null) return found;
+  }
+  return null;
 }
 
 function withAJoiner(): GameState {

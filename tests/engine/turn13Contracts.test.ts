@@ -113,8 +113,10 @@ describe('a v19 save opens with the section 4 defaults', () => {
     expect(ownerDrawPerDay(state)).toBe(200);
     expect(state.pipes).toEqual([]);
     expect(state.gates).toEqual([]);
+    // The noon break joined the settings in v70, asked every day in every lifted save.
     expect(state.settings).toEqual({
       tips: true,
+      noonBreak: 'ask',
       sound: { volume: SOUND_VOLUME_DEFAULT, muted: false },
     });
     expect(state.tips).toEqual({ seen: [] });

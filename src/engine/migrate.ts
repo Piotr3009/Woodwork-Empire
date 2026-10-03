@@ -20,11 +20,12 @@ import {
   WORKER_RATES,
 } from './constants';
 import { receive } from './economy';
-import { canPlace, firstFreeCell } from './layout';
+import { layRunsAgain } from './premises';
+import { apronPlaceFor, boxOf, canPlace, firstFreeCell, standsOnTheApron } from './layout';
 import { isSold } from './machines';
 import { planPlaces } from './production';
 import { rolesForTask } from './tasks';
-import type { GameState, Orientation, TaskKind, WorkerRole, WorkerTier } from './types';
+import type { Equipment, GameState, OnOrderItem, Orientation, TaskKind, WorkerRole, WorkerTier } from './types';
 
 /** The weeks in a month that the Turn 20 build converted a monthly wage with, thirty days over
  *  seven. Turn 21 deleted `WEEKS_PER_MONTH` from the constants because nothing in the game converts
@@ -988,6 +989,48 @@ function liftToVersion36(state: Raw): void {
   state.version = 36;
 }
 
+/** Version 36 to 37 (v72): nothing in the shape of a save changes. The number marks the saves in
+ *  which a second flexi system may be standing on the first, which `standThePlantApart` puts
+ *  right once the save is whole. */
+function liftToVersion37(state: Raw): void {
+  state.version = 37;
+}
+
+/** Everything out on the apron on a place of its own (PIOTR, 03.10; v72). Until v72 every thing of
+ *  one kind was given the one place out there, so a second flexi system, standing or on its way,
+ *  was on the first. The first to be bought keeps its place, and each one after it that stands on
+ *  another is moved to the nearest clear length of the apron; one there is no room for stays where
+ *  it is. The pipe runs of a thing that moved are laid again at no charge (`layRunsAgain`). */
+export function standThePlantApart(state: GameState): void {
+  const kerb = state.unit.widthCells;
+  const seen: Array<{ x: number; y: number; width: number; depth: number }> = [];
+  const moved = new Set<string>();
+  const things: Array<Equipment | OnOrderItem> = [
+    ...state.equipment.filter((item) => standsOnTheApron(item.specId) && item.anchorX >= kerb),
+    ...state.onOrder.filter((held) => standsOnTheApron(held.specId) && held.anchorX >= kerb),
+  ];
+  for (const thing of things) {
+    const box = boxOf(thing.specId, thing.anchorX, thing.anchorY, thing.variantId, thing.orientation);
+    const onAnother = seen.some(
+      (other) =>
+        box.x < other.x + other.width &&
+        other.x < box.x + box.width &&
+        box.y < other.y + other.depth &&
+        other.y < box.y + box.depth,
+    );
+    if (onAnother) {
+      const at = apronPlaceFor(state, thing.specId, thing.variantId, thing.id);
+      if (at !== null) {
+        thing.anchorX = at.x;
+        thing.anchorY = at.y;
+        moved.add(thing.id);
+      }
+    }
+    seen.push(boxOf(thing.specId, thing.anchorX, thing.anchorY, thing.variantId, thing.orientation));
+  }
+  layRunsAgain(state, moved);
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -1013,6 +1056,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   33: liftToVersion34,
   34: liftToVersion35,
   35: liftToVersion36,
+  36: liftToVersion37,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -1042,6 +1086,14 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       standTheBoothsAgain(lifted);
     } catch {
       // Not a whole hall: nothing to stand them on.
+    }
+  }
+  // The plant out on the apron, each on a place of its own (v72).
+  if (version < 37 && Array.isArray(lifted.equipment) && Array.isArray(lifted.onOrder) && lifted.unit) {
+    try {
+      standThePlantApart(lifted);
+    } catch {
+      // Not a whole hall: no apron to stand them on.
     }
   }
   // Who has a place, worked out the moment the save is open rather than left for the first

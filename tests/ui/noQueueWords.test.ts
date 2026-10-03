@@ -18,7 +18,9 @@ import { renderDayEnd } from '../../src/ui/dayEnd';
 import { jobRow } from '../../src/ui/jobCard';
 import { renderMachineCard } from '../../src/ui/machineCard';
 import { renderMachinesPage } from '../../src/ui/machinesPage';
-import { renderOurTeam, renderPerson } from '../../src/ui/personCard';
+import { renderPerson } from '../../src/ui/personCard';
+import { renderTeam } from '../../src/ui/team';
+import { USAGE_TRADES } from '../../src/engine/usage';
 import { renderTopbar } from '../../src/ui/topbar';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import { sixJoinersOnSheetWork, withOnlyCuttingLeft } from '../helpers';
@@ -72,7 +74,7 @@ function everyScreen(state: GameState): string[] {
     renderCompany(state),
     renderCatalogue(state, '', 'owned'),
     renderMachinesPage(state),
-    renderOurTeam(state),
+    ...USAGE_TRADES.map((trade) => renderTeam(state, 'ourTeam', trade)),
     renderDayEnd(state),
     ...state.jobs.map((job) => jobRow(state, job)),
     ...state.equipment.map((item) => renderMachineCard(state, item.id, null)),

@@ -102,7 +102,8 @@ describe('the week on a man s card', () => {
     // line under every row (CLAUDE.md T23 2.13).
     expect(text).not.toContain('efficiency');
     expect(text).not.toContain('This week:');
-    // The tile keeps the one week figure it has room for.
-    expect(text).toContain('this week');
+    // The row keeps the one week figure it has room for: how much of his paid hours he worked,
+    // which for a man in his first week is this week's so far (v72).
+    expect(text).toContain('his first week, so far');
   });
 });

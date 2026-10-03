@@ -7,6 +7,7 @@
 // docs/mockups/t23/team-cards.png; CLAUDE.md T23 2.13).
 
 import { describe, expect, it } from 'vitest';
+import { USAGE_TRADES, usageOfMan } from '../../src/engine/usage';
 import { WORKING_DAYS_PER_MONTH } from '../../src/engine/constants';
 import { ownerDrawPerDay } from '../../src/engine/index';
 import { monthlyWageOf } from '../../src/engine/staff';
@@ -29,8 +30,12 @@ function parse(html: string): HTMLElement {
   return holder;
 }
 
+/** Every row of Our team, a trade at a time in the page's own order: from v72 the page lists the
+ *  people of the trade that is picked, the owner's own trade first. */
 function tiles(state: GameState): HTMLElement[] {
-  return Array.from(parse(renderTeam(state, 'ourTeam')).querySelectorAll('[data-person]'));
+  return USAGE_TRADES.flatMap((trade) =>
+    Array.from(parse(renderTeam(state, 'ourTeam', trade)).querySelectorAll<HTMLElement>('[data-person]')),
+  );
 }
 
 function tileFor(state: GameState, id: string): HTMLElement | undefined {
@@ -86,21 +91,23 @@ describe('Our team', () => {
     expect(tile?.querySelector('[data-now]')?.textContent).toContain('starts');
   });
 
-  it('paints the day he has had, and says the three figures under it', () => {
-    // A morning at the books: the minutes he spends are minutes of his day.
+  it('paints how much of his paid hours he worked, and says what the figure is a reading of', () => {
+    // A morning at the books: the minutes he spends are minutes of his week. Until v72 the tile
+    // carried his day; the row carries how much of him is used, and his day is on his card.
     const state = doTask(withAJoiner(), 'bookkeeping');
     expect(state.owner.minutesWorked).toBeGreaterThan(0);
     const first = tiles(state)[0];
-    const bar = first?.querySelector('[data-day-bar]');
+    const bar = first?.querySelector('[data-usage-bar]');
     expect(bar).not.toBeNull();
-    // Green for the minutes he worked, and it is a real width and not a nought.
+    // Green for the hours he worked, and it is a real width and not a nought.
     const worked = bar?.querySelector('.seg-worked');
     expect(worked).not.toBeNull();
     expect(worked?.getAttribute('style')).toContain('width:');
-    const hours = Math.round(state.owner.minutesWorked / 6) / 10;
-    expect(first?.querySelector('[data-figures]')?.textContent).toContain(`${hours} h worked`);
-    expect(first?.querySelector('[data-figures]')?.textContent).toContain('idle');
-    expect(first?.querySelector('[data-figures]')?.textContent).toContain('this week');
+    const usage = usageOfMan(state, 'owner');
+    expect(first?.querySelector('[data-usage]')?.getAttribute('data-usage')).toBe(String(usage?.percent));
+    expect(first?.querySelector('.usage-percent')?.textContent).toBe(`${usage?.percent}%`);
+    // No week behind him yet: the figure is this week's, and the row says so.
+    expect(first?.querySelector('.usage-words')?.textContent).toBe('the first week, so far');
   });
 
   it('lists the draftsman with his grade and the month he is paid by (CLAUDE.md T21 2.10, T26 2.8)', () => {

@@ -157,11 +157,11 @@ import type {
  *  Version 35 is v67 (PIOTR, 03.10): the unit can be extended and its canteen enlarged. The unit
  *  says where its extension stands, not asked for in every save there is, and whether the canteen
  *  has been enlarged, which it has not. Every v25 to v34 save loads. */
-export const STATE_VERSION = 36;
+export const STATE_VERSION = 37;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v71';
+export const APP_VERSION = 'v72';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1075,6 +1075,16 @@ export const BIG_JOB_REFERENCE_RATE = 1;
  *  the meeting, the survey, the drawings at their cap, the material list and the lorry [TUNE]
  *  (v65). */
 export const BIG_JOB_LEAD_DAYS = 10;
+/** [PIOTR, 03.10: "five days before the job ends, so there is time for the paperwork"] A joiner on
+ *  a job the Work Plan has ending within so many working days counts as free for a big job. A man
+ *  on a standing contract does not, because a contract is nearly always renewed (v72). */
+export const BIG_JOB_SOON_DAYS = 5;
+/** How much of a trade is used, on Our team: from this share of its paid hours a trade the shop
+ *  keeps one or two of (the labourer, the office, the draftsman, the manager) is near full, and
+ *  the next job of its kind wants a second man [PIOTR, 03.10]; under the lower one it stands most
+ *  of the week [TUNE] (v72). */
+export const USAGE_NEAR_FULL_PERCENT = 90;
+export const USAGE_LOW_PERCENT = 50;
 /** The most a big job's drawing takes at the owner's own speed: five working days. Two hundred
  *  bookcases are drawn once and not two hundred times, and at the ordinary 24 minutes a thousand
  *  pounds a job of a million was fifty days at the board [PIOTR, 02.10; TUNE] (v65). */

@@ -85,6 +85,7 @@ import { renderDayEnd, renderDaySummary, renderGameOver } from './dayEnd';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopPage, laptopPageFrom, renderLaptop } from './laptop';
 import { type TeamTab, teamTabFrom } from './team';
+import { type UsageTrade, usageTradeFrom } from '../engine/usage';
 import { renderSpriteCheck } from './spriteCheck';
 import { type WorkPlanTab, renderWorkPlan, workPlanTabFrom } from './workPlan';
 import {
@@ -203,6 +204,8 @@ interface Ui {
   laptopPage: LaptopPage;
   /** Which of the Team's four tabs is on top, on the laptop's team page (CLAUDE.md T15 2.3). */
   teamTab: TeamTab;
+  /** Which trade's people Our team lists under its tiles (PIOTR, 03.10; v72). */
+  teamTrade: UsageTrade;
   /** Which tab of the equipment catalogue is on top, and which family folder is open inside it
    *  (CLAUDE.md T6 3.6, T7 3.7). */
   catalogueTab: CatalogueTab;
@@ -390,6 +393,7 @@ function freshUi(): Ui {
     canteenPage: 0,
     laptopPage: 'home',
     teamTab: 'workshop',
+    teamTrade: 'joiner',
     catalogueTab: CATALOGUE_FIRST_TAB,
     catalogueFolder: null,
     ownedTab: 'all',
@@ -519,6 +523,7 @@ function modalBody(id: ModalId, current: GameState): string {
         page: ui.laptopPage,
         stockSheets: ui.stockSheets,
         teamTab: ui.teamTab,
+        teamTrade: ui.teamTrade,
         tickedTasks: ui.tickedTasks,
       });
     case 'workPlan':
@@ -1535,6 +1540,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       dispatch({ type: 'ASSIGN_AIR', equipmentId: id, compressorId });
       return;
     }
+    case 'teamTrade':
+      // A trade's tile on Our team: its people are the list under the tiles (v72).
+      ui.teamTrade = usageTradeFrom(id);
+      break;
     case 'teamTab':
       // A tab of the Team page; off the laptop's Joinery Core tile it is the Technical tab, where
       // Turn 13 put the software line, and the page comes up with it (CLAUDE.md T14 2.1, T15 2.3).

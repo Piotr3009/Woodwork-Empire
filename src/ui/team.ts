@@ -23,6 +23,7 @@ import {
   HOUSE_TIER_NAMES,
   OWNER_DRAW_TIERS,
   TIER_WORDS,
+  USAGE_NEAR_FULL_PERCENT,
 } from '../engine/constants';
 import {
   HOLIDAY_OPTIONS_DAYS,
@@ -36,7 +37,10 @@ import {
 } from '../engine/index';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { ROLE_WORDS } from '../engine/staff';
-import { renderOurTeam, workerDoing } from './personCard';
+import { OWNER } from '../engine/machines';
+import { tradeUsage } from '../engine/usage';
+import type { TradeUsage, UsageTrade } from '../engine/usage';
+import { renderPerson, usageBar, workerDoing } from './personCard';
 import {
   button,
   emptyLine,
@@ -340,17 +344,81 @@ function joineryCoreLines(state: GameState): string {
   );
 }
 
-function tabBody(state: GameState, tab: TeamTab): string {
-  // The roll call, and nobody is hired from it (CLAUDE.md T17 2.9). A column of the tiles of
-  // 2.13 from Turn 23: the accountant's three lines of Turn 17 are gone and their figures are on
-  // the man's own card (PIOTR, 20.09; CLAUDE.md T23 2.13).
-  if (tab === 'ourTeam') {
-    return (
-      '<h3>Our team</h3>' +
-      '<p class="hint">Everybody on the books, the owner first. Click a man for his card.</p>' +
-      renderOurTeam(state)
-    );
+/** The tile of one trade on Our team: its name, how much of it was used, the bar and the one
+ *  sentence about it. A click puts its people in the list under the tiles (PIOTR, 03.10; v72). */
+function tradeTile(usage: TradeUsage, on: boolean): string {
+  const figure = usage.percent === null ? (usage.men.length === 0 ? 'none hired' : '') : `${usage.percent}%`;
+  return (
+    `<button class="tile usage-trade${on ? ' is-on' : ''}" data-do="teamTrade" data-id="${usage.trade}" ` +
+    `data-trade="${usage.trade}" data-band="${usage.band}">` +
+    '<span class="usage-trade-head">' +
+    `<b class="usage-trade-name">${escapeHtml(usage.label)}</b>` +
+    `<span class="usage-percent">${escapeHtml(figure)}</span></span>` +
+    usageBar(usage.percent, usage.band) +
+    `<span class="usage-trade-words">${escapeHtml(usage.words)}</span>` +
+    '</button>'
+  );
+}
+
+/** Where a trade is hired, in the words of the tab that hires it. */
+function hiredOn(trade: UsageTrade): string {
+  if (trade === OWNER) return '';
+  const tab = tradeOf(trade);
+  return TABS.find(([id]) => id === tab)?.[1] ?? '';
+}
+
+/** The list under the tiles: the people of the trade that is picked, a row a man, under the heads
+ *  of its columns; or, for a trade nobody is hired in, where one is taken on. */
+function tradeRows(state: GameState, usage: TradeUsage): string {
+  if (usage.men.length === 0) {
+    return emptyLine(`Nobody yet. One is taken on under ${hiredOn(usage.trade)}.`);
   }
+  return (
+    '<div class="usage-rows" data-usage-rows>' +
+    '<div class="usage-row usage-heads">' +
+    '<span></span><span>Name</span><span>Now</span><span>Used last week</span>' +
+    '<span class="usage-wage">A month</span><span></span></div>' +
+    usage.men.map((who) => renderPerson(state, who, 'row')).join('') +
+    '</div>'
+  );
+}
+
+/** What the three colours of a bar are, said once under the list. */
+function usageLegend(): string {
+  return (
+    '<p class="usage-legend">' +
+    '<span><i class="seg-worked"></i>worked</span>' +
+    '<span><i class="seg-stood"></i>paid and stood</span>' +
+    `<span><i class="seg-full"></i>${USAGE_NEAR_FULL_PERCENT}% and over: near full, ` +
+    'more work of that kind wants a second man</span>' +
+    '</p>'
+  );
+}
+
+/** Our team: how much of each trade is used, a tile a trade, and under them the people of the
+ *  trade that is picked. Until v72 it was everybody on the books in one column of tiles, which
+ *  said nothing about a trade and took a screen for three men (PIOTR, 03.10: "tabs by the kind of
+ *  people, and the per cent of how much each is used: a draftsman or a labourer at ninety is the
+ *  sign a second one has to be taken on"). Nobody is hired from it (CLAUDE.md T17 2.9). */
+function ourTeamBody(state: GameState, trade: UsageTrade): string {
+  const trades = tradeUsage(state);
+  const picked = trades.find((entry) => entry.trade === trade) ?? trades[0];
+  if (picked === undefined) return '';
+  const count = picked.trade === OWNER ? '' : plural(picked.men.length, 'man', 'men');
+  const used = picked.percent === null ? '' : `${picked.percent}% used`;
+  return (
+    '<h3>How much of each trade is used</h3>' +
+    '<p class="hint">Last week, the hours worked out of the hours paid for. Click a trade for its people.</p>' +
+    `<div class="usage-trades">${trades.map((entry) => tradeTile(entry, entry === picked)).join('')}</div>` +
+    `<h3 data-usage-picked="${picked.trade}">${escapeHtml(picked.label)}</h3>` +
+    `<p class="hint">${escapeHtml([count, used, 'click a row for the card'].filter((part) => part !== '').join(' · '))}</p>` +
+    tradeRows(state, picked) +
+    usageLegend()
+  );
+}
+
+function tabBody(state: GameState, tab: TeamTab, trade: UsageTrade): string {
+  if (tab === 'ourTeam') return ourTeamBody(state, trade);
   const options = hiringOptions(state).filter((option) => tradeOf(option.role) === tab);
   const crew = crewRows(state, tab);
   const heading =
@@ -374,10 +442,10 @@ function tabBody(state: GameState, tab: TeamTab): string {
   );
 }
 
-export function renderTeam(state: GameState, tab: TeamTab): string {
+export function renderTeam(state: GameState, tab: TeamTab, trade: UsageTrade = 'joiner'): string {
   return (
     // The interview he is sitting in, and that the man is not on the books until it is over
     // (CLAUDE.md T7 3.10).
-    tripLine(state) + tabBar('teamTab', TABS, tab) + tabBody(state, tab)
+    tripLine(state) + tabBar('teamTab', TABS, tab) + tabBody(state, tab, trade)
   );
 }

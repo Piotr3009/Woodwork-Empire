@@ -93,6 +93,8 @@ describe('footprints in metres', () => {
       tableSaw: [2, 1, 1],
       workbench: [2, 1, 0.9],
       sheetRack: [2, 1, 1.5],
+      // The high capacity rack of v69 is the industrial rack's own size, in red.
+      sheetRackHigh: [4, 1, 2.2],
       edgebander: [1, 1, 0.5],
       // The spray booth and the pelletiser were measured in metres tonight as well, and both
       // came down in height (CLAUDE.md T7 3.3). The booths are the size of their pictures from v56,

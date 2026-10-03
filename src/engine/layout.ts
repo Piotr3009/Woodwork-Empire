@@ -9,6 +9,7 @@ import {
   LOCKER_SLOT_LAYOUT_WIDE,
   M2_PER_PERSON,
   WELFARE_IN_THE_CANTEEN,
+  STARTING_LAYOUT,
   YARD_WIDTH_CELLS,
   roomsOf,
 } from './constants';
@@ -82,6 +83,56 @@ function boxOfItem(
   y: number,
 ): Box {
   return boxOf(item.specId, x, y, item.variantId, item.orientation);
+}
+
+/** True for the kit that stands outside on the apron and not on the hall floor: the two central
+ *  systems and the van (`STARTING_LAYOUT`). */
+export function standsOnTheApron(specId: string): boolean {
+  return STARTING_LAYOUT[specId]?.yard === true;
+}
+
+/** Where the next thing of this kind stands on the apron, or null when the apron has no room for
+ *  it: its own place when nothing is on it, and from there the nearest clear place up and down the
+ *  apron, a length of itself at a time. Until v72 everything of one kind was given the one place,
+ *  so a second flexi system stood on the first (PIOTR, 03.10). What is on its way holds its place
+ *  like what has landed. `ignoreId` is the thing being stood again, which is not in its own way. */
+export function apronPlaceFor(
+  state: GameState,
+  specId: string,
+  variantId?: string,
+  ignoreId: string | null = null,
+): { x: number; y: number } | null {
+  const slot = STARTING_LAYOUT[specId];
+  if (slot === undefined || slot.yard !== true) return null;
+  const kerb = state.unit.widthCells;
+  const taken: Box[] = [];
+  for (const item of state.equipment) {
+    if (item.id === ignoreId || item.anchorX < kerb || findSpec(item.specId)?.category === 'furniture') continue;
+    taken.push(boxOfItem(item, item.anchorX, item.anchorY));
+  }
+  for (const held of state.onOrder) {
+    if (held.id === ignoreId || held.anchorX < kerb) continue;
+    taken.push(boxOfItem(held, held.anchorX, held.anchorY));
+  }
+  const x = kerb + slot.x;
+  const own = boxOf(specId, x, slot.y, variantId);
+  const clear = (y: number): boolean => {
+    if (y < 0 || y + own.depth > state.unit.depthCells) return false;
+    if (x + own.width > kerb + YARD_WIDTH_CELLS) return false;
+    const box = { ...own, y };
+    return !taken.some((other) => overlaps(box, other));
+  };
+  if (clear(slot.y)) return { x, y: slot.y };
+  for (let step = 1; step * own.depth <= state.unit.depthCells; step += 1) {
+    for (const y of [slot.y + step * own.depth, slot.y - step * own.depth]) {
+      if (clear(y)) return { x, y };
+    }
+  }
+  // Anywhere at all, for a thing its neighbours are not a whole length of itself from.
+  for (let y = 0; y + own.depth <= state.unit.depthCells; y += 1) {
+    if (clear(y)) return { x, y };
+  }
+  return null;
 }
 
 /** Is this cell a cell of the floor at all: inside the hall or on the apron beside it, off every
