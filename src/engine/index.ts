@@ -292,6 +292,7 @@ export {
   takeEnquiry,
   takeOffOutstanding,
   transportLabel,
+  courierCostFor,
 } from './jobs';
 export { dropJob, dropReputationCost } from './jobs';
 export { changeReputation, companyTotals } from './reputation';

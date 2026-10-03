@@ -7,6 +7,8 @@ import {
   BIG_JOB_EMAIL_PRICE_MAX,
   BUILDING_ROLES,
   COURIER_COST,
+  COURIER_COST_SMALL,
+  COURIER_SMALL_JOB_MAX_PRICE,
   MEETING_PRICE_THRESHOLD,
   DEADLINE_DAYS_BASE,
   DEADLINE_DAYS_FACTOR,
@@ -1284,11 +1286,23 @@ export function jobsAtGate(state: GameState): Job[] {
   return state.jobs.filter((job) => job.stage === 'awaitingTransport');
 }
 
-/** What ordering transport costs today: a courier, or the trip in the van the company would send,
- *  its minutes and the pieces it takes (v54). */
-export function transportLabel(state: GameState): string {
+/** What a courier charges to take this piece to its client: the small price up to
+ *  `COURIER_SMALL_JOB_MAX_PRICE` of the job's own price, the full one above it (PIOTR, 03.10;
+ *  v79). The one place the two prices are chosen between. */
+export function courierCostFor(job: Job): number {
+  return job.price <= COURIER_SMALL_JOB_MAX_PRICE ? COURIER_COST_SMALL : COURIER_COST;
+}
+
+/** What ordering transport costs today for these pieces: a courier, at the one price they all go
+ *  at or at both when the pieces are of both sizes, or the trip in the van the company would
+ *  send, its minutes and the pieces it takes (v54, v79). */
+export function transportLabel(state: GameState, jobs: readonly Job[]): string {
   const van = tripVan(state);
-  if (van === null) return `Courier ${formatMoney(COURIER_COST)}, next working day`;
+  if (van === null) {
+    const costs = [...new Set(jobs.map(courierCostFor))].sort((a, b) => a - b);
+    const prices = (costs.length > 0 ? costs : [COURIER_COST]).map((cost) => formatMoney(cost));
+    return `Courier ${prices.join(' or ')}, next working day`;
+  }
   const pieces = vanClassOf(van).piecesPerTrip;
   return `Take it in the van, ${deliveryMinutes(state)} min${pieces > 1 ? `, up to ${pieces} pieces a trip` : ''}`;
 }
@@ -1311,7 +1325,7 @@ export function orderTransport(state: GameState, jobId: string): boolean {
     }
     return true;
   }
-  chargeUnavoidable(state, 'transport', `Courier for ${job.name}`, COURIER_COST);
+  chargeUnavoidable(state, 'transport', `Courier for ${job.name}`, courierCostFor(job));
   job.deliverOnDay = nextWorkingDay(state.clock.day);
   return true;
 }

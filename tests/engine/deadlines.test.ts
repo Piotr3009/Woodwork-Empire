@@ -48,18 +48,20 @@ describe('what the client gives', () => {
     }
   });
 
-  it('gives a 15,000 kitchen twenty four or twenty five days, and nineteen or twenty express', () => {
+  it('gives a 15,000 kitchen twenty two or twenty three days, and eighteen or nineteen express', () => {
     // On the day one hall the moulding's quarter of the kitchen is by hand, there being no spindle
     // moulder, so the owner's days over it are longer and the client is told a later date (v55):
-    // eighteen to twenty three days until v55, and seventeen to nineteen express.
+    // eighteen to twenty three days until v55, and seventeen to nineteen express. Twenty four or
+    // twenty five and nineteen or twenty until v79: the owner's base is ten per cent up, so his
+    // days over the same kitchen are fewer and the client asks for it sooner (PIOTR, 03.10).
     const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const standard = spread(state, 15000, false);
-    expect(standard[0], `${standard.join(',')}`).toBeGreaterThanOrEqual(24);
-    expect(standard[standard.length - 1], `${standard.join(',')}`).toBeLessThanOrEqual(25);
+    expect(standard[0], `${standard.join(',')}`).toBeGreaterThanOrEqual(22);
+    expect(standard[standard.length - 1], `${standard.join(',')}`).toBeLessThanOrEqual(23);
     // Turn 17: express is 20% sooner and no longer 40% (PIOTR, 17.09; CLAUDE.md T17 2.23).
     const express = spread(state, 15000, true);
-    expect(express[0], `${express.join(',')}`).toBeGreaterThanOrEqual(19);
-    expect(express[express.length - 1], `${express.join(',')}`).toBeLessThanOrEqual(20);
+    expect(express[0], `${express.join(',')}`).toBeGreaterThanOrEqual(18);
+    expect(express[express.length - 1], `${express.join(',')}`).toBeLessThanOrEqual(19);
     // A hall with no saw, no edgebander and no spindle moulder does three quarters of the job by
     // hand at half again as long, so the client is told a longer date still (CLAUDE.md T7 3.1).
     const bare = spread(newGame(), 15000, false);

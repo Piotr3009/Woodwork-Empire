@@ -296,7 +296,7 @@ export function gateSection(state: GameState): string {
   const waiting = jobsAtGate(state);
   if (waiting.length === 0) return emptyLine('Nothing waiting to go out.');
   return (
-    `<p class="hint">${escapeHtml(transportLabel(state))}.</p>` +
+    `<p class="hint">${escapeHtml(transportLabel(state, waiting))}.</p>` +
     waiting
       .map(
         (job) =>

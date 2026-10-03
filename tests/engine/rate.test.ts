@@ -74,16 +74,17 @@ function atTheBench(options: { express?: boolean } = {}): GameState {
 }
 
 describe('the four readings of 2.26', () => {
-  it('reads 40 an hour for the owner alone at full work for a week', () => {
+  it('reads 44 an hour for the owner alone at full work for a week', () => {
+    // 40 until v79, when the owner's base went from 320 a day to 352 (PIOTR, 03.10).
     const state = ownerWeek(new Array<number>(RATE_WEEK_DAYS).fill(OWNER_LABOUR_VALUE_PER_DAY));
     const rate = weekRate(state);
     expect(rate.rate).toBe(OWNER_RATE_PER_HOUR);
-    expect(rate.rate).toBe(40);
+    expect(rate.rate).toBe(44);
     expect(rate.days).toBe(RATE_WEEK_DAYS);
     expect(rate.paidHours).toBe(RATE_WEEK_DAYS * PAID_HOURS_PER_WORKING_DAY);
     // One man on the books, so a man earns what the workshop earns.
     expect(rate.people).toBe(1);
-    expect(rate.perMan).toBe(40);
+    expect(rate.perMan).toBe(44);
   });
 
   it('reads 24 an hour when the shop stands two of the five days', () => {
@@ -94,22 +95,22 @@ describe('the four readings of 2.26', () => {
     expect(weekRate(state).paidHours).toBe(40);
   });
 
-  it('is pulled under 40 by a joiner with no experience who is idle half the day', () => {
-    // The owner at his work all day is 320; a joiner with no experience at 0.6 of him is 192 a
-    // day, and half of that is 96. Two men are sixteen hours paid for, so 416 over the sixteen is
-    // 26 an hour (CLAUDE.md T21 2.9).
+  it('is pulled under 44 by a joiner with no experience who is idle half the day', () => {
+    // The owner at his work all day is 352 (v79); a joiner with no experience at 0.6 of him is
+    // 211.2 a day, and half of that is 105.6. Two men are sixteen hours paid for, so 457.6 over
+    // the sixteen is 28.6 an hour (CLAUDE.md T21 2.9).
     const green = OWNER_LABOUR_VALUE_PER_DAY * WORKER_RATES.novice;
     const days = new Array<number>(RATE_WEEK_DAYS)
       .fill(0)
       .map((_, index) => closed(index + 1, OWNER_LABOUR_VALUE_PER_DAY + green / 2, PAID_HOURS_PER_WORKING_DAY * 2));
     const rate = weekRate(withDays(days));
-    expect(rate.rate).toBe(26);
+    expect(rate.rate).toBe(28.6);
     expect(rate.rate).toBeLessThan(OWNER_RATE_PER_HOUR);
     expect(rate.people).toBe(2);
-    expect(rate.perMan).toBe(13);
+    expect(rate.perMan).toBe(14.3);
   });
 
-  it('is pushed over 40 by an express job', () => {
+  it('is pushed over 44 by an express job', () => {
     // The same eight hours, and the client pays the uplift on top of them.
     const days = new Array<number>(RATE_WEEK_DAYS)
       .fill(0)
@@ -117,9 +118,9 @@ describe('the four readings of 2.26', () => {
         closed(index + 1, OWNER_LABOUR_VALUE_PER_DAY, PAID_HOURS_PER_WORKING_DAY, { expressUplift: 240 }),
       );
     const rate = weekRate(withDays(days));
-    expect(rate.rate).toBe(70);
+    expect(rate.rate).toBe(74);
     expect(rate.rate).toBeGreaterThan(OWNER_RATE_PER_HOUR);
-    expect(labourEarnedOn(days[0] as DaySummary)).toBe(560);
+    expect(labourEarnedOn(days[0] as DaySummary)).toBe(592);
   });
 });
 

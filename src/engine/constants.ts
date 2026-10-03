@@ -165,7 +165,7 @@ export const STATE_VERSION = 39;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v78';
+export const APP_VERSION = 'v79';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -293,9 +293,14 @@ export const HOLIDAY_MAX_DAYS = 10;
 /** Sick leave once per game year, 4 to 5 days, random day (PIOTR). */
 export const SICK_DAYS_MIN = 4;
 export const SICK_DAYS_MAX = 5;
-/** Owner output: 800 of job value per day, so 320 of labour value per day (PIOTR). */
-export const OWNER_JOB_VALUE_PER_DAY = 800;
-export const OWNER_LABOUR_VALUE_PER_DAY = 320;
+/** Owner output: 880 of job value per day, so 352 of labour value per day. It was 800 and 320
+ *  (PIOTR) until v79, when Piotr put ten per cent on it (03.10: "raise my output by ten per cent;
+ *  the men are counted from my base, so everything goes up by ten per cent"). The one base of
+ *  every minute worked in the hall: a man's minute is this times his grade and the hall's points.
+ *  The wages of v77 stay what they were, so at a pace of one the labour of a job is now a little
+ *  under the forty per cent of its price they were worked out from. */
+export const OWNER_JOB_VALUE_PER_DAY = 880;
+export const OWNER_LABOUR_VALUE_PER_DAY = 352;
 /** CLAUDE.md 8.5 writes this as 0.6667, which is this exact fraction rounded to four places. */
 export const OWNER_LABOUR_PER_MINUTE = OWNER_LABOUR_VALUE_PER_DAY / MINUTES_PER_WORKING_DAY;
 
@@ -306,7 +311,7 @@ export const OWNER_LABOUR_PER_MINUTE = OWNER_LABOUR_VALUE_PER_DAY / MINUTES_PER_
 export const PAID_HOURS_PER_WORKING_DAY = 8;
 
 /** The owner alone, at his work every minute of his eight hours, earns exactly this an hour:
- *  the reference the workshop rate is read against. 320 over 8 is 40 (CLAUDE.md T17 2.26). */
+ *  the reference the workshop rate is read against. 352 over 8 is 44 (CLAUDE.md T17 2.26; v79). */
 export const OWNER_RATE_PER_HOUR = OWNER_LABOUR_VALUE_PER_DAY / PAID_HOURS_PER_WORKING_DAY;
 
 /** Working days the workshop rate on the Company board is read over, and the week it compares
@@ -561,6 +566,12 @@ export const DEPOSIT_FRACTION = 0.5;
 /** A finished piece stands at the gate until it is taken to the client (PIOTR). The courier bill
  *  and the minutes the van costs somebody are both [TUNE]. */
 export const COURIER_COST = 120;
+/** A courier for a small job costs less (PIOTR, 03.10: "the courier down to 40 for jobs up to
+ *  ten thousand"; v79). A flat 120 was a third of the price of a set of garage shelves, and most
+ *  of the profit of a company that makes nothing bigger yet. The price is the job's own, the one
+ *  the client agreed to. */
+export const COURIER_COST_SMALL = 40;
+export const COURIER_SMALL_JOB_MAX_PRICE = 10000;
 export const OWN_DELIVERY_MINUTES = 90;
 /** More than three pieces at the gate and the hall is in its own way (PIOTR: 30% slower). */
 export const GATE_CROWD_LIMIT = 3;

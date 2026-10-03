@@ -3,7 +3,7 @@ import {
   ANSWER_MAX,
   ANSWER_MIN,
   BY_HAND_DURATION_FACTOR,
-  COURIER_COST,
+  COURIER_COST_SMALL,
   DEPOSIT_FRACTION,
   GATE_CROWD_FACTOR,
   OWN_DELIVERY_MINUTES,
@@ -273,23 +273,25 @@ describe('production', () => {
     expect(idle.jobs[0]?.labourRemaining).toBe(160);
   });
 
-  it('takes 240 minutes of the owner for a 400 job', () => {
+  it('takes 218 minutes of the owner for a 400 job', () => {
     let state = accept(ready());
     // A budget spindle moulder beside the saw, so every quarter of the job runs at 1.00: on the
-    // day one hall the moulding's quarter is by hand and the same job is 270 minutes (v55).
+    // day one hall the moulding's quarter is by hand and the same job is longer (v55). 240 minutes
+    // until v79, when the owner's base went up by ten per cent (PIOTR, 03.10): 160 of labour at
+    // 352 a day of 480 minutes.
     placeEquipment(state, 'spindleMoulder', { variantId: 'budget', x: 14, y: 1, id: 'kit-spindle' });
 
     firstJob(state).stage = 'ready';
-    expect(minutesRemainingFor(state, firstJob(state), 1)).toBeCloseTo(240, 6);
+    expect(minutesRemainingFor(state, firstJob(state), 1)).toBeCloseTo(160 / OWNER_LABOUR_PER_MINUTE, 6);
     state = act(state, { type: 'WORK_HERE', jobId: null });
     expect(state.jobs[0]?.stage).toBe('inProduction');
     expect(ownerJob(state)?.id).toBe(state.jobs[0]?.id);
-    state = tick(state, 239);
+    state = tick(state, 218);
     expect(state.jobs[0]?.stage).toBe('inProduction');
     state = tick(state, 1);
     // Made, not delivered: it stands at the gate until transport is ordered (CLAUDE.md T2 3.7).
     expect(state.jobs[0]?.stage).toBe('awaitingTransport');
-    expect(state.owner.minutesByCategory.workshop).toBe(240);
+    expect(state.owner.minutesByCategory.workshop).toBe(219);
   });
 
   it('pays nothing until the client has it, then the balance and the rating', () => {
@@ -320,7 +322,7 @@ describe('production', () => {
     // No van, so the courier takes it and the client has it the next working day.
     const beforeCourier = state.cash;
     state = act(clearEvents(state), { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
-    expect(state.cash).toBeCloseTo(beforeCourier - COURIER_COST, 6);
+    expect(state.cash).toBeCloseTo(beforeCourier - COURIER_COST_SMALL, 6);
     const run = runToDay(clearEvents(state), 2);
     const job = run.state.jobs[0];
     expect(job?.stage).toBe('completed');
@@ -332,10 +334,11 @@ describe('production', () => {
     expect(eventsOfKind(run.events, 'jobPaid')).toHaveLength(1);
   });
 
-  it('works at 0.6667 of job value a minute, so 800 of job value fills a day', () => {
-    // CLAUDE.md 8.5: 800 of job value a day, of which 0.40 is labour value.
+  it('works at 0.7333 of labour value a minute, so 880 of job value fills a day', () => {
+    // CLAUDE.md 8.5: 800 of job value a day, of which 0.40 is labour value; 880 and 352 from v79,
+    // when Piotr put ten per cent on the owner's base (03.10).
     expect(OWNER_LABOUR_PER_MINUTE * 480).toBeCloseTo(OWNER_JOB_VALUE_PER_DAY * LABOUR_FRACTION, 6);
-    expect(OWNER_JOB_VALUE_PER_DAY * LABOUR_FRACTION).toBe(320);
+    expect(OWNER_JOB_VALUE_PER_DAY * LABOUR_FRACTION).toBe(352);
   });
 });
 
@@ -430,15 +433,16 @@ describe('scenario: garage shelves on Easy', () => {
     expect(job?.rating).toBe(3);
     // The client's +3 is booked at half from Turn 26 (CLAUDE.md T26 2.11).
     expect(day3.reputation).toBe(1.5);
-    // 200 deposit in, one sheet at the ad hoc price out, 120 courier out, 200 balance in: 80 of
-    // the 400 is left (CLAUDE.md 8.4, T13 3.3).
+    // 200 deposit in, one sheet at the ad hoc price out, 40 courier out, 200 balance in: 160 of
+    // the 400 is left (CLAUDE.md 8.4, T13 3.3). The courier was 120 and the rest 80 until v79,
+    // when a job of up to ten thousand took the small price (PIOTR, 03.10).
     const jobMoves = day3.ledger
       .filter((entry) =>
         ['jobDeposit', 'jobBalance', 'material', 'transport'].includes(entry.category),
       )
       .map((entry) => entry.amount);
-    expect(jobMoves).toEqual([200, -sheetPriceFor(1), -COURIER_COST, 200]);
-    expect(jobMoves.reduce((total, value) => total + value, 0)).toBe(80);
+    expect(jobMoves).toEqual([200, -sheetPriceFor(1), -COURIER_COST_SMALL, 200]);
+    expect(jobMoves.reduce((total, value) => total + value, 0)).toBe(160);
     // The daily costs quietly took more than the job left behind.
     const laterCosts = day3.ledger
       .filter(
@@ -447,7 +451,7 @@ describe('scenario: garage shelves on Easy', () => {
       )
       .reduce((total, entry) => total + entry.amount, 0);
     expect(laterCosts).toBeLessThan(-450);
-    expect(day3.cash).toBeCloseTo(cashBefore + 80 + laterCosts, 6);
+    expect(day3.cash).toBeCloseTo(cashBefore + 160 + laterCosts, 6);
   });
 });
 
@@ -491,7 +495,7 @@ describe('the piece at the gate', () => {
     let state = finished();
     const before = state.cash;
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
-    expect(before - state.cash).toBe(COURIER_COST);
+    expect(before - state.cash).toBe(COURIER_COST_SMALL);
     expect(firstJob(state).deliverOnDay).toBe(2);
     expect(firstJob(state).stage).toBe('awaitingTransport');
     const run = runToDay(clearEvents(state), 2);

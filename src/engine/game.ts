@@ -1806,7 +1806,7 @@ function raiseJobAtGate(state: GameState, job: Job): void {
   const choices = has(state, 'van')
     ? adHocChoices(state, deliveryMinutes(state), 'Take it in the van', 'Leave it at the gate')
     : [
-        { id: 'transport', label: transportLabel(state) },
+        { id: 'transport', label: transportLabel(state, [job]) },
         { id: 'later', label: 'Leave it at the gate' },
       ];
   queueEvent(state, {
@@ -1814,7 +1814,7 @@ function raiseJobAtGate(state: GameState, job: Job): void {
     title: `${job.name} is finished`,
     body:
       'It is standing in front of the gate. The balance is paid when the client has it. ' +
-      `${transportLabel(state)}.`,
+      `${transportLabel(state, [job])}.`,
     choices,
     data: { jobId: job.id },
   });
