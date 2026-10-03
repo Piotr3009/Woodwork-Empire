@@ -161,7 +161,7 @@ export const STATE_VERSION = 35;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v67';
+export const APP_VERSION = 'v68';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1547,7 +1547,8 @@ export const DRAWN_TURN_MINUTES = 60;
  *  how many machines a crew of so many men wants [PIOTR, 25.09: "how many machines there must be for
  *  how many people"]: the saw from one man to four up its ladder, the edgebander and the spindle
  *  moulder twice that because the trade uses them less, a CNC from four to ten, so a hall with one
- *  needs no saw at all, and the booth and the thicknesser like the saw [PIOTR, 24.09] (v55). v57 had
+ *  needs no second saw (the one saw every shop keeps is asked for by the board, not by this table;
+ *  v68), and the booth and the thicknesser like the saw [PIOTR, 24.09] (v55). v57 had
  *  the edgebander, the spindle moulder and the thicknesser at six to sixteen and the booth at eight
  *  to forty; Piotr put the table of 24.09 back the same evening (v58). Only the men whose work goes
  *  through the family count against it, and of those only the owner and the joiners

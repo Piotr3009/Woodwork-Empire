@@ -180,15 +180,17 @@ describe('the material take off', () => {
 });
 
 describe('v62 (PIOTR, 02.10)', () => {
-  it('lets a CNC stand in for the saw on sheet work, on the board and in the catalogue', () => {
+  it('let a CNC stand in for the saw on the board until v68, which wants the saw again', () => {
+    // v62 read "a CNC replaces several saws" as "no saw at all"; Piotr put it right on 03.10: one
+    // saw has to be there, even a small one (tests/engine/v68.test.ts has the rule).
     const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     state.equipment = state.equipment.filter((item) => item.specId !== 'tableSaw');
     const shelves = PRODUCT_TEMPLATES.find((entry) => entry.id === 'garageShelves');
     if (!shelves) throw new Error('the shelves are wanted');
     expect(missingEquipment(state, shelves)).toEqual(['tableSaw']);
     state.equipment.push({ ...(state.equipment[0] as Equipment), id: 'kit-cnc', specId: 'cnc', variantId: 'pro', anchorX: 2, anchorY: 6 });
-    expect(missingEquipment(state, shelves)).toEqual([]);
-    expect(lockReasonFor(state, shelves)).toBeNull();
+    expect(missingEquipment(state, shelves)).toEqual(['tableSaw']);
+    expect(lockReasonFor(state, shelves)).toBe('Needs table saw');
   });
 
   it('puts a machine with no valve set on the biggest compressor, not the first bought', () => {

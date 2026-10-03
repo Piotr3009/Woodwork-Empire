@@ -27,17 +27,14 @@ export function templatesForReputation(reputation: number): ProductTemplate[] {
 
 /** Tools the workshop is short of for this template. Only kit standing in the hall counts: a
  *  machine on the lorry takes no work until it has landed [PIOTR, 30.09] (v60, reversing T8 3.2).
- *  A CNC stands in for the saw on sheet work: the cutting goes on the CNC whenever the hall has
- *  one (`jobOnCnc`), so a hall with a CNC and no saw is short of nothing for a sheet job
- *  (PIOTR, 02.10: "a CNC replaces several saws"; v62). The one reader: the board's lock and the
- *  catalogue's grey both ask here. */
+ *  A saw is one of them whatever else the hall has: a joinery shop always has a saw, even the
+ *  smallest one, and a CNC does not stand in for it [PIOTR, 03.10: "one has to be there, even a
+ *  small one; the CNC will not cope"] (v68, reversing v62). What the CNC does take off the saw is
+ *  the cutting of a sheet job (`jobOnCnc`), so with one in the hall the number of saws against the
+ *  men counts for nothing. A saw that is broken or away for its service is still the shop's saw.
+ *  The one reader: the board's lock and the catalogue's grey both ask here. */
 export function missingEquipment(state: GameState, entry: ProductTemplate): string[] {
-  return entry.requiredEquipment.filter((specId) => !has(state, specId) && !cncStandsIn(state, entry, specId));
-}
-
-/** True when a CNC in the hall does what this tool would have done for this template. */
-function cncStandsIn(state: GameState, entry: ProductTemplate, specId: string): boolean {
-  return specId === 'tableSaw' && entry.material === 'sheet' && has(state, 'cnc');
+  return entry.requiredEquipment.filter((specId) => !has(state, specId));
 }
 
 /** The greyed out reason on the board, or null when the job can be taken as it stands. */
