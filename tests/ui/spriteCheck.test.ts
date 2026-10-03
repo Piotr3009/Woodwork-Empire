@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { CNC_TOOL_CHANGER_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants';
-import { HALL_LAYERS, PALLET_SPRITE } from '../../src/render/hall';
+import { HALL_LAYERS, HALL_WIDE_LAYERS, PALLET_SPRITE } from '../../src/render/hall';
 import { OFFICE_LAYERS, OFFICE_LIT_LAYERS } from '../../src/render/office';
 import { standsInTheHall } from '../../src/engine/machines';
 import { spriteUrl } from '../../src/render/sprites';
@@ -109,11 +109,21 @@ describe('the sprite check page', () => {
       expect(cell?.textContent, layer.key).toContain('1680 by 1128');
       expect(cell?.textContent, layer.key).toContain(layer.name);
     }
-    // Seven layer cells in all: three of the hall, three of the office and the lit door the art
-    // side owes (CLAUDE.md T14 2.2), each once. The figures have wide cells of their own beside
-    // them, keyed by the sheet and not by a sprite (CLAUDE.md T9 3.13).
+    // Nine layer cells in all: three of the hall, the two an extended unit is painted with in
+    // their place (v67), three of the office and the lit door the art side owes (CLAUDE.md T14
+    // 2.2), each once. The figures have wide cells of their own beside them, keyed by the sheet
+    // and not by a sprite (CLAUDE.md T9 3.13).
     const wide = Array.from(page.querySelectorAll('.sprite-wide-grid [data-sprite-target]'));
-    expect(wide).toHaveLength(HALL_LAYERS.length + OFFICE_LAYERS.length + OFFICE_LIT_LAYERS.length);
+    expect(wide).toHaveLength(
+      HALL_LAYERS.length + HALL_WIDE_LAYERS.length + OFFICE_LAYERS.length + OFFICE_LIT_LAYERS.length,
+    );
+    // The extended background says its own, longer canvas; the enlarged canteen block is on the
+    // first one.
+    expect(page.innerHTML).toContain('The painted hall, extended');
+    const background = page.querySelector('.sprite-wide-grid [data-sprite-target="hallBackgroundWide"]');
+    expect(background?.textContent).toContain('2640 by 1608');
+    const canteen = page.querySelector('.sprite-wide-grid [data-sprite-target="hallCanteenWide"]');
+    expect(canteen?.textContent).toContain('1680 by 1128');
     expect(page.innerHTML).toContain('The office, lit');
     expect(page.querySelector('[data-sprite-target="officeDoorLit"]')).not.toBeNull();
     const keys = wide.map((cell) => cell.getAttribute('data-sprite-target'));

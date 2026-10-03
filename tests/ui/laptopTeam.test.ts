@@ -165,7 +165,16 @@ describe('the Office tiles', () => {
     const rule = CSS.slice(CSS.indexOf('.screen-small-tile .screen-icon {'));
     expect(rule.slice(0, rule.indexOf('}'))).toContain('color: var(--screen-green);');
     expect(rule.slice(0, rule.indexOf('}'))).toContain('height: 30px;');
-    expect(OFFICE_GROUP.map((tile) => tile.id)).toEqual(['team', 'website', 'insurance', 'security', 'joineryCore', 'settings']);
+    // Premises came between Security and Joinery Core in v67 (PIOTR, 03.10).
+    expect(OFFICE_GROUP.map((tile) => tile.id)).toEqual([
+      'team',
+      'website',
+      'insurance',
+      'security',
+      'premises',
+      'joineryCore',
+      'settings',
+    ]);
     expect(EQUIPMENT_GROUP.map((tile) => tile.id)).toEqual(['machines']);
   });
 });

@@ -152,12 +152,16 @@ import type {
  *  becomes a joiner of his grade, the two desk trades that went become office admins, and the
  *  draftsman takes the first of his three grades; the advertising agency is added, off, and a job
  *  and an enquiry say how many free joiners they want, nought for all of them. Every v25 to v33
- *  save loads. */
-export const STATE_VERSION = 34;
+ *  save loads.
+ *
+ *  Version 35 is v67 (PIOTR, 03.10): the unit can be extended and its canteen enlarged. The unit
+ *  says where its extension stands, not asked for in every save there is, and whether the canteen
+ *  has been enlarged, which it has not. Every v25 to v34 save loads. */
+export const STATE_VERSION = 35;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v66';
+export const APP_VERSION = 'v67';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -387,9 +391,14 @@ export const UNIT_RATES_MONTHLY = 450;
 export function unitDepositFor(rentMonthly: number): number {
   return rentMonthly;
 }
+/** What the unit draws with nothing running in it, a day: the lights and the heating of the 200 m2
+ *  it was rented as. A bigger unit draws in proportion to its floor (`standingPowerPerDay`; v67). */
 export const POWER_BASE_DAILY = 4;
 export const POWER_PER_MACHINE_DAILY = 3;
 export const BENCH_SLOTS = 4;
+/** What the builder charges for the second 200 m2 of hall, paid at the click [PIOTR accepted,
+ *  03.10; TUNE] (v67). The landlord's deposit on the bigger rent is on top of it. */
+export const UNIT_EXTENSION_PRICE = 120000;
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
 
@@ -3356,10 +3365,54 @@ export function roomById(id: RoomId): (typeof ROOM_LAYOUT)[number] {
 }
 
 /** The cell outside a room's door. The doors are centred on the faces the hall is on: y = 4 for
- *  the office and the canteen, y = 2 for the WC (docs/art/SPRITES.md 9.3). */
+ *  the office and the canteen, y = 2 for the WC (docs/art/SPRITES.md 9.3). It is read off the
+ *  rooms as they were built: an enlarged canteen grows away from its door, which stays in the
+ *  wall it was painted in (v67). */
 export function roomDoorCell(id: RoomId): { x: number; y: number } {
   const room = roomById(id);
   return { x: room.x + Math.floor(room.width / 2), y: room.y + room.depth };
+}
+
+/** A room block as the hall stands it: the three of `ROOM_LAYOUT`, each at the size this unit has
+ *  it at. */
+export interface RoomBlock {
+  id: RoomId;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  height: number;
+  tooltip: string;
+}
+
+/** How wide the canteen is once it is enlarged: two metres more along the rear wall, four by four
+ *  [PIOTR, 03.10: "I thought it grows to 16 square metres too"] (v67). */
+export const CANTEEN_WIDE_WIDTH = 4;
+
+/** The two sets of rooms a unit can have, made once: the walk asks for them cell by cell. */
+const ROOMS_AS_BUILT: readonly RoomBlock[] = ROOM_LAYOUT.map((room) => ({ ...room }));
+const ROOMS_CANTEEN_WIDE: readonly RoomBlock[] = ROOM_LAYOUT.map((room) =>
+  room.id === 'canteen' ? { ...room, width: CANTEEN_WIDE_WIDTH } : { ...room },
+);
+
+/** The room blocks of this unit: the three of the painted hall, the canteen at four metres once it
+ *  has been enlarged. The one list the floor, the walk, the placement and the drawing all ask, so
+ *  a cell is inside a room for every one of them or for none (v67). */
+export function roomsOf(unit: { canteenWide?: boolean }): readonly RoomBlock[] {
+  return unit.canteenWide === true ? ROOMS_CANTEEN_WIDE : ROOMS_AS_BUILT;
+}
+
+/** The floor an enlarged canteen takes that the one as built does not: the two by four metres
+ *  beside it, which has to be clear before it can grow (v67). */
+export function canteenGrowthBox(): { x: number; y: number; width: number; depth: number } {
+  const canteen = roomById('canteen');
+  return {
+    x: canteen.x + canteen.width,
+    y: canteen.y,
+    width: CANTEEN_WIDE_WIDTH - canteen.width,
+    depth: canteen.depth,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -3420,8 +3473,19 @@ export const CANTEEN_PLATES: readonly RoomRect[] = [
  *  eight men, until there is a bigger canteen [PIOTR, 20.09; CLAUDE.md T23 2.10]. */
 export const CANTEEN_LOCKERS = CANTEEN_PLATES.length;
 
+/** How many compartments the enlarged canteen has: a second pair of banks the same as the first,
+ *  sixteen in all [PIOTR, 03.10] (v67). The room is painted with one pair, so it shows them eight
+ *  at a time. */
+export const CANTEEN_LOCKERS_WIDE = CANTEEN_LOCKERS * 2;
+
 /** The counter over the banks, where the room says how many of the eight are in use [PIOTR]. */
 export const CANTEEN_COUNTER: RoomRect = { x: 95, y: 35, w: 450, h: 65 };
+
+/** The same strip in an enlarged canteen, where the line says which eight of the sixteen the
+ *  room is showing and is the control that turns to the other eight: longer, so it runs on along
+ *  the clear wall over the far bank and stops short of the window, with room at its end for the
+ *  name the pointer brings up, clear of the line itself (v67). */
+export const CANTEEN_COUNTER_WIDE: RoomRect = { x: 95, y: 35, w: 660, h: 65 };
 
 /** The plate's hand: 18 px, centred, and a name longer than eight characters is cut to fit the
  *  plate, because the plate is the size the picture painted it [PIOTR]. */
@@ -3492,6 +3556,27 @@ export const LOCKER_SLOT_LAYOUT: LayoutSlot[] = [
   { x: 3, y: 1 },
   { x: 3, y: 2 },
   { x: 3, y: 3 },
+];
+
+/** Where the lockers of the enlarged canteen stand, in the order they are bought: the column of
+ *  the canteen as built, which holds the first eight the way it always has, and then the far
+ *  column of the new half for the second eight, the ninth to the twelfth on a cell each and the
+ *  rest on its last (v67). */
+export const LOCKER_SLOT_LAYOUT_WIDE: LayoutSlot[] = [
+  // The first eight, where the canteen as built stands them.
+  { x: 3, y: 0 },
+  { x: 3, y: 1 },
+  { x: 3, y: 2 },
+  { x: 3, y: 3 },
+  { x: 3, y: 3 },
+  { x: 3, y: 3 },
+  { x: 3, y: 3 },
+  { x: 3, y: 3 },
+  // The second eight, in the far column of the new half.
+  { x: 6, y: 0 },
+  { x: 6, y: 1 },
+  { x: 6, y: 2 },
+  { x: 6, y: 3 },
 ];
 
 /** Tool cabinets stand in the row between the rear machines and the benches: one for the owner

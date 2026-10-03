@@ -13,9 +13,12 @@ import {
   CLASS_BADGE,
   ROOM_DOOR,
   ROOM_LAYOUT,
+  UNIT_WIDTH_CELLS,
   WELFARE_IN_THE_CANTEEN,
   YARD_WIDTH_CELLS,
+  roomById,
   roomDoorCell,
+  roomsOf,
 } from '../engine/constants';
 import {
   bagStore,
@@ -80,7 +83,7 @@ import { ownerIsAvailable } from '../engine/owner';
 import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
 import { FIGURE_DEPTH_OFFSET } from '../engine/constants';
-import type { RoomId } from '../engine/constants';
+import type { RoomBlock, RoomId } from '../engine/constants';
 import type {
   Bubble,
   Equipment,
@@ -425,6 +428,18 @@ export const HALL_CANVAS = {
   originY: 288 / SPRITE_SCALE,
 };
 
+/** The canvas of the extended hall's background: the same origin, so everything painted on the
+ *  first canvas stands where it stood, and twenty metres more of floor and rear wall to the right
+ *  of it, 2640 by 1608 in the file (v67). */
+export const HALL_CANVAS_WIDE = {
+  width: 2640 / SPRITE_SCALE,
+  height: 1608 / SPRITE_SCALE,
+  originX: HALL_CANVAS.originX,
+  originY: HALL_CANVAS.originY,
+};
+
+export type HallCanvas = typeof HALL_CANVAS;
+
 export interface HallLayer {
   /** The sprite key, which is the file name in public/sprites. */
   key: string;
@@ -432,6 +447,8 @@ export interface HallLayer {
   name: string;
   /** The room block this layer paints. The WC is painted into the background. */
   room: RoomId;
+  /** The canvas it is painted on, where that is not the hall's first one (v67). */
+  canvas?: HallCanvas;
 }
 
 /** Back to front (docs/art/SPRITES.md 9.3). */
@@ -440,6 +457,29 @@ export const HALL_LAYERS: HallLayer[] = [
   { key: 'hallOffice', name: 'Office block', room: 'office' },
   { key: 'hallCanteen', name: 'Canteen block', room: 'canteen' },
 ];
+
+/** The two layers a unit that has grown is painted with in place of its own: the background of
+ *  the hall at forty metres, and the canteen block at four by four. Both are made of the first
+ *  three pictures and nothing else: the floor and the rear wall carried on along the hall, and
+ *  the canteen block stood beside itself with its second door walled up (PIOTR, 03.10: "do we
+ *  need new art, or will you just double what is there"; v67). */
+export const HALL_WIDE_LAYERS: HallLayer[] = [
+  { key: 'hallBackgroundWide', name: 'Hall background, extended', room: 'wc', canvas: HALL_CANVAS_WIDE },
+  { key: 'hallCanteenWide', name: 'Canteen block, enlarged', room: 'canteen' },
+];
+
+/** The layers this unit is painted with, back to front: the first three, with the extended
+ *  background once the hall is longer than it was built and the enlarged canteen block once the
+ *  canteen is (v67). */
+export function hallLayersOf(unit: { widthCells: number; canteenWide?: boolean }): HallLayer[] {
+  const extended = unit.widthCells > UNIT_WIDTH_CELLS;
+  return HALL_LAYERS.map((layer) => {
+    const wide = HALL_WIDE_LAYERS.find((entry) => entry.room === layer.room);
+    if (wide === undefined) return layer;
+    if (layer.room === 'wc') return extended ? wide : layer;
+    return unit.canteenWide === true ? wide : layer;
+  });
+}
 
 /** The box docs/art/SPRITES.md 9.5 leaves on the wall for the company name, given there in
  *  canvas pixels at 2x: x 300 to 560, y 130 to 200. Its width is what the name is fitted to. */
@@ -485,6 +525,22 @@ export const HALL_CLOCK_WALL = {
   x: HALL_NAME_WALL.x + HALL_NAME_WIDTH / TILE_RISE / 2 + HALL_CLOCK_GAP,
   z: 1.6,
 };
+
+/** How high the company name is lettered in a hall whose canteen has been enlarged, in metres up
+ *  the rear wall to its baseline [TUNE]. The enlarged block reaches two metres further along the
+ *  wall and stands in front of the first letters of a long name, so the name goes up over the
+ *  block's roof line, which is 2.7 m, and stays where it is along the wall: pushed along instead,
+ *  it would take the clock with it, behind whatever stands at the wall past it (v67). */
+export const HALL_NAME_WALL_RAISED = 2.85;
+
+/** Where the company name is lettered in this unit: the middle of its baseline, in metres along
+ *  the rear wall and up it. */
+export function hallNameWall(unit: { canteenWide?: boolean }): { x: number; z: number } {
+  return {
+    x: HALL_NAME_WALL.x,
+    z: unit.canteenWide === true ? HALL_NAME_WALL_RAISED : HALL_NAME_WALL.z,
+  };
+}
 
 /** A box on a wall, in metres across the face and up it. The two the hall cares about are the
  *  door and the name over it, which must not touch (CLAUDE.md T6 3.2). */
@@ -557,8 +613,11 @@ export function roomSilhouette(room: {
  *  which are one full canvas each and would answer for every pixel of the hall (CLAUDE.md T6 3.1).
  *  The rooms are tried nearest first, in the reverse of the order they are painted in, so the
  *  block in front takes the click the way it takes the pixel. */
-export function roomAtScenePoint(point: Point): RoomId | null {
-  const nearestFirst = [...ROOM_LAYOUT].sort(
+export function roomAtScenePoint(
+  point: Point,
+  rooms: readonly RoomBlock[] = ROOM_LAYOUT,
+): RoomId | null {
+  const nearestFirst = [...rooms].sort(
     (left, right) => depthKey(right.x, right.y) - depthKey(left.x, left.y),
   );
   for (const room of nearestFirst) {
@@ -569,12 +628,17 @@ export function roomAtScenePoint(point: Point): RoomId | null {
 
 /** Where a layer goes in the hall's own coordinates: the canvas, shifted so its origin pixel
  *  lands on world (0, 0, 0). */
-export function hallLayerBox(): { x: number; y: number; width: number; height: number } {
+export function hallLayerBox(canvas: HallCanvas = HALL_CANVAS): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} {
   return {
-    x: -HALL_CANVAS.originX,
-    y: -HALL_CANVAS.originY,
-    width: HALL_CANVAS.width,
-    height: HALL_CANVAS.height,
+    x: -canvas.originX,
+    y: -canvas.originY,
+    width: canvas.width,
+    height: canvas.height,
   };
 }
 
@@ -1477,9 +1541,13 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const ghost = options.ghost ?? null;
   const files = options.files ?? spriteFiles();
   const layerUrl = (key: string): string | null => pickSprite(files, key);
+  // The layers this unit is painted with: the first three, or the extended background and the
+  // enlarged canteen block once the unit has grown (v67).
+  const layers = hallLayersOf(unit);
+  const background = layers[0];
   // The background carries the floor, the walls and the kerbs. Without it the game draws its own
   // flat floor, so the hall is playable and testable before the art arrives.
-  const painted = layerUrl('hallBackground') !== null;
+  const painted = background !== undefined && layerUrl(background.key) !== null;
   const bounds = gridBounds(unit.widthCells + YARD_WIDTH_CELLS, unit.depthCells, 5);
   const pad = 24;
   const parts: string[] = [];
@@ -1487,11 +1555,12 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
 
   if (painted) {
     // The layers sit at the canvas origin, every one of them, which is what keeps the two room
-    // blocks on their own cells (docs/art/SPRITES.md 9.3).
-    const at = hallLayerBox();
-    for (const layer of HALL_LAYERS) {
+    // blocks on their own cells (docs/art/SPRITES.md 9.3). The extended background is a bigger
+    // canvas with the same origin, so it is laid on its own box and the blocks stay where they are.
+    for (const layer of layers) {
       const url = layerUrl(layer.key);
       if (url === null) continue;
+      const at = hallLayerBox(layer.canvas);
       parts.push(
         // The box is the canvas itself, so none is the honest fit: it puts every pixel of the
         // painting exactly where the art side drew it, with nothing left for a fit rule to round.
@@ -1535,9 +1604,12 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // Which doors have somebody standing in them this minute, read once for the whole scene.
   // The three room blocks. Each is a layer of the painting, or a placeholder box while that layer
   // is missing; either way its footprint is what the player clicks on.
-  for (const room of ROOM_LAYOUT) {
-    const layer = HALL_LAYERS.find((entry) => entry.room === room.id);
+  for (const room of roomsOf(unit)) {
+    const layer = layers.find((entry) => entry.room === room.id);
     const drawn = layer !== undefined && layerUrl(layer.key) !== null;
+    // The room as it was built: its door is in the face it was painted in and its name is over
+    // that door, wherever an enlarged block has grown to (v67).
+    const built = roomById(room.id);
     // A room is a layer of the painting or a placeholder box, and nothing else: there is no sprite
     // of its own any more, which would be a second way to draw the same block
     // (docs/art/SPRITES.md 9.3 replaced the room sprites of section 6).
@@ -1554,9 +1626,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
             // A boxed room already carries its name in the middle: one name per room either way.
             paintedText(
               tileToScreen(
-                room.x + room.width / 2,
-                room.y + room.depth,
-                roomLabelBox(room).bottom,
+                built.x + built.width / 2,
+                built.y + built.depth,
+                roomLabelBox(built).bottom,
               ),
               room.name,
               'painted-text room-label',
@@ -1574,7 +1646,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       const door = roomDoorCell(room.id);
       drawables.push({
         depth: depthKey(door.x, door.y) - 0.05,
-        svg: roomDoor(room, room.id),
+        svg: roomDoor(built, room.id),
       });
     }
   }
@@ -1679,11 +1751,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // no drag: it is placed by count and that is all (PIOTR, 17.09; CLAUDE.md T17 2.2). The art
   // side has no seat and no locker yet, so this is the one placeholder function's box
   // (docs/art/REQUESTS-T17.md 2).
-  const canteen = ROOM_LAYOUT.find((room) => room.id === 'canteen');
+  const canteen = roomById('canteen');
   for (const item of welfare) {
     const spec = findSpec(item.specId);
     if (spec === null || spec === undefined) continue;
-    const lift = canteen?.height ?? 0;
+    const lift = canteen.height;
     const faces = boxPolygons(
       item.anchorX + CANTEEN_KIT_INSET,
       item.anchorY + CANTEEN_KIT_INSET,
@@ -1890,11 +1962,13 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // (CLAUDE.md T6 3.2). It is live text and not part of the shell: the company the player typed
   // in is state, and a new game has a new one.
   if (painted) {
+    // Over the roof line of an enlarged canteen, where it was built otherwise (v67).
+    const nameAt = hallNameWall(unit);
     const fitted = fitName(state.companyName, HALL_NAME_WIDTH);
     if (fitted.text !== '') {
       live.push(
         paintedText(
-          tileToScreen(HALL_NAME_WALL.x, 0, HALL_NAME_WALL.z),
+          tileToScreen(nameAt.x, 0, nameAt.z),
           fitted.text,
           'painted-text hall-company',
           fitted.fontSize,
@@ -1940,7 +2014,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
 
   // With the painting there, the frame is the canvas: the view box is the art's own edges, so the
   // registration cannot drift whatever else is in the hall. Without it, the grid sets the frame.
-  const layerAt = hallLayerBox();
+  const layerAt = hallLayerBox(background?.canvas);
   const size = painted
     ? {
         x: layerAt.x,
@@ -1961,7 +2035,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     'hall',
     viewBox,
     options.setup === true ? 'setup' : 'run',
-    HALL_LAYERS.map((layer) => layerUrl(layer.key) ?? '').join(','),
+    layers.map((layer) => layerUrl(layer.key) ?? '').join(','),
   ].join('|');
   return {
     key,

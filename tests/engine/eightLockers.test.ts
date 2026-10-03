@@ -1,6 +1,8 @@
 // Eight lockers, eight joiners (PIOTR, 20.09; CLAUDE.md T23 2.10). The canteen was built with eight
 // compartments, so a ninth locker cannot be bought. The owner needs no locker: he is not on the
-// books. A bigger canteen is parked (CLAUDE.md T23 8). Turn 26 gave the lockers to the joiners and
+// books. A bigger canteen was parked (CLAUDE.md T23 8) until v67, when the canteen of an extended
+// unit can be enlarged to sixteen (tests/engine/v67.test.ts); everything here is the canteen as it
+// was built. Turn 26 gave the lockers to the joiners and
 // the labourer and took them off the manager and the office (CLAUDE.md T26 2.10); from v64 they
 // are the joiners' alone, because seven joiners and a labourer left no locker for the eighth joiner
 // the unit takes (PIOTR, 02.10: "I cannot hire more joiners").

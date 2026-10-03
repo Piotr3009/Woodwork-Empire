@@ -970,6 +970,17 @@ function liftToVersion34(state: Raw): void {
   state.version = 34;
 }
 
+/** Version 34 to 35 (v67): the unit can be extended and its canteen enlarged (PIOTR, 03.10). Every
+ *  save there is rents the unit as it was built, so its extension is not asked for and its canteen
+ *  is the one of eight lockers. */
+function liftToVersion35(state: Raw): void {
+  if (isRecord(state.unit)) {
+    state.unit.extension = 'none';
+    state.unit.canteenWide = false;
+  }
+  state.version = 35;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -993,6 +1004,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   31: liftToVersion32,
   32: liftToVersion33,
   33: liftToVersion34,
+  34: liftToVersion35,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

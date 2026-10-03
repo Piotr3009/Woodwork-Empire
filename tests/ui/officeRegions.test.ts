@@ -195,6 +195,8 @@ describe('the laptop tiles', () => {
       'website',
       'insurance',
       'security',
+      // The unit, its extension and its canteen (PIOTR, 03.10; v67).
+      'premises',
       'joineryCore',
       'settings',
       // The Equipment group, added in Turn 20 (CLAUDE.md T20 2.9).

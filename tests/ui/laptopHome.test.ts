@@ -208,6 +208,8 @@ describe('home first', () => {
       'Website',
       'Insurance',
       'Security',
+      // The unit, its extension and its canteen, from v67 (PIOTR, 03.10).
+      'Premises',
       'Joinery Core',
       'Settings',
       'Machines',
@@ -217,6 +219,7 @@ describe('home first', () => {
       'website',
       'insurance',
       'security',
+      'premises',
       'joineryCore',
       'settings',
     ]);

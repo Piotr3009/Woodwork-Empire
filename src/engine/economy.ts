@@ -20,6 +20,7 @@ import {
   PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
   POWER_BASE_DAILY,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
+  UNIT_AREA_M2,
   WORKING_DAYS_PER_MONTH,
   unitDepositFor,
 } from './constants';
@@ -360,10 +361,17 @@ export function dailyRates(state: GameState): number {
   return state.unit.ratesMonthly / DAYS_PER_MONTH;
 }
 
+/** What the unit draws a day with nothing running in it: the base of the 200 m2 it was rented
+ *  as, in proportion to its floor, so an extended unit of 400 m2 draws twice it (PIOTR, 03.10;
+ *  v67). */
+export function standingPowerPerDay(unit: { areaM2: number }): number {
+  return (POWER_BASE_DAILY * unit.areaM2) / UNIT_AREA_M2;
+}
+
 /** The base the unit draws plus what every machine in it pulls: a dearer class of machine costs
  *  more to run (CLAUDE.md T3 3.5). */
 export function dailyPower(state: GameState): number {
-  return POWER_BASE_DAILY + machinePowerPerDay(state);
+  return standingPowerPerDay(state.unit) + machinePowerPerDay(state);
 }
 
 /** One month of the costs that arrive whether or not a single job is made. */
@@ -674,6 +682,9 @@ export const MONTH_LINE_OF: Record<LedgerCategory, MonthLineId> = {
   rent: 'rentAndRates',
   rates: 'rentAndRates',
   unitDeposit: 'rentAndRates',
+  // The builder's price of the extension is not rent: it is a line of its own in the ledger and
+  // goes with everything else on the month's card (v67).
+  unitExtension: 'other',
   power: 'power',
   insurance: 'insurance',
   claim: 'insurance',

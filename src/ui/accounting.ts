@@ -60,6 +60,7 @@ const CATEGORY_LABELS: Record<LedgerCategory, string> = {
   equipment: 'Equipment',
   material: 'Material',
   unitDeposit: 'Deposit on the unit',
+  unitExtension: 'Extension of the unit',
   jobDeposit: 'Deposits from clients',
   jobBalance: 'Balances from clients',
   interest: 'Interest',

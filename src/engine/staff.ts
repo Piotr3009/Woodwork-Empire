@@ -8,7 +8,6 @@ import {
   SIGNATURE_NAMES,
   ACCIDENT_CHANCE_PER_DAY,
   ACCIDENT_DAYS_OFF,
-  CANTEEN_LOCKERS,
   DAY_END_MINUTE,
   LABOURER_HOME_CELL,
   HIRE_START_DELAY_DAYS,
@@ -51,7 +50,7 @@ import { addToJob, assignJob, findJob, takeOffJob } from './jobs';
 // module back for the men in today, which is the same two way pair production.ts and this module
 // have carried since Turn 13: neither touches the other while it is being loaded.
 import { workPlan } from './plan';
-import { crewLimit } from './layout';
+import { canteenLockers, crewLimit, lockersInWords } from './layout';
 import { plural } from './text';
 import {
   benchPlaceOf,
@@ -138,6 +137,15 @@ export const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager
  *  unit takes could not be reached; from v64 the eight lockers are the eight joiners' (PIOTR,
  *  02.10: "I cannot hire more joiners"). */
 export const LOCKER_ROLES: WorkerRole[] = ['joiner'];
+
+/** What the hire card says when every locker the canteen holds has its man: how many it holds,
+ *  and, in a unit that has been extended round a canteen still the size it was built, where the
+ *  bigger one is asked for (v67). */
+export function canteenFullLine(state: GameState): string {
+  const line = `No locker for him: the canteen holds ${lockersInWords(state)}`;
+  const canGrow = !state.unit.canteenWide && state.unit.extension === 'open';
+  return canGrow ? `${line}. Enlarge it on the laptop, under Premises` : line;
+}
 
 /** The men of the canteen's lockers, in the order they were taken on. */
 export function lockerMen(state: GameState): Worker[] {
@@ -516,12 +524,14 @@ export function hiringOptions(state: GameState): HiringOption[] {
       // benches (PIOTR, 02.10). The slots still limit how many benches the unit holds, and a
       // place at a bench for every joiner is the shortfall below.
       blockReason = crewLine(state);
-    } else if (LOCKER_ROLES.includes(spec.role) && lockerMen(state).length >= CANTEEN_LOCKERS) {
+    } else if (LOCKER_ROLES.includes(spec.role) && lockerMen(state).length >= canteenLockers(state)) {
       // And so does the canteen: it was built with eight compartments, every man on the books
       // keeps his things in one of them, and the owner needs none. This comes before the
       // shortfall below, because a ninth locker cannot be bought either and "Buy first: Locker"
-      // would send the player to a greyed line (PIOTR, 20.09; CLAUDE.md T23 2.10).
-      blockReason = 'No locker for him: the canteen holds eight';
+      // would send the player to a greyed line (PIOTR, 20.09; CLAUDE.md T23 2.10). An enlarged
+      // canteen holds sixteen, and a unit that has been extended and still has the canteen it
+      // was built with says where the bigger one is (PIOTR, 03.10; v67).
+      blockReason = canteenFullLine(state);
     } else if (missing.length > 0) {
       // A bench holds one, two or three men by its class from Turn 23, so a hall that has benches
       // and no room left at them is short of a place and not of a bench, and says so in those

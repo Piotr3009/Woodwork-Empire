@@ -48,7 +48,7 @@ describe('GameState', () => {
     // v57 is 33: the timber offers taken off the board until the timber branch (PIOTR, 25.09).
     // v63 is 34: one kind of man on the floor, the draftsman's grades and the agency (CLAUDE.md T26
     // section 4).
-    expect(STATE_VERSION).toBe(34);
+    expect(STATE_VERSION).toBe(35);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

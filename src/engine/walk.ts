@@ -12,7 +12,7 @@
 // over equipment in the air and never round it, so the two are not the same search and are not
 // shared (CLAUDE.md T16 2.2).
 
-import { PALLET_LAYOUT, PICTURE_COVER_SHARE, ROOM_LAYOUT } from './constants';
+import { PALLET_LAYOUT, PICTURE_COVER_SHARE, roomsOf } from './constants';
 import { findSpec, isSold, itemStandsInTheHall } from './machines';
 import { footprintOrigin } from './pipes';
 import type { Cell } from './pipes';
@@ -58,7 +58,7 @@ export function insideUnit(state: GameState, cell: Cell): boolean {
 export function isFree(state: GameState, cell: Cell): boolean {
   if (!insideUnit(state, cell)) return false;
   if (covers(PALLET_LAYOUT, cell)) return false;
-  for (const room of ROOM_LAYOUT) {
+  for (const room of roomsOf(state.unit)) {
     if (covers(room, cell)) return false;
   }
   for (const item of state.equipment) {

@@ -2,12 +2,17 @@
 // before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
 
 import {
+  CANTEEN_LOCKERS,
+  CANTEEN_LOCKERS_WIDE,
   GATE_LANE,
+  LOCKER_SLOT_LAYOUT,
+  LOCKER_SLOT_LAYOUT_WIDE,
   M2_PER_PERSON,
-  ROOM_LAYOUT,
   WELFARE_IN_THE_CANTEEN,
   YARD_WIDTH_CELLS,
+  roomsOf,
 } from './constants';
+import type { LayoutSlot } from './constants';
 import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
 import type { Equipment, GameState, OnOrderItem, Orientation } from './types';
@@ -91,7 +96,7 @@ export function cellIsFloor(state: GameState, cell: { x: number; y: number }): b
   if (cell.x >= state.unit.widthCells + YARD_WIDTH_CELLS) return false;
   if (cell.y >= state.unit.depthCells) return false;
   if (overlaps(box, gateLane())) return false;
-  return !ROOM_LAYOUT.some((room) =>
+  return !roomsOf(state.unit).some((room) =>
     overlaps(box, { x: room.x, y: room.y, width: room.width, depth: room.depth }),
   );
 }
@@ -121,7 +126,7 @@ export function canPlaceSpec(
   ) {
     return { ok: false, reason: 'Off the floor' };
   }
-  for (const room of ROOM_LAYOUT) {
+  for (const room of roomsOf(state.unit)) {
     if (!overlaps(box, { x: room.x, y: room.y, width: room.width, depth: room.depth })) continue;
     // The welfare kit lives inside the canteen and nowhere else: a man's locker belongs out of the
     // dust, and it takes no hall cell at all (PIOTR, 17.09; CLAUDE.md T17 2.2, T23 2.11).
@@ -239,7 +244,7 @@ export function moveItem(
  *  zone of everything placed or held for a delivery, in square metres (CLAUDE.md T13 3.10). */
 export function freeFloorM2(state: GameState): number {
   let taken = 0;
-  for (const room of ROOM_LAYOUT) taken += room.width * room.depth;
+  for (const room of roomsOf(state.unit)) taken += room.width * room.depth;
   const lane = gateLane();
   taken += lane.width * lane.depth;
   for (const item of hallItems(state)) {
@@ -261,6 +266,36 @@ export function freeFloorM2(state: GameState): number {
  *  machines still take floor: a bench needs its place, and that is the only way they limit men. */
 export function crewLimit(state: GameState): number {
   return Math.floor((state.unit.widthCells * state.unit.depthCells) / M2_PER_PERSON);
+}
+
+/** How many lockers this unit's canteen holds: the eight it was built with, and sixteen once it
+ *  has been enlarged. The one figure the hiring gate, the catalogue and the room itself count by
+ *  (PIOTR, 20.09 and 03.10; CLAUDE.md T23 2.10; v67). */
+export function canteenLockers(state: GameState): number {
+  return state.unit.canteenWide ? CANTEEN_LOCKERS_WIDE : CANTEEN_LOCKERS;
+}
+
+/** The same figure in a word, for the two sentences that say it: `eight`, `sixteen`. */
+export function lockersInWords(state: GameState): string {
+  return state.unit.canteenWide ? 'sixteen' : 'eight';
+}
+
+/** Where the lockers stand inside the canteen, in the order they are bought (CLAUDE.md T17 2.2;
+ *  v67). */
+export function lockerSlots(state: GameState): readonly LayoutSlot[] {
+  return state.unit.canteenWide ? LOCKER_SLOT_LAYOUT_WIDE : LOCKER_SLOT_LAYOUT;
+}
+
+/** What stands on this piece of floor, or has a place held on it for the day it is delivered: the
+ *  catalogue lines, each once, in the order they stand in the hall. What has to be moved before
+ *  anything else can have the floor (v67). */
+export function standingOn(state: GameState, box: Box): string[] {
+  const found: string[] = [];
+  for (const item of [...hallItems(state), ...reservedItems(state)]) {
+    if (!overlaps(box, boxOfItem(item, item.anchorX, item.anchorY))) continue;
+    if (!found.includes(item.specId)) found.push(item.specId);
+  }
+  return found;
 }
 
 /** The first cell, reading along each row in turn, where a thing of this kind fits. */

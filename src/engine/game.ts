@@ -12,14 +12,12 @@ import {
   BOARD_MIDDAY_MINUTE,
   BREAK_START_MINUTE,
   CABINET_SLOT_LAYOUT,
-  CANTEEN_LOCKERS,
   DAY_LOGS_KEPT,
   DAY_SUMMARIES_MAX,
   DAY_END_MINUTE,
   DIFFICULTIES,
   GATE_LANE,
   LABOURER_CLEAN_WEEKDAY,
-  LOCKER_SLOT_LAYOUT,
   GATE_PRICE,
   HOLIDAY_MAX_DAYS,
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
@@ -70,7 +68,15 @@ import { connectExtraction, disconnectExtraction, dropOrphanPipes } from './pipe
 import { burgle, rollBurglary, setSecurityLevel } from './security';
 import { setWebsiteLevel } from './website';
 import { missCall, nextDueCall, takeCall } from './calls';
-import { canPlaceSpec, firstFreeCell, moveItem } from './layout';
+import {
+  canPlaceSpec,
+  canteenLockers,
+  firstFreeCell,
+  lockerSlots,
+  lockersInWords,
+  moveItem,
+} from './layout';
+import { enlargeCanteen, extendUnit, openExtension } from './premises';
 import {
   createOnOrder,
   findOnOrder,
@@ -370,6 +376,9 @@ export function createGame(options: NewGameOptions): GameState {
       ratesMonthly: spec.ratesMonthly,
       benchSlots: spec.benchSlots,
       depositHeld: 0,
+      // The unit as it was rented: not extended, and the canteen as it was built (v67).
+      extension: 'none',
+      canteenWide: false,
     },
     owner: {
       present: true,
@@ -543,6 +552,9 @@ function startDay(state: GameState): void {
     expressUplift: 0,
     byMan: {},
   };
+  // An extension paid for yesterday is there this morning, before the day is charged: its first
+  // day is paid for at the bigger unit's rent (PIOTR, 03.10; v67).
+  openExtension(state);
   // The month's paper before the day's: the loan, the covers and the security run with the
   // monthly items, and the report is put in front of the player before the board (T13 3.20).
   runDayCosts(state, state.clock.day);
@@ -2363,6 +2375,13 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'SET_AGENCY':
       setAgency(next, action.on);
       break;
+    case 'EXTEND_UNIT':
+      // The second 200 m2: paid for at the click, there in the morning (PIOTR, 03.10; v67).
+      extendUnit(next);
+      break;
+    case 'ENLARGE_CANTEEN':
+      enlargeCanteen(next);
+      break;
     case 'CONNECT_EXTRACTION':
       connectExtraction(next, action.equipmentId);
       break;
@@ -2498,10 +2517,11 @@ export function canBuy(
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
   }
-  // The canteen was built with eight compartments and a bigger one is not built yet, so there is
-  // nowhere for a ninth locker to stand (PIOTR, 20.09; CLAUDE.md T23 2.10, 8).
-  if (specId === 'locker' && countOf(state, 'locker') >= CANTEEN_LOCKERS) {
-    return { ok: false, reason: 'The canteen has eight lockers' };
+  // The canteen was built with eight compartments, so there is nowhere for a ninth locker to
+  // stand until it is enlarged, and nowhere for a seventeenth after that (PIOTR, 20.09 and 03.10;
+  // CLAUDE.md T23 2.10; v67).
+  if (specId === 'locker' && countOf(state, 'locker') >= canteenLockers(state)) {
+    return { ok: false, reason: `The canteen has ${lockersInWords(state)} lockers` };
   }
   if (!prepaid && !canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
   // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
@@ -2524,7 +2544,7 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
   // the next one nobody has been promised (CLAUDE.md T8 3.2).
   const index = countOf(state, specId) + onOrderCount(state, specId);
   if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
-  if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
+  if (specId === 'locker') return slotFrom(lockerSlots(state), index);
   if (specId === TOOL_CABINET) return slotFrom(CABINET_SLOT_LAYOUT, index);
   const slot = STARTING_LAYOUT[specId];
   // Anything the layout has no opinion about starts in the front half, clear of the gate lane.

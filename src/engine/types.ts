@@ -417,6 +417,10 @@ export interface OwnerState {
   idleByReason: Record<OwnerIdleReason, number>;
 }
 
+/** Where the second 200 m2 stand: not asked for, paid for and opening the next working morning,
+ *  or open (PIOTR, 03.10; v67). */
+export type UnitExtension = 'none' | 'building' | 'open';
+
 export interface UnitState {
   areaM2: number;
   widthCells: number;
@@ -426,6 +430,11 @@ export interface UnitState {
   benchSlots: number;
   /** One month of rent the landlord holds. Returned on a move, which is parked. */
   depositHeld: number;
+  /** The extension of the unit along the rear wall, twenty metres more of hall (v67). */
+  extension: UnitExtension;
+  /** True once the canteen has been enlarged from two by four metres to four by four, which is
+   *  what takes its lockers from eight to sixteen (PIOTR, 03.10; v67). */
+  canteenWide: boolean;
 }
 
 export interface Worker {
@@ -795,7 +804,9 @@ export type GameEventKind =
    *  (CLAUDE.md T13 3.16). */
   | 'contractEnded'
   /** An accident with no liability cover: the claim lands (CLAUDE.md T13 3.15). */
-  | 'insuranceClaim';
+  | 'insuranceClaim'
+  /** The morning the extension of the unit opens (v67). */
+  | 'unitExtended';
 
 export interface GameEventChoice {
   id: string;
@@ -832,6 +843,8 @@ export type LedgerCategory =
   | 'equipment'
   | 'material'
   | 'unitDeposit'
+  /** The builder's price of the unit's extension, paid at the click (v67). */
+  | 'unitExtension'
   | 'jobDeposit'
   | 'jobBalance'
   | 'interest'
@@ -1431,6 +1444,10 @@ export type GameAction =
   // Orders and stock:
   | { type: 'SET_WEBSITE_LEVEL'; level: number }
   | { type: 'SET_AGENCY'; on: boolean }
+  /** Pays for the second 200 m2 of the unit, which open the next working morning (v67). */
+  | { type: 'EXTEND_UNIT' }
+  /** Enlarges the canteen to four by four metres, once the floor beside it is clear (v67). */
+  | { type: 'ENLARGE_CANTEEN' }
   // Machines and the hall:
   | { type: 'CONNECT_EXTRACTION'; equipmentId: string }
   | { type: 'BUY_GATE'; equipmentId: string }

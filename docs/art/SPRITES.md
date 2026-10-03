@@ -287,6 +287,22 @@ positioned in canvas coordinates.
 3. No text, logo, people, machines. Passed.
 4. Style matches section 4 (realistic, muted, upper-left light). Passed.
 
+### 9.7 The extended hall (v67, PIOTR 03.10.2026: "do we need new art, or will you just double what is there")
+
+A unit that has been extended is 40 × 10 m, and its canteen can be enlarged to 4 × 4 m (x 3..7,
+y 0..4, the door where it was, on the y = 4 face at x 4). Two more layers, both made of the three
+pictures of 9.3 by `scripts/hall-wide.py` and of nothing else, so nothing was painted for them:
+
+| File in `public/sprites/` | Format | Contents | Used |
+|---|---|---|---|
+| `hallBackgroundWide.png` | RGB, 2640 × 1608 | the background with its own floor and rear wall carried on to x = 40 | in place of `hallBackground.png` once the unit is extended |
+| `hallCanteenWide.png` | RGBA, 1680 × 1128 | the canteen block stood beside itself, the second door walled up, one roof | in place of `hallCanteen.png` once the canteen is enlarged |
+
+The wide background keeps the origin of 9.2 (`ox = 600`, `oy = 288`), so the office and canteen
+layers sit on it unchanged; its canvas is the first one plus 20 m: 960 px wider and 480 px taller.
+Floor corners on it: (40,0) = 2520, 1248; (40,10) = 2040, 1488. If the art side repaints any of the
+three layers of 9.3, run the script again and then `npm run sprites:manifest`.
+
 ---
 
 ## 10. Characters (accepted by Piotr, 13.09.2026): frame sheets from the 3D model

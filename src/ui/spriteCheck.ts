@@ -6,6 +6,7 @@ import { CNC_TOOL_CHANGER_SPRITE, EQUIPMENT_SPECS } from '../engine/constants';
 import {
   HALL_CANVAS,
   HALL_LAYERS,
+  HALL_WIDE_LAYERS,
   PALLET_LAYOUT,
   PALLET_SPRITE,
   box,
@@ -305,11 +306,14 @@ function cell(target: SpriteTarget, ports: Record<string, Port>): string {
 function layerSection(
   title: string,
   hint: string,
-  layers: ReadonlyArray<{ key: string; name: string }>,
-  canvas: { width: number; height: number },
+  layers: ReadonlyArray<{ key: string; name: string; size?: { width: number; height: number } }>,
+  shared: { width: number; height: number },
 ): string {
   const cells = layers
     .map((layer) => {
+      // A layer painted on a canvas of its own says its own size: the extended hall's background
+      // is longer than the block that stands on it (v67).
+      const canvas = layer.size ?? shared;
       const url = spriteUrl(layer.key);
       const shot =
         url === null
@@ -427,6 +431,21 @@ export function renderSpriteCheck(ports: Record<string, Port> = PORTS): string {
         'the floor, the walls, the kerbs, the shutter and the WC, then the office block and the ' +
         'canteen block on their own cells. The game halves them.',
       HALL_LAYERS,
+      { width: HALL_CANVAS.width * SPRITE_SCALE, height: HALL_CANVAS.height * SPRITE_SCALE },
+    ) +
+    layerSection(
+      'The painted hall, extended',
+      'The two layers a unit that has grown is painted with in place of its own: the background ' +
+        'at forty metres, on a longer canvas with the same origin, and the canteen block at four ' +
+        'by four on the first canvas. Both are made of the three pictures above (v67).',
+      HALL_WIDE_LAYERS.map((layer) => {
+        const canvas = layer.canvas ?? HALL_CANVAS;
+        return {
+          key: layer.key,
+          name: layer.name,
+          size: { width: canvas.width * SPRITE_SCALE, height: canvas.height * SPRITE_SCALE },
+        };
+      }),
       { width: HALL_CANVAS.width * SPRITE_SCALE, height: HALL_CANVAS.height * SPRITE_SCALE },
     ) +
     layerSection(

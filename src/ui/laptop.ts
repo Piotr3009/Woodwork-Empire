@@ -2,8 +2,9 @@
 // tiles behind a bezel, in the system font on a cool background, and nothing of paper inside it.
 // Home is three big tiles, Tasks, Stock and Drawings in that order, each with a live line the
 // engine counts and a red count in its corner while there is something to do, and under a rule
-// the Office group of small tiles with their icons: Team, Website, Insurance, Security, Joinery
-// Core, Settings, and under that the Equipment group with Machines on it (CLAUDE.md T20 2.9).
+// the Office group of small tiles with their icons: Team, Website, Insurance, Security, Premises
+// (v67), Joinery Core, Settings, and under that the Equipment group with Machines on it
+// (CLAUDE.md T20 2.9).
 // A tile opens its page full screen inside the laptop with a back arrow to home
 // in the same place on every page; the tiles are the whole of the navigation, and there is no
 // tab bar (CLAUDE.md T15 2.3).
@@ -29,6 +30,7 @@ import { renderInsurance } from './insurance';
 import { gateSection } from './jobCard';
 import { renderMachinesPage } from './machinesPage';
 import { renderMaterials } from './materials';
+import { renderPremises } from './premises';
 import { renderSecurity } from './security';
 import { type TeamTab, renderTeam } from './team';
 import { renderWebsite } from './website';
@@ -55,6 +57,8 @@ export type LaptopPage =
   | 'website'
   | 'insurance'
   | 'security'
+  /** The unit itself: its extension and its canteen (PIOTR, 03.10; v67). */
+  | 'premises'
   /** The kit standing in the hall, with the life of every machine and its service
    *  (CLAUDE.md T20 2.9). */
   | 'machines';
@@ -68,6 +72,7 @@ const PAGES: readonly LaptopPage[] = [
   'website',
   'insurance',
   'security',
+  'premises',
   'machines',
 ];
 
@@ -109,6 +114,8 @@ export const OFFICE_GROUP: ReadonlyArray<{
   { id: 'website', label: 'Website', action: 'laptopPage', extra: 'data-id="website"' },
   { id: 'insurance', label: 'Insurance', action: 'laptopPage', extra: 'data-id="insurance"' },
   { id: 'security', label: 'Security', action: 'laptopPage', extra: 'data-id="security"' },
+  // The unit the company rents, its extension and its canteen (PIOTR, 03.10; v67).
+  { id: 'premises', label: 'Premises', action: 'laptopPage', extra: 'data-id="premises"' },
   { id: 'joineryCore', label: 'Joinery Core', action: 'teamTab', extra: 'data-id="technical"' },
   { id: 'settings', label: 'Settings', action: 'openSettings', extra: '' },
 ];
@@ -122,6 +129,7 @@ const PAGE_TITLES: Record<Exclude<LaptopPage, 'home'>, string> = {
   website: 'Website',
   insurance: 'Insurance',
   security: 'Security',
+  premises: 'Premises',
   machines: 'Machines',
 };
 
@@ -141,8 +149,9 @@ const ICONS: Record<HomePage, string> = {
   drawings: icon('<path d="M5 3h10l4 4v14H5z M15 3v4h4 M8 11h8v6H8z M8 11l8 6" />'),
 };
 
-/** The line icons of the six Office tiles, from mockup C: people, a globe, a shield, a lock, a
- *  monitor and a gear, in the game's green above the label (CLAUDE.md T15 2.3). */
+/** The line icons of the Office tiles, from mockup C: people, a globe, a shield, a lock, a
+ *  monitor and a gear, in the game's green above the label (CLAUDE.md T15 2.3), and the building
+ *  of the Premises tile, drawn the same way (v67). */
 const OFFICE_ICONS: Record<string, string> = {
   team: icon(
     '<circle cx="9" cy="8" r="3.5" /><circle cx="17" cy="9" r="2.5" />' +
@@ -158,6 +167,8 @@ const OFFICE_ICONS: Record<string, string> = {
     '<rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 018 0v3" />' +
       '<circle cx="12" cy="15.5" r="1.5" />',
   ),
+  // A unit with its roof and its shutter: the building itself (v67).
+  premises: icon('<path d="M3 21V10l9-5 9 5v11z" /><path d="M8 21v-6h8v6M8 18h8" />'),
   joineryCore: icon('<rect x="3" y="5" width="18" height="12" rx="2" /><path d="M7 20h10M12 17v3M6 9h12M6 13h7" />'),
   machines: icon(
     '<rect x="3" y="11" width="18" height="8" rx="1" /><path d="M7 11V7h6v4M9 4h8M17 4v3" />' +
@@ -373,6 +384,8 @@ function pageBody(state: GameState, page: Exclude<LaptopPage, 'home'>, view: Lap
       return renderInsurance(state);
     case 'security':
       return renderSecurity(state);
+    case 'premises':
+      return renderPremises(state);
     case 'machines':
       return renderMachinesPage(state);
   }

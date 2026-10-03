@@ -66,9 +66,10 @@ import {
   type RoomId,
   TOOL_CABINET,
   roomById,
+  roomsOf,
 } from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
-import { canteenScene } from '../render/canteen';
+import { CANTEEN_PAGE_REGION, canteenPages, canteenScene } from '../render/canteen';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderContracts } from './contracts';
@@ -192,6 +193,9 @@ interface Ui {
   /** The house card is up at the end of the day, since this real time (CLAUDE.md T13 3.18). */
   houseCardSince: number | null;
   houseCardDone: boolean;
+  /** Which eight of an enlarged canteen's sixteen lockers the room is showing: 0 for the first,
+   *  1 for the ninth to the sixteenth (v67). */
+  canteenPage: number;
   /** Which page of the laptop is on its screen. It opens on home every time, with no memory of
    *  the last page (CLAUDE.md T14 2.1). */
   laptopPage: LaptopPage;
@@ -380,6 +384,7 @@ function freshUi(): Ui {
     contractMan: null,
     houseCardSince: null,
     houseCardDone: false,
+    canteenPage: 0,
     laptopPage: 'home',
     teamTab: 'workshop',
     catalogueTab: CATALOGUE_FIRST_TAB,
@@ -917,7 +922,9 @@ function sceneFor(current: GameState): Scene | null {
   if (ui.view === 'hall') {
     return hallScene(current, { ghost: ghostFor(current), setup: ui.setup });
   }
-  if (ui.view === 'canteen') return canteenScene(current, roomViewport());
+  if (ui.view === 'canteen') {
+    return canteenScene(current, roomViewport(), undefined, ui.canteenPage);
+  }
   return officeScene(current, roomViewport());
 }
 
@@ -1473,6 +1480,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         openLaptopPage('team');
         break;
       }
+      // The line over the banks of an enlarged canteen turns to its other eight lockers (v67).
+      if (region === CANTEEN_PAGE_REGION) {
+        ui.canteenPage = (ui.canteenPage + 1) % canteenPages(game());
+        break;
+      }
       const modal = OFFICE_REGION_MODALS[region];
       if (modal !== undefined) openModal(modal);
       break;
@@ -1605,6 +1617,15 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'setAgency':
       // The Office's switch for the advertising agency (CLAUDE.md T26 2.13).
       dispatch({ type: 'SET_AGENCY', on: id === 'on' });
+      return;
+    case 'extendUnit':
+      // The Premises page's two buttons (PIOTR, 03.10; v67).
+      dispatch({ type: 'EXTEND_UNIT' });
+      return;
+    case 'enlargeCanteen':
+      dispatch({ type: 'ENLARGE_CANTEEN' });
+      // The room shows its first eight lockers again, whichever it was showing.
+      ui.canteenPage = 0;
       return;
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
@@ -2115,6 +2136,8 @@ function copyState(): void {
 function walkTo(view: 'hall' | 'office' | 'canteen'): void {
   ui.view = view;
   if (view !== 'hall') endSetup();
+  // The canteen is walked into at its first eight lockers, whichever it was left at (v67).
+  if (view === 'canteen') ui.canteenPage = 0;
   resetCamera();
   requestRender();
 }
@@ -2290,7 +2313,8 @@ function runClick(event: MouseEvent): void {
   if (ui.setup || target.closest('.hall-view') === null) return;
   const local = contentPointUnder(event);
   if (local === null) return;
-  const room = roomAtScenePoint(local);
+  if (state === null) return;
+  const room = roomAtScenePoint(local, roomsOf(state.unit));
   if (room !== null) handleRoomClick(room);
 }
 
@@ -2555,9 +2579,10 @@ function objectCentreUnder(event: MouseEvent): { x: number; y: number } | null {
   }
   const local = contentPointUnder(event);
   if (local === null) return null;
-  const room = roomAtScenePoint(local);
+  const rooms = roomsOf(state.unit);
+  const room = roomAtScenePoint(local, rooms);
   if (room === null) return null;
-  const block = roomById(room);
+  const block = rooms.find((entry) => entry.id === room) ?? roomById(room);
   return centreOf(block.x, block.y, block.width, block.depth, block.height);
 }
 
@@ -2573,7 +2598,7 @@ function onPanPointerDown(event: MouseEvent): boolean {
   if (!spaceHeld) {
     // Empty floor: nothing of the workshop under the pointer, and no room block either.
     if (target.closest('[data-kit],[data-van]') !== null) return false;
-    if (roomAtScenePoint(sceneToContent(ui.camera, start)) !== null) return false;
+    if (roomAtScenePoint(sceneToContent(ui.camera, start), roomsOf(state.unit)) !== null) return false;
   }
   const from = { ...ui.camera };
   let moved = false;
