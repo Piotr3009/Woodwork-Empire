@@ -152,10 +152,10 @@ describe('the hiring pool', () => {
     state = hireNow(state, 'joiner', 'novice');
     expect(state.workers).toHaveLength(1);
     expect(state.workers[0]?.rate).toBe(WORKER_RATES.novice);
-    expect(state.workers[0]?.monthlyWage).toBe(1950);
+    expect(state.workers[0]?.monthlyWage).toBe(4550);
   });
 
-  it('pays a joiner 1,950, 2,470, 2,940 and 3,350 a month, tier by tier (v38)', () => {
+  it('pays a joiner 4,550, 5,765, 6,860 and 7,815 a month, tier by tier (v77)', () => {
     // Piotr's own four figures: the excellent man at about 1,000 a week, which is 4,330 a month,
     // and the experienced one at 2,600, with the other two scaled off him [TUNE]
     // (PIOTR, 19.09; CLAUDE.md T21 2.9, 2.10). Written out as the four figures and not off the
@@ -163,7 +163,10 @@ describe('the hiring pool', () => {
     const rows = HIRING_SPECS.filter((spec) => spec.role === 'joiner');
     expect(rows.map((spec) => spec.tier)).toEqual(['novice', 'experienced', 'senior', 'master']);
     // v38 (PIOTR, 21.09): a unit of work costs less a grade up, not more.
-    expect(rows.map((spec) => spec.monthlyWage)).toEqual([1950, 2470, 2940, 3350]);
+    // v77 (PIOTR, 03.10): labour is forty per cent of the price at a pace of one, so the very
+    // experienced man is paid the 320 a working day he makes, 6,860 a month, and the other three
+    // keep their place against him: 1,950 / 2,470 / 2,940 / 3,350 until then.
+    expect(rows.map((spec) => spec.monthlyWage)).toEqual([4550, 5765, 6860, 7815]);
     expect(rows.map((spec) => spec.minReputation)).toEqual([REPUTATION_MIN, 15, 35, 60]);
   });
 
@@ -217,7 +220,7 @@ describe('the hiring pool', () => {
     expect(availableJoiners(state)).toHaveLength(0);
     const day2 = runToDay(state, 2).state;
     expect(availableJoiners(day2)).toHaveLength(1);
-    expect(monthlyWageBill(day2)).toBe(1950);
+    expect(monthlyWageBill(day2)).toBe(4550);
   });
 
   it('gives everyone a different name', () => {
@@ -240,7 +243,8 @@ describe('the hiring pool', () => {
     expect(state.workers[1]?.role).toBe('salesman');
     // The salesman's 2,200 is his month, whole: the week Turn 20 cut it into is gone
     // (CLAUDE.md T21 2.10).
-    expect(state.workers[1]?.monthlyWage).toBe(2200);
+    // 5,135 from v77, when every wage went up (PIOTR, 03.10).
+    expect(state.workers[1]?.monthlyWage).toBe(5135);
   });
 });
 
@@ -282,7 +286,8 @@ describe('the production manager s four grades (CLAUDE.md T23 2.4)', () => {
     // and his four wages are Piotr's own and not the ladder every other role comes off: the
     // ladder against 3,400 would put the man with no experience at 2,550 (PIOTR, 20.09).
     expect(cards.map((card) => card.tier)).toEqual([...TIERS]);
-    expect(cards.map((card) => card.monthlyWage)).toEqual([2400, 3400, 4200, 5200]);
+    // His 2,400 / 3,400 / 4,200 / 5,200, raised with every wage in v77 (PIOTR, 03.10).
+    expect(cards.map((card) => card.monthlyWage)).toEqual([5600, 7935, 9800, 12135]);
     for (const card of cards) {
       expect(card.monthlyWage, card.label).toBe(
         PRODUCTION_MANAGER_MONTHLY_WAGE[card.tier as WorkerTier],

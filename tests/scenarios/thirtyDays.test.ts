@@ -610,7 +610,9 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // -862 from v61: the novice's grade times the hall's points (PIOTR, 01.10), 0.60 of a minute
     // that has lost the penalties, not the penalties off his 0.60 [measured].
     // -680 from Turn 26: a gain booked at half moves which enquiries the board draws (T26 2.11).
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-680);
+    // -3,281 from v77: the novice is paid 4,550 and not 1,950, which is 2,600 more on the one pay
+    // day of the month, and the pound is rounding [measured] (PIOTR, 03.10).
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-3281);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });

@@ -158,7 +158,7 @@ describe('what is coming, on the Summary tab', () => {
       (entry.querySelector('.row-main')?.textContent ?? '').startsWith('Wages,'),
     );
     expect(row?.querySelector('.row-main')?.textContent).toBe(`Wages, ${formatCalendarDay(due)}`);
-    expect(monthlyWageBill(state)).toBe(1900);
+    expect(monthlyWageBill(state)).toBe(4435);
     expect(row?.querySelector('.row-figure')?.textContent).toBe(money(monthlyWageBill(state)));
     expect(page.textContent).not.toContain('a week');
   });

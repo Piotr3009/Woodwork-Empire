@@ -66,7 +66,8 @@ describe('pay by the month, everybody', () => {
     // The experienced manager on Piotr's 3,400 (CLAUDE.md T23 2.4), the experienced draftsman on
     // 2,400 (CLAUDE.md T26 2.8) and the office admin on 1,900. Until Turn 26 this month was a
     // booth's own trade and the take off man beside the admin, two trades that went.
-    expect(monthlyWageBill(state)).toBe(3400 + 2400 + 1900);
+    // From v77 they are 7,935, 5,600 and 4,435: every wage went up by the one factor (PIOTR, 03.10).
+    expect(monthlyWageBill(state)).toBe(7935 + 5600 + 4435);
     // One pay day in the month, and it is its last working day. The ledger calls it what the
     // player reads on the Accounting page.
     const days = payDaysOf(state);

@@ -1069,6 +1069,19 @@ export function standThePlantBehindTheWall(state: GameState): void {
   layRunsAgain(state, moved);
 }
 
+/** Version 38 to 39 (v77): labour costs what the price says it costs (PIOTR, 03.10). Every wage in
+ *  the game went up by the one factor, and a man already on the books is not left on the wage he
+ *  was hired at: he is paid his role's and his grade's wage of today from the next pay day
+ *  [PIOTR: "yes"]. A man whose role and grade have no hire card keeps what he has. */
+function liftToVersion39(state: Raw): void {
+  for (const worker of records(state.workers)) {
+    const tier = typeof worker.tier === 'string' ? worker.tier : null;
+    const spec = HIRING_SPECS.find((entry) => entry.role === worker.role && entry.tier === tier);
+    if (spec !== undefined) worker.monthlyWage = spec.monthlyWage;
+  }
+  state.version = 39;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -1096,6 +1109,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   35: liftToVersion36,
   36: liftToVersion37,
   37: liftToVersion38,
+  38: liftToVersion39,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

@@ -148,7 +148,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(38);
+    expect(STATE_VERSION).toBe(39);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -293,7 +293,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(38);
+    expect(lifted.version).toBe(39);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -317,7 +317,10 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
     // conversions came to (PIOTR, 21.09); the admin has no grade and keeps his 1,899.
     // From Turn 26 the sprayer is a joiner of his grade at the joiner's wage for it, 2,940 and not
     // the sprayer's 3,055 (CLAUDE.md T26 section 4).
-    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([1950, 2470, 2940, 1899]);
+    // From v77 every wage is up by the one factor, and a man on the books of a save is paid his
+    // role's wage of today, the admin included: 4,435 and not the 1,899 his conversions left him
+    // (PIOTR, 03.10).
+    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([4550, 5765, 6860, 4435]);
     expect(lifted.workers.map((worker) => worker.role)[2]).toBe('joiner');
     for (const worker of lifted.workers) {
       expect(Object.keys(worker), String(worker.name)).not.toContain('weeklyWage');
@@ -422,13 +425,14 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(38);
+    expect(lifted.version).toBe(39);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
     // told the player he cost (CLAUDE.md T21 2.10). From v38 that holds until the v22 lift, which
     // does re-read every graded man off the hiring specs, because the ladder itself was wrong and
     // Piotr's own senior was the case that showed it (PIOTR, 21.09).
-    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([1950, 2470, 2940, 3350, 1907]);
+    // From v77 the save's men are on today's wages, every role of them (PIOTR, 03.10).
+    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([4550, 5765, 6860, 7815, 4435]);
     for (const worker of lifted.workers) {
       expect(Object.keys(worker), String(worker.name)).not.toContain('weeklyWage');
     }
@@ -640,7 +644,7 @@ describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
     // There is one track for money from tonight: a cost the player did not choose is paid out of
     // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
     // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
-    expect(lifted.version).toBe(38);
+    expect(lifted.version).toBe(39);
     expect(lifted.cash).toBe(-4998 - 2780);
   });
 
@@ -732,7 +736,7 @@ describe('a v35 save in this build (CLAUDE.md T23 section 4)', () => {
     // A played company starts its list at its next month end: the card the player was shown that
     // evening is the report, and one worked out again tonight would not be that card
     // (CLAUDE.md T23 2.14).
-    expect(lifted.version).toBe(38);
+    expect(lifted.version).toBe(39);
     expect(lifted.monthlyReports).toEqual([]);
   });
 
@@ -828,7 +832,7 @@ describe('a v23 save made under the split day (PIOTR, 21.09; v42)', () => {
   if (lifted === null) throw new Error('the lift refused a version 23 state');
 
   it('comes up at this build s version', () => {
-    expect(lifted.version).toBe(38);
+    expect(lifted.version).toBe(39);
   });
 
   it('takes every man on a running contract off the jobs he was standing on', () => {
@@ -855,7 +859,7 @@ describe('a v24 save in this build (v44)', () => {
   it('comes in with no evening take-over in hand', () => {
     const lifted = migrateState({ version: 24, owner: { wentHome: false } }, 24);
     if (lifted === null) throw new Error('the lift refused a version 24 state');
-    expect(lifted.version).toBe(38);
+    expect(lifted.version).toBe(39);
     expect(lifted.owner.tookOverJobId).toBe(null);
   });
 });
@@ -867,7 +871,7 @@ describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
       25,
     );
     if (lifted === null) throw new Error('the lift refused a version 25 state');
-    expect(lifted.version).toBe(38);
+    expect(lifted.version).toBe(39);
     expect(lifted.dayStats.byMan).toEqual({});
     // The figure the sheet prints above the block is the save's own and is not guessed at.
     expect(lifted.dayStats.workMinutes).toBe(12);
@@ -881,7 +885,7 @@ describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
       };
       const lifted = migrateState(raw.state, raw.state.version);
       if (lifted === null) throw new Error(`${path} did not open`);
-      expect(lifted.version).toBe(38);
+      expect(lifted.version).toBe(39);
       expect(lifted.dayStats.byMan).toEqual({});
     }
   });
@@ -900,7 +904,7 @@ describe('a v25 save in this build (PIOTR, 22.09; v51)', () => {
   if (lifted === null) throw new Error('the lift refused a version 25 state');
 
   it('comes up at this build s version, through v26 on the way', () => {
-    expect(lifted.version).toBe(38);
+    expect(lifted.version).toBe(39);
     expect(lifted.version).toBe(STATE_VERSION);
     expect(lifted.dayStats.byMan).toEqual({});
   });
@@ -931,7 +935,7 @@ describe('a v25 save in this build (PIOTR, 22.09; v51)', () => {
       26,
     );
     if (fromT24 === null) throw new Error('the lift refused a version 26 state');
-    expect(fromT24.version).toBe(38);
+    expect(fromT24.version).toBe(39);
     expect(fromT24.equipment[0]?.servicedDay).toBe(40);
   });
 });
@@ -989,7 +993,7 @@ describe('a v27 save in this build (CLAUDE.md T25 section 4)', () => {
 
   it('clears every claim on a machine and never writes one again', () => {
     const lifted = lifted27();
-    expect(lifted.version).toBe(38);
+    expect(lifted.version).toBe(39);
     for (const item of lifted.equipment) expect(item.takenBy, item.id).toBeNull();
   });
 
@@ -1101,7 +1105,7 @@ describe('a v28 save in this build (PIOTR, 24.09; v53)', () => {
 
   it('comes up at this build s version with no job waiting on the CNC', () => {
     const { after } = lifted28();
-    expect(after.version).toBe(38);
+    expect(after.version).toBe(39);
     for (const job of after.jobs) expect('sawFallback' in job, job.id).toBe(false);
   });
 
@@ -1150,7 +1154,7 @@ describe('a v29 save in this build (PIOTR, 24.09; v54)', () => {
 
   it('makes the pallet truck and the better forklift classes of the one family', () => {
     const after = lifted29();
-    expect(after.version).toBe(38);
+    expect(after.version).toBe(39);
     const byId = new Map(after.equipment.map((item) => [item.id, item]));
     expect([byId.get('kit-pt')?.specId, byId.get('kit-pt')?.variantId]).toEqual(['forklift', 'used']);
     expect([byId.get('kit-fb')?.specId, byId.get('kit-fb')?.variantId]).toEqual(['forklift', 'pro']);
@@ -1189,7 +1193,7 @@ describe('a v30 save in this build (PIOTR, 24.09; v55)', () => {
 
   it('empties the bags of the stages that are gone and loses nothing of the job', () => {
     const { after } = lifted30();
-    expect(after.version).toBe(38);
+    expect(after.version).toBe(39);
     const job = after.jobs[0];
     if (job === undefined) throw new Error('the job went missing in the lift');
     expect(job.stageLabour).toEqual({ cutting: job.labourValue * 0.25 });
@@ -1240,7 +1244,7 @@ describe('a v55 save with its spray booths at their old size (PIOTR, 25.09; v56)
     const { raw, used } = hallOfV55();
     const after = migrateState(raw, 31);
     if (after === null) throw new Error('the lift refused a v31 state');
-    expect(after.version).toBe(38);
+    expect(after.version).toBe(39);
     const booth = (id: string) => {
       const item = after.equipment.find((entry) => entry.id === id);
       if (item === undefined) throw new Error(`${id} went missing in the lift`);
@@ -1271,7 +1275,7 @@ describe('a v56 save with timber offers on its board (PIOTR, 25.09; v57)', () =>
     raw.version = 32;
     const after = migrateState(raw, 32);
     if (after === null) throw new Error('the lift refused a v32 state');
-    expect(after.version).toBe(38);
+    expect(after.version).toBe(39);
     const ids = after.enquiries.map((enquiry) => enquiry.id);
     expect(ids).toContain(shelves.id);
     expect(ids).not.toContain(oak.id);
@@ -1337,11 +1341,12 @@ describe('a v33 save in this build (CLAUDE.md T26 section 4)', () => {
 
   it('makes the booth s man a joiner of his grade at a joiner s wage, and the two desks admins', () => {
     const byId = new Map(lifted.workers.map((worker) => [worker.id, worker]));
-    expect(byId.get('w-spray')).toMatchObject({ role: 'joiner', tier: 'senior', rate: 1, monthlyWage: 2940 });
-    expect(byId.get('w-take')).toMatchObject({ role: 'officeAdmin', tier: null, rate: 0, monthlyWage: 1900 });
-    expect(byId.get('w-order')).toMatchObject({ role: 'officeAdmin', tier: null, rate: 0, monthlyWage: 1900 });
+    // The wages are today's, which v77 raised (PIOTR, 03.10).
+    expect(byId.get('w-spray')).toMatchObject({ role: 'joiner', tier: 'senior', rate: 1, monthlyWage: 6860 });
+    expect(byId.get('w-take')).toMatchObject({ role: 'officeAdmin', tier: null, rate: 0, monthlyWage: 4435 });
+    expect(byId.get('w-order')).toMatchObject({ role: 'officeAdmin', tier: null, rate: 0, monthlyWage: 4435 });
     // The draftsman takes the first of his three grades and its wage (CLAUDE.md T26 2.8).
-    expect(byId.get('w-draw')).toMatchObject({ role: 'draftsman', tier: 'experienced', monthlyWage: 2400 });
+    expect(byId.get('w-draw')).toMatchObject({ role: 'draftsman', tier: 'experienced', monthlyWage: 5600 });
   });
 
   it('puts down a job of work the new trade does not do, and leaves the one it does', () => {

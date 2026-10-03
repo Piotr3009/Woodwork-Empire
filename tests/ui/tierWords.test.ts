@@ -90,7 +90,7 @@ describe('the four classes on the hire cards', () => {
     // One unit of pay and it is the month, so the one line is the month's figure: a very
     // experienced joiner is on 2,940 from v38 (PIOTR, 21.09; CLAUDE.md T21 2.9, 2.10).
     const month = `${money(man.monthlyWage)} a month`;
-    expect(man.monthlyWage).toBe(2940);
+    expect(man.monthlyWage).toBe(6860);
     expect(monthlyWageOf(man)).toBe(man.monthlyWage);
     const page = parse(renderTeam(state, 'workshop'));
     expect(page.querySelector(`[data-crew="${man.id}"]`)?.textContent).toContain(month);

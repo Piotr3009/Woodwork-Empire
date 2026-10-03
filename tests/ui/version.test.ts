@@ -45,7 +45,7 @@ describe('the version in the corner', () => {
     // admin (PIOTR, 30.09). v61 makes a man's minute his grade times the hall's points and v62 the
     // assign lists of free men only (PIOTR, 01.10 and 02.10). v63 is Turn 26: one kind of man on
     // the floor, and a hall that looks like a workshop (PIOTR, 02.10).
-    expect(APP_VERSION).toBe('v76');
+    expect(APP_VERSION).toBe('v77');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -61,7 +61,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v76'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v77'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

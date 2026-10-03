@@ -156,12 +156,16 @@ import type {
  *
  *  Version 35 is v67 (PIOTR, 03.10): the unit can be extended and its canteen enlarged. The unit
  *  says where its extension stands, not asked for in every save there is, and whether the canteen
- *  has been enlarged, which it has not. Every v25 to v34 save loads. */
-export const STATE_VERSION = 38;
+ *  has been enlarged, which it has not. Every v25 to v34 save loads.
+ *
+ *  Version 39 is v77 (PIOTR, 03.10): labour costs what the price says it costs. Every wage went
+ *  up, and every man on the books of a save is paid his role's and his grade's wage of today from
+ *  the next pay day. */
+export const STATE_VERSION = 39;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v76';
+export const APP_VERSION = 'v77';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -795,10 +799,12 @@ export const PRODUCTION_MANAGER_PACE: Record<WorkerTier, number> = {
  *  experienced man keeps the 3,400 a manager is paid today, which is why a saved manager is made
  *  experienced when a v19 save is lifted (CLAUDE.md T23 2.4, section 4). */
 export const PRODUCTION_MANAGER_MONTHLY_WAGE: Record<WorkerTier, number> = {
-  novice: 2400,
-  experienced: 3400,
-  senior: 4200,
-  master: 5200,
+  // Piotr's four of 20.09 (2,400 / 3,400 / 4,200 / 5,200), raised with every wage in v77 by the
+  // joiner's own 6,860 over 2,940 and rounded to five pounds [PIOTR, 03.10: "raise them too"].
+  novice: 5600,
+  experienced: 7935,
+  senior: 9800,
+  master: 12135,
 };
 
 /** How each grade picks the next man's job, in the words the hire card says it in [PIOTR, 20.09:
@@ -865,9 +871,10 @@ export const DRAFTSMAN_RATE: Record<DraftsmanTier, number> = {
 /** Paid by the month like everybody else [TUNE: 2,400 / 2,900 / 3,400, the 2,400 being his own
  *  of Turn 21] (CLAUDE.md T21 2.10, T26 2.8). */
 export const DRAFTSMAN_MONTHLY_WAGE: Record<DraftsmanTier, number> = {
-  experienced: 2400,
-  senior: 2900,
-  master: 3400,
+  // 2,400 / 2,900 / 3,400 until v77, raised with every wage by the same factor (PIOTR, 03.10).
+  experienced: 5600,
+  senior: 6765,
+  master: 7935,
 };
 /** The standing each grade answers an advert from [PIOTR, 02.10: 15, 50, 90]. His own table: the
  *  joiner's rungs stay 15, 35, 60 (CLAUDE.md T26 2.8). */
@@ -3838,7 +3845,15 @@ export const TIER_MIN_REPUTATION: Record<WorkerTier, number> = {
  *  is the cheaper one per hour of work done and not the dearer (it was 3,250 / 3,250 / 3,500 /
  *  3,608 a unit, novice to master, which paid a shop to keep only novices). The rates are Piotr's
  *  ladder and do not move; the wages move: 1,950 / 2,470 / 2,940 / 3,350 for a joiner. */
-export const JOINER_MONTHLY_WAGE_EXPERIENCED = 2470;
+/** v77 (PIOTR, 03.10: "labour is always forty per cent at x1, and less as the pace rises; a
+ *  joinery cannot start out paying eight or seventeen per cent for its labour"). A job is forty
+ *  per cent labour, and a very experienced man makes 320 of that labour a working day at a pace
+ *  of one, so that is what he is paid a working day: 6,860 a month. The other three keep their
+ *  place against him (the better man still the cheaper one per unit of work), and every other
+ *  wage in the game was raised by the same 6,860 over 2,940: 4,550 / 5,765 / 6,860 / 7,815 for a
+ *  joiner [PIOTR]. A faster hall makes the same wage go further, which is what a machine is
+ *  bought for. */
+export const JOINER_MONTHLY_WAGE_EXPERIENCED = 5765;
 export const TIER_WAGE_FACTOR: Record<WorkerTier, number> = {
   novice: 1950 / 2470,
   experienced: 1,
@@ -3862,7 +3877,15 @@ export function tierMonthlyWages(experiencedMonthly: number): Record<WorkerTier,
   };
 }
 
-export const JOINER_MONTHLY_WAGE = tierMonthlyWages(JOINER_MONTHLY_WAGE_EXPERIENCED);
+/** The joiner's four wages, the figures Piotr was shown and said yes to (03.10; v77). Written out
+ *  and not taken down the ladder, whose rounding to five pounds would make the excellent man
+ *  7,820. */
+export const JOINER_MONTHLY_WAGE: Record<WorkerTier, number> = {
+  novice: 4550,
+  experienced: JOINER_MONTHLY_WAGE_EXPERIENCED,
+  senior: 6860,
+  master: 7815,
+};
 
 export interface HiringSpec {
   role: WorkerRole;
@@ -3952,14 +3975,16 @@ export const HIRING_SPECS: HiringSpec[] = [
     () =>
       'Production at the bench and at every machine, the booth included, by day or on the ' +
       'second shift.',
+    JOINER_MONTHLY_WAGE,
   ),
   {
     role: 'helper',
     tier: null,
     label: 'Labourer',
     // [TUNE: 420 a week was his Turn 20 figure and he never had a monthly one; 1,800 is that week
-    // over the month and a round figure, which is what the hire card now prints.]
-    monthlyWage: 1800,
+    // over the month and a round figure, which is what the hire card now prints.] 4,200 from v77,
+    // the 1,800 raised with every wage (PIOTR, 03.10).
+    monthlyWage: 4200,
     minReputation: REPUTATION_MIN,
     duties: 'Bag changes, cleaning, unloading, the weekly clean.',
   },
@@ -3967,7 +3992,8 @@ export const HIRING_SPECS: HiringSpec[] = [
     role: 'officeAdmin',
     tier: null,
     label: 'Office admin',
-    monthlyWage: 1900,
+    // 1,900 until v77, raised with every wage (PIOTR, 03.10).
+    monthlyWage: 4435,
     minReputation: 5,
     // Everything of the office that is not the drawing board's or the phone's, in one sentence
     // (PIOTR, 02.10; CLAUDE.md T26 2.9).
@@ -3989,7 +4015,8 @@ export const HIRING_SPECS: HiringSpec[] = [
     role: 'salesman',
     tier: null,
     label: 'Salesman',
-    monthlyWage: 2200,
+    // 2,200 until v77, raised with every wage (PIOTR, 03.10).
+    monthlyWage: 5135,
     minReputation: 15,
     duties: 'Client calls, and the meeting a big job starts with while there is no draftsman.',
   },

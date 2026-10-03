@@ -128,8 +128,8 @@ describe('a fresh game in this build', () => {
     // Jacks, the pace as a sum and the admin's take off touch no field of the save (PIOTR, 30.09).
     // v61 and v62 are state 33 as well. v63 is state 34: one kind of man on the floor, the
     // draftsman's three grades and the agency, off (CLAUDE.md T26 section 4).
-    expect(APP_VERSION).toBe('v76');
-    expect(STATE_VERSION).toBe(38);
+    expect(APP_VERSION).toBe('v77');
+    expect(STATE_VERSION).toBe(39);
   });
 
   it('saves through the store, the file and the cloud row on day 1, and loads back three ways', async () => {

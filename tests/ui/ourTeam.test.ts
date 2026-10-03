@@ -85,7 +85,7 @@ describe('Our team', () => {
     // What a month of him costs is what he is paid: a joiner with no experience is on 1,950 and
     // there is no week behind it any more (CLAUDE.md T21 2.10).
     expect(monthlyWageOf(man)).toBe(man.monthlyWage);
-    expect(man.monthlyWage).toBe(1950);
+    expect(man.monthlyWage).toBe(4550);
     expect(tile?.querySelector('[data-wage]')?.textContent).toContain(money(monthlyWageOf(man)));
     // He does not start until the next working day, so that is what his line says of him.
     expect(tile?.querySelector('[data-now]')?.textContent).toContain('starts');

@@ -211,7 +211,8 @@ describe('the draftsman', () => {
     // Turn 26 he was one man at 2,400 from 15.
     const specs = HIRING_SPECS.filter((entry) => entry.role === 'draftsman');
     expect(specs.map((spec) => spec.tier)).toEqual(['experienced', 'senior', 'master']);
-    expect(specs.map((spec) => spec.monthlyWage)).toEqual([2400, 2900, 3400]);
+    // 5,600, 6,765 and 7,935 from v77, when every wage went up (PIOTR, 03.10).
+    expect(specs.map((spec) => spec.monthlyWage)).toEqual([5600, 6765, 7935]);
     expect(specs.map((spec) => spec.minReputation)).toEqual([15, 50, 90]);
     for (const spec of specs) {
       const tier = spec.tier as 'experienced' | 'senior' | 'master';
