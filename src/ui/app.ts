@@ -171,6 +171,8 @@ interface Ui {
   modal: ModalId | null;
   modalPosition: ModalPosition | null;
   eventPosition: ModalPosition | null;
+  /** The Break card's `Do not ask again` tick, the page's own until the card is answered (v70). */
+  breakRemember: boolean;
   menuOpen: boolean;
   note: string;
   /** The one line that says why a click did nothing, and the pulse on the Pause button that goes
@@ -372,6 +374,7 @@ function freshUi(): Ui {
     modal: null,
     modalPosition: null,
     eventPosition: null,
+    breakRemember: false,
     menuOpen: false,
     note: '',
     toast: '',
@@ -883,7 +886,7 @@ function modalSpecs(): ModalSpec[] {
           ? renderDayEnd(current)
           : event.kind === 'monthEnd'
             ? renderMonthEnd(current, event)
-            : renderEvent(current, event),
+            : renderEvent(current, event, ui.breakRemember),
       footer: houseCard ? '' : renderEventFooter(event),
       closable: !houseCard && event.choices.length === 1,
       // The bank's card joins the day end and the month end on the middle folder size: a head, a
@@ -1574,6 +1577,13 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'setTips':
       dispatch({ type: 'SET_TIPS', on: element.dataset.on === '1' });
       return;
+    case 'setNoonBreak': {
+      const choice = element.dataset.choice;
+      if (choice === 'ask' || choice === 'take' || choice === 'skip') {
+        dispatch({ type: 'SET_NOON_BREAK', choice });
+      }
+      return;
+    }
     case 'setSound':
       // The mute, off the same two chips the tips row uses (CLAUDE.md T19 2.10).
       dispatch({ type: 'SET_SOUND', muted: element.dataset.muted === '1' });
@@ -1913,7 +1923,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'resolveEvent': {
       ui.eventPosition = null;
       const kind = game().activeEvent?.kind;
-      dispatch({ type: 'RESOLVE_EVENT', choiceId: id });
+      // The Break card's tick goes with the answer and is spent with it (PIOTR, 03.10; v70).
+      const remember = kind === 'breakTime' && ui.breakRemember;
+      ui.breakRemember = false;
+      dispatch({ type: 'RESOLVE_EVENT', choiceId: id, remember });
       // He has said yes to the move: the clock is run through it, so he is told when it lands.
       if (kind === 'moveConfirm' && id === 'do') {
         ui.toast = moveFinishNote(game());
@@ -2338,6 +2351,11 @@ function runInput(event: Event): void {
   }
   if (field === 'showWhy') {
     ui.showWhy = target.checked;
+    requestRender();
+    return;
+  }
+  if (field === 'breakRemember') {
+    ui.breakRemember = target.checked;
     requestRender();
     return;
   }

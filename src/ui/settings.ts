@@ -14,7 +14,7 @@
 // rather than the nearest of a handful of named steps: nothing on the row is a rounded lie.
 
 import { SOUND_VOLUME_STEP } from '../engine/constants';
-import type { GameState } from '../engine/index';
+import type { GameState, NoonBreak } from '../engine/index';
 import { lockedButton } from './modal';
 
 /** The volume as the row prints it: whole percent of the master, off the setting itself. */
@@ -34,7 +34,28 @@ function volumeStep(label: string, to: number, reason: string, spent: boolean): 
   return `<button class="chip" data-do="setVolume" data-volume="${to}">${label}</button>`;
 }
 
-/** Three rows, two chips or two steps each, one lit or one figure between. A click on the lit one
+/** The noon break: asked every day, or answered for him. It is the way back from the Break card's
+ *  `Do not ask again` tick, in the chips the tips row uses (PIOTR, 03.10; v70). */
+const NOON_BREAK_CHIPS: ReadonlyArray<[NoonBreak, string]> = [
+  ['ask', 'Ask me'],
+  ['take', 'Always take'],
+  ['skip', 'Always skip'],
+];
+
+function noonBreakRow(choice: NoonBreak): string {
+  const chips = NOON_BREAK_CHIPS.map(
+    ([id, label]) =>
+      `<button class="chip${id === choice ? ' is-on' : ''}" data-do="setNoonBreak" data-choice="${id}">` +
+      `${label}</button>`,
+  ).join('');
+  return (
+    '<div class="row" data-setting="noonBreak"><span class="row-main">Noon break</span>' +
+    `<span class="row-action">${chips}</span></div>` +
+    '<p class="hint">Ask me brings the Break card back at noon.</p>'
+  );
+}
+
+/** Four rows, chips or two steps each, one lit or one figure between. A click on the lit one
  *  does nothing more (CLAUDE.md T13 1). */
 export function renderSettings(state: GameState): string {
   const on = state.settings.tips;
@@ -48,6 +69,7 @@ export function renderSettings(state: GameState): string {
     '</span></div>' +
     '<p class="hint">The first use bubbles on every screen. Off, and every one of them goes; on, ' +
     'and the ones you have not dismissed come back.</p>' +
+    noonBreakRow(state.settings.noonBreak) +
     '<div class="row sound-row" data-setting="sound"><span class="row-main">Sound</span>' +
     '<span class="row-action">' +
     `<button class="chip${sound.muted ? '' : ' is-on'}" data-do="setSound" data-muted="0">` +

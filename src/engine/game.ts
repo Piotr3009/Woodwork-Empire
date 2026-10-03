@@ -448,7 +448,7 @@ export function createGame(options: NewGameOptions): GameState {
     ownerDraw: { tier: 0 },
     pipes: [],
     gates: [],
-    settings: { tips: true, sound: { volume: SOUND_VOLUME_DEFAULT, muted: false } },
+    settings: { tips: true, noonBreak: 'ask', sound: { volume: SOUND_VOLUME_DEFAULT, muted: false } },
     hallSetUp: false,
     tips: { seen: [] },
     shift: { second: false },
@@ -1942,6 +1942,12 @@ function askAboutBreak(state: GameState): boolean {
   if (owner.breakAsked || state.clock.minute !== BREAK_START_MINUTE) return false;
   owner.breakAsked = true;
   if (!ownerIsAvailable(state)) return false;
+  // He ticked `Do not ask again` on this card once: the answer he gave then is given for him and
+  // no card is raised, the same rule and the same charge to tomorrow (PIOTR, 03.10; v70).
+  if (state.settings.noonBreak !== 'ask') {
+    owner.breakSkipped = state.settings.noonBreak === 'skip';
+    return false;
+  }
   queueEvent(state, {
     kind: 'breakTime',
     title: 'Break',
@@ -2038,7 +2044,7 @@ export function tick(state: GameState, minutes: number): GameState {
   return runMinutes(state, minutes).state;
 }
 
-function resolveEvent(state: GameState, choiceId: string): void {
+function resolveEvent(state: GameState, choiceId: string, remember = false): void {
   const event = state.activeEvent;
   if (!event) return;
   state.activeEvent = null;
@@ -2046,6 +2052,8 @@ function resolveEvent(state: GameState, choiceId: string): void {
     case 'breakTime':
       // Skipping is his to take: it buys him the hour and it is charged to tomorrow.
       state.owner.breakSkipped = choiceId === 'skip';
+      // `Do not ask again`: this answer is every noon's from now on (PIOTR, 03.10; v70).
+      if (remember) state.settings.noonBreak = choiceId === 'skip' ? 'skip' : 'take';
       break;
     case 'goingHome':
       if (choiceId === 'home') finishDay(state);
@@ -2297,7 +2305,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     }
     case 'RESOLVE_EVENT':
-      resolveEvent(next, action.choiceId);
+      resolveEvent(next, action.choiceId, action.remember === true);
       break;
     // Turn 13 (CLAUDE.md T13 section 3). Each case routes to its group's module; the refusals
     // are written there.
@@ -2393,6 +2401,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'SET_TIPS':
       next.settings.tips = action.on;
+      break;
+    case 'SET_NOON_BREAK':
+      next.settings.noonBreak = action.choice;
       break;
     case 'ADD_TO_JOB':
       // One more man on the job, however many are on it already (CLAUDE.md T19 2.5).

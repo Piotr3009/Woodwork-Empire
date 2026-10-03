@@ -100,7 +100,18 @@ export function renderBankruptcyCard(state: GameState, event: GameEvent): string
   );
 }
 
-export function renderEvent(state: GameState, event: GameEvent): string {
+/** The tick under the Break card's words: ticked, the answer he gives now is the answer every
+ *  noon and the card is not raised again; Settings has the row that takes it back (PIOTR, 03.10;
+ *  v70). The tick is the page's own until he answers, so it is drawn off `remember`. */
+function breakRememberRow(remember: boolean): string {
+  return (
+    '<label class="event-check" data-break-remember>' +
+    `<input type="checkbox" data-field="breakRemember"${remember ? ' checked' : ''} />` +
+    ' Do not ask again</label>'
+  );
+}
+
+export function renderEvent(state: GameState, event: GameEvent, remember = false): string {
   if (event.kind === 'bankruptcy') return renderBankruptcyCard(state, event);
   const equipmentId = event.data.equipmentId;
   const machine =
@@ -109,7 +120,8 @@ export function renderEvent(state: GameState, event: GameEvent): string {
       : null;
   const key = whyKeyForEvent(event.kind, machine?.specId ?? '');
   const note = key === null ? '' : ` ${whyLink(state, key)}`;
-  return `<p class="event-body">${escapeHtml(event.body)}${marginTail(event)}${note}</p>`;
+  const tick = event.kind === 'breakTime' ? breakRememberRow(remember) : '';
+  return `<p class="event-body">${escapeHtml(event.body)}${marginTail(event)}${note}</p>${tick}`;
 }
 
 export function renderEventFooter(event: GameEvent): string {

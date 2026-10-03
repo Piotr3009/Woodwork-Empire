@@ -378,14 +378,25 @@ export function familyRuns(state: GameState, family: string): boolean {
   return familyAirBlock(state, family) === '';
 }
 
-/** The machines of this family that have places this minute, in the order they were bought, which
- *  is the order they are filled in: standing in the hall, not sold, not broken and not away for
- *  its service, in a family that runs. A broken machine has no places, which is what a breakdown
- *  costs beside its repair (CLAUDE.md T20 2.9.3, T25 2.1; v53). */
+/** The machines of this family that have places this minute, in the order they are filled in:
+ *  the best class first, its gate counted, and the order they were bought in between two of the
+ *  same pace. So the shop works on the good machine and the old one takes the overflow, which is
+ *  what the hall's pace has said since 21.09 (PIOTR, 03.10: an industrial edgebander that "does
+ *  nothing" beside the old one the men stood at; v70). Standing in the hall, not sold, not broken
+ *  and not away for its service, in a family that runs. A broken machine has no places, which is
+ *  what a breakdown costs beside its repair (CLAUDE.md T20 2.9.3, T25 2.1; v53). */
 export function placedMachines(state: GameState, family: string): Equipment[] {
   if (!familyRuns(state, family)) return [];
-  return floorMachines(state, family).filter(
+  const placed = floorMachines(state, family).filter(
     (item) => !item.broken && !machineIsOut(item, state.clock.day),
+  );
+  // The benches stay in the order they were bought: a bench is a man's own place and not a
+  // machine the shop chooses between (`benches`).
+  if (family === BENCH) return placed;
+  const bought = new Map(placed.map((item, index) => [item.id, index]));
+  return placed.sort(
+    (left, right) =>
+      paceOf(state, right) - paceOf(state, left) || (bought.get(left.id) ?? 0) - (bought.get(right.id) ?? 0),
   );
 }
 
@@ -396,8 +407,9 @@ export function hallPlaces(state: GameState, family: string): number {
 }
 
 /** The machine the man at this place of the family works at, and which of its own places he
- *  is at: the machines in the order they were bought, each filled up to its places, so the
- *  second man at a two place saw is at its second place and the third is at the second saw
+ *  is at: the machines in the order `placedMachines` gives them, the best class first, each
+ *  filled up to its places, so the second man at a two place saw is at its second place and the
+ *  third is at the second saw
  *  [PIOTR: "with two saws let them go to the second one"]. Null past the hall's last place. The
  *  figure loop and the machine's card both read this (CLAUDE.md T25 2.5, 2.6). */
 export function machineForPlace(

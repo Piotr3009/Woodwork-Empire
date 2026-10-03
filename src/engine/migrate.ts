@@ -981,6 +981,13 @@ function liftToVersion35(state: Raw): void {
   state.version = 35;
 }
 
+/** Version 35 to 36 (v70): the noon break can be answered once and for all (PIOTR, 03.10). Every
+ *  save there is was asked every day, so it goes on being asked. */
+function liftToVersion36(state: Raw): void {
+  if (isRecord(state.settings)) state.settings.noonBreak = 'ask';
+  state.version = 36;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -1005,6 +1012,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   32: liftToVersion33,
   33: liftToVersion34,
   34: liftToVersion35,
+  35: liftToVersion36,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

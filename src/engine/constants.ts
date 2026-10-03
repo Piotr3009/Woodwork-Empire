@@ -157,11 +157,11 @@ import type {
  *  Version 35 is v67 (PIOTR, 03.10): the unit can be extended and its canteen enlarged. The unit
  *  says where its extension stands, not asked for in every save there is, and whether the canteen
  *  has been enlarged, which it has not. Every v25 to v34 save loads. */
-export const STATE_VERSION = 35;
+export const STATE_VERSION = 36;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v69';
+export const APP_VERSION = 'v70';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of

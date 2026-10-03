@@ -46,8 +46,19 @@ describe('the settings modal', () => {
     const off = parse(renderSettings(state));
     expect(off.querySelector('[data-do="setTips"][data-on="1"]')?.className).toBe('chip');
     expect(off.querySelector('[data-do="setTips"][data-on="0"]')?.className).toBe('chip is-on');
-    // The tips and the sound, and nothing else: two chips, two chips and two steps.
-    expect(off.querySelectorAll('[data-do]')).toHaveLength(6);
+    // The tips, the noon break (v70) and the sound, and nothing else: two chips, three chips, two
+    // chips and two steps.
+    expect(off.querySelectorAll('[data-do]')).toHaveLength(9);
+  });
+
+  it('carries the noon break, with the lit chip following the setting (v70)', () => {
+    const state = newGame();
+    const lit = (): string =>
+      parse(renderSettings(state)).querySelector('[data-setting="noonBreak"] .chip.is-on')?.getAttribute('data-choice') ?? '';
+    expect(lit()).toBe('ask');
+    state.settings.noonBreak = 'skip';
+    expect(lit()).toBe('skip');
+    expect(parse(renderSettings(state)).querySelectorAll('[data-do="setNoonBreak"]')).toHaveLength(3);
   });
 
   it('carries the sound: a mute in the tips row\'s own shape, and a volume that steps', () => {

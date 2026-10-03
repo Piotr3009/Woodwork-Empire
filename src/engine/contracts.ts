@@ -65,7 +65,7 @@ import { ownerDrawPerDay, staffOutputFactor } from './owner';
 import { changeReputation, effectiveReputation, reputationTier } from './reputation';
 import { chance, float, int, pick } from './rng';
 import type { RngCarrier } from './rng';
-import { crewHasGoneHome, isWorkingToday, joiners } from './staff';
+import { crewHasGoneHome, isWorkingToday, joiners, managerPaceFor } from './staff';
 import { STATION_DOOR, STATION_HOME } from './stations';
 import { familyForStage, jobOnCnc, manPace, pacePoints, stageSpeed } from './stages';
 import type { Contract, ContractWeek, Equipment, GameState, StageId, Worker } from './types';
@@ -1034,8 +1034,10 @@ export function runContractMinute(
       const { stage } = pieceStage(state, piece);
       const speed = stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
       hall ??= hallProductivityFactor(state);
-      // His grade times the points, as the job minute is (v61).
-      const worth = manPace(worker.rate, away, speed, hall);
+      // His grade times the points, as the job minute is (v61), the manager's among them: a man on
+      // a contract is carried by the manager like any other, and until v70 his row printed the
+      // manager's points and his minute did not have them (PIOTR, 03.10).
+      const worth = manPace(worker.rate, away, managerPaceFor(state, worker), speed, hall);
       contract.pieceMinutes = Math.round((contract.pieceMinutes + worth) * 10000) / 10000;
       contract.labourMinutes += 1;
       worker.productionMinutes += 1;

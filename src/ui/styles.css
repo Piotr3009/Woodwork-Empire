@@ -1049,6 +1049,22 @@ input.num {
   margin: 0;
 }
 
+/* The Break card's tick (v70): the box and its words on one line under the card's words, in the
+   card's own ink. */
+.event-check {
+  align-items: center;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.event-check input {
+  margin: 0;
+  width: auto;
+}
+
 /* --------------------------------------------------------------------------
    The order board tiles
    -------------------------------------------------------------------------- */

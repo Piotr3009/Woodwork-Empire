@@ -1060,8 +1060,15 @@ export interface PipeRun {
 }
 
 /** What the player can switch (CLAUDE.md T13 3.22). Tips and nothing else tonight. */
+/** What the owner does at noon: asked every day, or the answer he ticked `Do not ask again` on
+ *  (PIOTR, 03.10; v70). */
+export type NoonBreak = 'ask' | 'take' | 'skip';
+
 export interface SettingsState {
   tips: boolean;
+  /** The noon break: `ask` raises the Break card every day, `take` and `skip` answer it for him and
+   *  no card is raised (PIOTR, 03.10; v70). */
+  noonBreak: NoonBreak;
   /** The master volume and the mute, saved with the game (CLAUDE.md T19 2.10). */
   sound: SoundSettings;
 }
@@ -1417,7 +1424,9 @@ export type GameAction =
   | { type: 'START_CLEANING' }
   | { type: 'REPAIR_MACHINE'; equipmentId: string }
   | { type: 'SERVICE_MACHINE'; equipmentId: string }
-  | { type: 'RESOLVE_EVENT'; choiceId: string }
+  /** `remember` is the Break card's `Do not ask again` tick: the answer is kept as the noon break
+   *  setting and the card is not raised again (PIOTR, 03.10; v70). */
+  | { type: 'RESOLVE_EVENT'; choiceId: string; remember?: boolean }
   | { type: 'END_DAY' }
   | { type: 'SKIP_DAY' }
   // Turn 13 (CLAUDE.md T13 section 3). Money and paper:
@@ -1454,6 +1463,8 @@ export type GameAction =
   | { type: 'SET_SECURITY_LEVEL'; level: number }
   // Chrome and guidance:
   | { type: 'SET_TIPS'; on: boolean }
+  /** The noon break row of Settings: ask every day, always take it, always work through it (v70). */
+  | { type: 'SET_NOON_BREAK'; choice: NoonBreak }
   /** Puts one more man on a job, from the Assign to this job list. There is no limit on how many
    *  (PIOTR, 17.09; CLAUDE.md T19 2.5). */
   | { type: 'ADD_TO_JOB'; jobId: string; workerId: string }
