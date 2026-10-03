@@ -3251,10 +3251,39 @@ input.num {
 .row.is-on-contract .row-main {
   font-weight: 600;
 }
-.house-card { width: 100%; text-align: center; }
-.house-picture { display: block; width: 100%; height: auto; border-radius: 6px; }
-.house-name { margin: 8px 0 2px; font-weight: 600; }
-.house-line { margin: 0 0 8px; }
+.house-card { width: 100%; }
+.house-picture { display: block; width: 100%; height: auto; }
+.house-bar {
+  align-items: center;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 12px 22px 14px;
+}
+.house-name {
+  color: var(--cream);
+  font-family: var(--font-title);
+  font-size: var(--fs-hand-big);
+  font-weight: 400;
+  line-height: 1.1;
+  margin: 0;
+}
+.house-line { color: var(--text-dim); margin: 2px 0 0; }
+/* The house card is a picture and not a sheet of paper (PIOTR, 03.10; v76): the picture is the
+   card, nearly the width of the page, and the tier and its one line are on a dark sill under it.
+   The head and the foot of the modal are not drawn; the title is still there for a reader. */
+.modal-photo {
+  border-radius: 10px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65);
+  max-height: 94vh;
+  overflow: hidden;
+  width: min(94vw, 1640px);
+}
+.modal-photo.modal-centred { top: 50%; transform: translate(-50%, -50%); }
+.modal-photo .modal-head,
+.modal-photo .modal-foot { display: none; }
+.modal-photo .modal-body { padding: 0; }
+.modal-photo .tip-bubble { margin: 0 22px 16px; }
 
 /* Phase B3 (REPORT-T13-B3.md, section 3) */
 /* The stock page (T13 3.2): a line of the software the player is meant to recognise. */

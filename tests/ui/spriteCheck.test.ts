@@ -206,9 +206,9 @@ describe('the sprite check page', () => {
       expect(cell?.textContent, name).toContain('2 of 4 orientations drawn');
       expect(cell?.textContent, name).toContain('the rest mirrored or the base picture');
     }
-    // A key with no file at all says none, and still says it: the budget class of the pallet
-    // trucks and forklifts, which the art side has not drawn yet (v54).
-    const truck = page.querySelector('[data-sprite-target="forklift.budget"] [data-turns]');
+    // A key with no file at all says none, and still says it: the better forklift, which the art
+    // side has not drawn yet (v54). The budget class, the electric pallet truck, landed in v76.
+    const truck = page.querySelector('[data-sprite-target="forklift.pro"] [data-turns]');
     expect(truck?.getAttribute('data-turns')).toBe('');
     expect(truck?.textContent).toContain('0 of 4 orientations drawn: none');
   });

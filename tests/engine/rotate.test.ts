@@ -241,8 +241,9 @@ describe('what turning does to the picture', () => {
     // turned file of v49 is still on disk beside its rename, `forklift.used.r.png` (v54), which
     // v61's DELETED.txt asked deleted: the build's manifest counts what is on disk (T26-A0).
     // Sixty eight from v69: the high capacity rack, the industrial rack's own turn in red.
+    // Seventy three from v76: the four vans and the electric pallet truck of the pack of 22.09.
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    expect(turned).toHaveLength(68);
+    expect(turned).toHaveLength(73);
     for (const family of ['cnc', 'cncToolChanger', 'compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'sprayBooth', 'tableSaw', 'toolCabinet', 'workbench']) {
       for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
         expect(turned, `${family}.${tier}`).toContain(`${family}.${tier}.r.png`);

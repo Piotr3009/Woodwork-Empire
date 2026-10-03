@@ -36,6 +36,10 @@ export interface ModalSpec {
   full?: boolean;
   /** Where the player dragged it. Null is centred. */
   position?: ModalPosition | null;
+  /** A picture and not a sheet of paper: the house card, whose picture is the card and nearly
+   *  the width of the page (PIOTR, 03.10; v76). The modal keeps its id and its content; only the
+   *  skin it wears for this render is the picture's. */
+  photo?: boolean;
 }
 
 export function minutes(value: number): string {
@@ -128,7 +132,7 @@ const FELT_MODALS: ReadonlySet<string> = new Set(['company']);
 
 function modalClass(spec: ModalSpec): string {
   const size = spec.full === true ? ' modal-full' : spec.wide === true ? ' modal-wide' : '';
-  const skin = ` modal-${MODAL_SKINS[spec.id] ?? 'folder'}`;
+  const skin = spec.photo === true ? ' modal-photo' : ` modal-${MODAL_SKINS[spec.id] ?? 'folder'}`;
   const felt = FELT_MODALS.has(spec.id) ? ' modal-felt' : '';
   return `modal${size}${skin}${felt}${spec.position ? '' : ' modal-centred'}`;
 }

@@ -75,7 +75,7 @@ import { type AccountingTab, accountingTabFrom, renderAccounting } from './accou
 import { renderContracts } from './contracts';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { acceptContractCheck, contractManCheck } from '../engine/contracts';
-import { renderHouseCard } from './house';
+import { housePictureUrl, renderHouseCard } from './house';
 import { renderMonthEnd, renderMonthlyReport } from './monthEnd';
 import { renderSettings } from './settings';
 import { renderTip, renderWarningStrip } from './tips';
@@ -882,8 +882,10 @@ function modalSpecs(): ModalSpec[] {
       title: houseCard ? 'Home' : event.title,
       body: houseCard
         ? withTip(
-            renderHouseCard(current) +
-              '<p class="choices"><button class="btn" data-do="closeHouseCard">The summary</button></p>',
+            renderHouseCard(
+              current,
+              '<button class="btn btn-primary" data-do="closeHouseCard">The summary</button>',
+            ),
             current,
             'house',
           )
@@ -899,7 +901,10 @@ function modalSpecs(): ModalSpec[] {
       // ("built 0 of them") was cut in half by the fold (T21-C4, picture 4; CLAUDE.md T21 2.2).
       wide:
         event.kind === 'dayEnd' || event.kind === 'monthEnd' || event.kind === 'bankruptcy',
-      position: ui.eventPosition,
+      // The house card is a picture nearly the width of the page, in the middle of it: it is not
+      // the paper the summary after it is, and it is not where that paper was dragged to (v76).
+      photo: houseCard,
+      position: houseCard ? null : ui.eventPosition,
     });
   }
   return specs;
@@ -1035,6 +1040,20 @@ function nowMs(): number {
 /** The day the walkers were last given their orders on, or null before the first of them. */
 let walkersDay: number | null = null;
 
+/** The house picture the page has already asked the browser for. */
+let housePictureAsked: string | null = null;
+
+/** Asks the browser for the picture of the owner's house ahead of the evening: a file of two
+ *  megabytes on a card that is up for three seconds has to be in the cache before the card is
+ *  (v76). Once a file; a page with no `Image` (a test's) asks for nothing. */
+function fetchHousePictureAhead(current: GameState): void {
+  const url = housePictureUrl(current);
+  if (url === null || url === housePictureAsked || typeof Image === 'undefined') return;
+  housePictureAsked = url;
+  const picture = new Image();
+  picture.src = url;
+}
+
 /** Gives every walker its orders off the page that has just been built, and puts every figure
  *  back where he had actually got to: the walker owns the transform between renders
  *  (CLAUDE.md T16 2.2). The network is the engine's: the walker asks it for the path and
@@ -1052,6 +1071,9 @@ function syncFigures(now: number): void {
       resetDoors();
     }
     walkersDay = day;
+    // And the picture of the house he goes home to tonight is asked for now, while the day runs,
+    // so the card opens with it and not with an empty frame (v76).
+    if (current !== null) fetchHousePictureAhead(current);
   }
   syncWalkers(root, now, (from, to) =>
     current === null ? [from, to] : walkPath(current, from, to),
