@@ -215,7 +215,8 @@ describe('the sprite check page', () => {
 
   it('lists every role of the game with every frame key, the two of Turn 13 among them', () => {
     // Every state the character system can be in has a key, home included (CLAUDE.md T13 3.23).
-    // Sweep joined them in Turn 20, for the labourer with a broom (CLAUDE.md T20 2.8).
+    // Sweep joined them in Turn 20, for the labourer with a broom (CLAUDE.md T20 2.8), and spray
+    // in v71, for the man in the booth.
     expect([...ANIMATIONS]).toEqual([
       'walk',
       'bench',
@@ -224,6 +225,7 @@ describe('the sprite check page', () => {
       'phone',
       'home',
       'sweep',
+      'spray',
     ]);
     // The owner and the six roles of Turn 26, and none of the three trades that went (CLAUDE.md
     // T26 2.6).

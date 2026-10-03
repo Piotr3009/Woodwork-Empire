@@ -1027,6 +1027,9 @@ function nowMs(): number {
   return typeof performance === 'undefined' ? 0 : performance.now();
 }
 
+/** The day the walkers were last given their orders on, or null before the first of them. */
+let walkersDay: number | null = null;
+
 /** Gives every walker its orders off the page that has just been built, and puts every figure
  *  back where he had actually got to: the walker owns the transform between renders
  *  (CLAUDE.md T16 2.2). The network is the engine's: the walker asks it for the path and
@@ -1034,6 +1037,17 @@ function nowMs(): number {
 function syncFigures(now: number): void {
   if (!root) return;
   const current = state;
+  // A new morning: every man is at his machine when the day opens, with no walk in from where the
+  // evening left him (PIOTR, 03.10; v71). The walkers are forgotten and the page's own cells are
+  // where the figures stand, which is what a view built from nothing has always been.
+  const day = current === null ? null : current.clock.day;
+  if (day !== walkersDay) {
+    if (walkersDay !== null && day !== null) {
+      resetWalkers();
+      resetDoors();
+    }
+    walkersDay = day;
+  }
   syncWalkers(root, now, (from, to) =>
     current === null ? [from, to] : walkPath(current, from, to),
   );

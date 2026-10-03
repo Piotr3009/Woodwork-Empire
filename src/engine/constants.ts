@@ -161,7 +161,7 @@ export const STATE_VERSION = 36;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v70';
+export const APP_VERSION = 'v71';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -3708,6 +3708,11 @@ export const WALK_STRIDE_METRES = 1.4;
  *  turns ninety degrees for more than two cells", so the figure is Piotr's and only its name is
  *  chosen here (CLAUDE.md T19 2.1). */
 export const WALK_CORNER_CELLS = 2;
+/** From this speed of the clock a walk is not drawn: a man is where the day has put him, at once
+ *  [PIOTR, 03.10]. A walk is real seconds and a day at these speeds is a few of them, so a man on
+ *  his way to a machine never got there (v71). Under it the walk between two machines is drawn as
+ *  it always was. */
+export const WALK_SKIPPED_FROM_SPEED = 30;
 /** How far in front of his own cell a figure is painted, in cells of the depth key [TUNE]. Not a
  *  new figure: it is the 0.2 `src/render/hall.ts` has painted a man in front of his own tile with
  *  since Turn 16, given a name so the scene and the re-sort of a walking man read one figure

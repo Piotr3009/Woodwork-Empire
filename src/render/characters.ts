@@ -14,13 +14,20 @@
 
 import { SIGNATURE_LOOKS } from '../engine/constants';
 import sheets from '../../public/sprites/characters.json';
-import { WALK_CELLS_PER_SECOND, WALK_CELLS_PER_SECOND_FAST, WALK_STRIDE_METRES } from '../engine/constants';
+import {
+  WALK_CELLS_PER_SECOND,
+  WALK_CELLS_PER_SECOND_FAST,
+  WALK_SKIPPED_FROM_SPEED,
+  WALK_STRIDE_METRES,
+} from '../engine/constants';
+import { SPRAY_BOOTH } from '../engine/machines';
 import {
   STATION_BENCH,
   STATION_CLEANING,
   STATION_GATE,
   STATION_PHONE,
   STATION_RACK,
+  machineStation,
 } from '../engine/stations';
 import { pickSprite, spriteFiles, SPRITE_SCALE } from './sprites';
 
@@ -30,8 +37,9 @@ export type Facing = 'sw' | 'se' | 'nw' | 'ne';
 /** What a figure can be doing: every state the character system can be in has a frame key
  *  (CLAUDE.md T9 3.13, T13 3.23). `home` is the figure going home at the end of the day; no
  *  sheet is wanted for it, so it falls back to idle like any missing frame.
- *  `sweep` is the labourer with a broom, whose sheet came in with v28 (CLAUDE.md T20 2.8). */
-export type Animation = 'walk' | 'bench' | 'carry' | 'idle' | 'phone' | 'home' | 'sweep';
+ *  `sweep` is the labourer with a broom, whose sheet came in with v28 (CLAUDE.md T20 2.8).
+ *  `spray` is the man in a spray booth, in the white suit and the respirator (PIOTR, 03.10; v71). */
+export type Animation = 'walk' | 'bench' | 'carry' | 'idle' | 'phone' | 'home' | 'sweep' | 'spray';
 
 export const ANIMATIONS: readonly Animation[] = [
   'walk',
@@ -41,13 +49,19 @@ export const ANIMATIONS: readonly Animation[] = [
   'phone',
   'home',
   'sweep',
+  'spray',
 ];
 
 /** What a role with no sheet of its own for an animation plays instead of it, before the idle
  *  fallback of Turn 19 is reached. A man with no broom sheet sweeping is a man working with his
  *  hands, so he plays the bench and not the standing about of idle: the labourer has the broom, the
  *  joiner and the owner fall to the bench (CLAUDE.md T20 2.8). */
-const INSTEAD_OF: Partial<Record<Animation, Animation>> = { sweep: 'bench' };
+const INSTEAD_OF: Partial<Record<Animation, Animation>> = { sweep: 'bench', spray: 'bench' };
+
+/** The animations every role plays off one sheet, and the name that sheet is delivered under in
+ *  the place of a role. The suit of the spray booth covers the man whoever he is, so there is one
+ *  picture of it and not one a role (v71). */
+const ONE_SHEET_FOR_ALL: Partial<Record<Animation, string>> = { spray: 'suit' };
 
 /** Where a missing direction is mirrored from (CLAUDE.md T9 3.13). */
 const MIRROR: Record<Facing, Facing> = { se: 'sw', sw: 'se', nw: 'ne', ne: 'nw' };
@@ -79,7 +93,7 @@ const DELIVERED = sheets as Record<string, CharacterSheet>;
 
 /** The key a role and an animation are delivered under. */
 export function characterKey(role: string, animation: Animation): string {
-  return `character.${role}.${animation}`;
+  return `character.${ONE_SHEET_FOR_ALL[animation] ?? role}.${animation}`;
 }
 
 /** The sheet role a man is drawn from: his role's, or his role's with his look's suffix when his
@@ -117,7 +131,12 @@ export function playableAnimation(
   wanted: Animation,
   options: CharacterOptions = {},
 ): { animation: Animation; frozen: boolean } | null {
-  if (characterSheet(role, wanted, options) !== null) return { animation: wanted, frozen: false };
+  // A sheet every role shares is still only for a role that is drawn from sheets at all: a man who
+  // is the capsule everywhere else is the capsule in a booth as well (v71).
+  const shared = ONE_SHEET_FOR_ALL[wanted] !== undefined;
+  const drawn =
+    !shared || characterSheet(role, 'idle', options) !== null || characterSheet(role, 'walk', options) !== null;
+  if (drawn && characterSheet(role, wanted, options) !== null) return { animation: wanted, frozen: false };
   const instead = INSTEAD_OF[wanted];
   if (instead !== undefined && characterSheet(role, instead, options) !== null) {
     return { animation: instead, frozen: false };
@@ -168,6 +187,9 @@ const LOCOMOTION: readonly Animation[] = ['walk', 'carry'];
  *  the game is at before the figures are moved, and the walk sheets read it so the feet still
  *  plant where the floor moves. */
 let pace = WALK_CELLS_PER_SECOND;
+/** True while the clock runs too fast for a walk to be drawn: a man is put where he is going
+ *  (PIOTR, 03.10; v71). The frame sets it with the pace. */
+let skipped = false;
 
 export function walkPaceFor(speed: number): number {
   return speed > 1 ? WALK_CELLS_PER_SECOND_FAST : WALK_CELLS_PER_SECOND;
@@ -175,6 +197,12 @@ export function walkPaceFor(speed: number): number {
 
 export function setWalkPace(speed: number): void {
   pace = walkPaceFor(speed);
+  skipped = speed >= WALK_SKIPPED_FROM_SPEED;
+}
+
+/** Whether the walks are skipped this frame: the clock is at `WALK_SKIPPED_FROM_SPEED` or over. */
+export function walksAreSkipped(): boolean {
+  return skipped;
 }
 
 export function walkPace(): number {
@@ -356,6 +384,8 @@ export function animationForStation(station: string): Animation {
   // At a bench or at his place at a machine, which is where every man at work stands
   // (CLAUDE.md T25 2.6). A man standing at his home cell with no place is not working, and stands
   // (`STATION_HOME` falls through to idle).
+  // In a spray booth he is in the suit, which is the bench's own work with white on (v71).
+  if (station === machineStation(SPRAY_BOOTH)) return 'spray';
   if (station === STATION_BENCH || station.startsWith('machine:')) return 'bench';
   if (station === STATION_RACK) return 'bench';
   if (station === STATION_GATE) return 'idle';

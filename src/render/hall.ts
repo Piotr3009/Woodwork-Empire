@@ -66,6 +66,7 @@ import {
   STATION_PHONE,
   STATION_RACK,
   type Facing as StationFacing,
+  boothPlaces,
   facingAt,
   stationNow,
   facingAtPallet,
@@ -80,7 +81,7 @@ import {
   stationMachine,
 } from '../engine/stations';
 import { ownerIsAvailable } from '../engine/owner';
-import { homeCellOf } from '../engine/staff';
+import { crewHasGoneHome, homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
 import { FIGURE_DEPTH_OFFSET } from '../engine/constants';
 import type { RoomBlock, RoomId } from '../engine/constants';
@@ -911,6 +912,17 @@ export interface Standing {
   x: number;
   y: number;
   facing: StationFacing;
+  /** Where he stands when that is not the middle of his cell: half a cell inside the spray booth
+   *  his place is in, in cells like the cell itself (PIOTR, 03.10; v71). */
+  inside?: { x: number; y: number };
+}
+
+/** A man's standing at a cell of this item: facing it, and for a place of a spray booth facing its
+ *  filter wall from the point inside it the place names (`boothPlaces`; v71). */
+function standingAt(cell: { x: number; y: number }, item: Equipment): Standing {
+  const place = boothPlaces(item).find((entry) => entry.cell.x === cell.x && entry.cell.y === cell.y);
+  if (place !== undefined) return { x: cell.x, y: cell.y, facing: place.facing, inside: place.inside };
+  return { x: cell.x, y: cell.y, facing: facingAt(cell, item) };
 }
 
 /** The standing cell a station puts a figure on, and the way he faces there: the station table's
@@ -954,7 +966,7 @@ function stationAnchor(
     const placed = who === null ? undefined : drawnPlaces(state).find((entry) => entry.who === who);
     if (placed !== undefined) {
       const cell = placeCellsAt(state, placed.item, placed.place + 1)[placed.place] ?? standingCell(state, placed.item);
-      return { ...cell, facing: facingAt(cell, placed.item) };
+      return standingAt(cell, placed.item);
     }
     // A man at a machine on an errand, a service or a bag change, stands at its operator's cell.
     const item = state.equipment.find(
@@ -962,7 +974,7 @@ function stationAnchor(
     );
     if (item) {
       const cell = standingCell(state, item, 'operator');
-      return { ...cell, facing: facingAt(cell, item) };
+      return standingAt(cell, item);
     }
   }
   if (station === STATION_RACK) {
@@ -1080,7 +1092,7 @@ export function figureStandings(state: GameState): Map<string, Standing> {
     const cells = placeCellsAt(state, item, men.length, taken);
     men.forEach((entry, index) => {
       const cell = cells[index] ?? standingCellsFor(state, [standingCell(state, item)], 1, taken)[0];
-      if (cell !== undefined) standings.set(entry.who, { ...cell, facing: facingAt(cell, item) });
+      if (cell !== undefined) standings.set(entry.who, standingAt(cell, item));
     });
   }
   const door = roomDoorCell('canteen');
@@ -1340,6 +1352,15 @@ export function markArt(bubble: Bubble, headTop: number, shift = 0): string {
   );
 }
 
+/** True while a man is off the hall's drawing: he has gone through a door (`figureIsThroughADoor`),
+ *  or it is the dinner hour and he is at his dinner. The dinner is not walked to: the whole hall
+ *  is gone at twelve from wherever each man stood, and is back at its machines at one, because at
+ *  the fast speeds the walk to the canteen and back was longer than the afternoon (PIOTR, 03.10:
+ *  "let them just vanish and appear at the machines"; v71). */
+function offTheHall(key: string, cell: Standing, station: string): boolean {
+  return station === STATION_LUNCH || figureIsThroughADoor(key, cell, station);
+}
+
 /** A worker is his sheet if the art side has delivered one and a capsule if it has not, with his
  *  name under him either way. The owner is the green one. The group carries its standing cell,
  *  its station and the way he faces there, and the walker in the renderer carries him to that
@@ -1356,7 +1377,9 @@ function figure(
   bubble: Bubble | null = null,
   markShift = 0,
 ): Drawable {
-  const feet = centreOf(tile.x, tile.y, 1, 1);
+  // Where his feet are: the middle of his cell, or the point inside a booth his place names (v71).
+  const at = tile.inside ?? tile;
+  const feet = centreOf(at.x, at.y, 1, 1);
   const fill = isOwner ? 'var(--owner)' : 'var(--worker)';
   // The sheet if the art side has delivered one for this role, and the capsule the game has
   // always drawn if it has not (CLAUDE.md T9 3.13).
@@ -1369,12 +1392,13 @@ function figure(
   const headTop =
     (art === null ? null : characterTop(art.role, rest, art.options)) ?? CAPSULE_HEAD_TOP;
   return {
-    depth: depthKey(tile.x, tile.y) + FIGURE_DEPTH_OFFSET,
-    feet: { x: tile.x + 0.5, y: tile.y + 0.5 },
+    depth: depthKey(at.x, at.y) + FIGURE_DEPTH_OFFSET,
+    feet: { x: at.x + 0.5, y: at.y + 0.5 },
     svg:
       `<g class="figure" data-figure="${key}" ` +
       `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ` +
-      `data-cell="${tile.x},${tile.y}" data-station="${escapeText(art?.station ?? '')}" ` +
+      `data-cell="${tile.x},${tile.y}"${tile.inside === undefined ? '' : ` data-inside="${tile.inside.x},${tile.inside.y}"`} ` +
+      `data-station="${escapeText(art?.station ?? '')}" ` +
       `data-facing-rest="${tile.facing}"${loop === '' ? '' : ` data-loop="${loop}"`} ` +
       `data-rest="${rest}" ${extra}>` +
       `<title>${escapeText(name)}</title>` +
@@ -1864,7 +1888,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // owner alone: a desk job is behind the office door and the dinner hour is behind the canteen's
     // (CLAUDE.md T21 2.11, 2.12). Nothing is drawn at the door after him: a man in a room has
     // nothing wrong with him, so he has no mark at all (CLAUDE.md T22 2.5).
-    if (figureIsThroughADoor(`worker-${worker.id}`, cell, station)) continue;
+    if (offTheHall(`worker-${worker.id}`, cell, station)) continue;
+    // Five o'clock: the hired men have gone home, and are gone from the hall with no walk to a
+    // door. They are back at their machines in the morning (PIOTR, 03.10; v71).
+    if (crewHasGoneHome(state)) continue;
     drawables.push(
       figure(
         `worker-${worker.id}`,
@@ -1886,7 +1913,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const ownerBubble = ownerIsAvailable(state) ? bubbleOf(OWNER) : null;
   // The owner in the office is not on the hall at all: he went through the door, and the office
   // view draws him at his desk (PIOTR, 18.09; CLAUDE.md T20 2.12, T19 2.2).
-  if (ownerIsAvailable(state) && !figureIsThroughADoor('owner', ownerCell, ownerStation)) {
+  if (ownerIsAvailable(state) && !offTheHall('owner', ownerCell, ownerStation)) {
     drawables.push(
       figure(
         'owner',

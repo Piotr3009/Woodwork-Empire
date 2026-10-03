@@ -390,6 +390,29 @@ than the standard one; the manifest carries the cell and the anchor, and the loa
 rather than assuming 112 × 151. The fps values come from GPT's timing (walk and carry 8 frames per
 7/3 s, bench 5 fps, idle 1 fps); the game plays each sheet at its own fps.
 
+### 10.6 The suit of the spray booth (v71, PIOTR 03.10.2026: "the only machine I want a man to walk into, in a mask and a white suit")
+
+| Sheet | Rows | Frames | fps | Cell | Anchor |
+|---|---|---|---|---|---|
+| `character.suit.spray` | sw, se, nw, ne | 8 | 5 | 112 × 151 | 56, 143 |
+
+One sheet, played by every role that is drawn from sheets: the suit covers the man whoever he is,
+so `suit` stands in the name where a role stands in every other sheet's, and `spray` is the
+animation a figure at `machine:sprayBooth` rests in. He walks to the booth in his own clothes and
+the suit is on him only while he stands inside it.
+
+The sheet is not painted. `scripts/spray-suit.py` makes it from `character.joiner.bench`, cell for
+cell: the clothes, the arms and the hair go to a shaded white, the lower half of the face to the
+grey of a respirator, and the boots stay as they are. It reads well at the hall's size and is
+coarse up close (the respirator is a handful of pixels). A painted sprayer delivered under the
+same two names, `character.suit.spray.sheet.png` and `character.suit.spray.json`, replaces it with
+no change to the code; the cell and the anchor above are the contract.
+
+Where he stands is `boothPlaces` in `src/engine/stations.ts`: every booth is painted open along
+one long side (the camera side as delivered, the right hand side in its `.r` picture), and a man
+stands half a cell inside that side, facing the filter wall, one man to a cell from the second
+cell of the doorway on. A repaint that moves the opening has to move that rule with it.
+
 
 ---
 

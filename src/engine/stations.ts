@@ -12,7 +12,15 @@ import {
   roomDoorCell,
 } from './constants';
 import { isBreak } from './clock';
-import { OWNER, isSold, itemStandsInTheHall, sheetCapacityOf, sheetsStrandedBySale } from './machines';
+import {
+  OWNER,
+  SPRAY_BOOTH,
+  isSold,
+  itemStandsInTheHall,
+  placesOf,
+  sheetCapacityOf,
+  sheetsStrandedBySale,
+} from './machines';
 import { plural } from './text';
 import type { Cell } from './pipes';
 import type { Equipment, GameState, TaskInstance } from './types';
@@ -393,6 +401,9 @@ export function standingCell(state: GameState, item: Equipment, role: StationRol
   // A locker is inside the canteen: a man at his stands in the doorway and is not drawn through
   // the wall (PIOTR, 17.09; CLAUDE.md T17 2.2, T23 2.11).
   if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) return roomDoorCell('canteen');
+  // A booth is worked from inside: the first of its own places, while that cell is floor (v71).
+  const inBooth = boothPlaces(item)[0];
+  if (inBooth !== undefined && isFree(state, inBooth.cell)) return inBooth.cell;
   const row = stationRow(item.specId);
   const box = standsOn(item);
   let offset: StationOffset;
@@ -428,6 +439,46 @@ export function itemAtCell(state: GameState, cell: Cell): Equipment | null {
         !isSold(item) && itemStandsInTheHall(item) && covers(footprintCells(item), cell),
     ) ?? null
   );
+}
+
+/** A place inside a spray booth: the floor cell in its doorway the walk ends on, the point half a
+ *  cell further in where the man stands, in cells like the cell itself, and the way he faces there,
+ *  which is at the filter wall with his back to the hall. */
+export interface BoothPlace {
+  cell: Cell;
+  inside: { x: number; y: number };
+  facing: Facing;
+}
+
+/** The places inside a spray booth, one for every man its class keeps busy, and none for anything
+ *  that is not a booth (PIOTR, 03.10: "the only machine I want a man to walk into"; v71).
+ *
+ *  Every booth is painted open along one long side: the camera side as it is delivered, and the
+ *  right hand side when it is turned. A booth stands centred in its zone, half a cell in, so the
+ *  zone's row along the open side is the booth's own doorway: its cells are floor, and their
+ *  centres are on the painted edge of the booth's floor. A man walks to one of them and steps half
+ *  a cell in. The places run along the doorway from its second cell, because the first and the
+ *  last are where the corner posts and the control box are painted. */
+export function boothPlaces(item: Equipment): BoothPlace[] {
+  if (item.specId !== SPRAY_BOOTH) return [];
+  const box = standsOn(item);
+  const turned = (item.orientation ?? 0) % 2 === 1;
+  const length = turned ? box.depth : box.width;
+  const places = Math.min(placesOf(item), length - 1);
+  const first = Math.max(1, Math.floor((length - places) / 2));
+  const out: BoothPlace[] = [];
+  for (let index = 0; index < places; index += 1) {
+    const along = first + index;
+    if (along > length - 1) break;
+    if (turned) {
+      const cell = { x: box.x + box.width, y: box.y + along };
+      out.push({ cell, inside: { x: cell.x - 0.5, y: cell.y }, facing: 'nw' });
+    } else {
+      const cell = { x: box.x + along, y: box.y + box.depth };
+      out.push({ cell, inside: { x: cell.x, y: cell.y - 0.5 }, facing: 'ne' });
+    }
+  }
+  return out;
 }
 
 /** The side an item's places run along: the table's own side, or the free side of a rack or a
@@ -573,6 +624,23 @@ export function placeCellsAt(
   taken: Set<string> = new Set<string>(),
 ): Cell[] {
   if (count <= 0) return [];
+  // A booth's men stand inside it, each at his own place along its open side; only the men past
+  // its places, and a booth with something standing in its doorway, go on to the floor round it
+  // like any machine's (PIOTR, 03.10; v71).
+  const inside: Cell[] = [];
+  for (const place of boothPlaces(item)) {
+    if (inside.length >= count) break;
+    const key = cellKey(place.cell);
+    if (taken.has(key) || !isFree(state, place.cell)) continue;
+    taken.add(key);
+    inside.push({ x: place.cell.x, y: place.cell.y });
+  }
+  if (inside.length >= count) return inside;
+  return [...inside, ...placeCellsBeside(state, item, count - inside.length, taken)];
+}
+
+/** The cells beside an item, for `placeCellsAt`: every family's but the inside of a booth. */
+function placeCellsBeside(state: GameState, item: Equipment, count: number, taken: Set<string>): Cell[] {
   const row = stationRow(item.specId);
   const box = standsOn(item);
   const side = queueSide(state, item);

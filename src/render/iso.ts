@@ -155,6 +155,11 @@ export interface FloorBox {
  *  2.4). The depth keys stay what they are; this is what honouring them means for a man and a thing
  *  bigger than a cell, whose key is the back corner of its zone. */
 export function standsBehind(feet: { x: number; y: number }, box: FloorBox): boolean {
+  // A man whose feet are on the thing's own floor is in it and not behind it: the man in a spray
+  // booth, who is painted over the booth he stands in (PIOTR, 03.10; v71).
+  if (feet.x >= box.x && feet.y >= box.y && feet.x < box.x + box.width && feet.y < box.y + box.depth) {
+    return false;
+  }
   return feet.x < box.x + box.width && feet.y < box.y + box.depth;
 }
 

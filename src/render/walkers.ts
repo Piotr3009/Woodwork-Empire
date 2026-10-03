@@ -4,9 +4,14 @@
 // when: on every frame it advances along its path at a man's pace in real seconds, whatever the
 // game's clock is doing, sets the figure's transform to the point between two cells, plays carry
 // on a leg that carries material and walk on the rest, and faces the way it is going. On arrival
-// it plays the station's animation and faces the item. A figure never jumps: when the engine
-// sends it somewhere else it sets off from wherever it had got to, and only a view built from
-// nothing (a load, a scene change) starts it at its station's cell.
+// it plays the station's animation and faces the item. At the slow speeds a figure never jumps:
+// when the engine sends it somewhere else it sets off from wherever it had got to, and only a view
+// built from nothing (a load, a scene change, a new morning) starts it at its station's cell. From
+// `WALK_SKIPPED_FROM_SPEED` no walk is drawn at all and a figure is put where it is going, because
+// a day at those speeds is shorter than a walk across the hall (PIOTR, 03.10; v71).
+//
+// A man in a spray booth has a point of his own beyond his cell, half a cell inside the booth
+// (`data-inside`): the walk ends on the cell, which is floor, and one more step takes him in.
 //
 // An unloading is a loop he never stands on (PIOTR, 16.09): the page gives both ends, the pallet
 // and the rack, and the walker touches one and goes to the other, with the sheet on the way to
@@ -30,6 +35,7 @@ import {
   playCharacters,
   setCharacterAnimation,
   walkPace,
+  walksAreSkipped,
 } from './characters';
 import { type FloorBox, centreOf, depthKey, figureSlot } from './iso';
 
@@ -41,6 +47,8 @@ export interface Cell {
 interface Goal {
   cell: Cell;
   station: string;
+  /** Where he stands once he is there, when that is not the cell itself: inside a booth (v71). */
+  inside: Cell | null;
 }
 
 export interface Arrival {
@@ -188,8 +196,15 @@ export function walkerIsThroughADoor(walker: Walker): boolean {
   return walker.path.length === 0 && isBehindTheDoor(walker.station, walker.at);
 }
 
-function goalKey(cell: Cell, station: string): string {
-  return `${cell.x},${cell.y}|${station}`;
+function goalKey(goal: Goal): string {
+  const inside = goal.inside === null ? '' : `|${goal.inside.x},${goal.inside.y}`;
+  return `${goal.cell.x},${goal.cell.y}|${goal.station}${inside}`;
+}
+
+/** Where a man at this goal stands: inside the booth when it names a point there, on the cell
+ *  when it does not. */
+function standsAt(goal: Goal): Cell {
+  return goal.inside ?? goal.cell;
 }
 
 function cellOf(raw: string): Cell | null {
@@ -287,8 +302,14 @@ export function legHeadings(from: Cell, path: readonly Cell[]): Facing[] {
   return facings;
 }
 
-/** Starts a walker on the way to a goal along the network. */
+/** Starts a walker on the way to a goal along the network, or puts him there at once while the
+ *  clock is too fast for a walk to be drawn (PIOTR, 03.10; v71). A man on the unloading loop is
+ *  never put: the loop is the walk itself and has no end to be put at. */
 function setOff(walker: Walker, goal: Goal): void {
+  if (walksAreSkipped() && walker.loop === null) {
+    land(walker, goal);
+    return;
+  }
   const from = setOffFrom(walker);
   // The network is a grid of whole cells: it is asked about the cell he is in, and the fraction
   // of a cell he has walked into it stays on the walker.
@@ -296,8 +317,20 @@ function setOff(walker: Walker, goal: Goal): void {
   // The path starts on the cell he is on: nothing to walk for that one.
   const first = cells[0];
   if (first !== undefined && cells.length > 1 && sameCell(first, walker.at)) cells.shift();
+  // The one step past the cell, into the booth.
+  if (goal.inside !== null) cells.push(goal.inside);
   walker.path = cells;
   walker.facings = legHeadings(from, cells);
+  walker.fromStation = walker.station;
+  walker.station = goal.station;
+}
+
+/** Puts a walker at a goal with no walk: where he stands there, and nothing left to walk. */
+function land(walker: Walker, goal: Goal): void {
+  const at = standsAt(goal);
+  walker.at = { x: at.x, y: at.y };
+  walker.path = [];
+  walker.facings = [];
   walker.fromStation = walker.station;
   walker.station = goal.station;
 }
@@ -305,8 +338,8 @@ function setOff(walker: Walker, goal: Goal): void {
 /** The other end of the loop from where he is: the far end after the pallet, the pallet after
  *  the far end, and the far end first when he is anywhere else. */
 function nextEnd(walker: Walker, loop: Loop): Goal {
-  if (walker.station === loop.farStation) return { cell: loop.gate, station: STATION_GATE };
-  return { cell: loop.rack, station: loop.farStation };
+  if (walker.station === loop.farStation) return { cell: loop.gate, station: STATION_GATE, inside: null };
+  return { cell: loop.rack, station: loop.farStation, inside: null };
 }
 
 /** Reads the figures the page has just been built with and gives every walker its orders: a new
@@ -323,12 +356,14 @@ export function syncWalkers(root: ParentNode, nowMs: number, pathFor: PathFinder
     seen.add(key);
     const station = node.getAttribute('data-station') ?? '';
     const loop = loopOf(node);
-    const goal = goalKey(cell, station);
+    const wanted: Goal = { cell, station, inside: cellOf(node.getAttribute('data-inside') ?? '') };
+    const goal = goalKey(wanted);
     let walker = walkers.get(key);
     if (walker === undefined) {
+      const at = standsAt(wanted);
       walker = {
         key,
-        at: { x: cell.x, y: cell.y },
+        at: { x: at.x, y: at.y },
         path: [],
         facings: [],
         station,
@@ -357,13 +392,12 @@ export function syncWalkers(root: ParentNode, nowMs: number, pathFor: PathFinder
       // The loop is over: he finishes the leg he is on and then goes where the engine put him.
       walker.loop = null;
       walker.lastGoal = goal;
-      const next: Goal = { cell, station };
-      if (walker.path.length === 0) setOff(walker, next);
-      else walker.after = next;
+      if (walker.path.length === 0) setOff(walker, wanted);
+      else walker.after = wanted;
     } else if (goal !== walker.lastGoal) {
       walker.lastGoal = goal;
       walker.after = null;
-      setOff(walker, { cell, station });
+      setOff(walker, wanted);
     }
     // The page was built with him at his station: put him back where he had actually got to, and
     // face him and play him the way he already was. The fresh markup carries his station's facing,
@@ -441,6 +475,18 @@ export function stepWalkers(root: ParentNode, nowMs: number): number {
     const seconds = Math.max(0, (nowMs - walker.lastMs) / 1000);
     walker.lastMs = nowMs;
     if (walker.path.length === 0) continue;
+    // The clock has been put to a speed no walk is drawn at: the leg he is on is over, where it
+    // was going (v71). A man on the loop walks it at any speed.
+    if (walksAreSkipped() && walker.loop === null) {
+      const end = walker.path[walker.path.length - 1] as Cell;
+      walker.at = { x: end.x, y: end.y };
+      walker.path = [];
+      walker.facings = [];
+      arrive(walker);
+      node.setAttribute('transform', translateOf(walker.at));
+      dress(node, walker, null);
+      continue;
+    }
     let left = Math.min(1, seconds * walkPace());
     let heading: Facing | null = null;
     while (left > 0 && walker.path.length > 0) {
