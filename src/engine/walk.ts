@@ -49,6 +49,13 @@ export function covers(
   return cell.x >= box.x && cell.x < box.x + box.width && cell.y >= box.y && cell.y < box.y + box.depth;
 }
 
+/** True for a thing that stands outside the hall and on none of its floor: out on the apron past
+ *  the end of it, or behind the rear wall (v73). The one test: the floor a man walks, the floor a
+ *  machine is moved over and the setting out of the hall all leave such a thing alone. */
+export function standsOutsideTheHall(state: GameState, item: { anchorX: number; anchorY: number }): boolean {
+  return item.anchorX >= state.unit.widthCells || item.anchorY < 0;
+}
+
 /** Inside the painted floor at all. */
 export function insideUnit(state: GameState, cell: Cell): boolean {
   return cell.x >= 0 && cell.y >= 0 && cell.x < state.unit.widthCells && cell.y < state.unit.depthCells;
@@ -63,7 +70,7 @@ export function isFree(state: GameState, cell: Cell): boolean {
   }
   for (const item of state.equipment) {
     if (isSold(item) || !itemStandsInTheHall(item)) continue;
-    if (item.anchorX >= state.unit.widthCells) continue;
+    if (standsOutsideTheHall(state, item)) continue;
     if (covers(footprintCells(item), cell)) return false;
   }
   return true;
@@ -94,7 +101,7 @@ export function isWalkable(state: GameState, cell: Cell, own: ReadonlySet<string
   if (!isFree(state, cell)) return false;
   for (const item of state.equipment) {
     if (isSold(item) || !itemStandsInTheHall(item)) continue;
-    if (item.anchorX >= state.unit.widthCells) continue;
+    if (standsOutsideTheHall(state, item)) continue;
     if (own.has(item.id) || !isAMachine(item)) continue;
     if (pictureCovers(item, cell)) return false;
   }

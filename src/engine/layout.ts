@@ -9,6 +9,7 @@ import {
   LOCKER_SLOT_LAYOUT_WIDE,
   M2_PER_PERSON,
   WELFARE_IN_THE_CANTEEN,
+  REAR_YARD_GAP_CELLS,
   STARTING_LAYOUT,
   YARD_WIDTH_CELLS,
   roomsOf,
@@ -16,6 +17,7 @@ import {
 import type { LayoutSlot } from './constants';
 import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
+import { standsOutsideTheHall } from './walk';
 import type { Equipment, GameState, OnOrderItem, Orientation } from './types';
 
 export interface PlaceCheck {
@@ -59,7 +61,7 @@ export function hallItems(state: GameState): Equipment[] {
     // (PIOTR, 17.09 and 20.09; CLAUDE.md T17 2.2, T23 2.11).
     if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) return false;
     if (!itemStandsInTheHall(item)) return false;
-    return item.anchorX < state.unit.widthCells;
+    return !standsOutsideTheHall(state, item);
   });
 }
 
@@ -85,17 +87,73 @@ function boxOfItem(
   return boxOf(item.specId, x, y, item.variantId, item.orientation);
 }
 
-/** True for the kit that stands outside on the apron and not on the hall floor: the two central
- *  systems and the van (`STARTING_LAYOUT`). */
-export function standsOnTheApron(specId: string): boolean {
+/** True for the kit that stands outside and not on the hall floor: the two central systems and
+ *  the van (`STARTING_LAYOUT`). */
+export function standsOutside(specId: string): boolean {
   return STARTING_LAYOUT[specId]?.yard === true;
+}
+
+/** True for the kit that stands outside behind the rear wall: the two central systems. On the
+ *  apron at the end of the hall they stood in front of the benches and hid them, and behind the
+ *  wall they hide nothing (PIOTR, 03.10; v73). The van stays on the apron. */
+export function standsBehindTheWall(specId: string): boolean {
+  return STARTING_LAYOUT[specId]?.rear === true;
+}
+
+/** Where the next thing of this kind stands outside, or null when there is no room for it: behind
+ *  the rear wall for the plant, on the apron for the van. */
+export function outsidePlaceFor(
+  state: GameState,
+  specId: string,
+  variantId?: string,
+  ignoreId: string | null = null,
+): { x: number; y: number } | null {
+  return standsBehindTheWall(specId)
+    ? rearYardPlaceFor(state, specId, variantId, ignoreId)
+    : apronPlaceFor(state, specId, variantId, ignoreId);
+}
+
+/** Where the next plant stands behind the rear wall, or null when the wall has no length left for
+ *  it: a metre back from the hall's first row, which is the wall's own, the first of them near
+ *  the far end of the hall and each one after it a metre nearer the gate. The far end is left
+ *  clear by the plant's own width and depth, so that nothing of it is seen past the end of the
+ *  wall. What is on its way holds its place like what has landed (v73). */
+export function rearYardPlaceFor(
+  state: GameState,
+  specId: string,
+  variantId?: string,
+  ignoreId: string | null = null,
+): { x: number; y: number } | null {
+  const own = boxOf(specId, 0, 0, variantId);
+  const y = -REAR_YARD_GAP_CELLS - own.depth;
+  const taken: Box[] = [];
+  for (const item of state.equipment) {
+    if (item.id === ignoreId || item.anchorY >= 0) continue;
+    taken.push(boxOfItem(item, item.anchorX, item.anchorY));
+  }
+  for (const held of state.onOrder) {
+    if (held.id === ignoreId || held.anchorY >= 0) continue;
+    taken.push(boxOfItem(held, held.anchorX, held.anchorY));
+  }
+  // A metre is kept between two of them: a box a metre longer than the plant has to be clear.
+  const clear = (x: number): boolean =>
+    x >= 0 &&
+    !taken.some((other) =>
+      overlaps({ x: x - REAR_YARD_GAP_CELLS, y, width: own.width + 2 * REAR_YARD_GAP_CELLS, depth: own.depth }, other),
+    );
+  const first = state.unit.widthCells - own.width - own.depth - REAR_YARD_GAP_CELLS;
+  for (let x = first; x >= 0; x -= 1) {
+    if (clear(x)) return { x, y };
+  }
+  return null;
 }
 
 /** Where the next thing of this kind stands on the apron, or null when the apron has no room for
  *  it: its own place when nothing is on it, and from there the nearest clear place up and down the
  *  apron, a length of itself at a time. Until v72 everything of one kind was given the one place,
- *  so a second flexi system stood on the first (PIOTR, 03.10). What is on its way holds its place
- *  like what has landed. `ignoreId` is the thing being stood again, which is not in its own way. */
+ *  so a second flexi system stood on the first (PIOTR, 03.10); from v73 the plant is behind the
+ *  rear wall and the apron is the van's. What is on its way holds its place like what has landed.
+ *  `ignoreId` is the thing being stood again, which is not in its own way. */
 export function apronPlaceFor(
   state: GameState,
   specId: string,
@@ -245,7 +303,7 @@ export function canPlace(
   if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) {
     return { ok: false, reason: 'It stands in the canteen' };
   }
-  if (item.anchorX >= state.unit.widthCells) return { ok: false, reason: 'It stands in the yard' };
+  if (standsOutsideTheHall(state, item)) return { ok: false, reason: 'It stands in the yard' };
   return canPlaceSpec(
     state,
     item.specId,

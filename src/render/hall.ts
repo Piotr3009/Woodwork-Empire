@@ -1489,6 +1489,29 @@ export function arrivedKit(item: OnOrderItem, index: number, files: readonly str
   };
 }
 
+/** The rear wall as the background is painted (scripts/hall-wide.py; docs/art/SPRITES.md 9.3):
+ *  three and a half metres to its top, and its top nine tenths of a metre from front to back. */
+export const REAR_WALL = { top: 3.5, back: 0.9 };
+
+/** The id of the clip a thing behind the rear wall is drawn through. */
+export const REAR_WALL_CLIP = 'rear-wall-clip';
+
+/** The clip itself: everything on the scene above the back edge of the rear wall's top, from well
+ *  before the hall to well past it. A plant standing behind the wall is drawn through it, so the
+ *  wall hides its foot and its top stands over the wall, which is what a thing behind a wall
+ *  looks like (PIOTR, 03.10; v73). */
+export function rearWallClip(widthCells: number): string {
+  const reach = widthCells + 20;
+  const from = tileToScreen(-20, -REAR_WALL.back, REAR_WALL.top);
+  const to = tileToScreen(reach, -REAR_WALL.back, REAR_WALL.top);
+  const sky = 4000;
+  return (
+    `<clipPath id="${REAR_WALL_CLIP}" clipPathUnits="userSpaceOnUse">` +
+    `<polygon points="${points([from, to, { x: to.x, y: to.y - sky }, { x: from.x, y: from.y - sky }])}" />` +
+    '</clipPath>'
+  );
+}
+
 /** The outline of something bought and not here yet, on the cells held for it (T8 3.2). */
 export function reservedOutline(item: OnOrderItem): string {
   const zone = itemZone(item);
@@ -1593,6 +1616,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           'preserveAspectRatio="none" />',
       );
     }
+    // What is seen of a thing standing behind the rear wall: everything above the back edge of
+    // the wall's top, along the whole of the hall (v73).
+    parts.push(rearWallClip(unit.widthCells));
   } else {
     // Floor and yard.
     parts.push(
@@ -1740,6 +1766,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       foot,
       svg:
         `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
+        // Plant behind the rear wall is seen over the wall and no lower (v73).
+        `${painted && item.anchorY < 0 ? `data-behind-wall="1" clip-path="url(#${REAR_WALL_CLIP})" ` : ''}` +
         `data-foot="${round(foot.x)},${round(foot.y)},${round(foot.width)},${round(foot.depth)}" ` +
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
         `class="clickable${fx.className}">` +
@@ -1810,6 +1838,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // with the footprint it will stand on inside it, and the day it is due under them. Setup mode
   // drags it about like a machine, because it carries the same data-kit hook (T8 3.2).
   for (const item of reservedItems(state)) {
+    // The floor held behind the rear wall is not seen from the hall: the wall is in front of it,
+    // and the Orders list is where a plant on its way is read (v73).
+    if (item.anchorY < 0) continue;
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY) - 0.01,
       svg: reservedOutline(item),

@@ -6,8 +6,8 @@
 // draftsman or the labourer is at ninety per cent, that is the sign a second one has to be taken
 // on."
 //
-// A second flexi system stands beside the first and not on it, and with no room left on the apron
-// another cannot be bought.
+// A second flexi system stands beside the first and not on it: from v73 behind the rear wall,
+// where tests/ui/v73.test.ts holds it.
 //
 // A big job of the agency's counts the joiners who come off a job within five working days with
 // the ones who are free, because nobody is put on it until its paperwork is in. Jobs only: a
@@ -21,19 +21,15 @@ import {
   AGENCY_JOB_REPUTATION,
   AGENCY_JOB_VALUE_MIN,
   BIG_JOB_SOON_DAYS,
-  STATE_VERSION,
   USAGE_NEAR_FULL_PERCENT,
 } from '../../src/engine/constants';
 import { acceptContract, assignContract, drawContract } from '../../src/engine/contracts';
-import { canBuy } from '../../src/engine/game';
 import type { GameState, Worker } from '../../src/engine/index';
 import { freeJoiners } from '../../src/engine/jobs';
-import { apronPlaceFor } from '../../src/engine/layout';
-import { migrateState } from '../../src/engine/migrate';
 import { weekMetersOf } from '../../src/engine/staff';
 import { tradeUsage, usageOfMan } from '../../src/engine/usage';
 import { renderTeam } from '../../src/ui/team';
-import { acceptNow, buyStartingKit, fillRack, newGame, placeEnquiry, placeEquipment, testJoiner } from '../helpers';
+import { acceptNow, buyStartingKit, fillRack, newGame, placeEnquiry, testJoiner } from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -137,45 +133,6 @@ describe('how much of each trade is used', () => {
     const none = parse(renderTeam(state, 'ourTeam', 'draftsman'));
     expect(none.querySelectorAll('[data-person]')).toHaveLength(0);
     expect(none.querySelector('.empty')?.textContent).toBe('Nobody yet. One is taken on under Technical.');
-  });
-});
-
-describe('a second flexi system', () => {
-  it('stands beside the first, and cannot be bought with no room on the apron', () => {
-    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    state.cash = 1000000;
-    state.reputation = 100;
-    const kerb = state.unit.widthCells;
-    expect(apronPlaceFor(state, 'flexiSystem')).toEqual({ x: kerb, y: 4 });
-    placeEquipment(state, 'flexiSystem', { x: kerb, y: 4, id: 'kit-flexi-1' });
-    // Its own place is taken: the next length of the apron from it.
-    expect(apronPlaceFor(state, 'flexiSystem')).toEqual({ x: kerb, y: 6 });
-    expect(canBuy(state, 'flexiSystem').ok).toBe(true);
-    // Five of them fill the ten metres of it.
-    let count = 1;
-    for (let at = apronPlaceFor(state, 'flexiSystem'); at !== null; at = apronPlaceFor(state, 'flexiSystem')) {
-      count += 1;
-      placeEquipment(state, 'flexiSystem', { x: at.x, y: at.y, id: `kit-flexi-${count}` });
-    }
-    expect(count).toBe(5);
-    expect(canBuy(state, 'flexiSystem')).toEqual({ ok: false, reason: 'No room on the apron' });
-  });
-
-  it('is moved off the first in a save that has one standing on the other', () => {
-    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    const kerb = state.unit.widthCells;
-    placeEquipment(state, 'flexiSystem', { x: kerb, y: 4, id: 'kit-flexi-1' });
-    placeEquipment(state, 'flexiSystem', { x: kerb, y: 4, id: 'kit-flexi-2' });
-    const raw = JSON.parse(JSON.stringify(state)) as { version: number };
-    raw.version = STATE_VERSION - 1;
-    const lifted = migrateState(raw, STATE_VERSION - 1);
-    if (lifted === null) throw new Error('the save is wanted');
-    const at = (id: string) => {
-      const item = lifted.equipment.find((entry) => entry.id === id);
-      return { x: item?.anchorX, y: item?.anchorY };
-    };
-    expect(at('kit-flexi-1')).toEqual({ x: kerb, y: 4 });
-    expect(at('kit-flexi-2')).toEqual({ x: kerb, y: 6 });
   });
 });
 

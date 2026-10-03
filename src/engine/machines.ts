@@ -2,63 +2,65 @@
 // ownership and power side that the economy needs.
 
 import {
-  PACE_FLOOR,
+  BAGS_LABOURER_EMPTY_AT,
+  BREAK_SKIP_FACTOR,
+  BUILDING_ROLES,
+  BY_HAND_DURATION_FACTOR,
+  CAPACITY_FAMILIES,
   CAPACITY_ROLES,
   CENTRAL_EXTRACTION_SPECS,
+  DRYING_RACKS,
+  DRYING_RACKS_PLACES_FACTOR,
   DUST_BANDS,
+  DUST_HIGH_THRESHOLD,
+  DUST_MAX,
   DUST_OUTPUT_M3_PER_HOUR,
+  DUST_PER_PRODUCTION_MINUTE,
+  DUST_PER_SAWDUST_PILE,
+  ENDURANCE_MINUTES_BY_CLASS,
+  EQUIPMENT_SPECS,
   EXTRACTOR_BAGS,
-  bagsToM3,
-  BUILDING_ROLES,
-  HEAVY_SPECS,
-  LIGHT_CLASSES,
-  LOW_AIR_FACTOR,
+  EXTRACTOR_BREAKDOWN_CHANCE,
+  EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
+  EXTRACTOR_BROKEN_DUST_MULTIPLIER,
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
-  BREAK_SKIP_FACTOR,
-  BY_HAND_DURATION_FACTOR,
+  EXTRACTOR_REPAIR_COST,
   GATE_CROWD_FACTOR,
   GATE_CROWD_LIMIT,
   GATE_OUTPUT_BONUS,
   GATE_PRICE,
+  HEAVY_SPECS,
+  LABOURER_REQUIRED_FROM_JOINERS,
+  LIGHT_CLASSES,
+  LOW_AIR_FACTOR,
+  MACHINE_CAPACITY,
+  MACHINE_HOURS_PER_MONTH,
+  MACHINE_PACE,
   MACHINE_REPAIR_COST_FRACTION,
+  MACHINE_SHORT_WORDS,
+  NO_DUCTING_SPECS,
+  NO_LABOURER_DUST_MULTIPLIER,
+  NO_LABOURER_PRODUCTIVITY_FACTOR,
   OVERDUE_BREAKDOWN_CHANCE,
+  PACED_FAMILIES,
+  PACE_FLOOR,
+  PAST_LIFE_WEEK_HOURS,
+  PRODUCING_ROLES,
+  PRODUCTION_MANAGER_PACE,
+  PROPERTY_INSURANCE_RATE_YEARLY,
+  SALE_FRACTION,
+  SALE_FRACTION_USED,
   SERVICE_COST_FRACTION,
   SERVICE_INTERVAL_DAYS,
   SERVICE_INTERVAL_MONTHS,
-  MACHINE_HOURS_PER_MONTH,
-  TIER_WORDS,
-  MACHINE_PACE,
-  CAPACITY_FAMILIES,
-  MACHINE_CAPACITY,
-  PACED_FAMILIES,
-  DUST_HIGH_THRESHOLD,
-  DUST_MAX,
-  DUST_PER_PRODUCTION_MINUTE,
-  ENDURANCE_MINUTES_BY_CLASS,
-  EQUIPMENT_SPECS,
-  EXTRACTOR_REPAIR_COST,
-  EXTRACTOR_BREAKDOWN_CHANCE,
-  EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
-  EXTRACTOR_BROKEN_DUST_MULTIPLIER,
-  LABOURER_REQUIRED_FROM_JOINERS,
-  MACHINE_SHORT_WORDS,
-  NO_DUCTING_SPECS,
-  DUST_PER_SAWDUST_PILE,
-  NO_LABOURER_DUST_MULTIPLIER,
-  NO_LABOURER_PRODUCTIVITY_FACTOR,
-  PROPERTY_INSURANCE_RATE_YEARLY,
-  PAST_LIFE_WEEK_HOURS,
-  PRODUCING_ROLES,
-  SALE_FRACTION,
   SERVICE_LIFE_EXTENSION,
-  UNDER_EXTRACTION_DUST_MULTIPLIER,
-  UNDER_EXTRACTION_OUTPUT_PENALTY,
-  SALE_FRACTION_USED,
+  TIER_WORDS,
   TOOL_CABINET,
   TOOL_CABINET_SLOTS,
+  UNDER_EXTRACTION_DUST_MULTIPLIER,
+  UNDER_EXTRACTION_OUTPUT_PENALTY,
   USED_VARIANT,
-  PRODUCTION_MANAGER_PACE,
-  BAGS_LABOURER_EMPTY_AT,
+  bagsToM3,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
@@ -403,7 +405,29 @@ export function placedMachines(state: GameState, family: string): Equipment[] {
 /** Every place at this family in the hall: the places of each of its machines that has any,
  *  added up (CLAUDE.md T25 2.1). */
 export function hallPlaces(state: GameState, family: string): number {
-  return placedMachines(state, family).reduce((total, item) => total + placesOf(item), 0);
+  return placedMachines(state, family).reduce((total, item) => total + placesAt(state, item), 0);
+}
+
+/** The spray booths that have drying racks in them (v73): the racks the hall owns go in its booths
+ *  one a booth, in the order the booths were bought, and a set with no booth left to go in stays
+ *  in its crate. The tool changer heads go on the CNCs the same way (`cncsWithToolChangers`). */
+export function boothsWithDryingRacks(state: GameState): Set<string> {
+  const racks = owned(state, DRYING_RACKS).filter((item) => !isSold(item)).length;
+  return new Set(
+    floorMachines(state, SPRAY_BOOTH)
+      .slice(0, racks)
+      .map((item) => item.id),
+  );
+}
+
+/** How many men this machine keeps busy in this hall: its class's places, and for a spray booth
+ *  with drying racks in it `DRYING_RACKS_PLACES_FACTOR` times as many, because the pieces dry on
+ *  the racks and not in the booth [PIOTR, 03.10] (v73). The hall's sums, the day plan and the
+ *  card read this; `placesOf` is the class by itself, which is what the catalogue prints. */
+export function placesAt(state: GameState, item: Equipment): number {
+  const own = placesOf(item);
+  if (item.specId !== SPRAY_BOOTH || own <= 0) return own;
+  return boothsWithDryingRacks(state).has(item.id) ? own * DRYING_RACKS_PLACES_FACTOR : own;
 }
 
 /** The machine the man at this place of the family works at, and which of its own places he
@@ -420,7 +444,7 @@ export function machineForPlace(
   if (index < 0) return null;
   let left = index;
   for (const item of placedMachines(state, family)) {
-    const places = placesOf(item);
+    const places = placesAt(state, item);
     if (left < places) return { item, place: left };
     left -= places;
   }
@@ -465,7 +489,7 @@ export function menAtMachine(state: GameState, item: { id: string }): string[] {
  *  nobody is at it. Empty for a thing nobody works at, and for a machine that has no places this
  *  minute because it is broken, away for its service or sold: its card says which. */
 export function placesLine(state: GameState, item: Equipment, form: 'card' | 'tile'): string {
-  const places = placesOf(item);
+  const places = placesAt(state, item);
   if (places <= 0) return '';
   if (!placedMachines(state, item.specId).some((entry) => entry.id === item.id)) return '';
   const men = menAtMachine(state, item);

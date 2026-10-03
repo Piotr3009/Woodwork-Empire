@@ -18,12 +18,15 @@ export function licenceLine(state: GameState): string {
   return `Subscription, ${state.software.tier} tier`;
 }
 
-/** Who has this drawing, and how much of his day is left (CLAUDE.md T2 3.8). */
+/** Who has this drawing, and how much of his day is left (CLAUDE.md T2 3.8). In his own words
+ *  from v73: `Harry is drawing it`, because "is on it" beside a Start button read as a drawing
+ *  waiting for the owner, and a click on it took the drawing off the man who was at it (PIOTR,
+ *  03.10: "why is the draftsman not drawing, it waits for me"). */
 function onItLine(state: GameState, task: TaskInstance): string {
   if (task.doneBy === null || task.doneBy === 'owner') return '';
   const worker = workerById(state, task.doneBy);
   if (!worker) return '';
-  return `${worker.name} is on it, ${minutes(staffMinutesLeft(worker))} of his day left`;
+  return `${worker.name} is drawing it, ${minutes(staffMinutesLeft(worker))} of his day left`;
 }
 
 function designRow(state: GameState, task: TaskInstance): string {
@@ -32,7 +35,9 @@ function designRow(state: GameState, task: TaskInstance): string {
   const staffLine = onItLine(state, task);
   const job = task.jobId === null ? null : findJob(state, task.jobId);
   const jobLine = job === null ? '' : ` · ${money(job.price)}`;
-  const action = taskStartAction(state, task, started ? 'Continue' : 'Start');
+  // A drawing a man of the office has is his: the owner's button on it says what the click does,
+  // which is take it over from him (v73).
+  const action = taskStartAction(state, task, staffLine !== '' ? 'Take over' : started ? 'Continue' : 'Start');
   return (
     `<div class="row${running ? ' is-running' : ''}">` +
     `<span class="row-main">${escapeHtml(task.label)}${jobLine}</span>` +

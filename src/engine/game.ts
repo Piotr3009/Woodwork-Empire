@@ -2,45 +2,46 @@
 // callers never see their input mutated. Every other engine module mutates the state it is given.
 
 import {
-  OWNER_LABOUR_PER_MINUTE,
-  WET_AIR_FINISH_FACTOR,
   ACCIDENT_CHANCE_PER_DAY,
   ADMIN_COVER_RATE,
   BENCH_SLOT_LAYOUT,
+  BOARD_MIDDAY_MINUTE,
   BREAK_MINUTES,
   BREAK_SKIP_FACTOR,
-  BOARD_MIDDAY_MINUTE,
   BREAK_START_MINUTE,
   CABINET_SLOT_LAYOUT,
+  DAY_END_MINUTE,
   DAY_LOGS_KEPT,
   DAY_SUMMARIES_MAX,
-  DAY_END_MINUTE,
   DIFFICULTIES,
+  DRYING_RACKS,
   GATE_LANE,
-  LABOURER_CLEAN_WEEKDAY,
   GATE_PRICE,
+  HAND_TOOL_SET,
+  HIRING_MINUTES,
   HOLIDAY_MAX_DAYS,
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
   JOINERY_CORE_MAX_EXTENSIONS,
   JOINERY_CORE_PRICE_YEARLY,
-  OWNER_DRAW_TIERS,
+  LABOURER_CLEAN_WEEKDAY,
+  LAPTOP_BOOT_MINUTES,
   MOVE_MINUTES_PER_ITEM,
-  SKIP_SPEED,
   OVERTIME_DEBT_PER_DAY,
+  OWNER_DRAW_TIERS,
+  OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
   SERVICE_INTERVAL_MONTHS,
+  SKIP_SPEED,
   SOFTWARE_ONE_OFF_JOBS,
-  HIRING_MINUTES,
-  LAPTOP_BOOT_MINUTES,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_TURN1_TIER,
+  SOUND_VOLUME_DEFAULT,
   STARTING_LAYOUT,
-  TOOL_CABINET,
-  HAND_TOOL_SET,
   STATE_VERSION,
+  TOOL_CABINET,
   WEBSITE_START_LEVEL,
   WELFARE_IN_THE_CANTEEN,
-  SOUND_VOLUME_DEFAULT,
+  WET_AIR_FINISH_FACTOR,
 } from './constants';
 import { arriveBigJob, setAgency } from './agency';
 import { drawnInUse } from './drawn';
@@ -69,14 +70,15 @@ import { burgle, rollBurglary, setSecurityLevel } from './security';
 import { setWebsiteLevel } from './website';
 import { missCall, nextDueCall, takeCall } from './calls';
 import {
-  apronPlaceFor,
   canPlaceSpec,
   canteenLockers,
   firstFreeCell,
   lockerSlots,
   lockersInWords,
   moveItem,
-  standsOnTheApron,
+  outsidePlaceFor,
+  standsBehindTheWall,
+  standsOutside,
 } from './layout';
 import { enlargeCanteen, extendUnit, openExtension } from './premises';
 import {
@@ -2527,6 +2529,15 @@ export function canBuy(
       state.equipment.filter((item) => item.specId === id && !isSold(item)).length + onOrderCount(state, id);
     if (counted('cncHead') >= counted('cnc')) return { ok: false, reason: 'Every CNC has a tool changer' };
   }
+  // Drying racks stand in a booth, one set a booth: with every booth fitted, or a set on its way
+  // for it, there is no booth for another (v73).
+  if (specId === DRYING_RACKS) {
+    const counted = (id: string): number =>
+      state.equipment.filter((item) => item.specId === id && !isSold(item)).length + onOrderCount(state, id);
+    if (counted(DRYING_RACKS) >= counted('sprayBooth')) {
+      return { ok: false, reason: 'Every spray booth has its drying racks' };
+    }
+  }
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
   }
@@ -2536,10 +2547,10 @@ export function canBuy(
   if (specId === 'locker' && countOf(state, 'locker') >= canteenLockers(state)) {
     return { ok: false, reason: `The canteen has ${lockersInWords(state)} lockers` };
   }
-  // The plant and the van stand outside, and the apron is three metres wide: with no clear length
-  // of it left there is nowhere for another to stand (v72).
-  if (standsOnTheApron(specId) && apronPlaceFor(state, specId, variant.id) === null) {
-    return { ok: false, reason: 'No room on the apron' };
+  // The plant and the van stand outside, the plant behind the rear wall and the van on the apron:
+  // with no clear length left out there, there is nowhere for another to stand (v72, v73).
+  if (standsOutside(specId) && outsidePlaceFor(state, specId, variant.id) === null) {
+    return { ok: false, reason: standsBehindTheWall(specId) ? 'No room behind the hall' : 'No room on the apron' };
   }
   if (!prepaid && !canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
   // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
@@ -2576,9 +2587,10 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
 function anchorFor(state: GameState, specId: string, variantId: string): { x: number; y: number } {
   const spec = findSpec(specId);
   const preferred = defaultAnchor(state, specId);
-  // Out on the apron a thing takes its own place, or the nearest clear one to it when another of
-  // its kind is on that already (PIOTR, 03.10: a second flexi system stood on the first; v72).
-  if (standsOnTheApron(specId)) return apronPlaceFor(state, specId, variantId) ?? preferred;
+  // Outside a thing takes a place of its own, the plant behind the rear wall and the van on the
+  // apron (PIOTR, 03.10: a second flexi system stood on the first, and both hid the benches; v72,
+  // v73).
+  if (standsOutside(specId)) return outsidePlaceFor(state, specId, variantId) ?? preferred;
   // The office furniture is not on the hall floor.
   if (!spec || spec.category === 'furniture') {
     return preferred;

@@ -41,6 +41,8 @@ import {
   COMPRESSOR,
   COMPRESSOR_AIR,
   COMPRESSOR_WITH_DRYER,
+  DRYING_RACKS,
+  DRYING_RACKS_PLACES_FACTOR,
   DUST_WASTE_MONTHLY,
   EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
@@ -238,6 +240,8 @@ function deliveryLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
 /** The picture a card or a row of this family shows: its own, except the tool changer head's, which
  *  has none of its own because it is bolted to a CNC, and shows the standard CNC with one on (v56). */
 export function pictureKeyOf(spec: { id: string; spriteKey: string }): string {
+  // The drying racks stand in a booth and have no picture of their own: theirs is the booth's (v73).
+  if (spec.id === DRYING_RACKS) return 'sprayBooth';
   return spec.id === 'cncHead' ? CNC_TOOL_CHANGER_SPRITE : spec.spriteKey;
 }
 
@@ -276,6 +280,7 @@ export function floorLine(specId: string, variantId: string): string {
   if (zone.width <= 0 || zone.depth <= 0) {
     // The tool changer head is bolted to the CNC's own frame; everything else that holds no floor is
     // a hand tool kept in a cabinet (v56).
+    if (specId === DRYING_RACKS) return 'Stood in a spray booth, take no floor';
     return specId === 'cncHead' ? 'Bolted to a CNC, takes no floor' : 'Kept in a tool cabinet';
   }
   return `Takes ${metresBy(stands)}, works in ${metresBy(zone)}`;
@@ -330,6 +335,11 @@ function figureLines(lines: Line[]): string {
  *  compressor gives air, a rack holds sheets, a machine with a drop can take a gate)
  *  (CLAUDE.md T13 3.1). */
 function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
+  // Drying racks are shelving that makes nothing of its own, no dust and no hours: the one thing
+  // they do is said in one line, off the engine's own factor (v73).
+  if (spec.id === DRYING_RACKS) {
+    return [line(`The booth they stand in keeps ${DRYING_RACKS_PLACES_FACTOR} times the men busy`)];
+  }
   const machine = spec.category === 'machine';
   return [
     line(atOnceLine(spec, variant)),

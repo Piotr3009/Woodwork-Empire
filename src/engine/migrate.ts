@@ -21,7 +21,16 @@ import {
 } from './constants';
 import { receive } from './economy';
 import { layRunsAgain } from './premises';
-import { apronPlaceFor, boxOf, canPlace, firstFreeCell, standsOnTheApron } from './layout';
+import { standsOutsideTheHall } from './walk';
+import {
+  apronPlaceFor,
+  boxOf,
+  canPlace,
+  firstFreeCell,
+  rearYardPlaceFor,
+  standsBehindTheWall,
+  standsOutside,
+} from './layout';
 import { isSold } from './machines';
 import { planPlaces } from './production';
 import { rolesForTask } from './tasks';
@@ -891,7 +900,7 @@ interface StandingThing {
 export function standTheBoothsAgain(state: GameState): void {
   const again = (thing: StandingThing): void => {
     if (thing.specId !== 'sprayBooth') return;
-    if (thing.anchorX >= state.unit.widthCells) return;
+    if (standsOutsideTheHall(state, thing)) return;
     if (canPlace(state, thing.id, thing.anchorX, thing.anchorY, thing.orientation).ok) return;
     // Off the floor while the hall is searched, so it is not standing in its own way.
     thing.anchorX = state.unit.widthCells;
@@ -1006,8 +1015,8 @@ export function standThePlantApart(state: GameState): void {
   const seen: Array<{ x: number; y: number; width: number; depth: number }> = [];
   const moved = new Set<string>();
   const things: Array<Equipment | OnOrderItem> = [
-    ...state.equipment.filter((item) => standsOnTheApron(item.specId) && item.anchorX >= kerb),
-    ...state.onOrder.filter((held) => standsOnTheApron(held.specId) && held.anchorX >= kerb),
+    ...state.equipment.filter((item) => standsOutside(item.specId) && item.anchorX >= kerb),
+    ...state.onOrder.filter((held) => standsOutside(held.specId) && held.anchorX >= kerb),
   ];
   for (const thing of things) {
     const box = boxOf(thing.specId, thing.anchorX, thing.anchorY, thing.variantId, thing.orientation);
@@ -1027,6 +1036,35 @@ export function standThePlantApart(state: GameState): void {
       }
     }
     seen.push(boxOf(thing.specId, thing.anchorX, thing.anchorY, thing.variantId, thing.orientation));
+  }
+  layRunsAgain(state, moved);
+}
+
+/** Version 37 to 38 (v73): nothing in the shape of a save changes. The number marks the saves in
+ *  which the extraction plant still stands on the apron at the end of the hall, which
+ *  `standThePlantBehindTheWall` moves once the save is whole. */
+function liftToVersion38(state: Raw): void {
+  state.version = 38;
+}
+
+/** The extraction plant behind the rear wall (PIOTR, 03.10: "the extractors hide a lot of the kit;
+ *  should we move them, behind another wall?"; v73). Every central system standing on the apron,
+ *  or on its way to it, is given the next place behind the wall, in the order they were bought;
+ *  one the wall has no length left for stays where it is. A pipe run to a thing that moved is laid
+ *  again at no charge (`layRunsAgain`). The van stays on the apron. */
+export function standThePlantBehindTheWall(state: GameState): void {
+  const moved = new Set<string>();
+  const things: Array<Equipment | OnOrderItem> = [
+    ...state.equipment.filter((item) => standsBehindTheWall(item.specId)),
+    ...state.onOrder.filter((held) => standsBehindTheWall(held.specId)),
+  ];
+  for (const thing of things) {
+    if (thing.anchorY < 0) continue;
+    const at = rearYardPlaceFor(state, thing.specId, thing.variantId, thing.id);
+    if (at === null) continue;
+    thing.anchorX = at.x;
+    thing.anchorY = at.y;
+    moved.add(thing.id);
   }
   layRunsAgain(state, moved);
 }
@@ -1057,6 +1095,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   34: liftToVersion35,
   35: liftToVersion36,
   36: liftToVersion37,
+  37: liftToVersion38,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -1094,6 +1133,14 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       standThePlantApart(lifted);
     } catch {
       // Not a whole hall: no apron to stand them on.
+    }
+  }
+  // And from there behind the rear wall, where it hides nothing (v73).
+  if (version < 38 && Array.isArray(lifted.equipment) && Array.isArray(lifted.onOrder) && lifted.unit) {
+    try {
+      standThePlantBehindTheWall(lifted);
+    } catch {
+      // Not a whole hall: no wall to stand them behind.
     }
   }
   // Who has a place, worked out the moment the save is open rather than left for the first

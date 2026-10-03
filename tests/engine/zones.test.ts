@@ -1,6 +1,7 @@
 // A zone is floor the player cannot build on; a footprint is what the picture stands on. Both are
 // the class's own, both are in metres, and the zone contains the footprint (CLAUDE.md T7 2, 3.3).
 
+import { standsOutsideTheHall } from '../../src/engine/walk';
 import { describe, expect, it } from 'vitest';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { findSpec, footprintOf, standsInTheHall, zoneOf } from '../../src/engine/machines';
@@ -169,7 +170,8 @@ describe('the whole catalogue on one floor', () => {
       // The van stands on the apron outside the front kerb, which is not hall floor at all, and
       // the office furniture stands in the office, which is a room and not a cell of the hall
       // (CLAUDE.md T4 3.1).
-      if (item.anchorX >= state.unit.widthCells) continue;
+      // And from v73 the extraction plant stands outside behind the rear wall.
+      if (standsOutsideTheHall(state, item)) continue;
       if (findSpec(item.specId)?.category === 'furniture') continue;
       const check = canPlaceSpec(
         state,

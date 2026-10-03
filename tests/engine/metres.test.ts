@@ -100,6 +100,8 @@ describe('footprints in metres', () => {
       // came down in height (CLAUDE.md T7 3.3). The booths are the size of their pictures from v56,
       // walk in booths, and the used one is 2.5 m high where it was 1.5 (PIOTR, 25.09).
       sprayBooth: [3, 2, 2.5],
+      // The booth's drying racks of v73 hold no floor, like the tool changer head: a cell by name.
+      dryingRacks: [1, 1, 1],
       // Measured again in Turn 10 against what the art side actually delivered: the two central
       // systems are 3 by 2 of plant four metres high, standing outside on the apron, and the
       // pelletiser is 2 by 2 and two and a half metres high (CLAUDE.md T10 3.4). The extractor

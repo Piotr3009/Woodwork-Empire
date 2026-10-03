@@ -157,11 +157,11 @@ import type {
  *  Version 35 is v67 (PIOTR, 03.10): the unit can be extended and its canteen enlarged. The unit
  *  says where its extension stands, not asked for in every save there is, and whether the canteen
  *  has been enlarged, which it has not. Every v25 to v34 save loads. */
-export const STATE_VERSION = 37;
+export const STATE_VERSION = 38;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v72';
+export const APP_VERSION = 'v73';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -2789,6 +2789,14 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   forklift: FORKLIFT_VARIANTS,
 };
 
+/** The spray booth's add on (PIOTR, 03.10: "something that adds to what the booth can take, up to
+ *  twenty four men; there is too little of it already"): racks the sprayed pieces dry on, stood in
+ *  a booth and holding no floor of their own, the way a tool changer is bolted to a CNC. A booth
+ *  with them keeps this many times the men busy that its class does, so the industrial booth's
+ *  four are twenty four [PIOTR] (v73). */
+export const DRYING_RACKS = 'dryingRacks';
+export const DRYING_RACKS_PLACES_FACTOR = 6;
+
 const BASE_SPEC = {
   // Nothing comes back in the owner's hands any more: hand tools, cabinets, lockers, seats and
   // the office furniture are ordered like everything else and come the next working day
@@ -3252,6 +3260,32 @@ const SPEC_DRAFTS: SpecDraft[] = [
   },
   {
     ...BASE_SPEC,
+    id: DRYING_RACKS,
+    // Fifteen days and forty thousand [PIOTR, 03.10].
+    deliveryDays: 15,
+    folder: 'Drying racks',
+    tab: 'spraying',
+    name: 'Drying racks',
+    price: 40000,
+    // Shelving and not a machine: nothing turns in them, so they draw no power, book no hours,
+    // come due for no service and are no line of the Pace sheet. What they do is places at the
+    // booth (`placesAt`).
+    category: 'storage',
+    width: 1,
+    depth: 1,
+    height: 1,
+    // Stood inside a booth and never on the hall floor: they hold no cell, like the tool changer
+    // head on a CNC (`boothsWithDryingRacks`).
+    zoneWidth: 0,
+    zoneDepth: 0,
+    spriteKey: DRYING_RACKS,
+    requires: ['sprayBooth'],
+    effect:
+      'Stood in a spray booth, no floor of their own. The booth keeps six times the men busy: ' +
+      'twenty four in an industrial one.',
+  },
+  {
+    ...BASE_SPEC,
     id: 'sprayBooth',
     // Twenty days for a booth (PIOTR).
     deliveryDays: 20,
@@ -3352,6 +3386,9 @@ export interface LayoutSlot {
   y: number;
   /** Parked outside the front kerb instead of on the hall floor. */
   yard?: boolean;
+  /** Outside behind the rear wall and not on the apron at the end of the hall: the extraction
+   *  plant, which stood in front of the benches out there and hid them (PIOTR, 03.10; v73). */
+  rear?: boolean;
 }
 
 /** The fixed room blocks, in the cells docs/art/SPRITES.md 9.3 registers the painted layers to:
@@ -3575,8 +3612,8 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   thicknesser: { x: 8, y: 0 },
   // The two central systems are plant, not machines: they stand outside on the apron by the
   // shutter, like the van, and draw their ducting along the rear wall (PIOTR, CLAUDE.md T10 3.4).
-  dustSystem: { x: 0, y: 1, yard: true },
-  flexiSystem: { x: 0, y: 4, yard: true },
+  dustSystem: { x: 0, y: 1, yard: true, rear: true },
+  flexiSystem: { x: 0, y: 4, yard: true, rear: true },
   extractor: { x: 19, y: 0 },
   compressor: { x: 19, y: 1 },
   pelletiser: { x: 8, y: 2 },
@@ -3685,6 +3722,11 @@ export const CNC_TOOL_CHANGER_SPRITE = 'cncToolChanger';
 /** Width of the apron drawn beyond the front kerb, where the company van and the two central
  *  extraction systems stand, in cells. */
 export const YARD_WIDTH_CELLS = 3;
+
+/** The metre the rear wall itself takes: the plant behind it stands that far back from the hall's
+ *  own first row, and the same metre is left between one plant and the next (v73). */
+export const REAR_YARD_GAP_CELLS = 1;
+
 
 /** The families that are a central system: with one in the hall every machine is connected and
  *  the drawing says so with a drop to each (CLAUDE.md T16 2.3). */
