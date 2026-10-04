@@ -90,8 +90,13 @@ describe('the one date in the game (CLAUDE.md T18 2.2)', () => {
     expect(formatCalendarDay(1)).not.toMatch(/\d{4}/);
   });
 
-  it('is what the top bar prints, with the clock after it', () => {
-    expect(formatDate({ day: 12, minute: 90 })).toBe(`${formatCalendarDay(12)} · 09:30`);
+  it('is what the top bar prints, with its year and the clock after it (CLAUDE.md T27 2.1)', () => {
+    expect(formatDate({ day: 12, minute: 90 })).toBe(`${formatCalendarDay(12)} 2025 · 09:30`);
+    const state = currentState();
+    if (state === null) throw new Error('no game');
+    const date = root().querySelector('.topbar .date');
+    expect(date?.textContent).toBe(formatDate(state.clock));
+    expect(date?.textContent).toMatch(/^\w{3} \d{1,2} \w+ 2025 · \d{2}:\d{2}$/);
   });
 
   it('never runs off the end of the names, whatever day it is handed', () => {

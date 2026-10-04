@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   addWorkingDays,
+  calendarYearOf,
   dayOfMonth,
   daysBetween,
+  formatCalendarDay,
   formatDate,
   formatTime,
   gameMinutesPerRealSecond,
@@ -93,8 +95,8 @@ describe('clock time of day', () => {
     expect(formatTime(720)).toBe('20:00');
   });
 
-  it('formats the date line', () => {
-    expect(formatDate({ day: 6, minute: 162 })).toBe('Sat 6 March · 10:42');
+  it('formats the date line, with its year from Turn 27', () => {
+    expect(formatDate({ day: 6, minute: 162 })).toBe('Sat 6 March 2025 · 10:42');
   });
 
   it('stops the workshop for the break, and counts it against nobody', () => {
@@ -176,5 +178,32 @@ describe('the summary cadence', () => {
     expect(
       summaryTitle({ ...state, summaryCadence: 'monthly', clock: { day: 5, minute: 0 } }),
     ).toBe('End of month 1');
+  });
+});
+
+describe('the year (CLAUDE.md T27 2.1)', () => {
+  it('opens the company on Monday 1 March 2025', () => {
+    expect(calendarYearOf(1)).toBe(2025);
+    expect(formatDate({ day: 1, minute: 0 })).toBe('Mon 1 March 2025 · 08:00');
+  });
+
+  it('keeps day 300 in December 2025 and puts day 301 on 1 January 2026', () => {
+    // Twelve months of thirty days from March: day 271 to 300 are December, the 300th its 30th.
+    expect(calendarYearOf(300)).toBe(2025);
+    expect(formatDate({ day: 300, minute: 197 })).toBe('Sat 30 December 2025 · 11:17');
+    expect(calendarYearOf(301)).toBe(2026);
+    expect(formatDate({ day: 301, minute: 0 })).toBe('Sun 1 January 2026 · 08:00');
+    // And on round the years: 30 December 2026 is day 660, and day 661 is 2027.
+    expect(calendarYearOf(660)).toBe(2026);
+    expect(calendarYearOf(661)).toBe(2027);
+  });
+
+  it('leaves the company s own count of years and the short date as they were', () => {
+    // `yearOfDay` counts the years from the opening, 360 days each, for whoever reads it.
+    expect(yearOfDay(301)).toBe(1);
+    expect(yearOfDay(361)).toBe(2);
+    // Every screen but the bar prints the short date, which has no year on it.
+    for (const day of [1, 300, 301, 900]) expect(formatCalendarDay(day)).not.toMatch(/\d{4}/);
+    expect(formatCalendarDay(301)).toBe('Sun 1 January');
   });
 });

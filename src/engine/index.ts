@@ -168,6 +168,7 @@ export {
   addWorkingDays,
   dayOfWorkingIndex,
   dayOfMonth,
+  calendarYearOf,
   formatCalendarDay,
   formatDate,
   formatTime,

@@ -243,9 +243,8 @@ export const DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR;
 export const WORKING_DAYS_PER_WEEK = 5;
 export const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 /** The twelve month names the calendar cycles through. The game's month is thirty days, so a name
- *  is a label on a block of thirty and never a real April; there is no year on a date, because a
- *  workshop's year number is nothing the player does anything with (PIOTR, 17.09;
- *  CLAUDE.md T18 2.2). */
+ *  is a label on a block of thirty and never a real April (PIOTR, 17.09; CLAUDE.md T18 2.2). From
+ *  Turn 27 the top bar's date carries the year as well, and nothing else does (`START_YEAR`). */
 export const MONTH_NAMES = [
   'January',
   'February',
@@ -263,6 +262,10 @@ export const MONTH_NAMES = [
 /** The month the company opens in, as an index into `MONTH_NAMES`: 0 is January, so 2 is March
  *  [TUNE: March, which is the spring the trade picks up in and what day 1 should feel like]. */
 export const START_MONTH = 2;
+/** The year the company opens in: day 1 is 1 March 2025, and the calendar's twelve months of
+ *  thirty days count the years on from it, so day 301 is 1 January 2026 [PIOTR, 03.10: "we write
+ *  the years as well; we start from 2025"] (CLAUDE.md T27 2.1). */
+export const START_YEAR = 2025;
 
 // ---------------------------------------------------------------------------
 // 7. The owner

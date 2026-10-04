@@ -83,3 +83,10 @@ not 217, and the two turned counts read 75 and not 76 (`rotate.test.ts`, `sprite
 two tax cards in the event modal's small folder beside December's report in the month end's middle
 folder with its `Tax` line, and the warning strip with the `taxComing` line, all of them the game's
 own markup made by its own functions, in its own classes, with tonight's change written in.
+
+**T27-B1 The year.** `START_YEAR` 2025 [PIOTR] and `calendarYearOf(day)` in `clock.ts`, counted off
+`START_MONTH` and the twelve thirty day months: day 1 to 300 are 2025, day 301 is 1 January 2026;
+`yearOfDay` is untouched. `formatDate`, the top bar's line, reads `Mon 1 March 2025 · 08:00`, so
+`topbar.ts` itself is not touched; `formatCalendarDay` has no year. One reading of the brief
+[TUNE]: the laptop's home line also printed `formatDate`, so it now prints `formatCalendarDay` and
+`formatTime` and keeps its old words, because the year is the bar's and the tax's alone tonight.

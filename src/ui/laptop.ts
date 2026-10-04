@@ -16,7 +16,8 @@
 import {
   TAKE_OFF_BUTTON_LABEL,
   findJob,
-  formatDate,
+  formatCalendarDay,
+  formatTime,
   jobsAtGate,
   laptopHome,
   openTasks,
@@ -332,7 +333,8 @@ function homeScreen(state: GameState): string {
   return (
     '<p class="screen-status">' +
     `<span class="screen-company">${escapeHtml(state.companyName)}</span>, ` +
-    `<span class="screen-clock">${escapeHtml(formatDate(state.clock))}</span></p>` +
+    // The date and the clock with no year: the year is the top bar's alone (CLAUDE.md T27 2.1).
+    `<span class="screen-clock">${escapeHtml(`${formatCalendarDay(state.clock.day)} · ${formatTime(state.clock.minute)}`)}</span></p>` +
     `<div class="screen-tiles">${tiles}</div>` +
     '<hr class="screen-rule" />' +
     '<h3 class="screen-group">Office</h3>' +

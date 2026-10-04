@@ -18,6 +18,7 @@ import {
   OVERTIME_END_MINUTE,
   REAL_SECONDS_PER_DAY_AT_1X,
   START_MONTH,
+  START_YEAR,
   WEEKDAY_NAMES,
   WORKING_DAYS_PER_WEEK,
 } from './constants';
@@ -80,6 +81,13 @@ export function yearOfDay(day: number): number {
   return Math.floor((day - 1) / (DAYS_PER_MONTH * MONTHS_PER_YEAR)) + 1;
 }
 
+/** The calendar year a game day falls in: `START_YEAR` from the opening month on, and one more
+ *  each time the months pass a December, so day 1 to 300 are 2025 and day 301 is 1 January 2026
+ *  (PIOTR, 03.10; CLAUDE.md T27 2.1). `yearOfDay` counts the company's own years and stays. */
+export function calendarYearOf(day: number): number {
+  return START_YEAR + Math.floor((START_MONTH + monthOfDay(day) - 1) / MONTHS_PER_YEAR);
+}
+
 /** The minute of the game so far, for putting in order two things that happened on different
  *  days. Not a clock reading the player ever sees. */
 export function minuteStamp(clock: Clock): number {
@@ -139,8 +147,11 @@ export function formatCalendarDay(day: number): string {
   return `${weekdayName(safe)} ${dayOfMonth(safe)} ${monthName(monthOfDay(safe))}`;
 }
 
+/** The top bar's line: the date with its year, then the clock, `Mon 26 May 2027 · 11:17`. The
+ *  year is the bar's and the tax's own words alone; every other screen prints `formatCalendarDay`
+ *  (PIOTR, 03.10; CLAUDE.md T27 2.1). */
 export function formatDate(clock: Clock): string {
-  return `${formatCalendarDay(clock.day)} · ${formatTime(clock.minute)}`;
+  return `${formatCalendarDay(clock.day)} ${calendarYearOf(clock.day)} · ${formatTime(clock.minute)}`;
 }
 
 /** The next day the workshop is open. */
