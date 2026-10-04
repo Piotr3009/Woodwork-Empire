@@ -128,3 +128,13 @@ it is booked in the clock's walk over the weekend), the year on the bar alone an
 why the tax has two fields of its own, the readings of the brief, what the tax does and does not see
 (a loan drawn in December and clients' deposits are cash and are taxed), the prices, what A0 found
 beyond its figures, and the copyright header Piotr's rule of 22.09 puts on tonight's new files.
+
+**T27-C2 Scenarios.** (uu) in `tests/scenarios/turn27.test.ts`: the day one hall bought on Tuesday 28
+November 2025 with 48,000 in the account [TUNE: the brief's figure], played by the careful script to
+Monday 2 January 2026, is warned on Friday 1 December with the tax on that morning's account, carries
+the strip's line at every step of all 21 working days to the 29th and at none outside them, pays on
+Saturday 30 December a quarter of the £43,315.50 it held that moment, £10,829, as the first line of
+the day, meets that card first on the Monday and December's report after it with its `Tax` line; the
+same hall at minus 3,000 [TUNE], idle so it stays under nought, is told `Nothing as it stands today.`,
+has no line and pays nothing. No scenario figure moved in C2; the one tonight moved is restated in its
+own commit (B4: the industrial saw month of `thirtyDays` pays 30,000 on day 1).
