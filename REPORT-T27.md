@@ -77,3 +77,9 @@ turn's brief (first line "Turn 27"), so nothing was moved; the README names the 
 name it flipped (`STATE_VERSION` is B2's). The two dead files `public/sprites/palletTruck.standard.png`
 and `.r.png` are `git rm`ed (the permissions let it through tonight), the manifest is 215 sprites and
 not 217, and the two turned counts read 75 and not 76 (`rotate.test.ts`, `spriteClasses.test.ts`).
+
+**T27-A2 The mockups.** `docs/mockups/t27/` with its README: the top bar at 1,280 wide before and after
+2.1 (the date with its year is 227 px against the knobs' 268, so nothing else on the bar moves), the
+two tax cards in the event modal's small folder beside December's report in the month end's middle
+folder with its `Tax` line, and the warning strip with the `taxComing` line, all of them the game's
+own markup made by its own functions, in its own classes, with tonight's change written in.
