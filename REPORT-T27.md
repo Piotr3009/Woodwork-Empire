@@ -138,3 +138,23 @@ the day, meets that card first on the Monday and December's report after it with
 same hall at minus 3,000 [TUNE], idle so it stays under nought, is told `Nothing as it stands today.`,
 has no line and pays nothing. No scenario figure moved in C2; the one tonight moved is restated in its
 own commit (B4: the industrial saw month of `thirtyDays` pays 30,000 on day 1).
+
+**T27-C3 The measurement.** `docs/balance-t27.md`: the first year, 1 March 2025 to the end of
+February 2026, of a new company on each difficulty with four crews, twelve tables of a row a month
+(money in, material, couriers, wages, the draw, rent, rates, power, the rest, and kit, loan and tax as
+columns of their own [TUNE]), each with its first month in the black, the bank's day and the tax, and
+a line for the same year on two more seeds; then one page of what they say, with no number proposed.
+The script, `scripts/balance-t27.ts`, is run by hand (`npx vite-node`) and is not part of `npm test`;
+it drives the autopilot of the suite and changes nothing of the game. Its limits are at the top of
+the file, each [TUNE]: it takes any residential sheet job whose client pays for its material and
+labour and never haggles, keeps two jobs open a man, pays the software by the month, writes the books
+up once a month, borrows the bank's one loan when the month's wages would take the account under
+nought (on Hard at the open of day 1), takes its crew on as the account allows, and gives the four
+experienced men a standing of 15 and the machines a month of their wages allows. Its first runs found
+three things that were the script's and not the year's, each said there: the one off licence runs out
+after thirty jobs and the script never bought it again (every drawing refused from about day 108),
+the playthrough's margin of a fifth turned a third of a new company's offers away, and the books left
+to wait cost 6,600 of `Late accounts` in the year. What the tables say: only the owner alone on Very
+easy lives the year, on all three seeds; no month of any run on the suite's seed is in the black;
+Hard is closed in its second month whoever is on the books; and the tax was paid by four companies
+in thirty six, each out of what was left of its starting 50,000.

@@ -107,5 +107,11 @@ this repo has it and there is no `LICENSE`, which is Piotr's to decide and was n
 
 ## 9. The measurement
 
-`docs/balance-t27.md` (T27-C3): twelve years of a new company played by the script, with the tax
-inside them.
+`docs/balance-t27.md` (T27-C3): a new company's first year, March 2025 to February 2026, played twelve
+times by the script (three difficulties, four crews), with the tax inside it. The script is
+`scripts/balance-t27.ts`, run by hand and not by `npm test`. Three things the first runs found are
+the script's and are said at the top of that file: the one off licence ends after thirty jobs and
+the script never bought it again, so it pays the subscription; the three month playthrough's margin
+of a fifth turned a third of a new company's offers away and left its men idle, so it takes anything
+that pays its material and labour; and Hard opens with nothing and a day one list dearer than its
+overdraft, so the script borrows at the open of day 1.
