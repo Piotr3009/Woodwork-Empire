@@ -128,7 +128,8 @@ describe('the Premises page, clicked', () => {
     const before = game().cash;
     click('[data-do="extendUnit"]');
     expect(game().unit.extension).toBe('building');
-    expect(game().cash).toBe(before - 122400);
+    // The builder's 250,000 from Turn 27 and the landlord's 2,400 (CLAUDE.md T27 2.4).
+    expect(game().cash).toBe(before - 252400);
     // The page says so, and the button is gone: it cannot be paid for twice.
     expect(card('extend').textContent).toContain('Being built');
     expect(root().querySelector('[data-do="extendUnit"]')).toBeNull();

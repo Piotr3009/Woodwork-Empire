@@ -105,3 +105,8 @@ the tax while there is cash to tax. State: the two fields of section 4, `finance
 warning was given or a tax of nothing settled, and it keeps only its last 2,000 lines. Buying a
 machine to dodge the tax and selling it in January loses more than the tax: it sells for half
 (`SALE_FRACTION` 0.5), so a pound spent saves 25p of tax and brings back 50p at best.
+
+**T27-B3 The extension at £250,000.** `UNIT_EXTENSION_PRICE` 120,000 to 250,000 [PIOTR]; the Premises
+card, the deposit beside it (2,400 on the starting rent) and the refusal read the constant, so the card
+says `£250,000 · and £2,400 more deposit. Needs £252,400 in the account.` and nothing else of it moved;
+a unit already extended stays extended. The three tests that named the price are flipped in place.

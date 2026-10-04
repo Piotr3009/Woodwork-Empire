@@ -425,9 +425,10 @@ export function unitDepositFor(rentMonthly: number): number {
 export const POWER_BASE_DAILY = 4;
 export const POWER_PER_MACHINE_DAILY = 3;
 export const BENCH_SLOTS = 4;
-/** What the builder charges for the second 200 m2 of hall, paid at the click [PIOTR accepted,
- *  03.10; TUNE] (v67). The landlord's deposit on the bigger rent is on top of it. */
-export const UNIT_EXTENSION_PRICE = 120000;
+/** What the builder charges for the second 200 m2 of hall, paid at the click (v67). The
+ *  landlord's deposit on the bigger rent is on top of it. 250,000 from Turn 27, where it was
+ *  120,000 [PIOTR, 04.10: "the extension is 250,000"] (CLAUDE.md T27 2.4). */
+export const UNIT_EXTENSION_PRICE = 250000;
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
 
