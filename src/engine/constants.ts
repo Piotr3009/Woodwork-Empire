@@ -19,6 +19,7 @@ import type {
   SoftwareTier,
   StageId,
   StageSpec,
+  UnitExtension,
   WorkerIdleReason,
   WorkerRole,
   WorkerTier,
@@ -166,12 +167,16 @@ import type {
  *  year whose 30 December has been settled and the last year the player was warned of it, so the
  *  tax is never taken twice for one year and the warning is said once; both are null in every
  *  older save, which is then warned on the next open in December and charged on the next
- *  30 December it plays through (CLAUDE.md T27 section 4). Every v25 to v39 save loads. */
+ *  30 December it plays through (CLAUDE.md T27 section 4). Every v25 to v39 save loads.
+ *
+ *  v82 adds one field and no version: a unit says where its second extension stands, and a save
+ *  that does not say so is a unit that has not had one (`secondExtensionOf`), so there is nothing
+ *  to lift. */
 export const STATE_VERSION = 40;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v81';
+export const APP_VERSION = 'v82';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -429,6 +434,28 @@ export const BENCH_SLOTS = 4;
  *  landlord's deposit on the bigger rent is on top of it. 250,000 from Turn 27, where it was
  *  120,000 [PIOTR, 04.10: "the extension is 250,000"] (CLAUDE.md T27 2.4). */
 export const UNIT_EXTENSION_PRICE = 250000;
+/** What the builder charges for the second extension: 400 m2 along the whole front of a unit that
+ *  has had its first, so the hall goes from forty metres by ten to forty by twenty, 800 m2, with
+ *  the floor the timber shop will stand on [PIOTR, 04.10: "the extension for timber, the next
+ *  400 m2 for a million"] (v82). The landlord's deposit on the bigger rent is on top of it. */
+export const UNIT_SECOND_EXTENSION_PRICE = 1000000;
+/** What the 800 m2 unit multiplies the costs its floor does not already set: the two insurance
+ *  premiums and the month of a security level that is not a firm's [PIOTR, 04.10: "all the costs
+ *  times two: insurance, security, power"] (v82). The rent, the rates, the standing power and a
+ *  security firm's month are doubled by the area itself, as they were by the first extension. */
+export const UNIT_SECOND_EXTENSION_COST_FACTOR = 2;
+
+/** Where the second extension of a unit stands. No save from before v82 carries the field, and
+ *  that is a unit that has not had one (v82). */
+export function secondExtensionOf(unit: { secondExtension?: UnitExtension }): UnitExtension {
+  return unit.secondExtension ?? 'none';
+}
+
+/** What the insurer and a flat security level multiply their figure by for this unit: two once
+ *  the second extension is open, and one until then (v82). */
+export function unitCostFactor(unit: { secondExtension?: UnitExtension }): number {
+  return secondExtensionOf(unit) === 'open' ? UNIT_SECOND_EXTENSION_COST_FACTOR : 1;
+}
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
 
@@ -873,8 +900,10 @@ export const NIGHT_QUALITY_TIER_DROP = 1;
 export const NIGHT_ERROR_FACTOR = 2;
 /** The floor limits the crew: one person per this many square metres of free floor [TUNE], set so
  *  that a 200 m2 hall with a normal set of machines and racks lands at the owner plus four, five
- *  at most (PIOTR; CLAUDE.md T13 3.10). */
-export const M2_PER_PERSON = 24;
+ *  at most (PIOTR; CLAUDE.md T13 3.10). Twenty five from v82, where it was twenty four: a unit of
+ *  200 m2 takes eight joiners and one of 400 sixteen by either figure, and the 800 m2 of the
+ *  second extension takes the thirty two Piotr gave it and not thirty three [PIOTR, 04.10]. */
+export const M2_PER_PERSON = 25;
 /** A job worth more than this starts with a meeting at the client's before anything is drawn
  *  (PIOTR). Four hours of somebody's day; the salesman goes instead of the owner once the company
  *  is known well enough for the client to accept him [TUNE threshold] (CLAUDE.md T7 3.11). */
@@ -3664,6 +3693,11 @@ export const CANTEEN_PLATES_WIDE: readonly RoomRect[] = [
  *  with [PIOTR, 03.10] (v67, v80). Until v80 the room had one picture, of eight doors, and showed
  *  the sixteen eight at a time. */
 export const CANTEEN_LOCKERS_WIDE = CANTEEN_PLATES_WIDE.length;
+
+/** How many lockers the enlarged canteen holds in the 800 m2 unit: thirty two, one for each joiner
+ *  that unit takes [PIOTR, 04.10: "thirty two workers"] (v82). Its picture has the sixteen doors
+ *  it was painted with, so the room shows the thirty two sixteen at a time. */
+export const CANTEEN_LOCKERS_DEEP = CANTEEN_LOCKERS_WIDE * 2;
 
 /** The counter over the banks, where the room says how many of the eight are in use [PIOTR]. */
 export const CANTEEN_COUNTER: RoomRect = { x: 95, y: 35, w: 450, h: 65 };

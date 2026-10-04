@@ -109,9 +109,9 @@ describe('the sprite check page', () => {
       expect(cell?.textContent, layer.key).toContain('1680 by 1128');
       expect(cell?.textContent, layer.key).toContain(layer.name);
     }
-    // Nine layer cells in all: three of the hall, the two an extended unit is painted with in
-    // their place (v67), three of the office and the lit door the art side owes (CLAUDE.md T14
-    // 2.2), each once. The figures have wide cells of their own beside them, keyed by the sheet
+    // Ten layer cells in all: three of the hall, the three a unit that has grown is painted with
+    // in their place (v67, and the 800 m2 background of v82), three of the office and the lit
+    // door the art side owes (CLAUDE.md T14 2.2), each once. The figures have wide cells of their own beside them, keyed by the sheet
     // and not by a sprite (CLAUDE.md T9 3.13).
     const wide = Array.from(page.querySelectorAll('.sprite-wide-grid [data-sprite-target]'));
     expect(wide).toHaveLength(

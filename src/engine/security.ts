@@ -11,6 +11,7 @@ import {
   SECURITY_SCALE_AREA_M2,
   SECURITY_SCALE_VALUE,
   SHEET_VALUE,
+  unitCostFactor,
 } from './constants';
 import type { SecurityLevelSpec } from './constants';
 import { canAfford, charge, formatMoney, noteLoss } from './economy';
@@ -57,7 +58,9 @@ export function securitySubscriptionParts(
   const spec = securitySpec(level);
   const areaM2 = state.unit.areaM2;
   const insured = insuredValue(state);
-  const areaFactor = spec.scaled ? areaM2 / SECURITY_SCALE_AREA_M2 : 1;
+  // A firm charges by the area. A flat level is what it is until the 800 m2 unit, which pays
+  // twice it: the firms' month has doubled with the floor, and so has the dogs' (v82).
+  const areaFactor = spec.scaled ? areaM2 / SECURITY_SCALE_AREA_M2 : unitCostFactor(state.unit);
   const valueFactor = spec.scaled ? 1 + insured / SECURITY_SCALE_VALUE : 1;
   return {
     base: spec.monthly,
@@ -69,8 +72,9 @@ export function securitySubscriptionParts(
   };
 }
 
-/** What a level costs a month: the flat figure, or for the two firms the base scaled by the
- *  hall's area and the insured equipment value (CLAUDE.md T13 3.17). */
+/** What a level costs a month: the flat figure, twice it on the 800 m2 unit (v82), or for the two
+ *  firms the base scaled by the hall's area and the insured equipment value (CLAUDE.md T13
+ *  3.17). */
 export function securitySubscriptionMonthly(state: GameState, level = state.security.level): number {
   return securitySubscriptionParts(state, level).monthly;
 }

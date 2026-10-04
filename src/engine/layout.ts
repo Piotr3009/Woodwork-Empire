@@ -3,6 +3,7 @@
 
 import {
   CANTEEN_LOCKERS,
+  CANTEEN_LOCKERS_DEEP,
   CANTEEN_LOCKERS_WIDE,
   GATE_LANE,
   LOCKER_SLOT_LAYOUT,
@@ -13,6 +14,7 @@ import {
   STARTING_LAYOUT,
   YARD_WIDTH_CELLS,
   roomsOf,
+  secondExtensionOf,
 } from './constants';
 import type { LayoutSlot } from './constants';
 import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
@@ -368,8 +370,9 @@ export function freeFloorM2(state: GameState): number {
 }
 
 /** How many joiners the unit has room for: one per so many square metres of the whole unit, 200
- *  over 24 is eight (PIOTR, 20.09: "the whole hall over 24, simplest"; v37), and from Turn 26 the
- *  eight are joiners, whoever else is on the books (PIOTR, 02.10; CLAUDE.md T26 2.10).
+ *  over 25 is eight (PIOTR, 20.09: "the whole hall over 24, simplest"; v37; 25 from v82, so that
+ *  800 m2 is thirty two), and from Turn 26 the eight are joiners, whoever else is on the books
+ *  (PIOTR, 02.10; CLAUDE.md T26 2.10).
  *  Until v37 it was the free floor after the machines' zones, which refused a fifth joiner on a
  *  working hall and left the canteen's eight lockers unreachable (REPORT-T23 items 1 and 6). The
  *  machines still take floor: a bench needs its place, and that is the only way they limit men. */
@@ -377,16 +380,27 @@ export function crewLimit(state: GameState): number {
   return Math.floor((state.unit.widthCells * state.unit.depthCells) / M2_PER_PERSON);
 }
 
-/** How many lockers this unit's canteen holds: the eight it was built with, and sixteen once it
- *  has been enlarged. The one figure the hiring gate, the catalogue and the room itself count by
- *  (PIOTR, 20.09 and 03.10; CLAUDE.md T23 2.10; v67). */
+/** How many lockers this unit's canteen holds: the eight it was built with, sixteen once it has
+ *  been enlarged, and thirty two in an enlarged canteen of the 800 m2 unit, a locker for every
+ *  joiner that unit takes. The one figure the hiring gate, the catalogue and the room itself
+ *  count by (PIOTR, 20.09, 03.10 and 04.10; CLAUDE.md T23 2.10; v67, v82). */
 export function canteenLockers(state: GameState): number {
-  return state.unit.canteenWide ? CANTEEN_LOCKERS_WIDE : CANTEEN_LOCKERS;
+  if (!state.unit.canteenWide) return CANTEEN_LOCKERS;
+  return secondExtensionOf(state.unit) === 'open' ? CANTEEN_LOCKERS_DEEP : CANTEEN_LOCKERS_WIDE;
 }
 
-/** The same figure in a word, for the two sentences that say it: `eight`, `sixteen`. */
+/** The figures a canteen can hold, in a word each. */
+const LOCKERS_IN_WORDS: Record<number, string> = {
+  [CANTEEN_LOCKERS]: 'eight',
+  [CANTEEN_LOCKERS_WIDE]: 'sixteen',
+  [CANTEEN_LOCKERS_DEEP]: 'thirty-two',
+};
+
+/** The same figure in a word, for the two sentences that say it: `eight`, `sixteen`,
+ *  `thirty-two`. */
 export function lockersInWords(state: GameState): string {
-  return state.unit.canteenWide ? 'sixteen' : 'eight';
+  const lockers = canteenLockers(state);
+  return LOCKERS_IN_WORDS[lockers] ?? String(lockers);
 }
 
 /** Where the lockers stand inside the canteen, in the order they are bought (CLAUDE.md T17 2.2;

@@ -84,9 +84,10 @@ function manager(id = 'pm-1'): Worker {
 describe('the floor limit', () => {
   it('is the whole unit over the square metres a person wants, rounded down', () => {
     // The whole unit and not the free floor since v37 (PIOTR, 20.09: "200 over 24 is eight,
-    // simplest"): a machine takes floor, and that is the only way it limits men.
+    // simplest"): a machine takes floor, and that is the only way it limits men. Twenty five from
+    // v82: eight and sixteen as before, and thirty two on the 800 m2 of the second extension.
     const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    expect(M2_PER_PERSON).toBe(24);
+    expect(M2_PER_PERSON).toBe(25);
     expect(crewLimit(state)).toBe(
       Math.floor((state.unit.widthCells * state.unit.depthCells) / M2_PER_PERSON),
     );

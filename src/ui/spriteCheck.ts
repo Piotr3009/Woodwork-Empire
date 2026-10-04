@@ -435,9 +435,10 @@ export function renderSpriteCheck(ports: Record<string, Port> = PORTS): string {
     ) +
     layerSection(
       'The painted hall, extended',
-      'The two layers a unit that has grown is painted with in place of its own: the background ' +
-        'at forty metres, on a longer canvas with the same origin, and the canteen block at four ' +
-        'by four on the first canvas. Both are made of the three pictures above (v67).',
+      'The layers a unit that has grown is painted with in place of its own: the background at ' +
+        'forty metres, on a longer canvas with the same origin, the background at forty metres ' +
+        'by twenty, on a canvas with an origin of its own, and the canteen block at four by four ' +
+        'on the first canvas. All of them are made of the three pictures above (v67, v82).',
       HALL_WIDE_LAYERS.map((layer) => {
         const canvas = layer.canvas ?? HALL_CANVAS;
         return {

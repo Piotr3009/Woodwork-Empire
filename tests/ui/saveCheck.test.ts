@@ -128,8 +128,9 @@ describe('a fresh game in this build', () => {
     // Jacks, the pace as a sum and the admin's take off touch no field of the save (PIOTR, 30.09).
     // v61 and v62 are state 33 as well. v63 is state 34: one kind of man on the floor, the
     // draftsman's three grades and the agency, off (CLAUDE.md T26 section 4). v81 is Turn 27 and
-    // state 40: the taxman's two years on the books (CLAUDE.md T27 section 4).
-    expect(APP_VERSION).toBe('v81');
+    // state 40: the taxman's two years on the books (CLAUDE.md T27 section 4). v82 is state 40
+    // too: the second extension is a field a save may not carry (PIOTR, 04.10).
+    expect(APP_VERSION).toBe('v82');
     expect(STATE_VERSION).toBe(40);
   });
 

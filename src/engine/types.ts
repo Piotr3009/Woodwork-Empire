@@ -421,6 +421,10 @@ export interface OwnerState {
  *  or open (PIOTR, 03.10; v67). */
 export type UnitExtension = 'none' | 'building' | 'open';
 
+/** The two times a unit can be extended, in the order they are built: the second 200 m2 along the
+ *  rear wall, and then 400 m2 along the front of that (v67, v82). */
+export type ExtensionStage = 'first' | 'second';
+
 export interface UnitState {
   areaM2: number;
   widthCells: number;
@@ -432,6 +436,10 @@ export interface UnitState {
   depositHeld: number;
   /** The extension of the unit along the rear wall, twenty metres more of hall (v67). */
   extension: UnitExtension;
+  /** The second extension, ten metres more of depth along the whole front of an extended unit:
+   *  forty metres by twenty, 800 m2 [PIOTR, 04.10] (v82). In no save from before v82, which is a
+   *  unit that has not had one: read it through `secondExtensionOf`. */
+  secondExtension?: UnitExtension;
   /** True once the canteen has been enlarged from two by four metres to four by four, which is
    *  what takes its lockers from eight to sixteen (PIOTR, 03.10; v67). */
   canteenWide: boolean;
@@ -1467,8 +1475,9 @@ export type GameAction =
   // Orders and stock:
   | { type: 'SET_WEBSITE_LEVEL'; level: number }
   | { type: 'SET_AGENCY'; on: boolean }
-  /** Pays for the second 200 m2 of the unit, which open the next working morning (v67). */
-  | { type: 'EXTEND_UNIT' }
+  /** Pays for an extension of the unit, which opens the next working morning: the second 200 m2
+   *  where no stage is named, and the 400 m2 along the front for `second` (v67, v82). */
+  | { type: 'EXTEND_UNIT'; stage?: ExtensionStage }
   /** Enlarges the canteen to four by four metres, once the floor beside it is clear (v67). */
   | { type: 'ENLARGE_CANTEEN' }
   // Machines and the hall:

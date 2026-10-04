@@ -53,6 +53,7 @@ import {
   UNLOAD_SHEETS_PER_STEP,
   VAN_CLASSES,
   bagsToM3,
+  unitCostFactor,
 } from '../engine/constants';
 import { insuranceForClass } from '../engine/machines';
 import { spriteUrl } from '../render/sprites';
@@ -157,9 +158,11 @@ function atOnceLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
 }
 
 /** What this class adds to the property premium a year, off the one rate the cover is written at
- *  (CLAUDE.md T13 3.1, 3.15). */
-function insuranceLine(variant: EquipmentVariant): string {
-  return `Insurance ${money(insuranceForClass(variant))} a year`;
+ *  (CLAUDE.md T13 3.1, 3.15), and twice it on the 800 m2 unit, where the insurer charges twice
+ *  the premium (v82). */
+function insuranceLine(state: GameState, variant: EquipmentVariant): string {
+  const yearly = insuranceForClass(variant) * unitCostFactor(state.unit);
+  return `Insurance ${money(yearly)} a year`;
 }
 
 /** What this class asks of the air, and what the hall would give it. The catalogue says it before
@@ -371,11 +374,11 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
 
 /** The costs of a class: the price, the wait, the power, the insurance it adds a year, and the
  *  floor it takes (CLAUDE.md T13 3.1). */
-function costLines(spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
+function costLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
   return [
     line(deliveryLine(spec, variant)),
     line(powerLine(spec, variant)),
-    line(insuranceLine(variant)),
+    line(insuranceLine(state, variant)),
     line(floorLine(spec.id, variant.id)),
   ];
 }
@@ -419,7 +422,7 @@ function classCard(
     pictureSlot(pictureKeyOf(spec), variant.id) +
     `<div class="card-effects">${figureLines(effectLines(state, spec, variant))}</div>` +
     `<div class="card-costs"><p class="tile-price">${money(variant.price)}</p>` +
-    `${figureLines(costLines(spec, variant))}</div>` +
+    `${figureLines(costLines(state, spec, variant))}</div>` +
     `<p class="tile-text card-description">${escapeHtml(variant.description)}</p>` +
     (check.ok || onTheList ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
     `<div class="tile-action">${buy}</div>` +

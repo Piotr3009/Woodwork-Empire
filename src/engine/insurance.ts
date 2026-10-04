@@ -13,6 +13,7 @@ import {
   SHEET_VALUE,
   UNINSURED_CLAIM_MAX,
   UNINSURED_CLAIM_MIN,
+  unitCostFactor,
 } from './constants';
 import { dayOfMonth } from './clock';
 import { canAfford, charge, formatMoney } from './economy';
@@ -73,13 +74,22 @@ export function insuredValue(state: GameState): number {
   return insuredMachinesValue(state) + insuredStockValue(state);
 }
 
+/** The rate on what is insured and the vans' own figures, and twice the two of them on the
+ *  800 m2 unit: the insurer charges for the bigger premises [PIOTR, 04.10] (v82). */
 export function propertyPremiumYearly(state: GameState): number {
-  return pence(insuredValue(state) * PROPERTY_INSURANCE_RATE_YEARLY + ownFigureCoverYearly(state));
+  return pence(
+    (insuredValue(state) * PROPERTY_INSURANCE_RATE_YEARLY + ownFigureCoverYearly(state)) *
+      unitCostFactor(state.unit),
+  );
 }
 
-/** Hired people: everybody on the books. */
+/** Hired people: everybody on the books. Twice it on the 800 m2 unit, as the property cover is
+ *  (v82). */
 export function liabilityPremiumYearly(state: GameState): number {
-  return LIABILITY_BASE_YEARLY + state.workers.length * LIABILITY_PER_EMPLOYEE_YEARLY;
+  return (
+    (LIABILITY_BASE_YEARLY + state.workers.length * LIABILITY_PER_EMPLOYEE_YEARLY) *
+    unitCostFactor(state.unit)
+  );
 }
 
 export function premiumYearlyFor(state: GameState, cover: InsuranceCover): number {

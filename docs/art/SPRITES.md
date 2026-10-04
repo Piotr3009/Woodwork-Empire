@@ -303,6 +303,23 @@ layers sit on it unchanged; its canvas is the first one plus 20 m: 960 px wider 
 Floor corners on it: (40,0) = 2520, 1248; (40,10) = 2040, 1488. If the art side repaints any of the
 three layers of 9.3, run the script again and then `npm run sprites:manifest`.
 
+### 9.8 The 800 m2 hall (v82, PIOTR 04.10.2026: "the extension for timber, the next 400 m2 for a million")
+
+A unit that has had its second extension is 40 × 20 m. One more layer, made of
+`hallBackgroundWide.png` by `scripts/hall-deep.py` and of nothing else, so nothing was painted for
+it:
+
+| File in `public/sprites/` | Format | Contents | Used |
+|---|---|---|---|
+| `hallBackgroundDeep.png` | RGB, 3120 × 1848 | the wide background with its floor, its left wall and its kerbs carried on to y = 20 | in place of `hallBackgroundWide.png` once the unit has had its second extension |
+
+The floor grows towards the camera, which is down and to the left on the screen, so this canvas
+has an origin of its own: `ox = 1080`, `oy = 288`, which is 480 px further along than 9.2. The
+game lays every layer down by its own origin, so the office and canteen layers sit on it
+unchanged. Floor corners on it: (0,20) = 120, 768; (40,0) = 3000, 1248; (40,20) = 2040, 1728. If
+the art side repaints any of the three layers of 9.3, run `scripts/hall-wide.py`, then this
+script, and then `npm run sprites:manifest`.
+
 ---
 
 ## 10. Characters (accepted by Piotr, 13.09.2026): frame sheets from the 3D model

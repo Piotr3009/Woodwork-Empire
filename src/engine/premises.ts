@@ -1,4 +1,4 @@
-// The unit itself, and the two things that can be done to it (PIOTR, 03.10; v67).
+// The unit itself, and the things that can be done to it (PIOTR, 03.10 and 04.10; v67, v82).
 //
 // Era 1 ends in a hall of 200 m2 that takes eight joiners, and from there a full shop has nowhere
 // to grow. From v67 the owner can pay a builder for a second 200 m2 along the rear wall. It opens
@@ -7,28 +7,37 @@
 // built for eight and stays that until it is enlarged: no charge, it comes with the extension,
 // but it grows two metres along the rear wall and the floor beside it has to be clear first.
 //
-// Everything a card says about either is worked out here, so the laptop prints figures and holds
-// none of its own.
+// From v82 a unit that has had that extension can have a second: 400 m2 along the whole of its
+// front, for a million, so the hall is forty metres by twenty and the timber shop has a floor to
+// stand on (PIOTR, 04.10). It opens the next working morning as the first does and doubles what
+// the floor sets, the joiners and the lockers of an enlarged canteen with it, thirty two of each;
+// and on the 800 m2 unit the insurer and a flat security level charge twice what they did, so
+// every cost of the unit is twice what it was.
+//
+// Everything a card says about any of them is worked out here, so the laptop prints figures and
+// holds none of its own.
 
 import {
-  CANTEEN_LOCKERS,
-  CANTEEN_LOCKERS_WIDE,
-  M2_PER_PERSON,
+  UNIT_DEPTH_CELLS,
   UNIT_EXTENSION_PRICE,
+  UNIT_SECOND_EXTENSION_PRICE,
   UNIT_WIDTH_CELLS,
   canteenGrowthBox,
   roomById,
   roomsOf,
+  secondExtensionOf,
   unitDepositFor,
 } from './constants';
 import { pay, standingPowerPerDay } from './economy';
 import { queueEvent } from './events';
-import { standingOn } from './layout';
+import type { EventDraft } from './events';
+import { monthlyPremiums } from './insurance';
+import { canteenLockers, crewLimit, standingOn } from './layout';
 import { findSpec } from './machines';
 import { routePipe } from './pipes';
-import { securityLevel, securitySubscriptionMonthly } from './security';
+import { securitySubscriptionMonthly } from './security';
 import { andList } from './text';
-import type { GameState } from './types';
+import type { ExtensionStage, GameState, UnitExtension, UnitState } from './types';
 
 export interface PremisesCheck {
   ok: boolean;
@@ -37,7 +46,7 @@ export interface PremisesCheck {
 
 const OK: PremisesCheck = { ok: true, reason: '' };
 
-/** Everything the extension changes, as the card prints it: what it costs at the click, the unit
+/** Everything an extension changes, as the card prints it: what it costs at the click, the unit
  *  as it will be, and each running cost as it is and as it will be. */
 export interface ExtensionTerms {
   /** The builder's price. */
@@ -54,6 +63,8 @@ export interface ExtensionTerms {
   /** The joiners and the benches the bigger unit takes. */
   joiners: number;
   benches: number;
+  /** The lockers an enlarged canteen holds in the bigger unit (v82). */
+  lockers: number;
   rentNow: number;
   rentThen: number;
   ratesNow: number;
@@ -61,52 +72,90 @@ export interface ExtensionTerms {
   /** What the unit draws a day with nothing running. */
   powerNow: number;
   powerThen: number;
-  /** A security firm charges by the area, so its month goes up with it; nought and nought for a
-   *  level that is not one of the firms. */
+  /** What the security level held costs a month. A firm charges by the area, so its month goes up
+   *  with either extension; a flat level is what it was after the first and twice it after the
+   *  second (v82). */
   securityNow: number;
   securityThen: number;
+  /** What the 1st takes for the covers held. The first extension leaves it as it is and the
+   *  second doubles it (v82). */
+  insuranceNow: number;
+  insuranceThen: number;
 }
 
-/** The terms of extending the unit as it stands this minute: twenty metres more of rear wall, the
- *  depth it has, and every figure the floor sets in the same proportion. Read while the unit is
- *  not extended; the card of an extended unit prints the unit itself. */
-export function extensionTerms(state: GameState): ExtensionTerms {
-  const unit = state.unit;
-  const widthCells = unit.widthCells + UNIT_WIDTH_CELLS;
-  const areaM2 = widthCells * unit.depthCells;
+/** Where a stage of the unit's extension stands. */
+export function extensionStatus(unit: UnitState, stage: ExtensionStage): UnitExtension {
+  return stage === 'first' ? unit.extension : secondExtensionOf(unit);
+}
+
+/** The unit as it is the morning a stage opens: twenty metres more of rear wall for the first,
+ *  ten metres more of depth for the second, and every figure the floor sets in the same
+ *  proportion. */
+function unitWith(unit: UnitState, stage: ExtensionStage): UnitState {
+  const widthCells = unit.widthCells + (stage === 'first' ? UNIT_WIDTH_CELLS : 0);
+  const depthCells = unit.depthCells + (stage === 'second' ? UNIT_DEPTH_CELLS : 0);
+  const areaM2 = widthCells * depthCells;
   const factor = areaM2 / unit.areaM2;
-  const rentThen = Math.round(unit.rentMonthly * factor);
-  const deposit = Math.max(0, unitDepositFor(rentThen) - unit.depositHeld);
-  const scaled = securityLevel(state).scaled;
-  const securityNow = scaled ? securitySubscriptionMonthly(state) : 0;
-  return {
-    price: UNIT_EXTENSION_PRICE,
-    deposit,
-    total: UNIT_EXTENSION_PRICE + deposit,
-    addsM2: areaM2 - unit.areaM2,
-    areaM2,
+  const grown: UnitState = {
+    ...unit,
     widthCells,
-    depthCells: unit.depthCells,
-    joiners: Math.floor(areaM2 / M2_PER_PERSON),
-    benches: Math.round(unit.benchSlots * factor),
+    depthCells,
+    areaM2,
+    rentMonthly: Math.round(unit.rentMonthly * factor),
+    ratesMonthly: Math.round(unit.ratesMonthly * factor),
+    benchSlots: Math.round(unit.benchSlots * factor),
+  };
+  if (stage === 'first') grown.extension = 'open';
+  else grown.secondExtension = 'open';
+  return grown;
+}
+
+/** The terms of an extension of the unit as it stands this minute: the unit as it will be, and
+ *  every running cost asked of the function that charges it, of the same company in that unit, so
+ *  a card cannot print a figure the month will not take. Read while the stage is not open; the
+ *  card of an extended unit prints the unit itself. */
+export function extensionTerms(state: GameState, stage: ExtensionStage = 'first'): ExtensionTerms {
+  const unit = state.unit;
+  const grown = unitWith(unit, stage);
+  const then: GameState = { ...state, unit: grown };
+  const price = stage === 'first' ? UNIT_EXTENSION_PRICE : UNIT_SECOND_EXTENSION_PRICE;
+  const deposit = Math.max(0, unitDepositFor(grown.rentMonthly) - unit.depositHeld);
+  return {
+    price,
+    deposit,
+    total: price + deposit,
+    addsM2: grown.areaM2 - unit.areaM2,
+    areaM2: grown.areaM2,
+    widthCells: grown.widthCells,
+    depthCells: grown.depthCells,
+    joiners: crewLimit(then),
+    benches: grown.benchSlots,
+    lockers: canteenLockers({ ...then, unit: { ...grown, canteenWide: true } }),
     rentNow: unit.rentMonthly,
-    rentThen,
+    rentThen: grown.rentMonthly,
     ratesNow: unit.ratesMonthly,
-    ratesThen: Math.round(unit.ratesMonthly * factor),
+    ratesThen: grown.ratesMonthly,
     powerNow: standingPowerPerDay(unit),
-    powerThen: standingPowerPerDay({ areaM2 }),
-    securityNow,
-    securityThen: Math.round(securityNow * factor * 100) / 100,
+    powerThen: standingPowerPerDay(grown),
+    securityNow: securitySubscriptionMonthly(state),
+    securityThen: securitySubscriptionMonthly(then),
+    insuranceNow: monthlyPremiums(state),
+    insuranceThen: monthlyPremiums(then),
   };
 }
 
 /** Why the unit cannot be extended this minute, or that it can. Money is the only condition
  *  [PIOTR, 03.10], and it is the money in the account: the bank does not lend the price of a
- *  building on the overdraft. */
-export function extendUnitCheck(state: GameState): PremisesCheck {
-  if (state.unit.extension === 'building') return { ok: false, reason: 'The builders are in' };
-  if (state.unit.extension === 'open') return { ok: false, reason: 'Extended already' };
-  const terms = extensionTerms(state);
+ *  building on the overdraft. The second extension is built along the front of a unit that has
+ *  had the first, so it waits for that one to be open (v82). */
+export function extendUnitCheck(state: GameState, stage: ExtensionStage = 'first'): PremisesCheck {
+  const status = extensionStatus(state.unit, stage);
+  if (status === 'building') return { ok: false, reason: 'The builders are in' };
+  if (status === 'open') return { ok: false, reason: 'Extended already' };
+  if (stage === 'second' && state.unit.extension !== 'open') {
+    return { ok: false, reason: 'Extend the unit first' };
+  }
+  const terms = extensionTerms(state, stage);
   // The card prints the figure beside the button, so the reason is the short one.
   if (state.cash < terms.total) return { ok: false, reason: 'Not enough in the account' };
   return OK;
@@ -114,16 +163,17 @@ export function extendUnitCheck(state: GameState): PremisesCheck {
 
 /** The click: the builder and the landlord are paid, and the builders are in. The hall is the one
  *  it was until the morning (`openExtension`). */
-export function extendUnit(state: GameState): PremisesCheck {
-  const check = extendUnitCheck(state);
+export function extendUnit(state: GameState, stage: ExtensionStage = 'first'): PremisesCheck {
+  const check = extendUnitCheck(state, stage);
   if (!check.ok) return check;
-  const terms = extensionTerms(state);
+  const terms = extensionTerms(state, stage);
   pay(state, 'unitExtension', `Extension of the unit, ${terms.addsM2} m²`, terms.price);
   if (terms.deposit > 0) {
     pay(state, 'unitDeposit', 'Unit deposit, the extension', terms.deposit);
     state.unit.depositHeld += terms.deposit;
   }
-  state.unit.extension = 'building';
+  if (stage === 'first') state.unit.extension = 'building';
+  else state.unit.secondExtension = 'building';
   return OK;
 }
 
@@ -161,20 +211,10 @@ export function layRunsAgain(state: GameState, moved: ReadonlySet<string>): void
   }
 }
 
-/** The morning after the click: the second half of the hall is there. Called at the day's open,
- *  before the day is charged, so the first day of the bigger unit is paid for at its own rent. */
-export function openExtension(state: GameState): void {
-  const unit = state.unit;
-  if (unit.extension !== 'building') return;
-  const terms = extensionTerms(state);
-  moveTheApron(state, unit.widthCells, terms.widthCells - unit.widthCells);
-  unit.widthCells = terms.widthCells;
-  unit.areaM2 = terms.areaM2;
-  unit.rentMonthly = terms.rentThen;
-  unit.ratesMonthly = terms.ratesThen;
-  unit.benchSlots = terms.benches;
-  unit.extension = 'open';
-  queueEvent(state, {
+/** What the card of the first morning says: the hall along the rear wall, and that the canteen
+ *  is still the one it was. */
+function firstOpened(terms: ExtensionTerms): EventDraft {
+  return {
     kind: 'unitExtended',
     title: 'The extension is open',
     body:
@@ -183,7 +223,44 @@ export function openExtension(state: GameState): void {
       'The rent, the rates and the power are charged on the bigger unit from today. ' +
       'The canteen still holds what it held: enlarge it from the laptop, under Premises.',
     data: { areaM2: terms.areaM2, widthCells: terms.widthCells },
-  });
+  };
+}
+
+/** And the card of the second: the hall twice as deep, the costs the 1st takes for it, and the
+ *  lockers the canteen holds now, or would hold enlarged (v82). */
+function secondOpened(state: GameState, terms: ExtensionTerms): EventDraft {
+  const canteen = state.unit.canteenWide
+    ? `The canteen holds ${terms.lockers} lockers now.`
+    : `Enlarged, the canteen holds ${terms.lockers} lockers: enlarge it from the laptop, under Premises.`;
+  return {
+    kind: 'unitExtended',
+    title: 'The second extension is open',
+    body:
+      `The builders are out. The hall is ${terms.widthCells} by ${terms.depthCells} m now, ` +
+      `${terms.areaM2} m², with room for ${terms.joiners} joiners and ${terms.benches} benches. ` +
+      'The rent, the rates and the power are charged on the bigger unit from today, and the ' +
+      `insurer and the security charge for it from the 1st. ${canteen}`,
+    data: { areaM2: terms.areaM2, widthCells: terms.widthCells, depthCells: terms.depthCells },
+  };
+}
+
+/** One stage, the morning after its click. The first takes the kerb at the hall's end out with
+ *  it. The second is along the front, where nothing stands and nothing has to move: the apron is
+ *  past the end of the hall and stays there. */
+function openStage(state: GameState, stage: ExtensionStage): void {
+  const unit = state.unit;
+  if (extensionStatus(unit, stage) !== 'building') return;
+  const terms = extensionTerms(state, stage);
+  if (stage === 'first') moveTheApron(state, unit.widthCells, terms.widthCells - unit.widthCells);
+  Object.assign(unit, unitWith(unit, stage));
+  queueEvent(state, stage === 'first' ? firstOpened(terms) : secondOpened(state, terms));
+}
+
+/** The morning after the click: the new floor is there. Called at the day's open, before the day
+ *  is charged, so the first day of the bigger unit is paid for at its own rent. */
+export function openExtension(state: GameState): void {
+  openStage(state, 'first');
+  openStage(state, 'second');
 }
 
 /** What the canteen is and what it becomes, for the card: its floor and its lockers, as built and
@@ -204,11 +281,13 @@ export function canteenTerms(state: GameState): CanteenTerms {
   const wide = roomsOf({ canteenWide: true }).find((room) => room.id === 'canteen') ?? built;
   const now = roomsOf(state.unit).find((room) => room.id === 'canteen') ?? built;
   const box = canteenGrowthBox();
+  // The lockers are the unit's own figure: sixteen enlarged, thirty two in the 800 m2 unit (v82).
+  const enlarged: GameState = { ...state, unit: { ...state.unit, canteenWide: true } };
   return {
     areaNow: now.width * now.depth,
-    lockersNow: state.unit.canteenWide ? CANTEEN_LOCKERS_WIDE : CANTEEN_LOCKERS,
+    lockersNow: canteenLockers(state),
     areaThen: wide.width * wide.depth,
-    lockersThen: CANTEEN_LOCKERS_WIDE,
+    lockersThen: canteenLockers(enlarged),
     grows: wide.width - built.width,
     clear: { width: box.width, depth: box.depth },
   };
@@ -255,8 +334,9 @@ export function enlargeCanteenCheck(state: GameState): PremisesCheck {
   return OK;
 }
 
-/** The click: the canteen is four by four metres from this minute, and holds sixteen lockers.
- *  Nothing is paid and nothing has to be moved, because the check has seen the floor clear. */
+/** The click: the canteen is four by four metres from this minute, and holds sixteen lockers,
+ *  thirty two in the 800 m2 unit. Nothing is paid and nothing has to be moved, because the check
+ *  has seen the floor clear. */
 export function enlargeCanteen(state: GameState): PremisesCheck {
   const check = enlargeCanteenCheck(state);
   if (!check.ok) return check;

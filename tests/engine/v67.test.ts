@@ -7,6 +7,10 @@
 // the standing power. "Leave the canteen that is there, only make it bigger": it grows two metres
 // along the rear wall, at no charge, once the extension is open and the floor beside it is clear,
 // and holds sixteen lockers.
+//
+// v82 (PIOTR, 04.10): the second extension, at the foot of this file. "The extension for timber,
+// the next 400 m2 for a million", and "do not forget to make everything bigger: thirty two
+// workers, and all the costs times two, insurance, security, power".
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -14,6 +18,7 @@ import {
   CANTEEN_LOCKERS_WIDE,
   STATE_VERSION,
   UNIT_EXTENSION_PRICE,
+  UNIT_SECOND_EXTENSION_PRICE,
   canteenGrowthBox,
   roomDoorCell,
   roomsOf,
@@ -21,12 +26,14 @@ import {
 import { MONTH_LINE_OF, dailyPower, standingPowerPerDay } from '../../src/engine/economy';
 import { canBuy, countOf, machinePowerPerDay, movePending } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
+import { premiumYearlyFor } from '../../src/engine/insurance';
 import {
   canPlaceSpec,
   canteenLockers,
   cellIsFloor,
   crewLimit,
   freeFloorM2,
+  lockersInWords,
 } from '../../src/engine/layout';
 import { migrateState } from '../../src/engine/migrate';
 import {
@@ -35,6 +42,7 @@ import {
   extendUnitCheck,
   extensionTerms,
 } from '../../src/engine/premises';
+import { securitySubscriptionMonthly, securitySubscriptionParts } from '../../src/engine/security';
 import { canHire, canteenFullLine } from '../../src/engine/staff';
 import { isFree } from '../../src/engine/walk';
 import {
@@ -370,5 +378,83 @@ describe('sixteen lockers', () => {
     // Sixteen joiners is the unit's own limit, and the unit says so first.
     expect(canHire(sixteen, 'joiner', 'novice').reason).toContain('the unit takes 16 joiners');
     expect(canteenFullLine(sixteen)).toBe('No locker for him: the canteen holds sixteen');
+  });
+});
+
+describe('the second extension: 400 m2 along the front, for a million [PIOTR, 04.10] (v82)', () => {
+  /** A shop that has had the first extension and has the money for the second. */
+  function rich(): GameState {
+    const state = extended();
+    state.cash = 1200000;
+    return state;
+  }
+
+  it('waits for the first, costs a million and a deposit, and doubles what the floor sets', () => {
+    expect(extendUnitCheck(shop(), 'second')).toEqual({ ok: false, reason: 'Extend the unit first' });
+    expect(act(shop(), { type: 'EXTEND_UNIT', stage: 'second' }).unit.secondExtension).toBeUndefined();
+    const terms = extensionTerms(rich(), 'second');
+    expect(UNIT_SECOND_EXTENSION_PRICE).toBe(1000000);
+    expect([terms.price, terms.deposit, terms.total]).toEqual([1000000, 4800, 1004800]);
+    expect([terms.addsM2, terms.areaM2, terms.widthCells, terms.depthCells]).toEqual([400, 800, 40, 20]);
+    expect([terms.joiners, terms.benches, terms.lockers]).toEqual([32, 24, 32]);
+    expect([terms.rentNow, terms.rentThen]).toEqual([4800, 9600]);
+    expect([terms.ratesNow, terms.ratesThen]).toEqual([900, 1800]);
+    expect([terms.powerNow, terms.powerThen]).toEqual([8, 16]);
+    const short = rich();
+    short.cash = 1004799;
+    expect(extendUnitCheck(short, 'second')).toEqual({ ok: false, reason: 'Not enough in the account' });
+  });
+
+  it('is there the next morning: forty metres by twenty, thirty two joiners, and said once', () => {
+    const events: GameEvent[] = [];
+    const before = rich();
+    const paid = act(before, { type: 'EXTEND_UNIT', stage: 'second' });
+    expect(paid.cash).toBe(before.cash - 1004800);
+    expect(paid.unit.secondExtension).toBe('building');
+    expect(paid.unit.depthCells).toBe(10);
+    expect(extendUnitCheck(paid, 'second')).toEqual({ ok: false, reason: 'The builders are in' });
+    const open = nextDay(paid, events);
+    expect(open.unit).toMatchObject({
+      areaM2: 800,
+      widthCells: 40,
+      depthCells: 20,
+      rentMonthly: 9600,
+      ratesMonthly: 1800,
+      benchSlots: 24,
+      extension: 'open',
+      secondExtension: 'open',
+    });
+    expect(crewLimit(open)).toBe(32);
+    expect(standingPowerPerDay(open.unit)).toBe(16);
+    expect(ledgerOf(open, 'rent', open.clock.day)).toBeCloseTo(-9600 / 30, 6);
+    const said = events.filter((event) => event.kind === 'unitExtended');
+    expect(said.map((event) => event.title)).toEqual(['The second extension is open']);
+    expect(said[0]?.body).toContain('40 by 20 m');
+    expect(extendUnitCheck(open, 'second')).toEqual({ ok: false, reason: 'Extended already' });
+    // The new floor takes a machine and a man, and the hall ends where it ends.
+    expect(canPlaceSpec(paid, 'tableSaw', 30, 14, null).ok).toBe(false);
+    expect(canPlaceSpec(open, 'tableSaw', 30, 14, null).ok).toBe(true);
+    expect(isFree(open, { x: 39, y: 19 })).toBe(true);
+    expect(isFree(open, { x: 39, y: 20 })).toBe(false);
+  });
+
+  it('doubles the insurance and the dogs, which the area does not set, and gives the canteen thirty two', () => {
+    const open = nextDay(act(rich(), { type: 'EXTEND_UNIT', stage: 'second' }));
+    placeEquipment(open, 'tableSaw', { variantId: 'pro', x: 12, y: 0, id: 'kit-saw' });
+    // The same company in the unit it had the day before.
+    const flat: GameState = { ...open, unit: { ...open.unit, secondExtension: 'none' } };
+    expect(premiumYearlyFor(flat, 'property')).toBeGreaterThan(0);
+    expect(premiumYearlyFor(open, 'property')).toBe(2 * premiumYearlyFor(flat, 'property'));
+    expect(premiumYearlyFor(open, 'liability')).toBe(2 * premiumYearlyFor(flat, 'liability'));
+    // The dogs are a flat 150 a month and 300 here; a firm's month is the area's, four times 200.
+    expect(securitySubscriptionMonthly(flat, 3)).toBe(150);
+    expect(securitySubscriptionMonthly(open, 3)).toBe(300);
+    expect(securitySubscriptionParts(open, 5).areaFactor).toBe(4);
+    // Eight lockers until the canteen is enlarged, and thirty two then: one for every joiner.
+    expect(canteenLockers(open)).toBe(8);
+    expect(canteenTerms(open).lockersThen).toBe(32);
+    const wide = act(open, { type: 'ENLARGE_CANTEEN' });
+    expect(canteenLockers(wide)).toBe(32);
+    expect(lockersInWords(wide)).toBe('thirty-two');
   });
 });

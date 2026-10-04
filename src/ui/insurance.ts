@@ -9,6 +9,7 @@ import {
   PROPERTY_INSURANCE_RATE_YEARLY,
   UNINSURED_CLAIM_MAX,
   UNINSURED_CLAIM_MIN,
+  unitCostFactor,
 } from '../engine/constants';
 import {
   COVER_LABELS,
@@ -33,6 +34,15 @@ function figureRow(label: string, value: number): string {
   );
 }
 
+/** What the insurer does with either figure on the 800 m2 unit, which is charged a multiple of
+ *  it: said in the cover's own line, so the premium under it adds up (v82). Nothing for a unit
+ *  that is charged the figure itself. */
+function unitLine(state: GameState): string {
+  const factor = unitCostFactor(state.unit);
+  if (factor === 1) return '';
+  return ` A unit of ${state.unit.areaM2} m² is charged ${factor} times that.`;
+}
+
 /** What the cover is written on, in words the player can check against the hall. */
 function basisLine(state: GameState, cover: InsuranceCover): string {
   if (cover === 'property') {
@@ -40,12 +50,12 @@ function basisLine(state: GameState, cover: InsuranceCover): string {
       `Every machine at what it cost, ${money(insuredMachinesValue(state))}, and the stock at ` +
       `its value, ${money(insuredStockValue(state))}: ${money(insuredValue(state))} insured at ` +
       `${Math.round(PROPERTY_INSURANCE_RATE_YEARLY * 100)}% a year. It follows every purchase ` +
-      'and every sheet.'
+      `and every sheet.${unitLine(state)}`
     );
   }
   return (
     `${money(LIABILITY_BASE_YEARLY)} a year, plus ${money(LIABILITY_PER_EMPLOYEE_YEARLY)} for each ` +
-    `of the ${plural(state.workers.length, 'person', 'people')} on the books.`
+    `of the ${plural(state.workers.length, 'person', 'people')} on the books.${unitLine(state)}`
   );
 }
 

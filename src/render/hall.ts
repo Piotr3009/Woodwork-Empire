@@ -13,6 +13,7 @@ import {
   CLASS_BADGE,
   ROOM_DOOR,
   ROOM_LAYOUT,
+  UNIT_DEPTH_CELLS,
   UNIT_WIDTH_CELLS,
   WELFARE_IN_THE_CANTEEN,
   YARD_WIDTH_CELLS,
@@ -439,6 +440,18 @@ export const HALL_CANVAS_WIDE = {
   originY: HALL_CANVAS.originY,
 };
 
+/** The canvas of the 800 m2 hall's background: forty metres by twenty, 3120 by 1848 in the file.
+ *  The floor grows towards the camera, which is down and to the left on the screen, so world
+ *  (0, 0, 0) is 480 file pixels further along this one than along the first. A layer is laid down
+ *  by its own origin, so everything painted on the first canvas still stands where it stood
+ *  (v82). */
+export const HALL_CANVAS_DEEP = {
+  width: 3120 / SPRITE_SCALE,
+  height: 1848 / SPRITE_SCALE,
+  originX: 1080 / SPRITE_SCALE,
+  originY: HALL_CANVAS.originY,
+};
+
 export type HallCanvas = typeof HALL_CANVAS;
 
 export interface HallLayer {
@@ -459,26 +472,40 @@ export const HALL_LAYERS: HallLayer[] = [
   { key: 'hallCanteen', name: 'Canteen block', room: 'canteen' },
 ];
 
-/** The two layers a unit that has grown is painted with in place of its own: the background of
- *  the hall at forty metres, and the canteen block at four by four. Both are made of the first
- *  three pictures and nothing else: the floor and the rear wall carried on along the hall, and
- *  the canteen block stood beside itself with its second door walled up (PIOTR, 03.10: "do we
- *  need new art, or will you just double what is there"; v67). */
+/** The layers a unit that has grown is painted with in place of its own: the background of the
+ *  hall at forty metres, the background at forty metres by twenty, and the canteen block at four
+ *  by four. All of them are made of the first three pictures and nothing else: the floor and the
+ *  walls carried on along the hall and then towards the camera, and the canteen block stood
+ *  beside itself with its second door walled up (PIOTR, 03.10: "do we need new art, or will you
+ *  just double what is there"; v67, v82). */
 export const HALL_WIDE_LAYERS: HallLayer[] = [
   { key: 'hallBackgroundWide', name: 'Hall background, extended', room: 'wc', canvas: HALL_CANVAS_WIDE },
+  { key: 'hallBackgroundDeep', name: 'Hall background, 800 m²', room: 'wc', canvas: HALL_CANVAS_DEEP },
   { key: 'hallCanteenWide', name: 'Canteen block, enlarged', room: 'canteen' },
 ];
 
+/** The picture a grown unit has in place of this layer, or the layer itself. */
+function grownLayer(layer: HallLayer, key: string | null): HallLayer {
+  return HALL_WIDE_LAYERS.find((entry) => entry.key === key) ?? layer;
+}
+
 /** The layers this unit is painted with, back to front: the first three, with the extended
- *  background once the hall is longer than it was built and the enlarged canteen block once the
- *  canteen is (v67). */
-export function hallLayersOf(unit: { widthCells: number; canteenWide?: boolean }): HallLayer[] {
+ *  background once the hall is longer than it was built, the 800 m2 one once it is deeper, and
+ *  the enlarged canteen block once the canteen is (v67, v82). */
+export function hallLayersOf(unit: {
+  widthCells: number;
+  depthCells?: number;
+  canteenWide?: boolean;
+}): HallLayer[] {
+  const deep = (unit.depthCells ?? UNIT_DEPTH_CELLS) > UNIT_DEPTH_CELLS;
   const extended = unit.widthCells > UNIT_WIDTH_CELLS;
+  const background = deep ? 'hallBackgroundDeep' : extended ? 'hallBackgroundWide' : null;
   return HALL_LAYERS.map((layer) => {
-    const wide = HALL_WIDE_LAYERS.find((entry) => entry.room === layer.room);
-    if (wide === undefined) return layer;
-    if (layer.room === 'wc') return extended ? wide : layer;
-    return unit.canteenWide === true ? wide : layer;
+    if (layer.room === 'wc') return grownLayer(layer, background);
+    if (layer.room === 'canteen') {
+      return grownLayer(layer, unit.canteenWide === true ? 'hallCanteenWide' : null);
+    }
+    return layer;
   });
 }
 

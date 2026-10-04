@@ -4,6 +4,9 @@
 // the hall of forty metres painted with the extended background, the canteen block at four by
 // four with its door where it was, and the canteen room showing sixteen lockers: eight at a time
 // until v80, and all sixteen at once on its own picture since (delivered 03.10).
+//
+// v82 (PIOTR, 04.10): the second extension, at the foot of this file: its card, the hall of forty
+// metres by twenty, and the thirty two lockers of its canteen sixteen at a time.
 
 import { describe, expect, it } from 'vitest';
 import { roomsOf } from '../../src/engine/constants';
@@ -17,6 +20,7 @@ import {
 } from '../../src/render/canteen';
 import {
   HALL_CANVAS,
+  HALL_CANVAS_DEEP,
   HALL_CANVAS_WIDE,
   HALL_NAME_WALL,
   hallLayerBox,
@@ -265,5 +269,82 @@ describe('the canteen room of an enlarged canteen', () => {
     expect(room.querySelector('[data-canteen-text="counter"]')?.textContent).toBe('10 of 16 lockers in use');
     expect(room.querySelector('[data-canteen-plate="8"]')?.textContent).toBe('Man9');
     expect(room.innerHTML).toContain('/sprites/canteenLockersWide.png');
+  });
+});
+
+describe('the second extension, as the player sees it (v82)', () => {
+  /** A shop that has had the first extension and has the money for the second. */
+  function rich(): GameState {
+    const state = extended();
+    state.cash = 1200000;
+    return state;
+  }
+
+  function deep(): GameState {
+    return nextDay(act(rich(), { type: 'EXTEND_UNIT', stage: 'second' }));
+  }
+
+  function linesOf(card: HTMLElement): Array<string | null> {
+    return Array.from(card.querySelectorAll('.figures')).map((line) => line.textContent);
+  }
+
+  it('is offered under the first once that is open, with what it costs and what it doubles', () => {
+    expect(dom(renderPremises(shop())).querySelector('[data-premises="extendSecond"]')).toBeNull();
+    const card = cardOf(dom(renderPremises(rich())), 'extendSecond');
+    expect(card.querySelector('h3')?.textContent).toBe('Extend the unit to 800 m²');
+    expect(linesOf(card)).toEqual([
+      '£1,000,000 · and £4,800 more deposit. Needs £1,004,800 in the account.',
+      'Adds 400 m² along the front of the hall: 40 × 20 m, ready the next morning. Room for 32 ' +
+        'joiners and 24 benches, and 32 lockers in the enlarged canteen. Rent £4,800 → £9,600 a ' +
+        'month, rates £900 → £1,800, standing power £8 → £16 a day.',
+    ]);
+    expect(card.querySelector('[data-do="extendUnit"]')?.getAttribute('data-stage')).toBe('second');
+    // The insurer's and the dogs' month are on the card of a company that pays them.
+    const covered = rich();
+    covered.insurance.liability = true;
+    covered.security.level = 3;
+    const text = cardOf(dom(renderPremises(covered)), 'extendSecond').textContent;
+    expect(text).toContain('Insurance £50 → £100 a month.');
+    expect(text).toContain('Security £150 → £300 a month.');
+  });
+
+  it('paints the hall forty metres by twenty on a canvas of its own, the blocks where they were', () => {
+    const open = deep();
+    expect(hallLayersOf(open.unit).map((layer) => layer.key)).toEqual([
+      'hallBackgroundDeep',
+      'hallOffice',
+      'hallCanteen',
+    ]);
+    expect(spriteFiles()).toContain('hallBackgroundDeep.png');
+    expect(hallLayerBox(HALL_CANVAS_DEEP)).toEqual({ x: -540, y: -144, width: 1560, height: 924 });
+    const hall = dom(renderHall(open));
+    expect(hall.querySelector('svg')?.getAttribute('viewBox')).toBe('-540 -144 1560 924');
+    expect(hall.querySelector('[data-layer="hallOffice"]')?.getAttribute('x')).toBe(String(-HALL_CANVAS.originX));
+    // The unit as it stands is said once, on the card of the last extension it has had.
+    const page = dom(renderPremises(open));
+    expect(linesOf(cardOf(page, 'extend'))).toEqual(['Extended', 'The first extension, to the right of the hall.']);
+    expect(linesOf(cardOf(page, 'extendSecond'))).toEqual(['Extended', '800 m², room for 32 joiners and 24 benches.']);
+  });
+
+  it('shows the thirty two lockers of its enlarged canteen sixteen at a time, and turns the page', () => {
+    let state = act(deep(), { type: 'ENLARGE_CANTEEN' });
+    for (let index = 0; index < 18; index += 1) state = buyNow(state, 'locker');
+    for (let index = 0; index < 18; index += 1) {
+      state.workers.push(testJoiner(`joiner-${index + 1}`, `Man${index + 1}`));
+    }
+    expect(canteenRegionsOf(state).map((region) => region.id)).toEqual([
+      'door',
+      'lockers',
+      'kitchen',
+      'table',
+      'lockerPage',
+    ]);
+    expect(canteenCounterLine(state)).toBe('Lockers 1 to 16 \u00b7 18 of 32 in use \u203a');
+    expect(canteenCounterLine(state, 1)).toBe('Lockers 17 to 32 \u00b7 18 of 32 in use \u203a');
+    expect(canteenPlateNames(state)[15]).toBe('Man16');
+    expect(canteenPlateNames(state, 1).slice(0, 3)).toEqual(['Man17', 'Man18', '']);
+    const room = dom(renderCanteen(state, { width: 1672, height: 941 }, spriteFiles(), 1));
+    expect(room.querySelector('[data-canteen-plate="0"]')?.textContent).toBe('Man17');
+    expect(room.querySelector('[data-office="lockerPage"]')).not.toBeNull();
   });
 });

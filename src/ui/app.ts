@@ -69,7 +69,7 @@ import {
   roomsOf,
 } from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
-import { canteenScene } from '../render/canteen';
+import { CANTEEN_PAGE_REGION, canteenPages, canteenScene } from '../render/canteen';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderContracts } from './contracts';
@@ -196,6 +196,10 @@ interface Ui {
   /** The house card is up at the end of the day, since this real time (CLAUDE.md T13 3.18). */
   houseCardSince: number | null;
   houseCardDone: boolean;
+  /** Which of its lockers the canteen's wall is showing, where it holds more of them than its
+   *  picture has doors: 0 for the first sixteen of the 800 m2 unit's thirty two, 1 for the rest
+   *  (v82). */
+  canteenPage: number;
   /** Which page of the laptop is on its screen. It opens on home every time, with no memory of
    *  the last page (CLAUDE.md T14 2.1). */
   laptopPage: LaptopPage;
@@ -387,6 +391,7 @@ function freshUi(): Ui {
     contractMan: null,
     houseCardSince: null,
     houseCardDone: false,
+    canteenPage: 0,
     laptopPage: 'home',
     teamTab: 'workshop',
     teamTrade: 'joiner',
@@ -932,7 +937,7 @@ function sceneFor(current: GameState): Scene | null {
     return hallScene(current, { ghost: ghostFor(current), setup: ui.setup });
   }
   if (ui.view === 'canteen') {
-    return canteenScene(current, roomViewport());
+    return canteenScene(current, roomViewport(), undefined, ui.canteenPage);
   }
   return officeScene(current, roomViewport());
 }
@@ -1520,6 +1525,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         openLaptopPage('team');
         break;
       }
+      // The line over the lockers of a canteen with more of them than its wall has doors turns
+      // to the others (v82).
+      if (region === CANTEEN_PAGE_REGION) {
+        ui.canteenPage = (ui.canteenPage + 1) % canteenPages(game());
+        break;
+      }
       const modal = OFFICE_REGION_MODALS[region];
       if (modal !== undefined) openModal(modal);
       break;
@@ -1665,11 +1676,14 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       dispatch({ type: 'SET_AGENCY', on: id === 'on' });
       return;
     case 'extendUnit':
-      // The Premises page's two buttons (PIOTR, 03.10; v67).
-      dispatch({ type: 'EXTEND_UNIT' });
+      // The Premises page's buttons (PIOTR, 03.10 and 04.10; v67, v82): the first extension, and
+      // the second on the button that names it.
+      dispatch({ type: 'EXTEND_UNIT', stage: element.dataset.stage === 'second' ? 'second' : 'first' });
       return;
     case 'enlargeCanteen':
       dispatch({ type: 'ENLARGE_CANTEEN' });
+      // The room shows its first lockers again, whichever it was showing.
+      ui.canteenPage = 0;
       return;
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
@@ -2183,6 +2197,8 @@ function copyState(): void {
 function walkTo(view: 'hall' | 'office' | 'canteen'): void {
   ui.view = view;
   if (view !== 'hall') endSetup();
+  // The canteen is walked into at its first lockers, whichever it was left at (v82).
+  if (view === 'canteen') ui.canteenPage = 0;
   resetCamera();
   requestRender();
 }

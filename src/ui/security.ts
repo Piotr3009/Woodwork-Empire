@@ -27,7 +27,8 @@ export function costLine(state: GameState, spec: SecurityLevelSpec): string {
   if (spec.scaled) {
     parts.push(`${money(securitySubscriptionParts(state, spec.level).monthly)} a month at this hall`);
   } else if (spec.monthly > 0) {
-    parts.push(`${money(spec.monthly)} a month`);
+    // The flat month, which the 800 m2 unit pays twice: the engine's figure, not the table's (v82).
+    parts.push(`${money(securitySubscriptionParts(state, spec.level).monthly)} a month`);
   }
   return parts.length === 0 ? 'nothing' : parts.join(' plus ');
 }
