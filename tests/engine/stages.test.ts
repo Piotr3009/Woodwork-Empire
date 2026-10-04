@@ -195,11 +195,12 @@ describe('where a job has got to', () => {
   it('counts what is left of the job at its one pace, whatever stage its bar stands at', () => {
     const state = jobInHall();
     const job = firstJob(state);
-    // 240 minutes of work, the moulding's 60 by hand at 90: 270 (v55).
-    expect(minutesLeftFor(state, job, 1)).toBeCloseTo(270, 6);
+    // 218.18 minutes of work, the moulding's 54.55 by hand at 81.82: 245.45 (v55; 240 and 270
+    // until v79, the owner's base 320 a day).
+    expect(minutesLeftFor(state, job, 1)).toBeCloseTo(2700 / 11, 6);
     // Half the job done is half the minutes left, at the job's one pace.
     job.labourRemaining = job.labourValue / 2;
-    expect(minutesLeftFor(state, job, 1)).toBeCloseTo(135, 6);
+    expect(minutesLeftFor(state, job, 1)).toBeCloseTo(1350 / 11, 6);
   });
 
   it('takes a whole job in the minutes its stages add up to, and half of it in half of them', () => {
@@ -210,8 +211,10 @@ describe('where a job has got to', () => {
     const enquiry = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
     const next = acceptNow(state, enquiry.id, false);
     const job = firstJob(next);
-    const whole = 60 / 1.12 + 60 + 90 + 60;
-    expect(jobPace(next, job)).toBeCloseTo(240 / whole, 10);
+    // A quarter of a 400 job is 54.55 of the owner's minutes from v79 (60 on his 320 a day).
+    const quarter = 600 / 11;
+    const whole = quarter / 1.12 + quarter + quarter * 1.5 + quarter;
+    expect(jobPace(next, job)).toBeCloseTo((4 * quarter) / whole, 10);
     // The whole of it at that pace is the minutes its stages add up to.
     expect(minutesLeftFor(next, job, 1)).toBeCloseTo(jobMinutesFor(next, job, 1), 6);
     expect(minutesLeftFor(next, job, 1)).toBeCloseTo(whole, 6);
@@ -228,14 +231,14 @@ describe('where a job has got to', () => {
     state = act(state, { type: 'SET_SPEED', speed: 1 });
     state = tick(state, 70);
     const job = firstJob(state);
-    // A 400 job is 240 minutes of work: 60 of cutting, then 60 of edging, at the job's one pace,
-    // 240 / 270 on this hall (the moulding by hand). A run closes on the minute its stage is
-    // worked off (v37): the cutting's 60 of labour takes 67.5 minutes at that pace, so its run
-    // ends on minute 67 of the day (v55).
+    // A 400 job is 218.18 minutes of work: 54.55 of cutting, then 54.55 of edging, at the job's
+    // one pace, 240 / 270 on this hall (the moulding by hand). A run closes on the minute its
+    // stage is worked off (v37): the cutting's 54.55 minutes take 61.36 at that pace, so its run
+    // ends on minute 61 of the day (v55; minute 67 until v79, the owner's base 320 a day).
     expect(job.stageRuns.map((run) => run.stage)).toEqual(['cutting', 'edging']);
     expect(job.stageRuns[0]?.startDay).toBe(1);
     expect(job.stageRuns[0]?.startMinute).toBe(0);
-    expect(job.stageRuns[0]?.endMinute).toBe(67);
+    expect(job.stageRuns[0]?.endMinute).toBe(61);
     expect(job.stageRuns[1]?.endDay).toBeNull();
   });
 });

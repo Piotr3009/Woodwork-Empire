@@ -59,12 +59,13 @@ describe('the day 128 save (PIOTR, 22.09; v46)', () => {
     state = runClock(state, 30);
     const after = state.jobs.find((entry) => entry.id === job.id);
     expect(after?.blockedBy).toBe('');
-    // The four men's half hour on the job, 71.67 of labour, all of it written on the cutting
+    // The four men's half hour on the job, 78.84 of labour, all of it written on the cutting
     // where the bar stands: the kitchen's pace, +0.07, and the hall's too few saws, −0.17, added
     // as points and each man's own grade times them (v61; PIOTR, 01.10). 71.61 on v60, the grade
     // a point too; 70.75 until v60, the three multiplied; until v53 it was the owner's half hour
     // alone (PIOTR, 24.09; v53); 63.56 on v54, with the old shares and a saw place for one man.
-    expect(before - (after?.labourRemaining ?? before)).toBeCloseTo(71.671, 3);
+    // 71.67 until v79, the owner's base 320 a day.
+    expect(before - (after?.labourRemaining ?? before)).toBeCloseTo(78.8385, 3);
     // The kitchen's round is its four machines, the saw, the edgebander, the spindle moulder and
     // the bench, and the four men go round them one each, moving on every half hour: at 9:53,
     // the second half hour of the day, the owner is at the edgebander and Pete at the saw (v55).

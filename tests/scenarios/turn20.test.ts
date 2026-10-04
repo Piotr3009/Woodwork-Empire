@@ -261,11 +261,13 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // term above): 5,382 taken, 2,340 of stock, the same 2,470, and the month is 572 above water
     // [measured]. The line of the cross check holds by 572 and no more. From v61, 118 packs (the
     // term above): 8,142 taken, 3,540 of stock, the same 2,470, 2,132 above water [measured].
+    // From v77 every wage is up by the one factor, his and the entry point's: 118 packs at 87 are
+    // 10,266, his month is 5,765, and the month is 961 above water [measured].
     expect(revenue).toBe(118 * contract.pricePerPiece);
-    expect(revenue).toBe(8142);
+    expect(revenue).toBe(10266);
     expect(material).toBe(3540);
-    expect(wages.total).toBe(2470);
-    expect(profit).toBe(2132);
+    expect(wages.total).toBe(5765);
+    expect(profit).toBe(961);
     expect(profit).toBeGreaterThan(0);
     // The closing report the player is handed says the same thing in its own arithmetic: it costs
     // the minutes he actually stood at the contract and not the days he was paid for, which reads
@@ -278,8 +280,8 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // 3,835.67 over the same 160 hours from v57, the one pack more of the term above. From v60,
     // 1,859.33 over the two weeks' 80 hours, the saw's wear 30 on them, the client having ended
     // it on day 22 (above) [measured]. From v61, 2,828 over three weeks' 120 hours, the wear 45
-    // (the client ending it on day 29, above) [measured].
-    expect(report.margin).toBe(2828);
+    // (the client ending it on day 29, above) [measured]. 2,645.50 from v77, his hour dearer.
+    expect(report.margin).toBe(2645.5);
     expect(report.machineWear).toBe(45);
     expect(report.labourHours).toBe(120);
     expect(report.margin + report.machineWear).toBeGreaterThan(profit);
@@ -782,13 +784,13 @@ describe('(ff) three services on one saw', () => {
       expect(away, `service ${index + 1}`).toBeGreaterThan(0);
       expect(away, `service ${index + 1}`).toBeLessThan(back);
     }
-    // The first of them in figures: 256.00 of the piece's labour the day the saw was away, 281.16
+    // The first of them in figures: 281.60 of the piece's labour the day the saw was away, 309.27
     // the day it was back, which is 0.8 against 0.88 (284.44 and 315.84 until v55, the paces
-    // above). v52 made 0 and then 304.
+    // above; 256.00 and 281.16 until v79, the owner's base 320 a day). v52 made 0 and then 304.
     const first = FF.rounds[0];
     if (first === undefined) throw new Error('three services are wanted');
-    expect(first.leftAtTheCall - first.leftThatEvening).toBeCloseTo(256.0, 2);
-    expect(first.leftThatEvening - first.leftTheNextEvening).toBeCloseTo(281.16, 2);
+    expect(first.leftAtTheCall - first.leftThatEvening).toBeCloseTo(281.6, 2);
+    expect(first.leftThatEvening - first.leftTheNextEvening).toBeCloseTo(309.27, 2);
     expect(machinesInService(FF.state)).toEqual([]);
     console.log(
       '(ff) THREE SERVICES ON ONE SAW\n' +

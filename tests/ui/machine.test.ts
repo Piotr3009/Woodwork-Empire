@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { renderCatalogue } from '../../src/ui/catalogue';
-import { isMachineFamily, recommendedVariant, renderMachine } from '../../src/ui/machine';
+import { isMachineFamily, pictureSlot, recommendedVariant, renderMachine } from '../../src/ui/machine';
 import { deliveryDaysFor, enduranceHoursFor, findSpec, plural } from '../../src/engine/index';
 import {
   CLASS_BADGE,
@@ -351,13 +351,13 @@ describe('the tiles inside a folder', () => {
     expect(booths.every((slot) => slot.querySelector('img') !== null)).toBe(true);
     const head = parse(renderMachine(state, 'cncHead')).querySelector('.tile-picture img');
     expect(head?.getAttribute('src')).toBe('/sprites/cncToolChanger.standard.png');
-    // And a family with no file at all still gets its box: the air dryer, which has no art yet. It
-    // was the spray booth until v56 and the CNC until v54.
-    const boxes = Array.from(
-      parse(renderMachine(state, 'airDryer')).querySelectorAll('.tile-picture'),
-    );
-    expect(boxes.length).toBeGreaterThan(0);
-    expect(boxes.every((slot) => slot.querySelector('.tile-picture-box') !== null)).toBe(true);
+    // And a key with no file at all still gets its box. From v80 every family of the catalogue has
+    // its picture, the air dryer the last of them, so the box is shown on the pallet at the gate,
+    // which the art side has not drawn (the air dryer until v80, the booth until v56).
+    const dryers = Array.from(parse(renderMachine(state, 'airDryer')).querySelectorAll('.tile-picture'));
+    expect(dryers.every((slot) => slot.querySelector('img') !== null)).toBe(true);
+    const box = parse(pictureSlot('pallet', 'standard'));
+    expect(box.querySelector('.tile-picture .tile-picture-box')).not.toBeNull();
   });
 
   it('puts the one accent button on the cheapest class the workshop can pay for', () => {

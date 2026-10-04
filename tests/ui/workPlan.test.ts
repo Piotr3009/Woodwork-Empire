@@ -160,12 +160,13 @@ describe('a job somebody has started', () => {
   it('shows the minutes done of the minutes it takes, and fills the bar that far', () => {
     // A small job, so three quarters of its work fits inside one morning and the test can put the
     // clock where that morning ends. A budget spindle moulder beside the saw, so every quarter of
-    // the job runs at 1.00 and its minutes are a whole number (v55).
-    const state = act(boardWith({ price: 400 }), { type: 'WORK_HERE', jobId: null });
+    // the job runs at 1.00 and its minutes are a whole number (v55). Priced 440 and not 400 from
+    // v79: on the owner's 352 a day a 400 job is 218.18 minutes, and a 440 one is 240.
+    const state = act(boardWith({ price: 440 }), { type: 'WORK_HERE', jobId: null });
     placeEquipment(state, 'spindleMoulder', { variantId: 'budget', x: 14, y: 1, id: 'kit-spindle' });
     const job = firstJob(state);
     const whole = minutesRemainingFor(state, job, 1);
-    expect(whole).toBe(240);
+    expect(whole).toBeCloseTo(240, 9);
     expect(whole * 0.75).toBeLessThan(BREAK_START_MINUTE);
     // Three quarters of the work done, and three quarters of the work's minutes gone by: the way
     // a real morning at the bench leaves it (CLAUDE.md T11 3.3).

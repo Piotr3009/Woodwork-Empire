@@ -284,8 +284,9 @@ describe('(v) a four week contract with the joiner taken off it for two of them'
     // point's price, and the entry point carries the reference saw's wear, which fell six fold
     // when the service went from 80 hours to six months (PIOTR, 22.09; v51): 76 became 69, and
     // 0.97 of 69 rounds to 67. The price moved it and nothing else did: the weeks, the short
-    // weeks and the factor are what they were.
-    expect(contract?.renegotiatedPrice).toBe(67);
+    // weeks and the factor are what they were. 84 from v77: the entry point carries the entry
+    // man's wages, up by the one factor, 87 a piece and 0.97 of it [measured].
+    expect(contract?.renegotiatedPrice).toBe(84);
     const report = seen.find((event) => event.kind === 'contractEnded');
     expect(report).toBeDefined();
     expect(report?.data.pieces).toBe(contract?.piecesMade);
@@ -479,14 +480,18 @@ describe('(x) a thicknesser and two saws on one extractor, with gates on the saw
     const thick = extractionLoad(running([thicknesser.id])).map((item) => item.id);
     expect(thick).toEqual([thicknesser.id]);
     // One saw running: the saw and the thicknesser, whose branch is open, and not the other saw.
+    // From v70 the shop fills the best saw first (`placedMachines`), so the one man is at the
+    // standard saw and not the day 1 kit's used one, and its two places take the second man too:
+    // it is the third man who runs the other saw.
     const one = extractionLoad(running([saws[0]?.id ?? ''])).map((item) => item.id).sort();
-    expect(one).toEqual([saws[0]?.id, thicknesser.id].sort());
+    expect(one).toEqual([saws[1]?.id, thicknesser.id].sort());
     // Both saws: everything.
-    const both = extractionLoad(running(saws.map((saw) => saw.id))).map((item) => item.id).sort();
+    const third = [saws[1]?.id ?? '', saws[1]?.id ?? '', saws[0]?.id ?? ''];
+    const both = extractionLoad(running(third)).map((item) => item.id).sort();
     expect(both).toEqual([...saws.map((saw) => saw.id), thicknesser.id].sort());
     // And the under extraction rule reads that sum: two saws and a thicknesser on a used fan is
     // short, one gated saw alone with the thicknesser is the same shortfall less a saw.
-    const check = extractionCheck(running(saws.map((saw) => saw.id)));
+    const check = extractionCheck(running(third));
     expect(check.short).toBe(true);
     expect(check.demand).toBeGreaterThan(extractionCheck(running([saws[0]?.id ?? ''])).demand);
   });

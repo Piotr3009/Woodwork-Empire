@@ -221,15 +221,16 @@ describe('what the day costs when the machine goes out (CLAUDE.md T20 2.9.3; v53
     // Until v53 the work did not happen: the stage the saw makes stood, the job read `table saw is
     // in for a service` and its progress stayed at 0. Now nothing stops the job: its cutting goes
     // at the by hand 1 / 1.5 while the saw is away, and the day's output falls by that and no more
-    // (PIOTR, 24.09; v53). The morning's 140.58 of labour with the used saw, at the job's pace
-    // of 0.8786 on a hall whose moulding is by hand (v55), is 128.00 with it away, at 0.8000:
-    // 0.0351 of the job against 0.0320 (157.92 and 142.22 on v53, with the old shares).
+    // (PIOTR, 24.09; v53). The morning's 154.64 of labour with the used saw, at the job's pace
+    // of 0.8786 on a hall whose moulding is by hand (v55), is 140.80 with it away, at 0.8000:
+    // 0.0387 of the job against 0.0352 (157.92 and 142.22 on v53, with the old shares; 140.58 and
+    // 128.00 until v79, the owner's base 320 a day).
     expect(hallBlock(stopped, firstJob(stopped))).toBe('');
     const done = (state: GameState): number => firstJob(state).labourValue - firstJob(state).labourRemaining;
     expect(done(worked)).toBeCloseTo((240 * OWNER_LABOUR_PER_MINUTE) / (0.25 / 0.95 + 0.25 + 0.25 * 1.5 + 0.25), 6);
     expect(done(stopped)).toBeCloseTo((240 * OWNER_LABOUR_PER_MINUTE) / (0.25 * 1.5 + 0.25 + 0.25 * 1.5 + 0.25), 6);
-    expect(jobProgress(firstJob(worked))).toBeCloseTo(0.0351, 4);
-    expect(jobProgress(firstJob(stopped))).toBeCloseTo(0.032, 4);
+    expect(jobProgress(firstJob(worked))).toBeCloseTo(0.0387, 4);
+    expect(jobProgress(firstJob(stopped))).toBeCloseTo(0.0352, 4);
   });
 });
 

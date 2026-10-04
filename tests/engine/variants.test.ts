@@ -259,17 +259,17 @@ describe('buying a class of machine', () => {
 
 describe('what a class of saw does to the work', () => {
   /** The cutting quarter of a 400 job, at this class of saw, and the three quarters after it. */
-  /** The 400 job's 240 minutes on the day one hall: the cutting's quarter at the saw's pace, the
-   *  edging's on the hand bander at 1.00, the moulding's by hand, the hall having no spindle
-   *  moulder, and the assembly's at 1.00 (v55). */
+  /** The 400 job's 218.18 minutes on the day one hall: the cutting's quarter at the saw's pace,
+   *  the edging's on the hand bander at 1.00, the moulding's by hand, the hall having no spindle
+   *  moulder, and the assembly's at 1.00 (v55). 240 until v79, the owner's base 320 a day. */
   function minutesWithSaw(factor: number): number {
-    return 240 * (0.25 / factor + 0.25 + 0.25 * BY_HAND_DURATION_FACTOR + 0.25);
+    return (2400 / 11) * (0.25 / factor + 0.25 + 0.25 * BY_HAND_DURATION_FACTOR + 0.25);
   }
 
   it('moves the cutting quarter and leaves the other three alone', () => {
     const budget = withSaw('budget');
     expect(minutesRemainingFor(budget, firstJob(budget), 1)).toBeCloseTo(minutesWithSaw(1), 6);
-    expect(minutesRemainingFor(budget, firstJob(budget), 1)).toBeCloseTo(270, 6);
+    expect(minutesRemainingFor(budget, firstJob(budget), 1)).toBeCloseTo(2700 / 11, 6);
     const used = withSaw('used');
     expect(stageSpeed(used, firstJob(used), 'cutting').speed).toBeCloseTo(0.95, 10);
     expect(minutesRemainingFor(used, firstJob(used), 1)).toBeCloseTo(minutesWithSaw(0.95), 6);

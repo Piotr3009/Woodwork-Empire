@@ -134,12 +134,12 @@ describe('the places at a machine', () => {
     const his = state.jobs.find((job) => job.assignees[0] === joiner.id);
     // Nothing went into his job until v53; now his hour: a novice's 0.60 times the job's pace of
     // 0.8889, the moulding's quarter by hand on this hall (v55; the grade multiplies the points
-    // from v61, PIOTR 01.10, and was a point itself on v60, 19.56): 21.33 of labour. The budget
+    // from v61, PIOTR 01.10, and was a point itself on v60, 19.56): 23.47 of labour. The budget
     // saw keeps two busy, so the hall is short of nothing (20.00 on v54, one saw place for the
-    // two).
+    // two). 21.33 until v79, the owner's base 320 a day.
     const worth = manPace(WORKER_RATES.novice, 1 / (0.75 + 0.25 * 1.5));
     expect((his?.labourValue ?? 0) - (his?.labourRemaining ?? 0)).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * worth, 6);
-    expect((his?.labourValue ?? 0) - (his?.labourRemaining ?? 0)).toBeCloseTo(21.3333, 4);
+    expect((his?.labourValue ?? 0) - (his?.labourRemaining ?? 0)).toBeCloseTo(23.4667, 4);
   });
 
   it('has two places at a standard saw, and the two men take them in turn, one at a time', () => {
