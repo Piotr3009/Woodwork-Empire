@@ -3,7 +3,47 @@
 Woodwork Empire, Turn 27. Built against `CLAUDE.md` of 04.10.2026 (first line "Turn 27").
 Branch `claude/turn-27-the-taxman-fqshvp`, the name this session's harness gave the brief's
 `turn-27-the-taxman` (pushes go to that branch and no other), off `52b808a`, the tree `origin/main`
-stands on (v80, STATE_VERSION 39).
+stands on (v80, STATE_VERSION 39). `APP_VERSION` v80 to v81, `STATE_VERSION` 39 to 40. One agent,
+serial, no worktrees, one commit a task, `npm run check` green on its own exit code before each
+(2,551 tests in 273 files at the end, none skipped).
+
+## 0. What Piotr should read first
+
+1. **A new company does not earn its keep in its first year** (C3, `docs/balance-t27.md`). Played by
+   the suite's scripted player on three seeds, only the owner alone on Very easy lives the year, and
+   he ends it with £1,947 to £4,287 of his 50,000. No month of any run on the suite's seed is in the
+   black. The owner alone takes about £4,900 a month over his material and couriers, against £7,657
+   of draw, rent, rates and power; a joiner with no experience adds about £3,700 a month of clients'
+   money for £4,550 of wages; four experienced men are closed on day 60 on Very easy and Easy; Hard
+   is closed in its second month whoever is on the books, and never takes a man on. The script never
+   haggles and takes no contracts, so a player does better; no number is proposed, the levers are
+   yours.
+2. **The tax met only companies that had lost money all year.** Four of the thirty six measured years
+   paid it (£325 to £3,181), each out of what was left of its starting 50,000; the most any held on
+   the 30th was about £12,700, so the December of your words, invest or pay, came to none of them.
+   It is a quarter of the cash and of nothing else, as you gave it: a loan drawn in December is taxed
+   with the rest, and so are clients' deposits (notes 5).
+3. **The strip shows one line, and the tax's is under the spending line** (2.3, the brief's order). In
+   the played December of (uu) the tax's line was the strip's on its first three working days (1, 4
+   and most of 5 December); from Wednesday 6 December `spendingOverEarning` stood over it to the 29th.
+   The card of 1 December says it whatever the strip shows.
+4. **A man taken on late in a month is paid the whole month** (found in C3, not changed: section 6
+   keeps the wages). `monthlyWageBill` pays every man whose first day is on or before the month's last
+   working day; in an early Easy run four experienced men who started on 18 to 23 March cost 23,060 on
+   30 March.
+5. **The one off licence runs out after thirty jobs with no card and no strip line** (found in C3, not
+   changed). The Drawings page says `0 jobs left` and the drawing task is refused `No software
+   licence`; nothing else says it, and the script's company earned nothing from about day 108 until
+   the bank closed it.
+6. **Nought pays nothing** [TUNE: chat asked you and has no answer yet]. An account at nought or under
+   on 30 December pays nothing and is shown no card; the warning reads `Nothing as it stands today.`
+   and the strip says nothing.
+7. **A0 found no fault.** The 49 failing tests on main were all figures the chat fixes moved, re-pinned
+   with a line each. Two notes from it: (jj) now writes its account 1,800 under the limit and the wages
+   of day 30 leave it 132 inside the bank's floor, and the three month playthrough has had no
+   production manager since v77 (notes 7).
+8. **The copyright header** of your rule of 22.09 is on every new code file of tonight; no older file
+   carries it and there is no `LICENSE` (notes 8).
 
 ## The tasks
 
@@ -131,8 +171,9 @@ beyond its figures, and the copyright header Piotr's rule of 22.09 puts on tonig
 
 **T27-C2 Scenarios.** (uu) in `tests/scenarios/turn27.test.ts`: the day one hall bought on Tuesday 28
 November 2025 with 48,000 in the account [TUNE: the brief's figure], played by the careful script to
-Monday 2 January 2026, is warned on Friday 1 December with the tax on that morning's account, carries
-the strip's line at every step of all 21 working days to the 29th and at none outside them, pays on
+Monday 2 January 2026, is warned on Friday 1 December with the tax on that morning's account, has the
+tax's line among the strip's warnings at every step of all 21 working days to the 29th and at none
+outside them (the strip shows the first of its warnings, 0.3), pays on
 Saturday 30 December a quarter of the £43,315.50 it held that moment, £10,829, as the first line of
 the day, meets that card first on the Monday and December's report after it with its `Tax` line; the
 same hall at minus 3,000 [TUNE], idle so it stays under nought, is told `Nothing as it stands today.`,
@@ -188,3 +229,36 @@ morning the warning was raised, on the Monday its line was the strip's one line,
 scrolled to its second row, as the player scrolls it, so the two prices are in the frame. Nothing was
 left running: the pages were served by a static server inside the shooting script, which stops it
 before it exits, and the pages themselves were deleted once shot.
+
+**T27-C6 Report and PR.** This file, and the pull request titled `Turn 27: the year, the taxman, and
+dearer top machines`, not merged. Nothing was left running: the measurement and the shooting ran to
+their ends, every watcher of this session was stopped, and no server is up.
+
+## The six pictures
+
+The third column is the nearest existing picture of the same screen; what each pair differs by is what
+this turn did to it.
+
+| picture | what it shows | beside |
+| --- | --- | --- |
+| `01-the-bar-with-the-year.png` | the top bar of the (uu) company on Friday 1 December 2025 at 11:28 with £47,214 in the account: `Fri 1 December 2025 · 11:28` over the speed knobs, and nothing else on the bar moved | `report-t18/01-top-bar-date.png`: the date without its year |
+| `02-the-tax-is-coming-card.png` | the warning as the engine queued it that morning: `On 30 December the taxman takes 25% of whatever is in the account: £11,804 as it stands today. Money spent on machines or on the workshop before then is not taxed. Invest, or pay.`, one `Right` and the cross | `docs/mockups/t27/tax-cards.png`: the mockup's £12,000 on 48,000; `report-t15/12-event-modal.jpg`: an event card of one choice |
+| `03-the-strip-line-in-december.png` | Monday 4 December 2025 at 11:00: the strip's one line, `Tax on 30 December: 25% of the account, £11,673 as it stands` | `report-t22/01-the-warning-line-at-day-12-of-30.png`: the strip with the bank's line |
+| `04-the-card-after-30-december.png` | Monday 2 January 2026, the first card of the morning: `The taxman took 25% of the £43,316 in the account: £10,829.` | `docs/mockups/t27/tax-cards.png`: the mockup's card; `report-t15/12-event-modal.jpg` |
+| `05-the-premises-page-at-250000.png` | the laptop's Premises page: `£250,000 · and £2,400 more deposit. Needs £252,400 in the account.`, the button greyed with `Not enough in the account` | `report-t13/31-laptop-security.jpg`: a laptop page of the same skin; the Premises page (v67) has no picture in the tree, and v80's card said £120,000 and £122,400 |
+| `06-the-cnc-folder-at-90000-and-144000.png` | the catalogue's CNC folder scrolled to its second row: the professional CNC at £90,000 (insurance £1,800 a year) and the industrial at £144,000 (£2,880) | `report-t13/11-catalogue-tableSaw.jpg`: a folder of five classes; v80 priced these two 75,000 and 120,000 |
+
+## What was not done tonight
+
+- Section 8's parked list, untouched: a minimum repayment of the loan and its warning; the third
+  stage of the unit, dearer timber machines with better contracts, the owner's forced holidays,
+  accidents, the crisis, robots; the difficulty of the start, which is for chat after the tables of
+  C3; the year on the other dates and the month report's title by the month's name and year; whether
+  the tax should spare clients' deposits or count stock and machines; the pipes of a moved fan, the
+  label over a man, the contract card's manager.
+- The two things C3 found and section 6 keeps out of tonight: a man's whole month paid however late
+  in it he starts, and the one off licence running out with no card (0.4, 0.5).
+- `scripts/balance-t27.ts` is outside `npm run check`: `scripts/` is in neither the TypeScript
+  config's include nor the lint's, and the repo has no `@types/node`. It was type checked by hand
+  against the project's own config, with nothing reported but node's `fs` and `process`.
+- Nothing skipped: there is no `it.skip`, `describe.skip`, `.only` or `.todo` in the tree.
