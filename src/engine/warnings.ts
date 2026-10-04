@@ -33,6 +33,7 @@ import { bagStore } from './machines';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine, hasOfficeAdmin } from './staff';
+import { taxComingLine } from './tax';
 import { designOutstandingFor } from './tasks';
 import type { GameState, LedgerCategory } from './types';
 
@@ -49,6 +50,8 @@ export type WarningKey =
   /** The money speaks before the month end (PIOTR accepted, 17.09; CLAUDE.md T18 2.6). */
   | 'belowZero'
   | 'spendingOverEarning'
+  /** The taxman comes on 30 December, from the warning to the tax (CLAUDE.md T27 2.3). */
+  | 'taxComing'
   | 'crewFull'
   /** The first days say what to do (PIOTR accepted, 17.09; CLAUDE.md T18 2.7). */
   | 'firstSteps';
@@ -78,6 +81,9 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   'noInsurance',
   'belowZero',
   'spendingOverEarning',
+  // Under the money lines and above the crew's: it has a date on it, where the crew line can
+  // stand for a year (CLAUDE.md T27 2.3) [TUNE].
+  'taxComing',
   'crewFull',
   'firstSteps',
 ];
@@ -168,6 +174,13 @@ function noInsuranceWarning(state: GameState): Warning | null {
     key: 'noInsurance',
     text: `${commercial.name} is commercial work and the company has no insurance for it`,
   };
+}
+
+/** The tax on 30 December, as the account stands, from the day the player was warned until it is
+ *  booked and only while there is cash to tax (CLAUDE.md T27 2.3). The words are the tax's own. */
+function taxComingWarning(state: GameState): Warning | null {
+  const text = taxComingLine(state);
+  return text === null ? null : { key: 'taxComing', text };
 }
 
 function crewFullWarning(state: GameState): Warning | null {
@@ -266,6 +279,7 @@ const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   noInsurance: noInsuranceWarning,
   belowZero: belowZeroWarning,
   spendingOverEarning: spendingOverEarningWarning,
+  taxComing: taxComingWarning,
   crewFull: crewFullWarning,
   firstSteps: firstStepsWarning,
 };

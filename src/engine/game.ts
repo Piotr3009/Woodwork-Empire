@@ -81,6 +81,7 @@ import {
   standsOutside,
 } from './layout';
 import { enlargeCanteen, extendUnit, openExtension } from './premises';
+import { raiseTaxWarning } from './tax';
 import {
   createOnOrder,
   findOnOrder,
@@ -437,6 +438,8 @@ export function createGame(options: NewGameOptions): GameState {
       daysBelowOverdraft: 0,
       loan: null,
       overdraftInterestAccrued: 0,
+      taxPaidForYear: null,
+      taxWarnedForYear: null,
       day: emptyTotals(),
       week: emptyTotals(),
       month: emptyTotals(),
@@ -565,6 +568,8 @@ function startDay(state: GameState): void {
   runDayCosts(state, state.clock.day);
   accrueOverdraftInterest(state);
   raiseMonthEnd(state);
+  // December's warning after the month's report: the taxman comes on the 30th (CLAUDE.md T27 2.3).
+  raiseTaxWarning(state);
   // The month's meters first, so the day that starts a month is counted into the new one, and
   // then the days off of this morning (CLAUDE.md T17 2.9).
   startMonthMeters(state);

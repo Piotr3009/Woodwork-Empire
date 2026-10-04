@@ -80,6 +80,7 @@ const CATEGORY_LABELS: Record<LedgerCategory, string> = {
   pipes: 'Extraction pipes',
   claim: 'Insurance claims and payouts',
   burglary: 'Burglary',
+  tax: 'Tax',
   other: 'Other',
 };
 

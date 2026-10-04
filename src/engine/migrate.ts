@@ -1082,6 +1082,18 @@ function liftToVersion39(state: Raw): void {
   state.version = 39;
 }
 
+/** Version 39 to 40 (v81): the taxman (PIOTR, 03.10 and 04.10). The books remember the year whose
+ *  30 December was settled and the year the player was warned of it, and an older save has done
+ *  neither: it is warned on its next open in December and charged on the next 30 December it plays
+ *  through, and never for a year it has already left (CLAUDE.md T27 section 4). */
+function liftToVersion40(state: Raw): void {
+  if (isRecord(state.finance)) {
+    state.finance.taxPaidForYear = null;
+    state.finance.taxWarnedForYear = null;
+  }
+  state.version = 40;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -1110,6 +1122,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   36: liftToVersion37,
   37: liftToVersion38,
   38: liftToVersion39,
+  39: liftToVersion40,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

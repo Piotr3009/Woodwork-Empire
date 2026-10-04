@@ -131,11 +131,16 @@ export function formatTime(minute: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+/** Which of the twelve a game month is, as an index into `MONTH_NAMES`: month 1 is
+ *  `START_MONTH` and the twelve cycle after it. */
+export function calendarMonthIndex(month: number): number {
+  return (((START_MONTH + month - 1) % MONTHS_PER_YEAR) + MONTHS_PER_YEAR) % MONTHS_PER_YEAR;
+}
+
 /** The name of a game month: month 1 is `START_MONTH` and the twelve names cycle after it, with
  *  no year on the end of it (CLAUDE.md T18 2.2). */
 export function monthName(month: number): string {
-  const index = (((START_MONTH + month - 1) % MONTHS_PER_YEAR) + MONTHS_PER_YEAR) % MONTHS_PER_YEAR;
-  return MONTH_NAMES[index] ?? MONTH_NAMES[START_MONTH];
+  return MONTH_NAMES[calendarMonthIndex(month)] ?? MONTH_NAMES[START_MONTH];
 }
 
 /** The one date in the game: the weekday, the day of its month and the month's name, `Mon 12

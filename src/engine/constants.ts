@@ -160,8 +160,14 @@ import type {
  *
  *  Version 39 is v77 (PIOTR, 03.10): labour costs what the price says it costs. Every wage went
  *  up, and every man on the books of a save is paid his role's and his grade's wage of today from
- *  the next pay day. */
-export const STATE_VERSION = 39;
+ *  the next pay day.
+ *
+ *  Version 40 is v81, Turn 27 (PIOTR, 03.10 and 04.10): the taxman. The books remember the last
+ *  year whose 30 December has been settled and the last year the player was warned of it, so the
+ *  tax is never taken twice for one year and the warning is said once; both are null in every
+ *  older save, which is then warned on the next open in December and charged on the next
+ *  30 December it plays through (CLAUDE.md T27 section 4). Every v25 to v39 save loads. */
+export const STATE_VERSION = 40;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -347,6 +353,17 @@ export const SPEND_WARNING_CATEGORIES = [
   'software',
   'agency',
 ] as const;
+/** The taxman's share of the account, once a year [PIOTR, 03.10 and 04.10: "the tax on 31
+ *  December, 25 per cent of the cash that is in the account"]. A quarter of `state.cash` and of
+ *  nothing else: not the profit, the stock, the machines, the loan or the deposits clients have
+ *  paid, which is what makes December a decision (CLAUDE.md T27 2.2). */
+export const TAX_RATE = 0.25;
+/** The month the taxman comes in, as an index into `MONTH_NAMES`: December [PIOTR]. His day is the
+ *  month's last, which is the 30th, because the game's months have thirty days [PIOTR said the
+ *  31st; the calendar has none] (CLAUDE.md T27 2.2). */
+export const TAX_MONTH = 11;
+export const TAX_DAY_OF_MONTH = DAYS_PER_MONTH;
+
 /** The two lines a margin is read against, on the client's answer and anywhere else the game
  *  colours one (PIOTR accepted, 17.09; CLAUDE.md T18 2.9) [TUNE]. A fifth of the price left after
  *  the material and the labour is a job worth having, which is the floor the scripted player of

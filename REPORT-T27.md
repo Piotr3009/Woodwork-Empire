@@ -90,3 +90,18 @@ own markup made by its own functions, in its own classes, with tonight's change 
 `topbar.ts` itself is not touched; `formatCalendarDay` has no year. One reading of the brief
 [TUNE]: the laptop's home line also printed `formatDate`, so it now prints `formatCalendarDay` and
 `formatTime` and keeps its old words, because the year is the bar's and the tax's alone tonight.
+
+**T27-B2 The tax and its warning, STATE_VERSION 40.** `src/engine/tax.ts`: at the open of 30 December,
+first in `runDayCosts` and so before the day's rent whether it is worked or not (in 2025 it is a
+Saturday), `TAX_RATE` 0.25 [PIOTR] of `state.cash`, rounded to the pound, one ledger line under `tax`,
+`Tax for 2025`, and the card `Tax for 2025` once; nothing is booked or said from an account at nought
+or under [TUNE: chat asked Piotr and has no answer yet]. Its own `Tax` line on the month report before
+`Everything else`, `Tax` in Accounting, in neither `SPEND_WARNING_CATEGORIES` nor the sales. The
+warning `Tax is coming` at the open of the first working day of December, after November's report,
+its figure the tax on the account that morning (`. Nothing as it stands today.` at nought [TUNE: the
+join]), and the strip's `taxComing` under `spendingOverEarning` and above `crewFull` [TUNE] from it to
+the tax while there is cash to tax. State: the two fields of section 4, `finance.taxPaidForYear` and
+`finance.taxWarnedForYear`, null in a v39 save (`liftToVersion40`), because the ledger cannot say a
+warning was given or a tax of nothing settled, and it keeps only its last 2,000 lines. Buying a
+machine to dodge the tax and selling it in January loses more than the tax: it sells for half
+(`SALE_FRACTION` 0.5), so a pound spent saves 25p of tax and brings back 50p at best.

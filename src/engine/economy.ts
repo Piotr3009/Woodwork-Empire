@@ -41,6 +41,8 @@ import { queueEvent } from './events';
 import { runFinanceMonth } from './finance';
 import { runInsuranceMonth } from './insurance';
 import { runSecurityMonth } from './security';
+// The taxman comes at the open of 30 December, from the same place, first (CLAUDE.md T27 2.2).
+import { runTaxDay } from './tax';
 import { has, hasCentralExtraction, machinePowerPerDay } from './machines';
 import { ownerDrawPerDay } from './owner';
 import { makeId } from './rng';
@@ -571,6 +573,9 @@ function countDayBelowOverdraft(state: GameState): void {
 export function runDayCosts(state: GameState, day: number): void {
   state.finance.day = emptyTotals();
   if (weekday(day) === 0) state.finance.week = emptyTotals();
+  // The taxman first, on the cash as the day opens it and before anything of the day is charged,
+  // weekend or not (PIOTR, 03.10; CLAUDE.md T27 2.2). His 30th is never a 1st.
+  runTaxDay(state, day);
   if (isFirstOfMonth(day)) {
     state.finance.month = emptyTotals();
     // The pellet bonus reads the month that has just gone, so the counter resets after it.
@@ -644,6 +649,7 @@ export type MonthLineId =
   | 'waste'
   | 'equipment'
   | 'software'
+  | 'tax'
   | 'other';
 
 /** The lines in the order the folder prints them. */
@@ -664,6 +670,8 @@ export const MONTH_LINES: ReadonlyArray<{ id: MonthLineId; label: string }> = [
   { id: 'waste', label: 'Waste collection' },
   { id: 'equipment', label: 'Equipment, pipes and repairs' },
   { id: 'software', label: 'Software, website and advertising' },
+  // A line of its own, so December's report says what the taxman took (CLAUDE.md T27 2.2).
+  { id: 'tax', label: 'Tax' },
   { id: 'other', label: 'Everything else' },
 ];
 
@@ -702,6 +710,7 @@ export const MONTH_LINE_OF: Record<LedgerCategory, MonthLineId> = {
   software: 'software',
   website: 'software',
   agency: 'software',
+  tax: 'tax',
   accounts: 'other',
   pellets: 'other',
   other: 'other',
