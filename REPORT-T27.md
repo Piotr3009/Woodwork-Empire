@@ -122,3 +122,9 @@ machine already owned moves by nothing; in the suite, the industrial saw month o
 30,000 on day 1 and nothing else of that month moved, and five catalogue and purchase tests are
 re-pinned. The contract entry point reads the standard class and the tips the used one, so no contract
 price moved.
+
+**T27-C1 Notes.** `docs/notes-t27.md`: the calendar the tax lives on (the first falls on a Saturday, so
+it is booked in the clock's walk over the weekend), the year on the bar alone and the laptop's line,
+why the tax has two fields of its own, the readings of the brief, what the tax does and does not see
+(a loan drawn in December and clients' deposits are cash and are taxed), the prices, what A0 found
+beyond its figures, and the copyright header Piotr's rule of 22.09 puts on tonight's new files.
