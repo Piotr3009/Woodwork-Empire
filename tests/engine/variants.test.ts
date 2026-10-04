@@ -143,8 +143,10 @@ describe('every catalogue line is a family', () => {
       'pro',
       'industrial',
     ]);
+    // The pro and the industrial a fifth dearer from Turn 27, 15,000 and 25,000 until then
+    // [PIOTR, 04.10] (CLAUDE.md T27 2.5).
     expect(TABLE_SAW_VARIANTS.map((variant) => variant.price)).toEqual([
-      1800, 5000, 7000, 15000, 25000,
+      1800, 5000, 7000, 18000, 30000,
     ]);
     // Every machine family has its five classes from Turn 13 (CLAUDE.md T13 3.12); a line that
     // is not a machine family, like the air dryer, still has the one synthetic standard class.
@@ -168,8 +170,11 @@ describe('every catalogue line is a family', () => {
     expect(findSpec('extractor')?.variants.map((variant) => variant.price)).toEqual([
       400, 600, 1400, 3200, 7500,
     ]);
+    // The compressor is a machine of five classes, so its two top ones are a fifth dearer from
+    // Turn 27 (9,000 and 22,000 until then); the extractor is not, and is what it was
+    // [PIOTR, 04.10] (CLAUDE.md T27 2.5).
     expect(findSpec('compressor')?.variants.map((variant) => variant.price)).toEqual([
-      300, 1200, 3500, 9000, 22000,
+      300, 1200, 3500, 10800, 26400,
     ]);
     // The footprints of 3.4, and the zone is the footprint for both families.
     const extractorSizes = [
@@ -239,8 +244,9 @@ describe('buying a class of machine', () => {
     const bought = buyNow(before, 'tableSaw', 'industrial');
     const saw = required(bought.equipment[0]);
     expect(saw.variantId).toBe('industrial');
-    expect(saw.purchasePrice).toBe(25000);
-    expect(before.cash - bought.cash).toBe(25000);
+    // 30,000 from Turn 27, 25,000 until then [PIOTR, 04.10] (CLAUDE.md T27 2.5).
+    expect(saw.purchasePrice).toBe(30000);
+    expect(before.cash - bought.cash).toBe(30000);
     expect(variantFor(saw)?.name).toBe('Industrial table saw');
   });
 

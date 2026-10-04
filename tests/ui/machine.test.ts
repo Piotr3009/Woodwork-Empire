@@ -187,11 +187,12 @@ describe('the tiles inside a folder', () => {
       'Life about 6,000 hours',
       GATE_LINE,
     ]);
-    expect(text(industrial?.querySelector('.tile-price') ?? null)).toBe('\u00a325,000');
+    // £30,000 from Turn 27, and its insurance with it [PIOTR, 04.10] (CLAUDE.md T27 2.5).
+    expect(text(industrial?.querySelector('.tile-price') ?? null)).toBe('\u00a330,000');
     expect(costs(industrial)).toEqual([
       'Delivered in 12 working days',
       'Power \u00a37 a day',
-      insuranceLine(25000),
+      insuranceLine(30000),
       'Takes 4 m by 2 m, works in 5 m by 4 m',
     ]);
   });

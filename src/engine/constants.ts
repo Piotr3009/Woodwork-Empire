@@ -1458,6 +1458,11 @@ export const MACHINE_ENDURANCE_HOURS_DEFAULT = 5000;
 /** Heights are the pictures' since v33 (the art side's table saws v2, 19.09): the canvas has to hold
  *  the guard arms, the hoses and the screens that rise above the 1 m body, and a height draws the
  *  canvas and nothing else. */
+/** The two top classes of every machine of the five classes cost a fifth more than they did, and
+ *  the three under them what they were [PIOTR, 04.10: "machines 20% up, but only the two highest;
+ *  leave the cheap ones as they are"] (CLAUDE.md T27 2.5): the pro and the industrial price of the
+ *  saw, the edgebander, the compressor, the thicknesser, the spindle moulder, the CNC and the
+ *  booth below are 1.2 times their price of v80, the fourteen figures being that arithmetic. */
 export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -1510,7 +1515,7 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional table saw',
-    price: 15000,
+    price: 18000,
     width: 3,
     depth: 2,
     height: 2.15,
@@ -1526,7 +1531,7 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial table saw',
-    price: 25000,
+    price: 30000,
     width: 4,
     depth: 2,
     height: 2.65,
@@ -2015,7 +2020,7 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional edgebander',
-    price: 16000,
+    price: 19200,
     width: 3,
     depth: 1,
     height: 1.3,
@@ -2032,7 +2037,7 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial edgebander',
-    price: 32000,
+    price: 38400,
     width: 4,
     depth: 1,
     height: 1.4,
@@ -2193,7 +2198,7 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional compressor',
-    price: 9000,
+    price: 10800,
     width: 2,
     depth: 1,
     height: 1.5,
@@ -2208,7 +2213,7 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial compressor',
-    price: 22000,
+    price: 26400,
     width: 2,
     depth: 2,
     height: 2.5,
@@ -2394,7 +2399,7 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional thicknesser',
-    price: 11000,
+    price: 13200,
     width: 3,
     depth: 1,
     height: 1,
@@ -2410,7 +2415,7 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial thicknesser',
-    price: 22000,
+    price: 26400,
     width: 3,
     depth: 2,
     height: 1.2,
@@ -2482,7 +2487,7 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional CNC',
-    price: 75000,
+    price: 90000,
     width: 4,
     depth: 2,
     height: 2.2,
@@ -2498,7 +2503,7 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial CNC',
-    price: 120000,
+    price: 144000,
     width: 4,
     depth: 3,
     height: 2.4,
@@ -2571,7 +2576,7 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional spray booth',
-    price: 32000,
+    price: 38400,
     width: 5,
     depth: 3,
     height: 3.2,
@@ -2586,7 +2591,7 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial spray booth',
-    price: 55000,
+    price: 66000,
     width: 6,
     depth: 4,
     height: 3.4,
@@ -2657,7 +2662,7 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional spindle moulder',
-    price: 16000,
+    price: 19200,
     width: 3,
     depth: 1,
     height: 2.15,
@@ -2673,7 +2678,7 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial spindle moulder',
-    price: 28000,
+    price: 33600,
     width: 3,
     depth: 2,
     height: 2.85,

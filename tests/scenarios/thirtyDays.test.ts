@@ -473,13 +473,15 @@ describe('replay', () => {
 describe('30 days on Very easy behind the best saw money can buy', () => {
   const state = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 31, BIG_SAW);
 
-  it('stood an industrial saw in the hall on day 1 and paid 25000 for it', () => {
+  it('stood an industrial saw in the hall on day 1 and paid 30000 for it', () => {
     const saw = machineOf(state, 'tableSaw');
     expect(saw.variantId).toBe('industrial');
-    expect(saw.purchasePrice).toBe(25000);
+    // 30,000 from Turn 27, 25,000 until then [PIOTR, 04.10] (CLAUDE.md T27 2.5); nothing else of
+    // the month moved, the company having the money either way [measured].
+    expect(saw.purchasePrice).toBe(30000);
     expect(
       state.ledger.some(
-        (entry) => entry.category === 'equipment' && entry.amount === -25000,
+        (entry) => entry.category === 'equipment' && entry.amount === -30000,
       ),
     ).toBe(true);
   });

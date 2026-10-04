@@ -110,3 +110,15 @@ machine to dodge the tax and selling it in January loses more than the tax: it s
 card, the deposit beside it (2,400 on the starting rent) and the refusal read the constant, so the card
 says `£250,000 · and £2,400 more deposit. Needs £252,400 in the account.` and nothing else of it moved;
 a unit already extended stays extended. The three tests that named the price are flipped in place.
+
+**T27-B4 The fourteen prices.** The pro and the industrial class of the seven machine families of five
+classes are 1.2 times their v80 price, written into the variant tables [PIOTR: the 20%; the figures
+are its arithmetic]: the saw 18,000 and 30,000, the edgebander 19,200 and 38,400, the compressor 10,800
+and 26,400, the thicknesser 13,200 and 26,400, the moulder 19,200 and 33,600, the CNC 90,000 and 144,000,
+the booth 38,400 and 66,000. What moved beside them: the insurance line of those fourteen cards (2% of
+the price a year, the pro saw's 300 to 360), and for one bought from tonight its service (a tenth),
+repair (a twentieth), contract wear and sale price (half), all read off its own `purchasePrice`, so a
+machine already owned moves by nothing; in the suite, the industrial saw month of `thirtyDays` pays
+30,000 on day 1 and nothing else of that month moved, and five catalogue and purchase tests are
+re-pinned. The contract entry point reads the standard class and the tips the used one, so no contract
+price moved.
