@@ -70,3 +70,10 @@ no case 3 was found and nothing of the engine was touched.
 | ui/machine | gives every tile a picture slot | 1 | v80: the air dryer has its picture; the box is shown on the undrawn pallet |
 | ui/planBar | keeps its outline and fills green from the left | 1 | v79: the job priced 440 so half of it is 135 whole minutes (input) |
 | ui/workPlan | shows the minutes done of the minutes it takes | 1 | v79: the job priced 440 so it is 240 whole minutes (input) |
+
+**T27-A1 Housekeeping and v81.** `docs/turn-26-brief.md` was already in `docs/` and `CLAUDE.md` is this
+turn's brief (first line "Turn 27"), so nothing was moved; the README names the Turn 26 brief and
+`REPORT-T27.md` and says Turn 27 asks no art, `APP_VERSION` goes v80 to v81 with the two tests that
+name it flipped (`STATE_VERSION` is B2's). The two dead files `public/sprites/palletTruck.standard.png`
+and `.r.png` are `git rm`ed (the permissions let it through tonight), the manifest is 215 sprites and
+not 217, and the two turned counts read 75 and not 76 (`rotate.test.ts`, `spriteClasses.test.ts`).
