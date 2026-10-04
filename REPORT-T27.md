@@ -158,3 +158,23 @@ to wait cost 6,600 of `Late accounts` in the year. What the tables say: only the
 easy lives the year, on all three seeds; no month of any run on the suite's seed is in the black;
 Hard is closed in its second month whoever is on the books; and the tax was paid by four companies
 in thirty six, each out of what was left of its starting 50,000.
+
+**T27-C4 Cross check.** Section 7, point by point. The year on `calendarYearOf` and `formatDate`
+(day 1 `Mon 1 March 2025`, day 300 in December 2025, day 301 `1 January 2026`) and no year in
+`formatCalendarDay` (`clock.test.ts`); the 48,000 that pays 12,000 once under `tax` as `Tax for
+2025`, the same day opened twice across a save and a load paying once, nought and minus 3,000 paying
+nothing with no card, the machine of the 29th out of what is taxed, the warning once and on the next
+open of a v39 save of 10 December, the strip from the card to the tax and its place in
+`WARNING_ORDER`, and December's report with its `Tax` line (`tax.test.ts`, `taxCards.test.ts`, and
+played in (uu)); 250,000 and the Premises page's £250,000 (`v67.test.ts`, engine and UI); the
+fourteen prices, the standard class of the seven, the top classes of the extractor, van, forklift,
+bench, rack and cabinet, and a pro saw of before tonight selling for half its own 15,000
+(`topClassPrices.test.ts`). The one point no task asserted, that the year is printed by the bar's
+date and the tax's words alone, is kept as `tests/engine/turn27CrossCheck.test.ts`: `calendarYearOf`
+is called in `clock.ts` and `tax.ts` and nowhere else in `src`, and `formatDate` in `topbar.ts`
+alone. Every value of the constants module, main against the branch: 35 moved, the fourteen prices
+(each twice, in its class table and in the catalogue that reads it), `UNIT_EXTENSION_PRICE`,
+`START_YEAR`, the three `TAX_` figures and the two versions, and nothing else. `git diff main
+--stat -- index.html src/ui/start.ts public/brand` is empty, and so is `src/ui/styles.css` and
+`src/ui/topbar.ts` (no new token, no new rule). No `it.skip`, `describe.skip`, `.only` or `.todo` in
+the tree. Every scenario green; the one figure tonight moved in one is restated (B4).
