@@ -178,3 +178,13 @@ alone. Every value of the constants module, main against the branch: 35 moved, t
 --stat -- index.html src/ui/start.ts public/brand` is empty, and so is `src/ui/styles.css` and
 `src/ui/topbar.ts` (no new token, no new rule). No `it.skip`, `describe.skip`, `.only` or `.todo` in
 the tree. Every scenario green; the one figure tonight moved in one is restated (B4).
+
+**T27-C5 Look and shoot.** Six pictures in `docs/report-t27/`, drawn by the game's own UI functions
+(`renderTopbar`, `renderWarningStrip`, `renderEvent` and `renderEventFooter` through `syncModals`,
+`renderLaptop`, `renderCatalogue`) from states the engine played, in the game's stylesheet, and shot in
+headless Chromium: the (uu) company of C2, played by the careful script from 28 November 2025, on the
+morning the warning was raised, on the Monday its line was the strip's one line, and on 2 January
+2026 with the tax's card; nothing in the markup is written by hand. The catalogue's folder is
+scrolled to its second row, as the player scrolls it, so the two prices are in the frame. Nothing was
+left running: the pages were served by a static server inside the shooting script, which stops it
+before it exits, and the pages themselves were deleted once shot.
