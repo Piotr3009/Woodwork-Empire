@@ -78,7 +78,8 @@ describe('the Premises page before anything is bought', () => {
     const card = cardOf(page, 'extend');
     expect(card.querySelector('h3')?.textContent).toBe('Extend the unit');
     const lines = Array.from(card.querySelectorAll('.figures')).map((line) => line.textContent);
-    expect(lines[0]).toBe('£120,000 · and £2,400 more deposit. Needs £122,400 in the account.');
+    // £250,000 from Turn 27, where it was £120,000 [PIOTR, 04.10] (CLAUDE.md T27 2.4).
+    expect(lines[0]).toBe('£250,000 · and £2,400 more deposit. Needs £252,400 in the account.');
     expect(lines[1]).toBe(
       'Adds 200 m² to the right of the hall: 40 × 10 m, ready the next morning. Room for 16 ' +
         'joiners and 12 benches. Rent £2,400 → £4,800 a month, rates £450 → £900, ' +

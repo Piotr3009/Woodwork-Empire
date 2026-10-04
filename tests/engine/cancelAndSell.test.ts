@@ -72,7 +72,8 @@ describe('cancelling an order', () => {
     if (!order) throw new Error('nothing on order');
     expect(order.dueDay - order.orderedDay).toBeGreaterThanOrEqual(7);
     const paid = order.pricePaid;
-    expect(paid).toBe(15000);
+    // 18,000 from Turn 27: the two top classes a fifth dearer [PIOTR, 04.10] (CLAUDE.md T27 2.5).
+    expect(paid).toBe(18000);
     // Day 3, well before the lorry.
     state = toDay(state, 3);
     expect(state.onOrder).toHaveLength(1);

@@ -145,11 +145,12 @@ describe('(aa) three men on one job, on Very easy', () => {
     // read 0.37; alone he is at the floor while a saw runs and at 0.49 at his bench.
     //
     // From v61, 16,026 against 12,622, 27% more: the grade times the points (PIOTR, 01.10) lifts
-    // the novice off the floor at the saw, 0.60 times the hall's 0.65 [measured].
+    // the novice off the floor at the saw, 0.60 times the hall's 0.65 [measured]. From v79, 14,514
+    // against 11,467, still 27% more: every man is counted from the owner's 352 a day [measured].
     const shared = watched(THREE).productionMinutes;
     const alone = watched(ONE).productionMinutes;
-    expect(shared).toBe(16026);
-    expect(alone).toBe(12622);
+    expect(shared).toBe(14514);
+    expect(alone).toBe(11467);
   });
 
   it('never goes more than three times faster with three men on it', () => {
@@ -293,8 +294,8 @@ describe('(bb) a lacquered kitchen, by a joiner of two grades', () => {
     expect(joinerDid).toBeGreaterThan(0);
     expect(seniorDid / joinerDid).toBeCloseTo(WORKER_RATES.senior / WORKER_RATES.experienced, 2);
     // The experienced joiner gets through what the booth's own man of v62 did, every half hour at his own
-    // rate [measured].
-    expect(joinerDid).toBeCloseTo(496.96, 2);
+    // rate [measured]. 546.66 from v79 (496.96 on the owner's 320 a day).
+    expect(joinerDid).toBeCloseTo(546.66, 2);
   });
 });
 

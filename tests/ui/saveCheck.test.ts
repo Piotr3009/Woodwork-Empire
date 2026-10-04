@@ -127,9 +127,10 @@ describe('a fresh game in this build', () => {
     // change to the save (PIOTR, 25.09). v59 and v60 are state 33 too: the canteen door, the two
     // Jacks, the pace as a sum and the admin's take off touch no field of the save (PIOTR, 30.09).
     // v61 and v62 are state 33 as well. v63 is state 34: one kind of man on the floor, the
-    // draftsman's three grades and the agency, off (CLAUDE.md T26 section 4).
-    expect(APP_VERSION).toBe('v80');
-    expect(STATE_VERSION).toBe(39);
+    // draftsman's three grades and the agency, off (CLAUDE.md T26 section 4). v81 is Turn 27 and
+    // state 40: the taxman's two years on the books (CLAUDE.md T27 section 4).
+    expect(APP_VERSION).toBe('v81');
+    expect(STATE_VERSION).toBe(40);
   });
 
   it('saves through the store, the file and the cloud row on day 1, and loads back three ways', async () => {

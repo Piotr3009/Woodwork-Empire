@@ -145,9 +145,9 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     // goes through the saw (v54, v55): the man alone is short of nothing, and a budget saw keeps
     // two busy, so of the three one is past it and works at the by hand pace, (2 + 1 / 1.5) / 3,
     // which is 0.11 off the hall's points, with the 0.10 of five joiners and no helper beside it,
-    // and the man's 0.60 times them (v61; PIOTR, 01.10): 6.31 and 16.27. On v60 the grade was a
+    // and the man's 0.60 times them (v61; PIOTR, 01.10): 6.94 and 17.89. On v60 the grade was a
     // point too, 5.19 and 11.11; until v60 the lines multiplied, 6.40 and 17.07 (v54 read 16.80, a
-    // place for one man; v53 21.60).
+    // place for one man; v53 21.60). 6.31 and 16.27 until v79, the owner's base 320 a day.
     const one = menOnOne(1, 1, 'budget');
     const three = menOnOne(3, 1, 'budget');
     const alone = labourIn(one, jobOfFirst(one).id, 'cutting', 20);
@@ -155,8 +155,8 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     expect(alone).toBeGreaterThan(0);
     const line = 1 - (2 + 1 / 1.5) / 3;
     expect(crowd).toBeCloseTo(3 * (alone - 20 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice * line), 4);
-    expect(alone).toBeCloseTo(6.3111, 4);
-    expect(crowd).toBeCloseTo(16.2667, 4);
+    expect(alone).toBeCloseTo(6.9422, 4);
+    expect(crowd).toBeCloseTo(17.8933, 4);
   });
 
   it('runs the same three men faster behind a saw of two places, by the saw s class and its hall line', () => {

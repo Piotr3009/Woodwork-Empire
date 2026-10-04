@@ -7,7 +7,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { formatDate, laptopHome } from '../../src/engine/index';
+import { formatCalendarDay, formatTime, laptopHome } from '../../src/engine/index';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import { HOME_TILES, OFFICE_GROUP, laptopPageFrom } from '../../src/ui/laptop';
 import { MODAL_SKINS } from '../../src/ui/modal';
@@ -120,12 +120,14 @@ describe('home first', () => {
     expect(node.classList.contains('modal-board')).toBe(false);
     expect(node.classList.contains('modal-full')).toBe(true);
     expect(MODAL_SKINS.laptop).toBe('screen');
-    // The company and the game's clock in one small line at the top, off the one formatter.
+    // The company and the game's clock in one small line at the top, off the two formatters the
+    // bar's own line is made of, with no year: the year is the bar's alone (CLAUDE.md T27 2.1).
     const state = currentState();
     if (state === null) throw new Error('no game');
     expect(node.querySelector('.screen-status')?.textContent).toBe(
-      `${state.companyName}, ${formatDate(state.clock)}`,
+      `${state.companyName}, ${formatCalendarDay(state.clock.day)} · ${formatTime(state.clock.minute)}`,
     );
+    expect(node.querySelector('.screen-status')?.textContent).not.toMatch(/\d{4}/);
   });
 
   it('has the three big tiles in the order of the contract, with a gap and an icon each', () => {

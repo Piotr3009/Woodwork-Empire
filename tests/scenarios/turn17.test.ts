@@ -155,8 +155,9 @@ describe('(y) two men on one job, on Very easy', () => {
     //
     // Re-measured on v61: 32 alone and 15 together, 0.47: the grade multiplies the hall's points
     // (PIOTR, 01.10), 0.60 times 0.65 is 0.39 and over the floor, so two men are twice one again.
-    expect(daysAlone).toBe(32);
-    expect(daysTogether).toBe(15);
+    // Re-measured on v79: 28 and 14, 0.50, every man counted from the owner's 352 a day.
+    expect(daysAlone).toBe(28);
+    expect(daysTogether).toBe(14);
     expect(daysAlone).toBeGreaterThan(15);
     expect(daysTogether).toBeLessThan(daysAlone);
     expect(daysTogether / daysAlone).toBeGreaterThan(0.4);
@@ -223,13 +224,15 @@ describe('(y) a contract whose material comes off the rack', () => {
       // and thirteen of the twenty, and the client ends it on day 15 again [measured]. What
       // this says about the sum is in the v60 report. From v61 the grade times the points, 0.39:
       // eight of eight and then 20, 20, 20, 20 and 21 of twenty, and the term runs on [measured].
+      // From v79 the 21 is week 5's and not week 6's: the job beside him runs on the owner's 352
+      // a day, and the hall round him moves with it [measured].
       expect(contract?.weeks).toEqual([
         { week: 1, wanted: 8, made: 8 },
         { week: 2, wanted: 20, made: 20 },
         { week: 3, wanted: 20, made: 20 },
         { week: 4, wanted: 20, made: 20 },
-        { week: 5, wanted: 20, made: 20 },
-        { week: 6, wanted: 20, made: 21 },
+        { week: 5, wanted: 20, made: 21 },
+        { week: 6, wanted: 20, made: 20 },
       ]);
       expect(contract?.status).toBe('active');
       // The rack never ran dry under him: not one of his minutes stood for want of sheets.
@@ -303,8 +306,9 @@ describe('(z) a week that proves the workshop rate', () => {
     // Measured on v60: 34.81. The owner alone at 1.00 loses nothing to the sum of points (PIOTR,
     // 30.09) while the hall is whole, so his week is the same week to within the Friday's messy
     // hall: 0.05 off every minute of it where the product took 0.05 of 0.8786, which is 0.044.
-    expect(rate.rate).toBe(34.81);
-    expect(rate.rate).toBeLessThan(40);
+    // Measured on v79: 38.29, under the 44 his hour is from v79 (352 a day and not 320).
+    expect(rate.rate).toBe(38.29);
+    expect(rate.rate).toBeLessThan(44);
   });
 
   it('says the same pounds in the month end as on the board, over the same days', () => {
@@ -329,8 +333,9 @@ describe('(z) a week that proves the workshop rate', () => {
     // Measured on v53: 23.69 against 39.15, 0.61; v52 read 22.80 against 37.68, the same 0.61,
     // because the job's one pace lifts the three days that worked in both weeks alike
     // (PIOTR, 24.09; v53). Measured on v55: 21.09 against 34.85, the same 0.61, the job's one pace
-    // of v55 lowering the three days that worked in both weeks alike.
-    expect(stood.rate).toBe(21.09);
+    // of v55 lowering the three days that worked in both weeks alike. Measured on v79: 23.19
+    // against 38.29, the same 0.61, the owner's base a tenth up on the three days that worked.
+    expect(stood.rate).toBe(23.19);
     expect(stood.rate / worked.rate).toBeGreaterThan(0.5);
     expect(stood.rate / worked.rate).toBeLessThan(0.7);
     expect(renderCompany(STOOD)).toContain(`Workshop earns ${formatMoney(stood.rate)} an hour`);

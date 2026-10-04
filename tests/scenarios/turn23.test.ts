@@ -242,8 +242,9 @@ describe('(ll) three men, no manager, and the boss assigns each morning', () => 
     // are the half hours a saw did not run. What this says about the sum is in the v60 report.
     //
     // 3,337.80 from v61: the grade times the hall's points (PIOTR, 01.10), 0.60 times 0.58, is
-    // 0.35 and over the floor again [measured on this build].
-    expect(NO_MANAGER.done).toBeCloseTo(3337.8, 2);
+    // 0.35 and over the floor again [measured on this build]. 3,683.36 from v79, every man counted
+    // from the owner's 352 a day [measured].
+    expect(NO_MANAGER.done).toBeCloseTo(3683.36, 2);
     expect(NO_MANAGER.state.jobs.every((job) => job.stage === 'inProduction')).toBe(true);
   });
 });
@@ -308,9 +309,10 @@ describe('(mm) the same crew with a novice manager over them', () => {
     // that margin and no other; what this says about the sum is in the v60 report.
     //
     // 3,510.60 from v61, 172.80 over (ll): the men are off the floor (above), so his 0.03 is on
-    // every minute again (PIOTR, 01.10) [measured].
+    // every minute again (PIOTR, 01.10) [measured]. 3,879.33 from v79, 195.97 over (ll), the
+    // owner's base a tenth up [measured].
     expect(NOVICE.done).toBeGreaterThan(NO_MANAGER.done);
-    expect(NOVICE.done).toBeCloseTo(3510.6, 2);
+    expect(NOVICE.done).toBeCloseTo(3879.33, 2);
   });
 
   it('never sends the owner to the Work Plan', () => {
@@ -501,6 +503,7 @@ describe('(oo) a bench and no compressor', () => {
     // points off the job's pace and not a share of it (PIOTR, 30.09), and the days before this one
     // ran on the same arithmetic, which is where the 249.43 comes from [measured]. From v61 the
     // owner's own factor times the hall's points (PIOTR, 01.10) ends the day at 157.32 [measured].
+    // From v79 at 206.34: the owner's base is a tenth up on this day and on the days before it.
     const day = BENCH_DAY.halfHours.filter((entry) => entry.minute < DAY_END_MINUTE);
     const bench = day.filter((entry) => entry.station === machineStation('workbench'));
     const saw = day.filter((entry) => entry.station === machineStation('tableSaw'));
@@ -515,7 +518,7 @@ describe('(oo) a bench and no compressor', () => {
     for (const entry of bench) expect(leftAfter(entry)).toBe(entry.left);
     for (const entry of saw) expect(leftAfter(entry)).toBeLessThan(entry.left);
     expect(BENCH_DAY.after).toBeLessThan(BENCH_DAY.before);
-    expect(BENCH_DAY.after).toBeCloseTo(157.32, 2);
+    expect(BENCH_DAY.after).toBeCloseTo(206.34, 2);
   });
 
   it('says why over his head at the bench, and nothing at the saw', () => {

@@ -216,12 +216,12 @@ describe('rule 2, the litres', () => {
       return before - firstJob(worked).labourRemaining;
     }
     // One man at a bench draws 30 l/min, which a used compressor holds without noticing. His
-    // twenty minutes are 9.6970 of labour, at the job's one pace on a hall with no machine but
+    // twenty minutes are 10.6667 of labour, at the job's one pace on a hall with no machine but
     // the benches: three quarters by hand at 1 / 1.5 and the assembly's at 1.00 (v55; 12.2531
-    // on v53, with a used saw and the old shares).
+    // on v53, with a used saw and the old shares). 9.6970 until v79, the owner's base 320 a day.
     const fine = assembled('used', 0);
     expect(fine).toBeCloseTo(20 * OWNER_LABOUR_PER_MINUTE / (0.75 * 1.5 + 0.25), 4);
-    expect(fine).toBeCloseTo(9.697, 3);
+    expect(fine).toBeCloseTo(10.6667, 3);
     // Eight of them draw 240, worked at 0.6 that is 144 against the 128 the pipe carries. The
     // short compressor is 0.30 off every minute's points from v60 (PIOTR, 30.09), six of the
     // owner's minutes over the twenty; until v60 it multiplied them by 0.7.

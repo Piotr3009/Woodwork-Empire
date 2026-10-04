@@ -334,8 +334,10 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // The office admin in the take off man's place from Turn 26, on the same days (CLAUDE.md T26 2.9).
     expect(state.workers.some((worker) => worker.role === 'officeAdmin' && worker.startDay <= 35)).toBe(true);
     // From v63 an experienced manager is taken on, on day 65, month 2 closing in the black with the
-    // standing's slower growth drawing other work (CLAUDE.md T26 2.11) [measured].
-    expect(state.workers.find((worker) => worker.role === 'productionManager')?.startDay).toBe(65);
+    // standing's slower growth drawing other work (CLAUDE.md T26 2.11) [measured]. From v77 there
+    // is none again: every wage went up, month 2 closes at -2,713, and no working day of month 3
+    // has a manager's month of pay in the account [measured].
+    expect(state.workers.find((worker) => worker.role === 'productionManager')).toBeUndefined();
     // The standard saw of 10.4 was bought in week 1. From v57 to v59 the burglary of day 79 took it
     // and the script bought none again; from v60 the stream that rolled the burglary has moved and
     // the saw stands in the hall to the end (the note above the describe).
@@ -352,8 +354,8 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(state.ownerDraw.tier).toBe(1);
     // The holiday of 10.4 comes with the manager: a man only takes one while there is somebody to
     // cover the hall (CLAUDE.md T13 3.9). From v60 to v62 there was no manager and no holiday; from
-    // v63 the manager of day 78 lets the owner take it [measured].
-    expect(days.some((day) => onHoliday(day))).toBe(true);
+    // v63 the manager of day 78 lets the owner take it [measured]; from v77 no manager, no holiday.
+    expect(days.some((day) => onHoliday(day))).toBe(false);
   });
 
   it('took every residential enquiry with a margin over twenty per cent, and no commercial one', () => {
@@ -430,15 +432,18 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // 01.10) [measured].
     // Re-measured for v63: 7,350, 398 and -12,999, the standing growing at half and the board
     // drawing other work for it, with an experienced manager's pay from day 65 (CLAUDE.md T26 2.11).
-    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(7350);
-    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(398);
-    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-12999);
-    // Three charges: 7.65 on day 31, 1.01 on day 61 and 44.74 on day 91, for the days each month
-    // ran under (CLAUDE.md T23 2.12) [measured].
+    // Re-measured for v80: 5,383, -2,713 and -10,198. v77's wages had the bank close the run on
+    // day 89; v79's tenth on the owner's base and its 40 courier have it trade to the end again,
+    // with no manager (above) [measured].
+    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(5383);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-2713);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-10198);
+    // Three charges: 7.54 on day 31, 2.07 on day 61 and 38.22 on day 91, for the days each month
+    // ran under (CLAUDE.md T23 2.12) [measured on v80; 7.65, 1.01 and 44.74 on v63].
     const overdraft = state.ledger.filter((entry) => entry.category === 'overdraftInterest');
     expect(overdraft.map((entry) => entry.day)).toEqual([31, 61, 91]);
     expect(Math.abs(overdraft[0]?.amount ?? 0)).toBeLessThan(15);
-    expect(Math.abs(overdraft[1]?.amount ?? 0)).toBeLessThan(2);
+    expect(Math.abs(overdraft[1]?.amount ?? 0)).toBeLessThan(3);
   });
 
   it('reaches house tier 2 in month 2 once the raised draw is really paid, and keeps it', () => {
@@ -472,9 +477,10 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // no burglary in this stream, so the saw is in the hall to the end and nothing stands.
     // Ninety one from v61, the grade times the hall's points (PIOTR, 01.10) [measured]. Ninety two
     // from v63, month 3 read again: the standing grows at half and the board draws other work
-    // (CLAUDE.md T26 2.11); month 2 reads 77 [measured].
+    // (CLAUDE.md T26 2.11); month 2 reads 77 [measured]. Eighty two from v80, 82.24, month 2 79:
+    // the run of v77's wages and v79's base, with no manager's pace in month 3 [measured].
     expect(months[1]?.efficiencyMean ?? 0).toBeGreaterThan(55);
-    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(92);
+    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(82);
   });
 
   it('took the first contract its crew could keep up with and made every week of it in full', () => {
@@ -492,8 +498,9 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(weeks.length).toBeGreaterThan(10);
     expect(weeks.every((week) => week.made >= week.wanted)).toBe(true);
     // 66 from v51 (73 from v40): the entry point's price with the reference saw's wear at six
-    // months between services in it, answered at this company's standing.
-    expect(first?.pricePerPiece).toBe(66);
+    // months between services in it, answered at this company's standing. 83 from v77: the entry
+    // point carries the entry man's wages, up by the one factor.
+    expect(first?.pricePerPiece).toBe(83);
     expect(first?.sheetsUsed ?? 0).toBeGreaterThan(0);
     expect(state.ledger.some((entry) => entry.label.includes(': material'))).toBe(false);
     // The term runs past the three months, and the same script plays on until the client's
@@ -527,8 +534,8 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(roles.has('joiner')).toBe(true);
     expect(roles.has('officeAdmin')).toBe(true);
     // The production manager of 10.4 was on the books from v52 to v59 (the note above the
-    // describe), none from v60 to v62, and a novice from day 78 on v63 (above).
-    expect(roles.has('productionManager')).toBe(true);
+    // describe), none from v60 to v62, a novice from day 78 on v63, and none from v77 (above).
+    expect(roles.has('productionManager')).toBe(false);
     for (const worker of state.workers) expect(worker.monthlyWage, worker.role).toBeGreaterThan(0);
     // The office salary line of the 1st of the month is gone with `monthlyWage`.
     expect(state.ledger.filter((entry) => entry.category === 'salaries')).toEqual([]);
@@ -546,8 +553,8 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // from v52 to v59).
     const last = wages[wages.length - 1];
     const crew = state.workers.filter((worker) => worker.startDay <= (last?.day ?? 0));
-    // The joiner, the admin and from v63 the manager of day 78 (above).
-    expect(crew.length).toBe(3);
+    // The joiner and the admin; the manager of day 78 was the third from v63 to v76 (above).
+    expect(crew.length).toBe(2);
     expect(Math.abs(last?.amount ?? 0)).toBeCloseTo(
       crew.reduce((total, worker) => total + worker.monthlyWage, 0),
       2,

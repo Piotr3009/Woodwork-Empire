@@ -806,7 +806,11 @@ export type GameEventKind =
   /** An accident with no liability cover: the claim lands (CLAUDE.md T13 3.15). */
   | 'insuranceClaim'
   /** The morning the extension of the unit opens (v67). */
-  | 'unitExtended';
+  | 'unitExtended'
+  /** The first working day of December: the taxman comes on the 30th (CLAUDE.md T27 2.3). */
+  | 'taxComing'
+  /** The open of 30 December took a quarter of the account (CLAUDE.md T27 2.2). */
+  | 'taxPaid';
 
 export interface GameEventChoice {
   id: string;
@@ -865,6 +869,8 @@ export type LedgerCategory =
   | 'pipes'
   | 'claim'
   | 'burglary'
+  /** The taxman's quarter of the account on 30 December, once a year (CLAUDE.md T27 2.2). */
+  | 'tax'
   /** Money that belongs on the books and on no line of its own. It exists for the v19 lift of
    *  Turn 22: a v18 save's unpaid balance is carried into the account and the line that says so is
    *  booked here, and the two categories that word took with it are rewritten to this, so not a
@@ -919,6 +925,14 @@ export interface FinanceState {
   /** Overdraft interest accrued day by day below zero and not yet charged: it goes out on the
    *  1st, interest only (CLAUDE.md T13 3.14). */
   overdraftInterestAccrued: number;
+  /** The last calendar year whose 30 December has been settled, a tax of nothing at an account at
+   *  nought included, so no year is ever taxed twice; null until the first (CLAUDE.md T27 2.2,
+   *  section 4). */
+  taxPaidForYear: number | null;
+  /** The last calendar year the player was told the tax is coming, so the warning is said once
+   *  and a save that came into December without it is told on its next open (CLAUDE.md T27 2.3,
+   *  section 4). */
+  taxWarnedForYear: number | null;
   day: PeriodTotals;
   week: PeriodTotals;
   month: PeriodTotals;

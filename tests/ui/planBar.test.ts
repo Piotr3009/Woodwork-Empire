@@ -70,7 +70,9 @@ describe('the bar of a started job', () => {
   });
 
   it('keeps its outline and fills green from the left as the work goes in', () => {
-    const state = started();
+    // Priced 440 and not 400 from v79, so half the job is a whole number of minutes on the owner's
+    // 352 a day (135) and the clock can stand on it.
+    const state = started({ price: 440 });
     const job = firstJob(state);
     const work = minutesRemainingFor(state, job, 1);
     job.labourRemaining = job.labourValue * 0.5;

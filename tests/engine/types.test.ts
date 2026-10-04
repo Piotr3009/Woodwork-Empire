@@ -47,8 +47,8 @@ describe('GameState', () => {
     // v56 is 32: the booths at their pictures' size, stood again where they fit (PIOTR, 25.09).
     // v57 is 33: the timber offers taken off the board until the timber branch (PIOTR, 25.09).
     // v63 is 34: one kind of man on the floor, the draftsman's grades and the agency (CLAUDE.md T26
-    // section 4).
-    expect(STATE_VERSION).toBe(39);
+    // section 4). v81 is 40: the taxman's two years on the books (CLAUDE.md T27 section 4).
+    expect(STATE_VERSION).toBe(40);
     expect(sample.version).toBe(STATE_VERSION);
   });
 
@@ -91,16 +91,18 @@ describe('constants', () => {
   });
 
   it('matches the owner productivity example from CLAUDE.md 8.5', () => {
-    // A 6400 wardrobe carries 2560 of labour value.
+    // A 6400 wardrobe carries 2560 of labour value. The owner makes it in 7.27 days from v79, his
+    // base 352 a day; 8 on the 320 of CLAUDE.md 8.5 (PIOTR, 03.10).
     const labour = 6400 * LABOUR_FRACTION;
     expect(labour).toBe(2560);
-    expect(labour / OWNER_LABOUR_PER_MINUTE / 480).toBeCloseTo(8, 6);
+    expect(labour / OWNER_LABOUR_PER_MINUTE / 480).toBeCloseTo(80 / 11, 6);
     // The ladder is Piotr's own four figures from tonight: the very experienced man matches the
-    // owner, and everybody below him is slower, so the same wardrobe is ten days for an
-    // experienced man and thirteen and a third for one with no experience (CLAUDE.md T21 2.9).
-    expect(labour / (OWNER_LABOUR_PER_MINUTE * WORKER_RATES.senior) / 480).toBeCloseTo(8, 6);
-    expect(labour / (OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced) / 480).toBeCloseTo(10, 6);
-    expect(labour / (OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice) / 480).toBeCloseTo(13.3333, 4);
+    // owner, and everybody below him is slower, so the same wardrobe is 9.09 days for an
+    // experienced man and 12.12 for one with no experience (CLAUDE.md T21 2.9; 10 and 13.33
+    // until v79).
+    expect(labour / (OWNER_LABOUR_PER_MINUTE * WORKER_RATES.senior) / 480).toBeCloseTo(80 / 11, 6);
+    expect(labour / (OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced) / 480).toBeCloseTo(100 / 11, 6);
+    expect(labour / (OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice) / 480).toBeCloseTo(12.1212, 4);
   });
 
   it('has unique ids in every catalogue', () => {

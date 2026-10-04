@@ -170,10 +170,11 @@ describe('the CNC s places', () => {
     if (!first) throw new Error('a job is wanted');
     // The owner's hour at the job's one pace: the used CNC's 2.00 times its class's 0.95 on the
     // cutting's quarter, the edging at 1.00, the moulding by hand and the halved assembly, 1.134
-    // in all: 45.37 of labour (v55; 68.31 on v53, with the old shares).
+    // in all: 49.91 of labour (v55; 68.31 on v53, with the old shares; 45.37 until v79, the
+    // owner's base 320 a day).
     expect(done[0]).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * jobPace(state, first), 6);
     expect(jobPace(state, first)).toBeCloseTo(1 / (0.25 / 1.9 + 0.25 + 0.25 * 1.5 + 0.125), 10);
-    expect(done[0]).toBeCloseTo(45.3731, 4);
+    expect(done[0]).toBeCloseTo(49.9104, 4);
     expect(done[1]).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * manPace(WORKER_RATES.novice, jobPace(state, first)), 6);
   });
 

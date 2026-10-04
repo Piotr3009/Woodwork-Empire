@@ -89,7 +89,7 @@ describe('a save from before v67', () => {
     old.version = 34;
     const lifted = migrateState(old, 34);
     expect(lifted?.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(39);
+    expect(STATE_VERSION).toBe(40);
     expect(lifted?.unit.extension).toBe('none');
     expect(lifted?.unit.canteenWide).toBe(false);
     // And everything else of the unit is what it was.
@@ -108,10 +108,11 @@ describe('a save from before v67', () => {
 describe('what the extension costs and what it changes [PIOTR accepted, 03.10]', () => {
   it('is the builder s price and one more month of rent in deposit, and doubles what the floor sets', () => {
     const terms = extensionTerms(shop());
-    expect(UNIT_EXTENSION_PRICE).toBe(120000);
-    expect(terms.price).toBe(120000);
+    // 250,000 from Turn 27, where it was 120,000 [PIOTR, 04.10] (CLAUDE.md T27 2.4).
+    expect(UNIT_EXTENSION_PRICE).toBe(250000);
+    expect(terms.price).toBe(250000);
     expect(terms.deposit).toBe(2400);
-    expect(terms.total).toBe(122400);
+    expect(terms.total).toBe(252400);
     expect(terms.addsM2).toBe(200);
     expect(terms.areaM2).toBe(400);
     expect(terms.widthCells).toBe(40);
@@ -137,13 +138,13 @@ describe('what the extension costs and what it changes [PIOTR accepted, 03.10]',
 
   it('wants the whole of it in the account, and not a pound of it on the overdraft', () => {
     const state = shop();
-    state.cash = 122399;
+    state.cash = 252399;
     expect(extendUnitCheck(state)).toEqual({ ok: false, reason: 'Not enough in the account' });
     // Refused: nothing is paid and nothing is built.
     const refused = act(state, { type: 'EXTEND_UNIT' });
-    expect(refused.cash).toBe(122399);
+    expect(refused.cash).toBe(252399);
     expect(refused.unit.extension).toBe('none');
-    state.cash = 122400;
+    state.cash = 252400;
     expect(extendUnitCheck(state).ok).toBe(true);
   });
 });
@@ -152,8 +153,8 @@ describe('the click', () => {
   it('pays the builder and the landlord at once, and leaves the hall as it is until the morning', () => {
     const before = shop();
     const paid = act(before, { type: 'EXTEND_UNIT' });
-    expect(paid.cash).toBe(before.cash - 122400);
-    expect(ledgerOf(paid, 'unitExtension')).toBe(-120000);
+    expect(paid.cash).toBe(before.cash - 252400);
+    expect(ledgerOf(paid, 'unitExtension')).toBe(-250000);
     // The deposit of day 1 and the one on the bigger rent.
     expect(ledgerOf(paid, 'unitDeposit')).toBe(-4800);
     expect(paid.unit.depositHeld).toBe(4800);

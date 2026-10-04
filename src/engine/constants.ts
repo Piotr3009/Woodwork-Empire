@@ -160,12 +160,18 @@ import type {
  *
  *  Version 39 is v77 (PIOTR, 03.10): labour costs what the price says it costs. Every wage went
  *  up, and every man on the books of a save is paid his role's and his grade's wage of today from
- *  the next pay day. */
-export const STATE_VERSION = 39;
+ *  the next pay day.
+ *
+ *  Version 40 is v81, Turn 27 (PIOTR, 03.10 and 04.10): the taxman. The books remember the last
+ *  year whose 30 December has been settled and the last year the player was warned of it, so the
+ *  tax is never taken twice for one year and the warning is said once; both are null in every
+ *  older save, which is then warned on the next open in December and charged on the next
+ *  30 December it plays through (CLAUDE.md T27 section 4). Every v25 to v39 save loads. */
+export const STATE_VERSION = 40;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v80';
+export const APP_VERSION = 'v81';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -243,9 +249,8 @@ export const DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR;
 export const WORKING_DAYS_PER_WEEK = 5;
 export const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 /** The twelve month names the calendar cycles through. The game's month is thirty days, so a name
- *  is a label on a block of thirty and never a real April; there is no year on a date, because a
- *  workshop's year number is nothing the player does anything with (PIOTR, 17.09;
- *  CLAUDE.md T18 2.2). */
+ *  is a label on a block of thirty and never a real April (PIOTR, 17.09; CLAUDE.md T18 2.2). From
+ *  Turn 27 the top bar's date carries the year as well, and nothing else does (`START_YEAR`). */
 export const MONTH_NAMES = [
   'January',
   'February',
@@ -263,6 +268,10 @@ export const MONTH_NAMES = [
 /** The month the company opens in, as an index into `MONTH_NAMES`: 0 is January, so 2 is March
  *  [TUNE: March, which is the spring the trade picks up in and what day 1 should feel like]. */
 export const START_MONTH = 2;
+/** The year the company opens in: day 1 is 1 March 2025, and the calendar's twelve months of
+ *  thirty days count the years on from it, so day 301 is 1 January 2026 [PIOTR, 03.10: "we write
+ *  the years as well; we start from 2025"] (CLAUDE.md T27 2.1). */
+export const START_YEAR = 2025;
 
 // ---------------------------------------------------------------------------
 // 7. The owner
@@ -344,6 +353,17 @@ export const SPEND_WARNING_CATEGORIES = [
   'software',
   'agency',
 ] as const;
+/** The taxman's share of the account, once a year [PIOTR, 03.10 and 04.10: "the tax on 31
+ *  December, 25 per cent of the cash that is in the account"]. A quarter of `state.cash` and of
+ *  nothing else: not the profit, the stock, the machines, the loan or the deposits clients have
+ *  paid, which is what makes December a decision (CLAUDE.md T27 2.2). */
+export const TAX_RATE = 0.25;
+/** The month the taxman comes in, as an index into `MONTH_NAMES`: December [PIOTR]. His day is the
+ *  month's last, which is the 30th, because the game's months have thirty days [PIOTR said the
+ *  31st; the calendar has none] (CLAUDE.md T27 2.2). */
+export const TAX_MONTH = 11;
+export const TAX_DAY_OF_MONTH = DAYS_PER_MONTH;
+
 /** The two lines a margin is read against, on the client's answer and anywhere else the game
  *  colours one (PIOTR accepted, 17.09; CLAUDE.md T18 2.9) [TUNE]. A fifth of the price left after
  *  the material and the labour is a job worth having, which is the floor the scripted player of
@@ -405,9 +425,10 @@ export function unitDepositFor(rentMonthly: number): number {
 export const POWER_BASE_DAILY = 4;
 export const POWER_PER_MACHINE_DAILY = 3;
 export const BENCH_SLOTS = 4;
-/** What the builder charges for the second 200 m2 of hall, paid at the click [PIOTR accepted,
- *  03.10; TUNE] (v67). The landlord's deposit on the bigger rent is on top of it. */
-export const UNIT_EXTENSION_PRICE = 120000;
+/** What the builder charges for the second 200 m2 of hall, paid at the click (v67). The
+ *  landlord's deposit on the bigger rent is on top of it. 250,000 from Turn 27, where it was
+ *  120,000 [PIOTR, 04.10: "the extension is 250,000"] (CLAUDE.md T27 2.4). */
+export const UNIT_EXTENSION_PRICE = 250000;
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
 
@@ -1437,6 +1458,11 @@ export const MACHINE_ENDURANCE_HOURS_DEFAULT = 5000;
 /** Heights are the pictures' since v33 (the art side's table saws v2, 19.09): the canvas has to hold
  *  the guard arms, the hoses and the screens that rise above the 1 m body, and a height draws the
  *  canvas and nothing else. */
+/** The two top classes of every machine of the five classes cost a fifth more than they did, and
+ *  the three under them what they were [PIOTR, 04.10: "machines 20% up, but only the two highest;
+ *  leave the cheap ones as they are"] (CLAUDE.md T27 2.5): the pro and the industrial price of the
+ *  saw, the edgebander, the compressor, the thicknesser, the spindle moulder, the CNC and the
+ *  booth below are 1.2 times their price of v80, the fourteen figures being that arithmetic. */
 export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -1489,7 +1515,7 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional table saw',
-    price: 15000,
+    price: 18000,
     width: 3,
     depth: 2,
     height: 2.15,
@@ -1505,7 +1531,7 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial table saw',
-    price: 25000,
+    price: 30000,
     width: 4,
     depth: 2,
     height: 2.65,
@@ -1994,7 +2020,7 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional edgebander',
-    price: 16000,
+    price: 19200,
     width: 3,
     depth: 1,
     height: 1.3,
@@ -2011,7 +2037,7 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial edgebander',
-    price: 32000,
+    price: 38400,
     width: 4,
     depth: 1,
     height: 1.4,
@@ -2172,7 +2198,7 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional compressor',
-    price: 9000,
+    price: 10800,
     width: 2,
     depth: 1,
     height: 1.5,
@@ -2187,7 +2213,7 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial compressor',
-    price: 22000,
+    price: 26400,
     width: 2,
     depth: 2,
     height: 2.5,
@@ -2373,7 +2399,7 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional thicknesser',
-    price: 11000,
+    price: 13200,
     width: 3,
     depth: 1,
     height: 1,
@@ -2389,7 +2415,7 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial thicknesser',
-    price: 22000,
+    price: 26400,
     width: 3,
     depth: 2,
     height: 1.2,
@@ -2461,7 +2487,7 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional CNC',
-    price: 75000,
+    price: 90000,
     width: 4,
     depth: 2,
     height: 2.2,
@@ -2477,7 +2503,7 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial CNC',
-    price: 120000,
+    price: 144000,
     width: 4,
     depth: 3,
     height: 2.4,
@@ -2550,7 +2576,7 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional spray booth',
-    price: 32000,
+    price: 38400,
     width: 5,
     depth: 3,
     height: 3.2,
@@ -2565,7 +2591,7 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial spray booth',
-    price: 55000,
+    price: 66000,
     width: 6,
     depth: 4,
     height: 3.4,
@@ -2636,7 +2662,7 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'pro',
     name: 'Professional spindle moulder',
-    price: 16000,
+    price: 19200,
     width: 3,
     depth: 1,
     height: 2.15,
@@ -2652,7 +2678,7 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'industrial',
     name: 'Industrial spindle moulder',
-    price: 28000,
+    price: 33600,
     width: 3,
     depth: 2,
     height: 2.85,

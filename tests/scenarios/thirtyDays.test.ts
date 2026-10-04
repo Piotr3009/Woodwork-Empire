@@ -207,11 +207,13 @@ describe('30 days on Easy, working the board', () => {
       );
     }
     // 2,741 from Turn 26: a gain booked at half moves the board's draw by a standing (T26 2.11).
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(2741);
+    // 3,379 from v79: the owner's base is a tenth up and a courier is 40, so the month's jobs go
+    // out sooner and cheaper [measured].
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(3379);
     expect(state.finance.daysBelowOverdraft).toBe(0);
   });
 
-  it('ends above the reputation it started on, on seven jobs out of the door', () => {
+  it('ends above the reputation it started on, on eight jobs out of the door', () => {
     // Turn 6 works the deadline out from the work in the job, and a one man shop that takes the
     // next job the day the last one goes out delivers some of them late. Counting the deadline in
     // working days gives every job the weekends back (T10 3.5), and the board is a quarter
@@ -223,8 +225,9 @@ describe('30 days on Easy, working the board', () => {
     // bookcase taken on day 10, five points where an on time job is three: 23 where it was 21.
     expect(state.reputation).toBeGreaterThan(0);
     // 11.5 from Turn 26: the same 23 points of ratings, every one a gain, booked at half (T26 2.11).
-    expect(state.reputation).toBeCloseTo(11.5, 6);
-    expect(state.jobs.filter((job) => job.stage === 'completed')).toHaveLength(7);
+    // 13 on eight jobs out from v79: the owner's base a tenth up gets an eighth job out [measured].
+    expect(state.reputation).toBeCloseTo(13, 6);
+    expect(state.jobs.filter((job) => job.stage === 'completed')).toHaveLength(8);
   });
 
   it('took bookcases and finished most of them', () => {
@@ -470,13 +473,15 @@ describe('replay', () => {
 describe('30 days on Very easy behind the best saw money can buy', () => {
   const state = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 31, BIG_SAW);
 
-  it('stood an industrial saw in the hall on day 1 and paid 25000 for it', () => {
+  it('stood an industrial saw in the hall on day 1 and paid 30000 for it', () => {
     const saw = machineOf(state, 'tableSaw');
     expect(saw.variantId).toBe('industrial');
-    expect(saw.purchasePrice).toBe(25000);
+    // 30,000 from Turn 27, 25,000 until then [PIOTR, 04.10] (CLAUDE.md T27 2.5); nothing else of
+    // the month moved, the company having the money either way [measured].
+    expect(saw.purchasePrice).toBe(30000);
     expect(
       state.ledger.some(
-        (entry) => entry.category === 'equipment' && entry.amount === -25000,
+        (entry) => entry.category === 'equipment' && entry.amount === -30000,
       ),
     ).toBe(true);
   });
@@ -612,7 +617,8 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // -680 from Turn 26: a gain booked at half moves which enquiries the board draws (T26 2.11).
     // -3,281 from v77: the novice is paid 4,550 and not 1,950, which is 2,600 more on the one pay
     // day of the month, and the pound is rounding [measured] (PIOTR, 03.10).
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-3281);
+    // -805 from v79: both men are counted from the owner's 352 a day and a courier is 40 [measured].
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-805);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
@@ -1040,7 +1046,7 @@ describe('a month of six joiners behind two saws', () => {
     expect(two.longest).toBe(0);
   });
 
-  it('gets three of the book out on two saws and two on one: the second saw buys a job again (v61)', () => {
+  it('gets four of the book out on two saws and three on one: the second saw buys a job again (v61)', () => {
     const done = (month: CrewMonth): number =>
       month.state.jobs.filter((job) => job.stage === 'completed').length;
     /** How far through its making each job still on the books is, to a tenth of a per cent. */
@@ -1086,11 +1092,12 @@ describe('a month of six joiners behind two saws', () => {
     //
     // Re-measured for v61: three out on two saws and two on one, 4,368 ahead; the grade times the
     // hall's points (PIOTR, 01.10) lifts the one saw minute off the floor, so the second saw shows.
-    expect(done(two)).toBe(3);
-    expect(done(one)).toBe(2);
-    expect(unfinished(two)).toEqual([0.858, 0.882, 0.946]);
-    expect(unfinished(one)).toEqual([0.77, 0.808, 0.883, 0.981]);
-    expect(Math.round(two.state.cash - one.state.cash)).toBe(4368);
+    // Re-measured for v79: four and three, 3,872 ahead; every man is counted from 352 a day.
+    expect(done(two)).toBe(4);
+    expect(done(one)).toBe(3);
+    expect(unfinished(two)).toEqual([0.954, 0.962]);
+    expect(unfinished(one)).toEqual([0.847, 0.872, 0.938]);
+    expect(Math.round(two.state.cash - one.state.cash)).toBe(3872);
   });
 
   it('has no longest stand at all on one saw either, the one saw having the places the crew wants', () => {
