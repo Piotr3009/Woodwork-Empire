@@ -16,7 +16,7 @@ import { PRODUCTION_MANAGER_CARRIES, USAGE_LOW_PERCENT, USAGE_NEAR_FULL_PERCENT 
 import { weekOfDay } from './clock';
 import { crewLimit } from './layout';
 import { OWNER } from './machines';
-import { ROLE_WORDS, ROLE_WORDS_MANY, crewCount, weekBeforeOf, weekNowOf, weekWorkedMinutes } from './staff';
+import { ROLE_WORDS, ROLE_WORDS_MANY, carriedByAManager, crewCount, weekBeforeOf, weekNowOf, weekWorkedMinutes } from './staff';
 import { plural } from './text';
 import type { GameState, Worker, WorkerRole } from './types';
 
@@ -33,6 +33,9 @@ export const USAGE_TRADES: readonly UsageTrade[] = [
   'salesman',
   'draftsman',
   'productionManager',
+  // The line engineer last, after the manager: he keeps the line and is nobody's man (CLAUDE.md
+  // T29 2.8) [TUNE: the place].
+  'lineEngineer',
 ];
 
 /** Where a figure sits: nobody to measure, under `USAGE_LOW_PERCENT`, near full, or between. */
@@ -91,7 +94,7 @@ function share(worked: number, paid: number): number | null {
  *  the order they were taken on, as `menCarried` counts them, whatever the hour is. */
 function carriedBy(state: GameState, manager: Worker): { carried: number; limit: number } {
   const limit = manager.tier === null ? 0 : PRODUCTION_MANAGER_CARRIES[manager.tier];
-  const others = state.workers.filter((worker) => worker.id !== manager.id).length;
+  const others = state.workers.filter((worker) => worker.id !== manager.id && carriedByAManager(worker)).length;
   return { carried: Math.min(others, limit), limit };
 }
 
@@ -153,6 +156,8 @@ const NOBODY_WORDS: Record<WorkerRole, string> = {
   salesman: 'Nobody. The client calls are yours.',
   draftsman: 'Nobody. You draw, measure and meet the clients yourself.',
   productionManager: 'Nobody. You put every man on his job yourself.',
+  // [TUNE: chat] (CLAUDE.md T29 2.8).
+  lineEngineer: 'Nobody. The line does not run without one.',
 };
 
 function labelOf(trade: UsageTrade, count: number): string {

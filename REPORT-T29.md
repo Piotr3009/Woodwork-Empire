@@ -73,3 +73,14 @@ extraction, air or ducting of its own. `SPRAY_ROBOT_FINISH_FACTOR` 2 is written 
 is refused with `The hall has its spraying robot`. Its card's own line stands in place of Output;
 it has no line on the Output sheet and no row in `machineSavings` (`onTheMachineSheets`). Pins:
 measured classes 99 to 100, `hallItems` 23 to 24 (it found its 3 by 2 on the 200 m² floor).
+
+**T29-C4 The line engineer.** `lineEngineer`, one grade, 15,000 a month [PIOTR], no reputation
+asked, hired on the Workshop tab by the tile every role has, his two refusals in `hiringOptions`
+before the bank's line: `The company has no production line` while no module stands or is on order,
+`Two engineers keep the whole line` at two. He is on `ROLE_WORDS`, `ROLE_WORDS_MANY`,
+`NOBODY_WORDS`, `TRADE_OF_ROLE`, `USAGE_TRADES`, `CHARACTER_ROLES` and `NEVER_ON_THE_HALL`, and
+`menCarried` and Our team's `carriedBy` pass over him through one predicate. Nobody can hire him yet:
+his tile stands refused until C5 lands the modules. Pins flipped by name: `boothJoiner.test.ts` (the
+set of roles), `spriteCheck.test.ts` (`CHARACTER_ROLES`), `capsule.test.ts` (the roles with no
+figure, and never drawn), `team.test.ts` (the Workshop tab's candidates) and `v72.test.ts` (Our
+team's tiles, not in the brief's list).

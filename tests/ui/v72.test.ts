@@ -112,6 +112,8 @@ describe('how much of each trade is used', () => {
       'salesman',
       'draftsman',
       'productionManager',
+      // From v84 the line engineer's tile last (CLAUDE.md T29 2.8).
+      'lineEngineer',
     ]);
     const picked = page.querySelector('[data-trade="helper"]');
     expect(picked?.classList.contains('is-on')).toBe(true);

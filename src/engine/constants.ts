@@ -4900,6 +4900,19 @@ export const LET_GO_NOTICE_DAYS = 7;
  *  (CLAUDE.md T20 2.7). */
 export const WEEK_JOBS_KEPT = 4;
 
+/** [PIOTR, 05.10: "the cost of running the production line will be considerable: one or two
+ *  engineers at 15k a month, depending on the size of the line"] The line engineer's month, one
+ *  grade (CLAUDE.md T29 2.8). */
+export const LINE_ENGINEER_MONTHLY_WAGE = 15000;
+/** Two engineers keep the whole line, and a third is refused (CLAUDE.md T29 2.8). */
+export const LINE_ENGINEERS_MAX = 2;
+/** The modules of the line its engineers on duty keep running, by how many are on duty: none with
+ *  no engineer, three with one, all five with two [PIOTR: "one or two depending on the size of the
+ *  line"; TUNE: chat: where the second begins] (CLAUDE.md T29 2.8, 2.9.4). */
+export const LINE_MODULES_KEPT: readonly number[] = [0, 3, 5];
+/** The five modules of the production line, in the order they are built (CLAUDE.md T29 2.9.1). */
+export const LINE_MODULES: readonly string[] = ['windowLine1', 'windowLine2', 'windowLine3', 'windowLine4', 'windowLine5'];
+
 export const HIRING_SPECS: HiringSpec[] = [
   ...tieredSpecs(
     'joiner',
@@ -4952,6 +4965,17 @@ export const HIRING_SPECS: HiringSpec[] = [
     monthlyWage: 5135,
     minReputation: 15,
     duties: 'Client calls, and the meeting a big job starts with while there is no draftsman.',
+  },
+  // The line engineer: one grade, no reputation asked, hired on the Workshop tab once the company
+  // has a production line standing or on order (PIOTR, 05.10; CLAUDE.md T29 2.8). His sentence is
+  // `LINE_MODULES_KEPT` in words [TUNE: chat].
+  {
+    role: 'lineEngineer',
+    tier: null,
+    label: 'Line engineer',
+    monthlyWage: LINE_ENGINEER_MONTHLY_WAGE,
+    minReputation: REPUTATION_MIN,
+    duties: 'Keeps the production line running. One keeps up to three modules, two keep all five.',
   },
   // The manager is a tiered role from Turn 23, four grades and four cards like the joiner, on his
   // own wage table (PIOTR, 20.09; CLAUDE.md T23 2.4).

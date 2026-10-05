@@ -81,10 +81,12 @@ function labourIn(state: GameState, minutes: number): number {
 }
 
 describe('the booth, a joiner\'s like every machine (CLAUDE.md T26 2.6)', () => {
-  it('hires no trade of its own: the floor is the joiner and the labourer', () => {
+  it('hires no trade of its own: the floor makes things with the joiner and the labourer', () => {
+    // Flipped in v84: the line engineer is a role of his own, hired on the floor's tab, who keeps
+    // the line and makes nothing (CLAUDE.md T29 2.8); the booth still has no trade.
     const roles = new Set(HIRING_SPECS.map((spec) => spec.role));
     expect([...roles].sort()).toEqual(
-      ['draftsman', 'helper', 'joiner', 'officeAdmin', 'productionManager', 'salesman'].sort(),
+      ['draftsman', 'helper', 'joiner', 'lineEngineer', 'officeAdmin', 'productionManager', 'salesman'].sort(),
     );
   });
 

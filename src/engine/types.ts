@@ -160,7 +160,9 @@ export type SummaryCadence = 'daily' | 'weekly' | 'monthly';
 
 /** On the floor there are joiners and the labourer, and nobody else (PIOTR, 02.10; CLAUDE.md T26
  *  2.6): the booth's own trade, the man who counted the sheets and the man who ordered them went
- *  with Turn 26, and the lift of `migrate.ts` makes them a joiner and two office admins. */
+ *  with Turn 26, and the lift of `migrate.ts` makes them a joiner and two office admins. The line
+ *  engineer of Turn 29 is hired on the floor's tab and keeps the line, and is never on the floor
+ *  as a man who makes anything (CLAUDE.md T29 2.8). */
 export type WorkerRole =
   | 'joiner'
   /** The labourer. The id is `helper` and stays so: a save carries the id and the art side's
@@ -175,7 +177,11 @@ export type WorkerRole =
   | 'officeAdmin'
   /** The drawings, the site survey and the client meeting, in three grades (CLAUDE.md T26 2.8). */
   | 'draftsman'
-  | 'salesman';
+  | 'salesman'
+  /** The production line's engineer, one grade: one keeps up to three modules running and two keep
+   *  all five. He builds nothing, takes no job, is never drawn on the hall and is not one of the
+   *  men a manager carries (PIOTR, 05.10; CLAUDE.md T29 2.8). */
+  | 'lineEngineer';
 
 /** Which shift a man on the floor works. The second one runs after the day shift, at the night
  *  rate, only while a production manager is on the books (CLAUDE.md T13 3.9). */

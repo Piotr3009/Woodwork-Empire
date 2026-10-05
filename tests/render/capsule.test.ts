@@ -101,7 +101,7 @@ describe('the helper on the floor', () => {
 });
 
 describe('every role of the game, on the hall or behind the office door (v75)', () => {
-  it('draws the manager from his own sheets, and no figure for the office s own three', () => {
+  it('draws the manager from his own sheets, and no figure for the office s own three or the line engineer', () => {
     const state = hallWithA('helper');
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper on the books');
@@ -112,16 +112,22 @@ describe('every role of the game, on the hall or behind the office door (v75)', 
       if (sheeted.includes(role)) expect(characterArt(role, 'idle', 'sw'), role).not.toBeNull();
       else expect(characterArt(role, 'idle', 'sw'), role).toBeNull();
     }
-    expect(CHARACTER_ROLES.filter((role) => !sheeted.includes(role))).toEqual(['officeAdmin', 'salesman', 'draftsman']);
+    // From v84 the line engineer has no figure either, and is never drawn (CLAUDE.md T29 2.8).
+    expect(CHARACTER_ROLES.filter((role) => !sheeted.includes(role))).toEqual([
+      'officeAdmin',
+      'salesman',
+      'draftsman',
+      'lineEngineer',
+    ]);
     // One of each of the office's roles with nothing to do, which is when they were seen on the
     // hall: the manager is still there, in his shirt, and the other three are behind the door.
-    for (const role of ['officeAdmin', 'salesman', 'draftsman', 'productionManager']) {
+    for (const role of ['officeAdmin', 'salesman', 'draftsman', 'productionManager', 'lineEngineer']) {
       state.workers.push({ ...helper, id: `staff-${role}`, name: role, role: role as WorkerRole, station: 'idle' });
     }
     const svg = renderHall(state);
     const manager = groupOf(svg, '[data-worker="staff-productionManager"]');
     expect(manager.querySelector('[data-character]')?.getAttribute('data-character')).toBe('productionManager');
-    for (const role of ['officeAdmin', 'salesman', 'draftsman']) {
+    for (const role of ['officeAdmin', 'salesman', 'draftsman', 'lineEngineer']) {
       expect(svg, role).not.toContain(`data-worker="staff-${role}"`);
     }
   });
