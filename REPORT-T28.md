@@ -226,3 +226,23 @@ and what is wrong with the stand ins; the sanders again when there is time; the 
 at the hand tool set's 112 by 112; and, for Piotr to decide and not to be drawn yet, a pack of
 timber at the gate, a trolley of machined parts, a rack of frames drying and a stillage of finished
 windows.
+
+**T28-D2 Scenarios.** `tests/scenarios/turn28.test.ts`, two new scenarios. (vv): a company in the
+800 m2 hall with the five families, a spindle moulder, a booth and the sash cutters, no admin,
+takes a sash window job on day 3 (14,710, due day 87 with the twelve days of lead); the strip
+says `Glass not ordered: Sash windows` once the paperwork is done and the owner orders it on day
+5 (in on day 19, ten working days on); the job stands one night for the glue (day 23) and one for
+the lacquer (day 33), is finished on day 39 and paid on day 40, nought days late. Its second run
+leaves the glass until the Glazing: the job stops `waiting for glass`, ten working days, and is
+then glazed and paid. (ww): played from Tuesday 28 November 2025 to Monday 9 January 2026, the
+break's card comes on Friday 1 December after the tax's, every working day to the 21st is worked,
+December's wages go out on Thursday the 21st, the closed days are not opened and book their rent,
+their rates, the draw on the weekdays and the tax on the 30th, and Friday 6 January opens with the
+tax's card and then `Back from the Christmas break`, `14 days closed`, and no `Weekend` card;
+August 2025 is worked with no card; the summer of 2026 is told on Friday 1 July, wages on Friday
+29 July, closed from Saturday 1 to Sunday 15 August, `16 days closed` on Monday 16 August. The
+late run found one fault and it is fixed in the engine: a window whose glass came while nobody was
+on it kept `waiting for glass` as its reason; `arriveGlass` now clears it (the reason's words
+moved to `constants.ts` so that `materials.ts` can name them). No figure of any other scenario
+moved in this task; the only scenario figures moved this turn are B2's re-dating of
+`tests/scenarios/turn27.test.ts`.

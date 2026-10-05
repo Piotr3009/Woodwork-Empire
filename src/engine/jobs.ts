@@ -38,6 +38,7 @@ import {
   VAN_REPAIR_FRACTION,
   VAN_VARIANTS,
   VAN_WORN_BREAKDOWN_FACTOR,
+  WAITING_FOR_GLASS,
   WORKER_MINUTE_RATE_DIVISOR,
   type VanClass,
 } from './constants';
@@ -906,8 +907,7 @@ export function dropJob(state: GameState, jobId: string): boolean {
  *  hand or not (CLAUDE.md T4 3.4). */
 export const BENCHLESS_HALL = 'the hall has no workbench';
 
-/** What a window at its Glazing says while its glass is not in (CLAUDE.md T28 2.9). */
-export const WAITING_FOR_GLASS = 'waiting for glass';
+export { WAITING_FOR_GLASS };
 
 /** Everything in the hall that stops a job for everybody on it: no extraction in the hall at all,
  *  or no bench in it. Nothing about one stage's machine stops a job any more: a machine broken, away

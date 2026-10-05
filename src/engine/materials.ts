@@ -15,6 +15,7 @@ import {
   TEMP_STORAGE_COST,
   STOCK_LINE_NAME,
   STOCK_LINE_KINDS,
+  WAITING_FOR_GLASS,
 } from './constants';
 import { addWorkingDays } from './clock';
 import { canAfford, pay } from './economy';
@@ -379,10 +380,13 @@ export function orderGlass(state: GameState, job: Job, orderedBy: string | null 
   return true;
 }
 
-/** The open of a working day: the glass due today is at the benches (CLAUDE.md T28 2.9). */
+/** The open of a working day: the glass due today is at the benches, and a window that stood for
+ *  it no longer says so (CLAUDE.md T28 2.9). */
 export function arriveGlass(state: GameState): void {
   for (const job of state.jobs) {
-    if (job.glass === 'ordered' && job.glassDay !== null && job.glassDay <= state.clock.day) job.glass = 'in';
+    if (job.glass !== 'ordered' || job.glassDay === null || job.glassDay > state.clock.day) continue;
+    job.glass = 'in';
+    if (job.blockedBy === WAITING_FOR_GLASS) job.blockedBy = '';
   }
 }
 

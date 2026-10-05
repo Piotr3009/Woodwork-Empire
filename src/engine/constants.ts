@@ -818,6 +818,8 @@ export const GLASS_DELIVERY_WORKING_DAYS = 10;
 /** The share of a timber job's material cost that is glass and ironmongery; the rest is boards
  *  (CLAUDE.md T28 2.9) [TUNE: chat]. */
 export const GLASS_SHARE = 0.35;
+/** What a window at its Glazing says while its glass is not in (CLAUDE.md T28 2.9). */
+export const WAITING_FOR_GLASS = 'waiting for glass';
 export const BESPOKE_COST_UPLIFT = 0.15;
 /** Temporary storage for a delivery that does not fit (PIOTR). */
 export const TEMP_STORAGE_COST = 150;
