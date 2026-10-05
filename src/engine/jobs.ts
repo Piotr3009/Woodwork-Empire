@@ -109,6 +109,7 @@ import type {
   JsonValue,
   MaterialKind,
   StageId,
+  TimberStandReason,
   Worker,
   WorkerRole,
 } from './types';
@@ -472,6 +473,7 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     dustyMinutes: 0,
     rating: null,
     overdueWarned: false,
+    curing: null,
   };
   state.jobs.push(job);
   removeEnquiry(state, enquiryId);
@@ -872,6 +874,11 @@ export const BENCHLESS_HALL = 'the hall has no workbench';
 export function hallStops(state: GameState, job: Job): string {
   if (!job.byHand && !hasExtraction(state)) return 'no extraction';
   if (!hallHasABench(state)) return BENCHLESS_HALL;
+  // A timber job standing its night after the pressing or the finishing: a stop like the one for
+  // want of a booth in every respect (CLAUDE.md T28 2.8).
+  if (job.curing !== null && job.curing !== undefined && state.clock.day < job.curing.untilDay) {
+    return job.curing.reason;
+  }
   // A lacquer is sprayed in a booth and nowhere else: the board takes the job with the booth on
   // the lorry (CLAUDE.md T10 3.7), and now that nobody waits for a stage the job can reach its
   // Finishing before the booth is in the hall. It stops there, for the booth (v53).
@@ -1263,6 +1270,7 @@ export function addLabour(state: GameState, job: Job, labour: number, stage: Sta
   const worked = plan.find((entry) => entry.id === stage);
   if (worked !== undefined && stageLeft(job, plan, worked) <= WORK_EPSILON) {
     closeStageRun(state, job, stage);
+    standForTheNight(state, job, stage);
   }
   state.dayStats.workMinutes += 1;
   state.dayStats.labourValue = Math.round((state.dayStats.labourValue + put) * 10000) / 10000;
@@ -1275,6 +1283,50 @@ export function addLabour(state: GameState, job: Job, labour: number, stage: Sta
   job.labourRemaining = 0;
   completeJob(state, job);
   return true;
+}
+
+/** The stages after which a timber job stands a night, and what it stands for: the glue cures
+ *  after the pressing and the lacquer dries after the finishing [PIOTR: "a bit more complicated";
+ *  TUNE: chat: the rule] (CLAUDE.md T28 2.8). */
+const TIMBER_STANDS: Partial<Record<StageId, TimberStandReason>> = {
+  pressing: 'glue curing',
+  finishing: 'lacquer drying',
+};
+
+/** The moment a timber job fills its pressing or its finishing it stands until the next working day
+ *  opens: nothing can be done to a frame meanwhile. A day on the job and never a timer of minutes,
+ *  so a weekend or a closure in between adds nothing to it (CLAUDE.md T28 2.8). A sheet job never
+ *  stands, lacquered or not. */
+function standForTheNight(state: GameState, job: Job, stage: StageId): void {
+  if (job.timber !== true) return;
+  const reason = TIMBER_STANDS[stage];
+  if (reason === undefined) return;
+  job.curing = { reason, untilDay: nextWorkingDay(state.clock.day) };
+  job.blockedBy = reason;
+}
+
+/** The open of a working day ends every stand whose day it is: the job is free to be worked on
+ *  again, whatever its men did in between (CLAUDE.md T28 2.8). */
+export function endTheStands(state: GameState): void {
+  for (const job of state.jobs) {
+    if (job.curing === null || job.curing === undefined || state.clock.day < job.curing.untilDay) continue;
+    if (job.blockedBy === job.curing.reason) job.blockedBy = '';
+    job.curing = null;
+  }
+}
+
+/** The nights a timber job has still to stand: one for a pressing or a finishing not yet filled,
+ *  and one for the night it is standing now. The Work Plan counts a working day for each
+ *  (CLAUDE.md T28 2.8). Nought for every other job. */
+export function nightsLeft(state: GameState, job: Job): number {
+  if (job.timber !== true) return 0;
+  const plan = stagePlanFor(state, job);
+  let nights = 0;
+  for (const stage of plan) {
+    if (TIMBER_STANDS[stage.id] !== undefined && stageLeft(job, plan, stage) > WORK_EPSILON) nights += 1;
+  }
+  if (job.curing !== null && job.curing !== undefined && state.clock.day < job.curing.untilDay) nights += 1;
+  return nights;
 }
 
 /** The piece is made. It stands in front of the gate until somebody takes it to the client, and

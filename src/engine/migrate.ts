@@ -1118,6 +1118,8 @@ function liftToVersion41(state: Raw): void {
   // No closure has been told of: a save in the month before one is told on its next open (CLAUDE.md
   // T28 2.2.1, section 4).
   state.closureWarnedFor = null;
+  // And no job stands a night (2.8): every job of a save is sheet work or the oak table.
+  for (const job of records(state.jobs)) job.curing = null;
   state.version = 41;
 }
 

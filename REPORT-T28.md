@@ -164,3 +164,18 @@ the cutting's rate with their machines gone, and a window is never on the CNC (i
 Company page's line says it through `stageDoing`. A man on a timber job is drawn only at the
 families of his own plan; every other man is drawn over the spots that are not the four new
 families, which is v82's drawing in a hall with no timber job.
+
+**T28-C6 The two nights.** When a timber job's bar fills its Pressing, and again its Finishing, the
+job stands until the next working day opens (`job.curing`: `glue curing` or `lacquer drying` and
+the day whose open ends it, set in `addLabour` the minute the stage fills and cleared by
+`endTheStands` at the open) [PIOTR: "a bit more complicated"; TUNE: chat: the rule]. While it
+stands `hallStops` gives its reason, so it is a stop like the one for want of a booth in every
+respect: its minutes are `hallStopped`, `blockedBy` carries the reason to the job card and the Work
+Plan's row, its men stay on it with no bubble and are not moved by the engine, no `No material`
+card is raised, and the night shift does nothing to it either. A weekend or a closure in between
+adds nothing (`nextWorkingDay`). The Work Plan counts a working day on the bar and in the latest
+start for each night not yet stood (`nightsLeft`), and leaves them out of the minutes lost. A
+sheet job never stands, lacquered or not; the drying racks and the wet air do what they did. The
+row reads the stage the bar has moved on to, `Sanding, glue curing`, where the mockup wrote
+`Pressing, glue curing`; left so and said. STATE_VERSION 41's lift gives every job of a save
+`curing: null`.

@@ -22,12 +22,14 @@ import {
   TIMBER_FAMILIES,
   TIMBER_STAGES,
   BY_HAND_DURATION_FACTOR,
+  DAY_END_MINUTE,
   DRAWN_TURN_MINUTES,
   TIMBER_LEAD_DAYS,
 } from '../../src/engine/constants';
 import { lockReasonFor, missingEquipment, template } from '../../src/engine/catalog';
 import { blockFor, enquiryDeadlineDays, kitBlockFor } from '../../src/engine/board';
 import { deadlineDaysFrom, labourValueFor, ownerDaysFor, stagedJob } from '../../src/engine/jobs';
+import { addWorkingDays } from '../../src/engine/clock';
 import {
   currentStage,
   jobMinutesFor,
@@ -39,13 +41,18 @@ import {
   stagesOf,
 } from '../../src/engine/stages';
 import { drawnPlaces } from '../../src/engine/drawn';
+import { tick } from '../../src/engine/game';
+import { hallStops, nightsLeft } from '../../src/engine/jobs';
+import { workPlan } from '../../src/engine/plan';
 import { migrateState } from '../../src/engine/migrate';
 import { planPlaces } from '../../src/engine/production';
 import { workshopRate } from '../../src/engine/plan';
 import type { GameState, Job } from '../../src/engine/index';
 import {
   acceptNow,
+  act,
   buyStartingKit,
+  clearEvents,
   fillRack,
   firstJob,
   newGame,
@@ -326,5 +333,118 @@ describe('where a window man is drawn (CLAUDE.md T28 2.7)', () => {
       }
     }
     expect(seenTimber).toBe(true);
+  });
+});
+
+/** A timber job in production with Tom on it, its material in hand and its bags full to within a
+ *  few minutes of the end of this stage. */
+function standingAt(stageId: 'pressing' | 'finishing', template = 'sashWindows'): { state: GameState; job: Job } {
+  let state = timberHall();
+  const enquiry = placeEnquiry(state, {
+    templateId: template,
+    name: template === 'sashWindows' ? 'Sash windows' : 'Lacquered kitchen',
+    price: 14000,
+    finish: 'lacquer',
+    materialKind: template === 'sashWindows' ? 'solidWood' : 'sheet',
+    deadlineDays: 60,
+  });
+  state = fillRack(acceptNow(state, enquiry.id), 80);
+  const job = firstJob(state);
+  job.stage = 'inProduction';
+  job.sheetsReserved = job.sheets;
+  job.designMinutesRemaining = 0;
+  const tom = testJoiner('w-tom', 'Tom');
+  state.workers.push(tom);
+  tom.jobId = job.id;
+  job.assignees = [tom.id];
+  state.tasks = state.tasks.filter((task) => task.jobId !== job.id);
+  const plan = stagePlanFor(state, job);
+  const at = plan.find((stage) => stage.id === stageId);
+  if (at === undefined) throw new Error(`no ${stageId} on the plan`);
+  const bags: Partial<Record<string, number>> = {};
+  for (const stage of plan) {
+    if (stage.to <= at.from) bags[stage.id] = stage.to - stage.from;
+  }
+  bags[stageId] = at.to - at.from - 0.5;
+  job.stageLabour = bags as Job['stageLabour'];
+  job.labourRemaining = job.labourValue - (at.to - 0.5);
+  job.stageRuns = [{ stage: plan[0]?.id ?? 'cutting', startDay: state.clock.day, startMinute: 0, endDay: null, endMinute: null } as never];
+  state.clock.minute = 60;
+  return { state, job };
+}
+
+describe('the two nights (CLAUDE.md T28 2.8)', () => {
+  it('stands a night after the pressing: glue curing, a hall stop, no material card, until the next working day opens', () => {
+    let { state } = standingAt('pressing');
+    const day = state.clock.day;
+    let job = firstJob(state);
+    expect(nightsLeft(state, job)).toBe(2);
+    // Work until the pressing is filled.
+    for (let minute = 0; minute < 120 && firstJob(state).curing === null; minute += 1) state = tick(state, 1);
+    job = firstJob(state);
+    expect(job.curing).toEqual({ reason: 'glue curing', untilDay: addWorkingDays(day, 1) });
+    expect(hallStops(state, job)).toBe('glue curing');
+    expect(nightsLeft(state, job)).toBe(2);
+    // The rest of the day: nothing goes into it, the minutes are the hall's stop, Tom stays on it.
+    const labour = job.labourRemaining;
+    const stopped = state.dayStats.efficiency.lost.hallStopped;
+    state = tick(state, 60);
+    job = firstJob(state);
+    expect(job.labourRemaining).toBe(labour);
+    expect(job.blockedBy).toBe('glue curing');
+    expect(job.assignees).toEqual(['w-tom']);
+    expect(state.dayStats.efficiency.lost.hallStopped).toBeGreaterThan(stopped);
+    expect(state.eventQueue.some((event) => event.kind === 'noMaterial')).toBe(false);
+    expect(state.activeEvent?.kind === 'noMaterial').toBe(false);
+    // The next working day opens and the frame is free.
+    state.clock.minute = DAY_END_MINUTE;
+    state = clearEvents(act(clearEvents(state), { type: 'END_DAY' }));
+    expect(state.clock.day).toBe(addWorkingDays(day, 1));
+    job = firstJob(state);
+    expect(job.curing).toBeNull();
+    expect(hallStops(state, job)).toBe('');
+    expect(nightsLeft(state, job)).toBe(1);
+  });
+
+  it('stands a night after the finishing too: lacquer drying', () => {
+    let { state } = standingAt('finishing');
+    for (let minute = 0; minute < 120 && firstJob(state).curing === null; minute += 1) state = tick(state, 1);
+    const job = firstJob(state);
+    expect(job.curing?.reason).toBe('lacquer drying');
+    expect(hallStops(state, job)).toBe('lacquer drying');
+    expect(nightsLeft(state, job)).toBe(1);
+  });
+
+  it('never stands a sheet job, lacquered or not', () => {
+    let { state } = standingAt('finishing', 'lacqueredKitchen');
+    expect(firstJob(state).timber).toBeUndefined();
+    const before = firstJob(state).labourRemaining;
+    state = tick(state, 120);
+    const job = firstJob(state);
+    expect(job.curing).toBeNull();
+    expect(job.labourRemaining).toBeLessThan(before);
+    expect(nightsLeft(state, job)).toBe(0);
+  });
+
+  it('counts a working day on the Work Plan for every night not yet stood', () => {
+    const { state, job } = sashJob();
+    const row = workPlan(state).rows.find((entry) => entry.jobId === job.id);
+    expect(nightsLeft(state, job)).toBe(2);
+    // Not started: the bar is its work and two working days, and its latest start is counted back
+    // over both from the deadline.
+    const work = (row?.minutesTotal ?? 0) / MINUTES_PER_WORKING_DAY;
+    expect(row?.to).toBeCloseTo((row?.from ?? 0) + work + 2, 2);
+    expect(row?.latestStartPoint).toBeCloseTo((row?.duePoint ?? 0) - work - 2, 1);
+  });
+
+  it('is ended by the day it names whatever lies between: a weekend adds nothing', () => {
+    const { state, job } = sashJob();
+    // A Friday's pressing stands until Monday's open.
+    state.clock.day = 5;
+    job.curing = { reason: 'glue curing', untilDay: addWorkingDays(5, 1) };
+    expect(job.curing.untilDay).toBe(8);
+    expect(hallStops(state, job)).toBe('glue curing');
+    state.clock.day = 8;
+    expect(hallStops(state, job)).toBe('');
   });
 });

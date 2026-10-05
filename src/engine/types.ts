@@ -48,6 +48,15 @@ export type Finish = 'laminate' | 'lacquer' | 'veneer';
  *  the bench, a quarter each, and Finishing in the booth for a lacquered job [PIOTR, 24.09: "every
  *  machine has its own stage, split evenly"]. `cnc` is the one stage a CNC does instead of Cutting;
  *  `delivery` carries no labour at all. `machining`, the 15% of v53 and before, is gone. */
+/** What a timber job stands for overnight (CLAUDE.md T28 2.8). */
+export type TimberStandReason = 'glue curing' | 'lacquer drying';
+
+/** A timber job standing a night: why, and the working day whose open ends it. */
+export interface TimberStand {
+  reason: TimberStandReason;
+  untilDay: number;
+}
+
 export type StageId =
   | 'cutting'
   | 'edging'
@@ -714,6 +723,10 @@ export interface Job {
   dustyMinutes: number;
   rating: number | null;
   overdueWarned: boolean;
+  /** The night a timber job stands after its pressing or its finishing, while the glue cures or
+   *  the lacquer dries: the reason the hall says and the day whose open ends it. Null on every
+   *  other job and between the two (CLAUDE.md T28 2.8). */
+  curing: TimberStand | null;
 }
 
 /** One call from the client: when he rings, and what happened when he did. */

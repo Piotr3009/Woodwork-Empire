@@ -76,6 +76,7 @@ function job(partial: Partial<Job>): Job {
     dustyMinutes: 0,
     rating: null,
     overdueWarned: false,
+    curing: null,
     ...partial,
   };
 }

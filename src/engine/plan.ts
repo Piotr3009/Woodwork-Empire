@@ -16,6 +16,7 @@ import {
   jobStage,
   meetingOutstanding,
   minutesRemainingFor,
+  nightsLeft,
 } from './jobs';
 import { ownerIsAvailable } from './owner';
 import { isWorkingToday, joiners, shiftOf } from './staff';
@@ -190,7 +191,10 @@ function rowFor(state: GameState, job: Job): PlanRow {
   const total = Math.max(whole, left);
   const from = productionStart(state, job);
   const notStarted = job.stageRuns.length === 0;
-  const length = total / MINUTES_PER_WORKING_DAY;
+  // A timber job stands a night after its pressing and another after its finishing: a working day
+  // on the bar for each it has not yet stood (CLAUDE.md T28 2.8).
+  const nights = nightsLeft(state, job);
+  const length = total / MINUTES_PER_WORKING_DAY + nights;
   const duePoint = workingDayIndex(job.dueDay);
   // The work takes working days, so counting back from the deadline counts back over the axis
   // and never over a weekend (CLAUDE.md T10 3.5).
@@ -202,8 +206,10 @@ function rowFor(state: GameState, job: Job): PlanRow {
   // (PIOTR, 15.09; CLAUDE.md T11 3.3).
   const to = notStarted
     ? from + length
-    : Math.max(from, now + left / MINUTES_PER_WORKING_DAY);
+    : Math.max(from, now + left / MINUTES_PER_WORKING_DAY + nights);
   const barMinutes = Math.max(1, (to - from) * MINUTES_PER_WORKING_DAY);
+  // The nights are the plan and not minutes the job's clock lost.
+  const nightMinutes = nights * MINUTES_PER_WORKING_DAY;
   const minutesDone = Math.max(0, total - left);
   const overdue = to > duePoint;
   return {
@@ -221,7 +227,7 @@ function rowFor(state: GameState, job: Job): PlanRow {
     done: notStarted ? 0 : Math.min(1, minutesDone / barMinutes),
     minutesDone,
     minutesTotal: total,
-    lostMinutes: notStarted ? 0 : Math.max(0, Math.round(barMinutes - total)),
+    lostMinutes: notStarted ? 0 : Math.max(0, Math.round(barMinutes - total - nightMinutes)),
     overdue,
     lateDays: overdue ? Math.max(1, Math.ceil(to - duePoint)) : 0,
     latestStart: latestStartPoint === null ? null : dayOfPoint(latestStartPoint),

@@ -195,6 +195,7 @@ import {
   resolveClientOffer,
   runBookedTransport,
   dropJob,
+  endTheStands,
   BUILDING_ROLES,
   takeOffJob,
   takeOverJob,
@@ -567,6 +568,9 @@ function startDay(state: GameState): void {
   // An extension paid for yesterday is there this morning, before the day is charged: its first
   // day is paid for at the bigger unit's rent (PIOTR, 03.10; v67).
   openExtension(state);
+  // The glue has cured and the lacquer dried overnight: the frames that stood are free (CLAUDE.md
+  // T28 2.8).
+  endTheStands(state);
   // The month's paper before the day's: the loan, the covers and the security run with the
   // monthly items, and the report is put in front of the player before the board (T13 3.20).
   runDayCosts(state, state.clock.day);
