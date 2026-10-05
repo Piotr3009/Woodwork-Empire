@@ -2,6 +2,80 @@
 
 Woodwork Empire, Turn 28. Built against `CLAUDE.md` of 05.10.2026 (first line "Turn 28").
 Branch `turn-28-timber` off `1624d33`, the tree `origin/main` stands on (v82, STATE_VERSION 40).
+`APP_VERSION` v82 to v83, `STATE_VERSION` 40 to 41. One writer, serial, no worktrees, one commit a
+task, `npm run check` green on its own exit code before each (2,652 tests in 278 files at the end,
+none skipped). Under Piotr's amendment of section 3 for this run, read-only sub-agents read the
+code, built the mockups, measured the ports, drafted tests, reviewed the diffs and wrote the art
+requests; none of them edited `src/` or `tests/`, committed or pushed.
+
+## 0. What Piotr should read first
+
+**Not reached: nothing.** Every task of section 5, T28-A0 to T28-D5, is done, one commit each, in
+the order of the brief, with `npm run check` green on its own exit code before each; and one commit
+more, `T28-C the review`, made after D2, for what the read-only review of the timber tasks found.
+The timber department is open: a company in the 800 m2 hall is offered windows and doors.
+
+**Red: nothing.** The last full check: lint, the build and 2,652 tests in 278 files, none
+failing and none skipped (no `it.skip`, `describe.skip`, `.only` or `.todo` in the tree). One test
+file, `tests/ui/app.test.ts`, plays the game in real time (its seed is the clock and its frames are
+the browser's) and failed nine of its tests in two of this session's checks while a sub-agent ran the
+suite beside it; on a quiet machine it passes every time, and nothing of tonight touches it (notes
+5).
+
+**What chat decided and you have not confirmed (section 10), with what was built:**
+
+1. *Christmas 22 December to 5 January from December 2025; summer 1 to 14 August from 2026.* Built
+   so, in one table (`CLOSURES` in `constants.ts`) and one rule (`closureOf` in `clock.ts`). Told on
+   the first working day of December and of July; the card counts every day it stepped over, so
+   Christmas 2025 says `14 days closed` and the summer of 2026 `16 days closed` (the weekend before
+   it and the one after are in it).
+2. *The whole company is closed, the owner with it; his draw is paid on the closure's weekdays.*
+   Built so: the draw is charged Monday to Friday whatever the calendar says, and his house keeps
+   its tier.
+3. *A closed day counts for no deadline.* Built so: every count in working days steps over a
+   closure, a deadline, a delivery, a courier, a service return, a new man's first day, the Work
+   Plan's columns.
+4. *The bank's count and a contract's term run through a closure.* Built so, as through a weekend;
+   the break's card tells an overdrawn company that the bank's clock does not stop.
+5. *Kit that stands outside asks for no free floor in the hall.* Built so for the pelletiser, the
+   two systems and the van.
+6. *Timber opens with the 800 m2 hall and is not shown before it; one crew for both departments;
+   the oak table stays off; the cutter sets cannot be sold.* Built so. No draw of a 200 or 400 m2
+   company's board moved; the machines and the sets are in the catalogue from day one.
+7. *Every price, place count, share and delivery day of 2.4 to 2.7.* Built as the brief's tables,
+   each asserted.
+8. *The cutter sets; the glass at ten working days and 0.35 of the material; the two nights, the
+   men of a job that stands left to the player; twelve working days on a timber deadline.* Built so.
+   The engine still puts a free owner, or a manager's free joiner, onto a window that is standing,
+   as it does onto a sheet job stopped for want of a booth (2.8 makes the stand that stop "in every
+   respect"; a reviewer asked for a filter and the check of the brief refused it).
+9. *A cross cut saw, a planer, a moulder, a sander, a frame press and a booth to take timber work;
+   not the glue table or the thicknesser.* Built so.
+10. *The twelve stand in pictures of the presses and the glue table.* In, as chat cut them;
+    `docs/art/REQUESTS-T28.md` asks the art side for them again, and for the sanders, whose pro and
+    industrial pairs stand off their anchors.
+
+**Found tonight and left for you:**
+
+- **A second cutter set can be bought and does nothing.** One set serves every moulder (2.5); the
+  card offers `Buy another` and a set is never sold, so the second is £3,000 to £5,000 lost. A hand
+  tool set is held to the cabinet's slots; nothing holds a cutter set, and the brief writes no
+  refusal, so none was invented.
+- **A save made before tonight late in December** (standing on 21 to 29 December 2025, or 19 to 29
+  December 2026) opens on that day: December's wages, due on the last working day before the 22nd,
+  are never charged, and a job due on a day now closed is one day late on the first day back (notes
+  5).
+- **The week of 18 to 21 December 2025 has no weekly summary**: it shows on a Friday, and that Friday
+  is closed.
+- **The first days back are thin**: the enquiries expired through the break and the board fills only
+  as fast as any morning. The same calendar days run for a contract offer, a contract's end, a let go
+  notice, a service interval, the overdraft's interest and the bank's count.
+- **The pelletiser behind the wall is about a third seen**: the wall's line crosses its picture
+  about 42 of its 116 px down (picture 01), much as chat's arithmetic said; nothing is done about it.
+- **The pelletiser stays on the floor of a lifted save only with no length of wall left**: in the 200
+  m2 unit with four systems already behind it, in the larger ones with nine.
+- **The strip shows one line**: in December a company with cash to tax reads the tax's line, and is
+  told of the closure by the cards (the brief's own reading).
 
 ## The tasks
 
@@ -294,6 +368,11 @@ drawn by `generateEnquiry` and `generateUnreachable` off halls short of what eac
 pages were served by a static server inside the shooting script, which stops it before it exits, and
 the pages themselves were deleted once shot.
 
+**T28-D5 Report and PR.** This file, section 0 first, and the pull request titled `Turn 28: the
+timber department, the holidays, and the pelletiser outside`, against main and not merged. Nothing
+was left running: the checks, the scenario runs, the review and the audit ran to their ends, the
+shooting script stopped its own server, and no watcher or server is up.
+
 ## The pictures
 
 The third column is the nearest existing picture of the same screen; what each pair differs by is
@@ -314,3 +393,42 @@ what this turn did to it.
 | `11-the-work-plan-glue-curing.png` | Wednesday 17 March: the frame has filled its Pressing, the row says `Pressing, glue curing` and the step `Production: Pressing`, its five men left on it | `docs/mockups/t28/work-plan-stops.png` |
 | `12-the-800-m2-hall-with-the-timber-machines.png` | the 800 m2 hall on Monday 8 March at 09:35 with one of each new machine standing at its standard class and the glue table by the press: the owner at the cross cut saw, Tom at the planer, Ben at the moulder, Sam at the sander, Joe at the frame press. Each machine of the plan wears the `too few places` mark: five men on one window are more than one standard machine of each family holds, which is 2.4's rule and the reason to buy a second | `report-t25/01-four-men-and-one-used-saw.png`: the same mark on the sheet side |
 | `13-the-sprite-check-rows.png` | the Sprite check page's 24 rows of the five families and the three cutter sets: a file, a footprint and no red port line for every class, `no file yet` for the three sets | `report-t22/10-the-sprite-check-page.png` |
+
+## The state: STATE_VERSION 41
+
+Lifted once, in B1. What a save carries from tonight, and where:
+
+- `GameState.closureWarnedFor` (`types.ts`, B2): the first day of the closure the break's card was
+  raised for, or null. The lift writes null, so a save loaded between a card's day and its closure
+  is told on its next open.
+- `Job.curing` (`types.ts`, C6): `{ reason, untilDay }` while a window stands for its glue or its
+  lacquer, else null. The lift writes null on every job.
+- `Job.glass` and `Job.glassDay` (`types.ts`, C7): `none`, `toOrder`, `ordered` or `in`, and the day
+  it arrives. The lift writes `none` and null on every job.
+- `Job.timber` and `StagedJob.timber` (C5): optional, absent meaning false, so no save needs it.
+- The pelletiser's anchor (B1): a pelletiser on the floor or on order is stood behind the wall by
+  `standThePlantBehindTheWall`, its second gate `version < 41`; no moving time is booked.
+
+Nothing else of a save is touched: no machine, man, price or job. Every save that loaded on v82
+loads (`OLDEST_SAVE_VERSION` 12), the fixtures in `tests/fixtures` among them. New kinds that are not
+state: the event kinds `closureComing` and `closureOver`, the action `ORDER_GLASS`, the warning keys
+`closureComing` and `glassNotOrdered`, the template field `cutters`.
+
+## What was not done tonight
+
+- Section 8's parked list, untouched: the spindle moulder's three men (its places stay 2, 4, 4, 6,
+  8); the thicknesser's place in the timber department; frames drying on floor or racks, the grade
+  of the timber and its waste, remedial visits; the products drawn on the hall (asked of the art
+  side in `REQUESTS-T28.md`, for you to decide first); timber standing contracts and timber big
+  jobs; the five axis CNC, the spraying robot and the line; the bank's count and a contract's term
+  through a closure; the owner's forced holidays, accidents, the crisis; your open questions after
+  v82 (the security firm at 800 m2, the waste collection, the second extension's card shown early)
+  and the logo; Turn 27's account at nought, the one off licence that runs out with no card, and
+  the first month's wage of a man hired late.
+- Section 6 kept: no sheet template, stage, share, place, pace, price or power moved; nothing of the
+  wages, the owner's base, the courier, the loan, the overdraft, the reputation, the contracts, the
+  agency's big jobs, the security, the insurance or the waste; the tax gained one sentence and
+  nothing else; no picture drawn, trimmed or scaled, no sound, no new screen, modal kind, tab kind
+  or CSS token (`git diff main --stat -- src/ui/styles.css` is empty), nothing of `public/brand/`.
+- The pictures the art side owes: the twelve frame press and glue table files again, the sanders
+  again, the three cutter sets (`docs/art/REQUESTS-T28.md`).
