@@ -731,6 +731,14 @@ export const BUILT_TO_ORDER: readonly string[] = ['cnc5'];
 export const BUILT_TO_ORDER_LINE = 'Built to order: it cannot be called off';
 /** Parts come off a CNC cut and drilled, so the assembly takes half the minutes (PIOTR). */
 export const CNC_ASSEMBLY_FACTOR = 2;
+/** [PIOTR, 04.10: "the same spray booth at first and later a robot arm that sprays by itself";
+ *  TUNE: chat: how much] While the hall has a spraying robot that stands, is not broken and is not
+ *  away for its service, the Finishing done at a booth goes this many times as fast: the hall's, as
+ *  the tool changer's five per cent is the hall's (CLAUDE.md T29 2.7). */
+export const SPRAY_ROBOT_FINISH_FACTOR = 2;
+/** The booth's robot arm (CLAUDE.md T29 2.7): one for the hall, carried in and stood by a booth,
+ *  making no dust and asking for no extraction or air of its own. */
+export const SPRAY_ROBOT = 'sprayRobot';
 
 /** The piece leaving. It carries no labour: it is the Turn 2 transport, not work at a bench
  *  (CLAUDE.md T7 3.1). The Work Plan drew a bar for it until Turn 9 took the bars away. */
@@ -1075,7 +1083,7 @@ export const GATE_PRICE = 1000;
 export const GATE_OUTPUT_BONUS = 0.02;
 /** Every machine family is ducted into the extraction except the compressor. The hand tools are
  *  not machines at all, so they never appear here (PIOTR). */
-export const NO_DUCTING_SPECS = ['compressor'];
+export const NO_DUCTING_SPECS = ['compressor', 'sprayRobot'];
 /** Skip ahead: the fastest the loop allows, run for the player while the owner is out and until
  *  the task he is out on is over (PIOTR, 13.09; CLAUDE.md T8 3.3). The Turn 4 forced 4x of a move
  *  of the hall is this same run now, so there is one speed the clock is ever taken to and one
@@ -2109,6 +2117,26 @@ export const SHEET_RACK_HIGH_VARIANTS: EquipmentVariant[] = [
       'The industrial rack with its bays packed twice as tight, in red so nobody takes it for ' +
       'the other one. Three hundred and twenty sheets on the four metres of floor that used to ' +
       'hold a hundred and sixty.',
+  },
+];
+
+/** The spraying robot's one class (CLAUDE.md T29 2.7): 120,000 [TUNE: chat], 8 a day of power
+ *  [TUNE], the art side's metres. */
+export const SPRAY_ROBOT_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Spraying robot',
+    price: 120000,
+    width: 2,
+    depth: 1,
+    height: 2.25,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    enduranceFactor: 1,
+    powerPerDay: 8,
+    description:
+      'A robot arm on a pedestal beside the booth, the gun on the end of it. It lays the coats ' +
+      'on the work in the booth by itself, as even as the last.',
   },
 ];
 
@@ -3451,6 +3479,7 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   cnc: CNC_VARIANTS,
   cnc5: CNC5_VARIANTS,
   sprayBooth: SPRAY_BOOTH_VARIANTS,
+  [SPRAY_ROBOT]: SPRAY_ROBOT_VARIANTS,
   spindleMoulder: SPINDLE_MOULDER_VARIANTS,
   // The cabinet is a family of five from Turn 22, and what a class is for is how many men's hand
   // tools it holds (PIOTR, 19.09; CLAUDE.md T22 2.12).
@@ -4172,7 +4201,26 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'sprayBooth',
     // Unlocked in Turn 11: two products ask for a sprayed finish now (CLAUDE.md T11 3.7).
     effect: 'Unlocks the lacquer finish. Its own extraction, and dry air for a clean finish.',
+  },  {
+    ...BASE_SPEC,
+    id: SPRAY_ROBOT,
+    // A month for the robot [TUNE] (CLAUDE.md T29 2.7).
+    deliveryDays: 30,
+    folder: 'Spraying robots',
+    tab: 'spraying',
+    name: 'Spraying robot',
+    price: 120000,
+    category: 'machine',
+    width: 2,
+    depth: 1,
+    height: 2.25,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    spriteKey: SPRAY_ROBOT,
+    requires: ['sprayBooth'],
+    effect: 'An arm that sprays by itself at the booth. One is enough for the hall.',
   },
+
   {
     ...BASE_SPEC,
     id: 'dustSystem',
@@ -5011,6 +5059,7 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   cncHead: 0.06, // the same head, the same chips
   cnc5: 0.06, // the CNC's figure [TUNE] (CLAUDE.md T29 2.6)
   sprayBooth: 0, // its own extraction, off this table
+  sprayRobot: 0, // an arm at the booth: no chips, and the booth's extraction is its own (CLAUDE.md T29 2.7)
   spindleMoulder: 0.12, // a bag a day, the figure the Turn 12 comment kept for it (PIOTR)
   // A compressor moves air and makes no chips. Not on Piotr's list: a zero so that every family
   // of the machine category is on this table and the test can hold it to that [TUNE].

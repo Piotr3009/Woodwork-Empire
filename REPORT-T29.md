@@ -64,3 +64,12 @@ it for a timber product only, and the tile's `Needs` line prints the one `wanted
 called off`). Pins: the CNC centre tab, ports 37 to 40 and 84 to 90, measured classes 96 to 99, the
 catalogue's metres; the two buy-everything tests pass over what the 200 m² unit refuses for its
 size.
+
+**T29-C3 The spraying robot.** `sprayRobot`, one class, 120,000, 30 working days, 8 a day, 2 by 1
+by 2.25 in a zone of 3 by 2, `requires: ['sprayBooth']`, carried in, no places, nought dust, no
+extraction, air or ducting of its own. `SPRAY_ROBOT_FINISH_FACTOR` 2 is written once, in
+`stageSpeed`, on the Finishing at a booth that runs while a robot stands that is not broken or away
+(`sprayRobotRuns`); a lacquered sheet job's Finishing feels it and nothing else of it moves. A second
+is refused with `The hall has its spraying robot`. Its card's own line stands in place of Output;
+it has no line on the Output sheet and no row in `machineSavings` (`onTheMachineSheets`). Pins:
+measured classes 99 to 100, `hallItems` 23 to 24 (it found its 3 by 2 on the 200 m² floor).

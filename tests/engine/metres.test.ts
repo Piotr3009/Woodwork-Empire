@@ -130,6 +130,8 @@ describe('footprints in metres', () => {
       // The five axis CNC's family line is its standard class, the art side's metres (CLAUDE.md
       // T29 2.4, 2.6).
       cnc5: [5, 3, 2.5],
+      // The spraying robot, the art side's metres (CLAUDE.md T29 2.4, 2.7).
+      sprayRobot: [2, 1, 2.25],
     };
     // Every line of the catalogue is in one of the two lists: nothing slips in unmeasured.
     expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(

@@ -21,7 +21,9 @@ import {
   CNC5_STAGE_FACTOR,
   DUST_OUTPUT_M3_PER_HOUR,
   HEAVY_SPECS,
+  MACHINE_CAPACITY,
   MACHINE_SHORT_WORDS,
+  SPRAY_ROBOT_FINISH_FACTOR,
   TIMBER_FAMILIES,
   TIPS,
 } from '../../src/engine/constants';
@@ -36,6 +38,10 @@ import {
   findSpec,
   footprintOf,
   hallPace,
+  isHeavy,
+  isServiced,
+  machineSavings,
+  outputBreakdown,
   placesOf,
 } from '../../src/engine/machines';
 import { airDemandOf, extractionDemandOf } from '../../src/engine/media';
@@ -264,5 +270,108 @@ describe('who stands in for whom on the board (CLAUDE.md T29 2.5.4)', () => {
     const kitchen = template('handlelessKitchen');
     const state = withCnc5(bigUnit(['spindleMoulder']));
     expect(missingEquipment(state, kitchen)).toContain('spindleMoulder');
+  });
+});
+
+describe('the spraying robot (CLAUDE.md T29 2.7)', () => {
+  /** The 800 m2 company with a robot standing beside its booth. */
+  function withRobot(state: GameState): GameState {
+    placeEquipment(state, 'sprayRobot', { x: 36, y: 6, id: 'kit-robot' });
+    return state;
+  }
+
+  function finishing(state: GameState, job: StagedJob): number {
+    return stageSpeed(state, job, 'finishing').speed;
+  }
+
+  it('is one class of the table, carried in, with no places, no dust and no extraction or air', () => {
+    const spec = findSpec('sprayRobot');
+    expect(spec).toMatchObject({
+      name: 'Spraying robot',
+      folder: 'Spraying robots',
+      tab: 'spraying',
+      category: 'machine',
+      requires: ['sprayBooth'],
+      price: 120000,
+      deliveryDays: 30,
+    });
+    expect(spec?.variants.map((variant) => variant.id)).toEqual(['standard']);
+    expect(spec?.variants[0]).toMatchObject({ powerPerDay: 8, zoneWidth: 3, zoneDepth: 2 });
+    expect(footprintOf('sprayRobot', 'standard')).toMatchObject({ width: 2, depth: 1, height: 2.25 });
+    expect(MACHINE_CAPACITY.sprayRobot).toBeUndefined();
+    expect(DUST_OUTPUT_M3_PER_HOUR.sprayRobot).toBe(0);
+    expect(extractionDemandOf({ specId: 'sprayRobot', variantId: 'standard' })).toBe(0);
+    expect(AIR_DEMAND.sprayRobot).toBeUndefined();
+    expect(isHeavy('sprayRobot', 'standard')).toBe(false);
+    expect(isServiced('sprayRobot')).toBe(true);
+  });
+
+  it('doubles the Finishing at a booth that runs, and only while it stands and runs', () => {
+    const state = withRobot(bigUnit());
+    const booth = hallPace(state, 'sprayBooth');
+    expect(finishing(state, windowJob())).toBe(booth * SPRAY_ROBOT_FINISH_FACTOR);
+    expect(SPRAY_ROBOT_FINISH_FACTOR).toBe(2);
+    const robot = state.equipment.find((item) => item.specId === 'sprayRobot');
+    if (robot === undefined) throw new Error('the robot is wanted');
+    robot.broken = true;
+    expect(finishing(state, windowJob())).toBe(booth);
+    robot.broken = false;
+    robot.inServiceUntilDay = state.clock.day + 3;
+    expect(finishing(state, windowJob())).toBe(booth);
+    robot.inServiceUntilDay = null;
+    // With no booth that runs it does nothing.
+    const boothItem = state.equipment.find((item) => item.specId === 'sprayBooth');
+    if (boothItem === undefined) throw new Error('the booth is wanted');
+    boothItem.broken = true;
+    const without = bigUnit();
+    const theirs = without.equipment.find((item) => item.specId === 'sprayBooth');
+    if (theirs === undefined) throw new Error('the booth is wanted');
+    theirs.broken = true;
+    expect(finishing(state, windowJob())).toBe(finishing(without, windowJob()));
+    expect(finishing(state, windowJob())).toBe(1);
+  });
+
+  it('speeds a lacquered sheet job s Finishing and nothing else of it, and leaves a laminate job alone', () => {
+    const plain = bigUnit();
+    const robot = withRobot(bigUnit());
+    const lacquered = stagedJob(100, 'sheet', false, 'lacquer', false, false);
+    const before = stagePlanFor(plain, lacquered);
+    const after = stagePlanFor(robot, lacquered);
+    expect(after.map((stage) => stage.family)).toEqual(before.map((stage) => stage.family));
+    for (const [index, stage] of after.entries()) {
+      const was = before[index];
+      if (was === undefined) throw new Error('the plans are the same length');
+      expect(stage.speed, stage.id).toBe(stage.id === 'finishing' ? was.speed * SPRAY_ROBOT_FINISH_FACTOR : was.speed);
+    }
+    const laminate = stagedJob(100, 'sheet', false, 'laminate', false, false);
+    expect(stagePlanFor(robot, laminate)).toEqual(stagePlanFor(plain, laminate));
+  });
+
+  it('is refused a second, and asks for a booth first', () => {
+    const state = bigUnit();
+    expect(canBuy(state, 'sprayRobot')).toEqual({ ok: true, reason: '' });
+    expect(placeEquipmentOrder(state, 'sprayRobot').ok).toBe(true);
+    expect(canBuy(state, 'sprayRobot')).toEqual({ ok: false, reason: 'The hall has its spraying robot' });
+    const owned = withRobot(bigUnit());
+    expect(canBuy(owned, 'sprayRobot')).toEqual({ ok: false, reason: 'The hall has its spraying robot' });
+    const noBooth = bigUnit(['sprayBooth']);
+    expect(canBuy(noBooth, 'sprayRobot')).toEqual({ ok: false, reason: 'Needs Spray booth first' });
+    // And it is bought in the 200 m2 unit as well: only the big kit names a unit.
+    const small = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    small.cash = 900000;
+    placeEquipment(small, 'sprayBooth', { variantId: 'standard', x: 7, y: 5 });
+    expect(canBuy(small, 'sprayRobot').ok).toBe(true);
+  });
+
+  it('has no line of its own on the Output sheet or in the machine hours, and its card says what it does', () => {
+    const state = withRobot(bigUnit());
+    expect(outputBreakdown(state).lines.some((line) => line.label.startsWith('Spraying robot'))).toBe(false);
+    expect(outputBreakdown(state).lines.some((line) => line.label.startsWith('Spray booth'))).toBe(true);
+    expect(machineSavings(state, 'week').rows.some((row) => row.id === 'kit-robot')).toBe(false);
+    const holder = document.createElement('div');
+    holder.innerHTML = renderCatalogue(state, '', catalogueTabFrom('spraying'), 'sprayRobot');
+    const card = holder.querySelector('.tile[data-variant]');
+    expect(card?.textContent).toContain(`The Finishing at the booth goes ${SPRAY_ROBOT_FINISH_FACTOR} times as fast`);
+    expect(card?.textContent).not.toContain('Output');
   });
 });

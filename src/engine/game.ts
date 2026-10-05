@@ -16,6 +16,7 @@ import {
   DIFFICULTIES,
   CUTTER_SETS,
   DRYING_RACKS,
+  SPRAY_ROBOT,
   GLUE_TABLE,
   GATE_LANE,
   GATE_PRICE,
@@ -2598,6 +2599,11 @@ export function canBuy(
     if (counted(GLUE_TABLE) >= counted('framePress')) {
       return { ok: false, reason: 'Every frame press has its glue table' };
     }
+  }
+  // One robot is enough for the hall, and a second would do nothing (CLAUDE.md T29 2.7).
+  if (specId === SPRAY_ROBOT) {
+    const counted = state.equipment.filter((item) => item.specId === specId && !isSold(item)).length + onOrderCount(state, specId);
+    if (counted > 0) return { ok: false, reason: 'The hall has its spraying robot' };
   }
   // One cutter set serves every moulder the company has and a set is never sold: a second of a
   // kind, owned or on its way, would be money thrown away (CLAUDE.md T29 2.2) [TUNE: chat].

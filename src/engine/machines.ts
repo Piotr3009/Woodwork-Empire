@@ -65,6 +65,7 @@ import {
   UNDER_EXTRACTION_OUTPUT_PENALTY,
   USED_VARIANT,
   bagsToM3,
+  SPRAY_ROBOT,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
@@ -1035,6 +1036,7 @@ export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'
   const families = new Set(
     state.equipment
       .filter((item) => !isSold(item) && findSpec(item.specId)?.category === 'machine')
+      .filter((item) => onTheMachineSheets(item.specId))
       .map((item) => item.specId),
   );
   for (const specId of Array.from(families).sort()) {
@@ -1454,6 +1456,20 @@ export function paceLines(state: GameState): PaceLine[] {
 /** The best class of this family standing in the hall, unbroken and not away for its service, as
  *  a machine: the one that sets the hall's pace (2.4), and the one a piece's minutes and its wear
  *  are worked out on. The first bought wins a tie. Null when the hall has none it can work at. */
+/** True while the hall has a spraying robot that stands, is not broken and is not away for its
+ *  service: the Finishing at the booth goes `SPRAY_ROBOT_FINISH_FACTOR` times as fast while it
+ *  does (CLAUDE.md T29 2.7). */
+export function sprayRobotRuns(state: GameState): boolean {
+  return bestMachineOf(state, SPRAY_ROBOT) !== null;
+}
+
+/** Whether a machine family has a line of its own on the sheets that list machines (the Output
+ *  sheet's `best in the hall` and the machine hours of `machineSavings`): the robot does not, since
+ *  nobody stands at it and what it does is the booth's (CLAUDE.md T29 2.7). */
+export function onTheMachineSheets(specId: string): boolean {
+  return specId !== SPRAY_ROBOT;
+}
+
 export function bestMachineOf(state: GameState, specId: string): Equipment | null {
   let best: Equipment | null = null;
   let pace = 0;
@@ -1882,7 +1898,7 @@ export function machineSavings(state: GameState, span: 'week' | 'month'): Machin
   for (const item of state.equipment) {
     if (isSold(item) || !itemStandsInTheHall(item)) continue;
     const spec = findSpec(item.specId);
-    if (!spec || spec.category !== 'machine') continue;
+    if (!spec || spec.category !== 'machine' || !onTheMachineSheets(item.specId)) continue;
     const effect = roundPoints(hallPace(state, item.specId) - 1);
     const ran = span === 'week' ? item.hoursThisWeek : item.hoursThisMonth;
     const saved = minutesSavedBy(state, item, ran);

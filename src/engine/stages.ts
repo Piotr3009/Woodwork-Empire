@@ -18,13 +18,14 @@ import {
   CNC_STAGE_FACTOR_WITH_HEAD,
   CNC5_STAGE_FACTOR,
   FINISHING_STAGE,
+  SPRAY_ROBOT_FINISH_FACTOR,
   MACHINE_STAGES,
   OWNER_LABOUR_PER_MINUTE,
   PRODUCTION_STAGES,
   TIMBER_STAGES,
   WORK_EPSILON,
 } from './constants';
-import { SPRAY_BOOTH, familyRuns, hallPace, has } from './machines';
+import { SPRAY_BOOTH, familyRuns, hallPace, has, sprayRobotRuns } from './machines';
 import type {
   Finish,
   GameState,
@@ -210,7 +211,10 @@ export function stageSpeed(
   // Parts come off a CNC cut and drilled, so the bench takes half the minutes (CLAUDE.md T7 3.4).
   const cnc = stage === 'assembly' && jobOnCnc(state, job, options) ? CNC_ASSEMBLY_FACTOR : 1;
   if (has(state, family) && familyRuns(state, family)) {
-    return { speed: hallPace(state, family) * cnc, byHand: false };
+    // The spraying robot speeds the Finishing at a booth that runs, a lacquered sheet job's among
+    // them, and does nothing with no booth that runs (CLAUDE.md T29 2.7).
+    const robot = family === SPRAY_BOOTH && sprayRobotRuns(state) ? SPRAY_ROBOT_FINISH_FACTOR : 1;
+    return { speed: hallPace(state, family) * cnc * robot, byHand: false };
   }
   if (!BY_HAND_STAGES.includes(stage)) return { speed: cnc, byHand: false };
   return { speed: cnc / BY_HAND_DURATION_FACTOR, byHand: true };

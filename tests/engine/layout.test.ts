@@ -193,8 +193,10 @@ describe('the whole workshop fits on the painted floor', () => {
     // Nineteen again from v69, with the high capacity rack; the drying racks of v73 hold no floor.
     // Eighteen from v83: the pelletiser stands behind the rear wall with the systems (CLAUDE.md T28
     // 2.1). Twenty three with the timber department's five families, each at its used class's zone
-    // and the glue table beside the press it asks for (CLAUDE.md T28 2.4).
-    expect(hallItems(state).length).toBe(23);
+    // and the glue table beside the press it asks for (CLAUDE.md T28 2.4). Twenty four with the
+    // spraying robot beside the booth it asks for (CLAUDE.md T29 2.7); the five axis CNC is passed
+    // over, refused in the 200 m2 unit (2.5.1).
+    expect(hallItems(state).length).toBe(24);
     expect(hallItems(state).some((item) => item.specId === 'cncHead')).toBe(false);
   });
 

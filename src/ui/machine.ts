@@ -48,6 +48,8 @@ import {
   GLUE_TABLE,
   GLUE_TABLE_PLACES,
   CNC5_STAGE_FACTOR,
+  SPRAY_ROBOT,
+  SPRAY_ROBOT_FINISH_FACTOR,
   DUST_WASTE_MONTHLY,
   EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
@@ -373,7 +375,17 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
   return [
     line(atOnceLine(spec, variant)),
     ...tripLines(spec, variant),
-    ...(machine ? [outputLine(spec, variant), line(cnc5Line(spec)), line(dustLine(spec))] : []),
+    // The robot's one line stands in place of the Output line a machine's card has: what it does
+    // is the booth's (CLAUDE.md T29 2.7).
+    ...(machine
+      ? [
+          spec.id === SPRAY_ROBOT
+            ? line(`The Finishing at the booth goes ${SPRAY_ROBOT_FINISH_FACTOR} times as fast`)
+            : outputLine(spec, variant),
+          line(cnc5Line(spec)),
+          line(dustLine(spec)),
+        ]
+      : []),
     line(extractionLine(spec, variant)),
     line(spec.id === COMPRESSOR ? '' : airLine(state, spec, variant)),
     line(lifeLine(spec, variant)),
