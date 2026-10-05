@@ -255,6 +255,48 @@ export function sheetCapacityOf(item: { specId: string; variantId: string }): nu
   return variantOf(spec, item.variantId).sheetCapacity ?? spec.sheetCapacity;
 }
 
+/** Boards this item holds: a timber store's figure, nought for everything else (CLAUDE.md T29
+ *  2.11.1). */
+export function boardCapacityOf(item: { specId: string; variantId: string }): number {
+  const spec = findSpec(item.specId);
+  if (!spec) return 0;
+  return variantOf(spec, item.variantId).boardCapacity ?? spec.boardCapacity ?? 0;
+}
+
+/** The boards in the workshop. A board is never free stock: it is always a timber job's own,
+ *  ordered for it and held for it, so the boards on the one counter are what the timber jobs hold,
+ *  and everything else on it is sheets (CLAUDE.md T29 2.11.2). Written here and not in
+ *  `materials.ts`, which reads this module, as `sheetsStrandedBySale` is. */
+export function boardsHeld(state: GameState): number {
+  let held = 0;
+  for (const job of state.jobs) {
+    if (job.timber !== true || job.stage === 'completed') continue;
+    held += job.sheetsReserved;
+  }
+  return held;
+}
+
+/** The sheets on the one counter: everything on it but the timber jobs' boards, never below
+ *  nought (CLAUDE.md T29 2.11.2, 2.11.4). */
+export function sheetsOnCounter(state: GameState): number {
+  return Math.max(0, state.stock.sheets - boardsHeld(state));
+}
+
+/** What the timber stores that stand hold between them (CLAUDE.md T29 2.11.1, 2.11.3). */
+export function boardRoom(state: GameState): number {
+  let room = 0;
+  for (const item of state.equipment) {
+    if (isSold(item) || !itemStandsInTheHall(item)) continue;
+    room += boardCapacityOf(item);
+  }
+  return room;
+}
+
+/** Room left on the timber stores, with the boards already on them counted off. */
+export function freeBoardRoom(state: GameState): number {
+  return Math.max(0, boardRoom(state) - boardsHeld(state));
+}
+
 /** How many men's hand tool sets this class of tool cabinet holds: one, one, two, four or eight up
  *  the ladder [PIOTR, 19.09]. Zero for everything that is not a cabinet, so the sum over a hall is
  *  the sum over its cabinets (CLAUDE.md T22 2.12). */
@@ -429,7 +471,19 @@ export function sheetsStrandedBySale(state: GameState, item: Equipment): number 
     if (other.id === item.id || isSold(other) || !itemStandsInTheHall(other)) continue;
     room += sheetCapacityOf(other);
   }
-  return Math.max(0, state.stock.sheets - room);
+  // Sheets only: the boards are on the timber stores (CLAUDE.md T29 2.11.2).
+  return Math.max(0, sheetsOnCounter(state) - room);
+}
+
+/** The boards a timber store's sale would leave with nowhere to go: the boards held less what the
+ *  other stores that stand hold, the rack's own rule (CLAUDE.md T29 2.11.2). */
+export function boardsStrandedBySale(state: GameState, item: Equipment): number {
+  let room = 0;
+  for (const other of state.equipment) {
+    if (other.id === item.id || isSold(other) || !itemStandsInTheHall(other)) continue;
+    room += boardCapacityOf(other);
+  }
+  return Math.max(0, boardsHeld(state) - room);
 }
 
 /** Tools of this family that live in a cabinet: two men can have one out at once. */

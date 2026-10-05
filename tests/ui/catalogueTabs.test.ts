@@ -203,6 +203,9 @@ describe('the tabs', () => {
       'sheetRack',
       // The high capacity rack, a line of its own beside the Racks folder (PIOTR, 03.10; v69).
       'sheetRackHigh',
+      // The two timber stores after it, the shelter on the apron (CLAUDE.md T29 2.11.1).
+      'timberRack',
+      'timberShelter',
       'toolCabinet',
       'locker',
     ]);

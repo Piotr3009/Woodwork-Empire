@@ -8,6 +8,7 @@
 import { BUILT_TO_ORDER, BUILT_TO_ORDER_LINE, DAY_ONE_KIT, DAY_ONE_SOFTWARE, DAY_ONE_STAND_INS } from './constants';
 import { addWorkingDays } from './clock';
 import { deliveryDaysFor, findSpec, findVariant, itemStandsInTheHall } from './machines';
+import { loadWords } from './materials';
 import { makeId } from './rng';
 import type { GameState, OnOrderItem } from './types';
 
@@ -219,7 +220,8 @@ export function shoppingList(state: GameState): OrderLine[] {
     lines.push({
       id: delivery.id,
       kind: 'material',
-      name: `${delivery.sheets} sheets`,
+      // `19 boards` for a timber job's load (CLAUDE.md T29 2.11.2).
+      name: loadWords(state, delivery),
       // For stock, or for the job it was ordered for by name (CLAUDE.md T13 3.2, 3.3).
       detail: delivery.jobId === null ? 'for stock' : `for ${jobNameFor(state, delivery.jobId)}`,
       pricePaid: delivery.pricePaid,

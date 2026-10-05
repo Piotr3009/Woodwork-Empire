@@ -178,6 +178,9 @@ import {
   variantOf,
   isLineModule,
   lineModuleIndex,
+  boardRoom,
+  freeBoardRoom,
+  sheetsOnCounter,
 } from './machines';
 import {
   acceptEnquiry,
@@ -221,6 +224,8 @@ import {
   restockSheets,
   stockIsLow,
   unloadIntoStock,
+  isBoards,
+  loadWords,
 } from './materials';
 import {
   chargeOvertimeDebt,
@@ -915,19 +920,17 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
   for (const delivery of arriving) {
     const task = state.tasks.find((entry) => entry.deliveryId === delivery.id && !entry.done);
     if (!task) continue;
-    if (unloadIsNotTheOwners(state, task)) continue;
-    const room = canUnload(state);
+    // A load that cannot come in is never silent: its card is raised whoever unloads, so a company
+    // that keeps a labourer is told too (CLAUDE.md T29 2.11.2).
+    const room = canUnload(state, delivery);
+    if (room && unloadIsNotTheOwners(state, task)) continue;
     const choices = room
       ? [
           { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
           { id: 'later', label: 'Leave it at the gate' },
         ]
       : [{ id: 'later', label: 'Leave it at the gate' }];
-    const body = room
-      ? `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived. Nothing can be made until ` +
-        'they are inside.'
-      : `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived and there is no shelving to ` +
-        'put them on. Buy some from the catalogue.';
+    const body = deliveryCardBody(state, delivery, room);
     queueEvent(state, {
       kind: 'deliveryArrived',
       title: 'Delivery at the gate',
@@ -936,6 +939,22 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
       data: { deliveryId: delivery.id, taskId: task.id, sheets: delivery.sheets },
     });
   }
+}
+
+/** The lorry's card in the words of its load: sheets want a rack, and boards room on the timber
+ *  stores for the whole load (CLAUDE.md T2 3.6, T29 2.11.2). */
+function deliveryCardBody(state: GameState, delivery: Delivery, room: boolean): string {
+  const load = loadWords(state, delivery);
+  if (room) return `${load} have arrived. Nothing can be made until they are inside.`;
+  if (!isBoards(state, delivery)) {
+    return `${load} have arrived and there is no shelving to put them on. Buy some from the catalogue.`;
+  }
+  const stores = boardRoom(state);
+  if (stores <= 0) return `${load} have arrived and there is no timber store to put them on. Buy one from the catalogue.`;
+  return (
+    `${load} have arrived and the timber stores have room for ${freeBoardRoom(state)}. ` +
+    'They wait at the gate until a job uses its boards or another store is bought.'
+  );
 }
 
 /** Whether today's summary is one the player asked to see. Daily is every day, weekly is Friday
@@ -1625,10 +1644,11 @@ function checkLowStock(state: GameState): void {
   queueEvent(state, {
     kind: 'lowStock',
     title: 'The rack is nearly empty',
+    // The sheets on the counter, never the boards the timber jobs hold (CLAUDE.md T29 2.11.2).
     body:
-      `${plural(state.stock.sheets, 'sheet', 'sheets')} left of ` +
+      `${plural(sheetsOnCounter(state), 'sheet', 'sheets')} left of ` +
       `${rackCapacity(state)}. Order material before the benches stop.`,
-    data: { sheets: state.stock.sheets },
+    data: { sheets: sheetsOnCounter(state) },
   });
 }
 
@@ -2980,7 +3000,7 @@ export function cancelOrder(state: GameState, orderId: string): BuyCheck {
   if (!delivery) return { ok: false, reason: 'Nothing on order' };
   if (delivery.arrived) return { ok: false, reason: 'It is at the gate' };
   if (timeIsPaused(state)) state.speed = 1;
-  refund(state, 'material', `Order cancelled: ${delivery.sheets} sheets`, delivery.pricePaid);
+  refund(state, 'material', `Order cancelled: ${loadWords(state, delivery)}`, delivery.pricePaid);
   state.deliveries = state.deliveries.filter((entry) => entry.id !== delivery.id);
   const job = delivery.jobId === null ? null : findJob(state, delivery.jobId);
   if (job !== null && job.stage === 'materialOrdered') {

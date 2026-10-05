@@ -233,6 +233,9 @@ export interface EquipmentVariant {
   zoneDepth?: number;
   /** Sheets this class holds. Left out means the family's own (CLAUDE.md T7 3.6). */
   sheetCapacity?: number;
+  /** Boards this class of timber store holds. Left out means the family's own (CLAUDE.md T29
+   *  2.11.1). */
+  boardCapacity?: number;
   /** What must be owned before this class can be bought. Left out means the family's own: a
    *  floor edgebander wants extraction where a hand one wants a cabinet (CLAUDE.md T7 3.6). */
   requires?: string[];
@@ -288,6 +291,9 @@ export interface EquipmentSpec {
   usedOn: MaterialKind | null;
   /** Sheets this item can hold on the rack. 0 for everything that is not shelving. */
   sheetCapacity: number;
+  /** Boards a timber store holds. Left out for everything that is not one: a store is never given
+   *  a `sheetCapacity`, which would make it a sheet rack everywhere (CLAUDE.md T29 2.11.1). */
+  boardCapacity?: number;
   /** Reputation needed to buy. */
   minReputation: number;
   /** Parked for a later stage: shown with a price, buy button disabled. */
@@ -786,6 +792,10 @@ export interface Delivery {
   bespoke: boolean;
   /** Sheets that did not fit in the rack and still need a decision. */
   overflowSheets: number;
+  /** A load of boards for a timber job, set when it is ordered for one: it goes on a timber store
+   *  and never on a sheet rack. A delivery without the mark is read from its job, so a save's
+   *  deliveries need no lift (CLAUDE.md T29 2.11.2). */
+  boards?: true;
 }
 
 export type TaskKind =

@@ -894,6 +894,13 @@ export function dropJob(state: GameState, jobId: string): boolean {
     noteLoss(state, 'material', `Glass written off: ${job.name}`, glassCostOf(job));
   }
   job.sheetsUsed = 0;
+  // A window's boards are written off and leave the workshop with it: off the counter, and every
+  // load of them not yet unloaded, on the road or at the gate, goes with its unloading task (the
+  // tasks of the job go below). They were never free sheets (CLAUDE.md T29 2.11.2).
+  if (job.timber === true) {
+    state.stock.sheets = Math.max(0, state.stock.sheets - job.sheetsReserved);
+    state.deliveries = state.deliveries.filter((delivery) => delivery.jobId !== job.id || delivery.unloaded);
+  }
   // What it held goes back to the free stock (CLAUDE.md T13 3.3).
   releaseReservation(job);
   // Nobody is left standing on a job that is not there any more.

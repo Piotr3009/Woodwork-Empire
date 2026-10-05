@@ -904,6 +904,15 @@ export function assignStaffTasks(state: GameState): void {
   }
 }
 
+/** True while the load an unloading is for has somewhere to go: a rack for sheets, room on the
+ *  timber stores for the whole of a load of boards (CLAUDE.md T29 2.11.2). An unloading of no load
+ *  asks nothing. */
+function roomToUnload(state: GameState, task: TaskInstance): boolean {
+  if (task.deliveryId === null) return true;
+  const delivery = state.deliveries.find((entry) => entry.id === task.deliveryId);
+  return canUnload(state, delivery);
+}
+
 function handOutTasks(state: GameState, started: readonly Worker[]): void {
   for (const task of state.tasks) {
     if (task.done) continue;
@@ -915,7 +924,7 @@ function handOutTasks(state: GameState, started: readonly Worker[]): void {
       }
       if (task.doneBy !== 'owner' || state.owner.currentTaskId === task.id) continue;
     }
-    if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) continue;
+    if (task.kind === 'unload' && !roomToUnload(state, task)) continue;
     const staff = bestTakerOf(state, started, task);
     if (!staff) continue;
     // He picks it up and works it off as the clock runs, like the owner does.
@@ -963,6 +972,10 @@ export function startTaskCheck(
   // (`callServiceIn`), both of which close this task.
   if (task.kind === 'service') return refused(SERVICE_IS_CALLED_IN);
   if (!ownerIsAvailable(state)) return refused('The owner is not in today');
+  // Nothing comes off the lorry until there is somewhere to put it (CLAUDE.md T2 3.6), asked by
+  // the load and before the labourer, so a load with nowhere to go says so whoever unloads
+  // (CLAUDE.md T29 2.11.2).
+  if (task.kind === 'unload' && !roomToUnload(state, task)) return refused('Nowhere to put it');
   // The unloading, the bags and the cleaning are the labourer's while he is here.
   if (!force && isLabourerTask(state, task)) return refused(WAITING_FOR_LABOURER);
   // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
@@ -979,10 +992,6 @@ export function startTaskCheck(
       (entry) => entry.kind === 'clientMeeting' && entry.jobId === task.jobId && !entry.done,
     );
     if (open) return refused('The client meeting comes first');
-  }
-  // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
-  if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) {
-    return refused('Nowhere to put it');
   }
   // The take off reads the drawing (CLAUDE.md T13 3.8).
   if (task.kind === 'materialTakeOff' && designOutstandingFor(state, task.jobId)) {

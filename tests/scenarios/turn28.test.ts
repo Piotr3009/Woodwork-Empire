@@ -57,6 +57,9 @@ function windowCompany(): GameState {
     ['cuttersSash', 0, 0],
     ['workbench', 16, 12],
     ['workbench', 16, 15],
+    // A timber store, which a window asks for from v84 (CLAUDE.md T29 2.11.3): the shelter, out on
+    // the apron, so no cell of the hall moves.
+    ['timberShelter', 40, 1],
   ];
   kit.forEach(([id, x, y], index) => {
     placeEquipment(state, id, { variantId: 'standard', x, y, id: `kit-t28-${index}` });

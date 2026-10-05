@@ -107,3 +107,24 @@ booked as worked, his Our team sentence `The line runs as 3 of its 5 modules.`),
 `isServiced`, so a bench, a rack or a cabinet older than 180 days no longer carries it. Pins: the
 eleven tabs to twelve, `WARNING_ORDER` and its all at once list, the catalogue's metres, measured
 classes 100 to 105.
+
+**T29-C6 The timber stores.** `timberRack` (40 boards, 1,200, 3 days, on the floor) and
+`timberShelter` (400 boards, 18,000, 15 days, on the apron at its first cell x 0, y 1, refused with
+`No room on the apron`), each a `boardCapacity` and never a `sheetCapacity`. One counter read two
+ways: `boardsHeld` (what the timber jobs hold) and `sheetsOnCounter` (the rest), so the sheet racks'
+plates, `stockFree`, the Materials page's sheet line, the Low stock card, the rack's sale and the
+contract man's mark count sheets only, and a store's plate and the new `Timber boards` row count
+boards. A load is marked `boards` when it is ordered for a timber job; `canUnload` asks by its kind,
+and boards come off whole onto the stores or wait at the gate, never into the paid store; the card
+of a load that cannot come in is raised whoever unloads, `startTaskCheck` asks the room before the
+labourer, `boardsAtTheGate` sits under `glassNotOrdered`, and the pallet drawn is the first load that
+can come in. The man unloading boards walks to the first timber rack, and stays at the gate with
+only a shelter. A dropped window takes its boards and its loads with it. The board asks for a
+`timber store` last of its list and `canAccept` refuses a window whose boards the stores could not
+hold even empty (`113 boards, and the timber stores hold 40`, red on the tile, asked once a store
+stands). The words `boards` on the task, the pallet, the ledger, the Orders list, the Materials
+rows and the tile. The outline of kit on order outside is refused `It stands in the yard`. Pins:
+the Storage tab's folders, the catalogue's metres, measured classes 105 to 107, `hallItems` 24 to 25
+(the timber rack finds its 4 m by 2 m on the 200 m² floor; the shelter is outside), `WARNING_ORDER`
+and its all at once list; `timberHall`, `bigHall` and `windowCompany` given a shelter on the apron,
+the tile's `Needs` line and its `boards of material`.

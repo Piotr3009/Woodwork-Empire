@@ -195,8 +195,10 @@ describe('the whole workshop fits on the painted floor', () => {
     // 2.1). Twenty three with the timber department's five families, each at its used class's zone
     // and the glue table beside the press it asks for (CLAUDE.md T28 2.4). Twenty four with the
     // spraying robot beside the booth it asks for (CLAUDE.md T29 2.7); the five axis CNC is passed
-    // over, refused in the 200 m2 unit (2.5.1).
-    expect(hallItems(state).length).toBe(24);
+    // over, refused in the 200 m2 unit (2.5.1). Twenty five with the timber rack, which finds its 4 m
+    // by 2 m; the timber shelter stands on the apron and holds no cell of the hall (CLAUDE.md T29
+    // 2.11.1).
+    expect(hallItems(state).length).toBe(25);
     expect(hallItems(state).some((item) => item.specId === 'cncHead')).toBe(false);
   });
 

@@ -27,6 +27,7 @@ import {
   STATION_GATE,
   STATION_PHONE,
   STATION_RACK,
+  STATION_TIMBER_RACK,
   machineStation,
 } from '../engine/stations';
 import { pickSprite, spriteFiles, SPRITE_SCALE } from './sprites';
@@ -387,7 +388,7 @@ export function animationForStation(station: string): Animation {
   // In a spray booth he is in the suit, which is the bench's own work with white on (v71).
   if (station === machineStation(SPRAY_BOOTH)) return 'spray';
   if (station === STATION_BENCH || station.startsWith('machine:')) return 'bench';
-  if (station === STATION_RACK) return 'bench';
+  if (station === STATION_RACK || station === STATION_TIMBER_RACK) return 'bench';
   if (station === STATION_GATE) return 'idle';
   // The broom, for as long as the sweeping lasts (PIOTR, 18.09; CLAUDE.md T20 2.8).
   if (station === STATION_CLEANING) return 'sweep';
@@ -403,7 +404,7 @@ export function animationForStation(station: string): Animation {
 export function legCarries(fromStation: string, toStation: string): boolean {
   const toMachine = toStation.startsWith('machine:');
   const fromMachine = fromStation.startsWith('machine:');
-  if (fromStation === STATION_GATE && toStation === STATION_RACK) return true;
+  if (fromStation === STATION_GATE && (toStation === STATION_RACK || toStation === STATION_TIMBER_RACK)) return true;
   if (fromStation === STATION_RACK && (toMachine || toStation === STATION_BENCH)) return true;
   if (fromMachine && toStation === STATION_BENCH) return true;
   return false;

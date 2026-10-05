@@ -11,7 +11,7 @@
 import { deliveriesInYard, deliveriesOnTheWay, formatCalendarDay, openJobs } from '../engine/index';
 import { restockCheck, sheetPriceFor, stockLines } from '../engine/index';
 // Straight off its own module: the public API does not carry it (REPORT-T13 10).
-import { restockSheets, restockSplit } from '../engine/materials';
+import { boardsLine, loadWords, restockSheets, restockSplit } from '../engine/materials';
 import type { Delivery, GameState, Job, StockLine } from '../engine/index';
 import { placeholderSvg } from '../render/placeholder';
 import { button, emptyLine, escapeHtml, lockedButton, money, plural } from './modal';
@@ -45,6 +45,25 @@ function stockRow(line: StockLine): string {
     `<span class="row-figure stock-reserved">Reserved ${line.reserved}</span>` +
     `<span class="row-figure stock-total">Total ${line.total} of ${line.capacity}</span>` +
     badge +
+    '</div>'
+  );
+}
+
+/** The boards' row, in the stock line's own markup: what the timber jobs hold, the room left on the
+ *  timber stores and what they hold between them. Shown once a store stands or a board is held
+ *  (CLAUDE.md T29 2.11.2) [TUNE: when]. */
+function boardsRow(state: GameState): string {
+  const { held, room } = boardsLine(state);
+  if (held <= 0 && room <= 0) return '';
+  return (
+    '<div class="stock-line" data-stock="boards">' +
+    '<span class="stock-thumb">' +
+    placeholderSvg('thumb.solidWood', THUMB_SIZE, { label: 'Timber' }) +
+    '</span>' +
+    '<span class="row-main"><span class="stock-name">Timber boards</span></span>' +
+    `<span class="row-figure stock-free">Held ${held}</span>` +
+    `<span class="row-figure stock-reserved">Room ${Math.max(0, room - held)}</span>` +
+    `<span class="row-figure stock-total">Total ${held} of ${room}</span>` +
     '</div>'
   );
 }
@@ -116,15 +135,16 @@ function projectRow(state: GameState, job: Job): string {
   return (
     `<div class="row" data-project="${job.id}">` +
     `<span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
-    `<span class="row-figure">${plural(job.sheets, 'sheet', 'sheets')}` +
+    // A window's boards say boards (CLAUDE.md T29 2.11.2).
+    `<span class="row-figure">${job.timber === true ? plural(job.sheets, 'board', 'boards') : plural(job.sheets, 'sheet', 'sheets')}` +
     `${job.bespokeMaterial ? ' · bespoke' : ''}</span>` +
     materialLine(state, job) +
     '</div>'
   );
 }
 
-function deliveryRow(delivery: Delivery): string {
-  const what = `${plural(delivery.sheets, 'sheet', 'sheets')}${delivery.bespoke ? ', bespoke' : ''}`;
+function deliveryRow(state: GameState, delivery: Delivery): string {
+  const what = `${loadWords(state, delivery)}${delivery.bespoke ? ', bespoke' : ''}`;
   const when = delivery.arrived
     ? 'at the gate, waiting to be unloaded'
     : `arrives ${formatCalendarDay(delivery.arriveDay)}`;
@@ -149,7 +169,7 @@ export function renderMaterials(state: GameState, sheets: string): string {
         'delivered.</p>') +
     '<div class="row stock-head"><span class="row-main">Stock</span>' +
     `${restockControl(state, sheets)}</div>` +
-    `<div class="stock-list">${lines.map(stockRow).join('')}</div>` +
+    `<div class="stock-list">${lines.map(stockRow).join('')}${boardsRow(state)}</div>` +
     (state.stock.tempStorageSheets > 0
       ? `<p class="hint">${plural(state.stock.tempStorageSheets, 'sheet is', 'sheets are')} in paid storage.</p>`
       : '') +
@@ -160,6 +180,6 @@ export function renderMaterials(state: GameState, sheets: string): string {
     '<h3>Deliveries</h3>' +
     (deliveries.length === 0
       ? emptyLine('Nothing on the way.')
-      : deliveries.map(deliveryRow).join(''))
+      : deliveries.map((delivery) => deliveryRow(state, delivery)).join(''))
   );
 }

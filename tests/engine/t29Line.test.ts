@@ -84,6 +84,7 @@ function bigUnit(without: string[] = []): GameState {
     ['cuttersSash', 0, 0],
     ['cuttersCasement', 0, 0],
     ['cuttersDoor', 0, 0],
+    ['timberShelter', 40, 1],
   ];
   for (const [id, x, y] of kit) {
     if (without.includes(id)) continue;

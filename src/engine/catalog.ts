@@ -7,6 +7,7 @@ import {
   PRODUCT_TEMPLATES,
   SOLID_WOOD_EQUIPMENT,
   TIMBER_STAND_INS,
+  TIMBER_STORE_WANTED,
 } from './constants';
 import { findSpec, has, isLineModule, lineModuleIndex, lineModules } from './machines';
 import type { Finish, GameState, ProductTemplate } from './types';
@@ -47,7 +48,18 @@ export function missingEquipment(state: GameState, entry: ProductTemplate): stri
  *  2.6). The one copy of the list: the tile's `Needs` line prints it whole, owned or not, and the
  *  lock asks it of the hall (CLAUDE.md T29 2.5.4). */
 export function wantedKit(entry: ProductTemplate): string[] {
-  return entry.cutters === null ? entry.requiredEquipment : [...entry.requiredEquipment, entry.cutters];
+  // A window or a door asks for a timber store as it asks for a machine, last of the list
+  // (CLAUDE.md T29 2.11.3).
+  return entry.cutters === null
+    ? entry.requiredEquipment
+    : [...entry.requiredEquipment, entry.cutters, TIMBER_STORE_WANTED];
+}
+
+/** A wanted thing as the board names it: the catalogue's name, and `timber store` for the store,
+ *  which either family satisfies (CLAUDE.md T29 2.11.3). */
+export function wantedName(specId: string): string {
+  if (specId === TIMBER_STORE_WANTED) return 'timber store';
+  return findSpec(specId)?.name ?? specId;
 }
 
 /** True while something that stands in for this machine on a timber product stands in the hall
@@ -75,7 +87,7 @@ export function lockReasonFor(state: GameState, entry: ProductTemplate): string 
     );
     return `Needs ${gone.join(' and ')}`;
   }
-  const names = missing.map((specId) => findSpec(specId)?.name ?? specId);
+  const names = missing.map(wantedName);
   return `Needs ${names.join(', ').toLowerCase()}`;
 }
 

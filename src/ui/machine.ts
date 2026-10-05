@@ -64,7 +64,7 @@ import {
   bagsToM3,
   unitCostFactor,
 } from '../engine/constants';
-import { insuranceForClass, isLineModule, lineModuleIndex } from '../engine/machines';
+import { boardCapacityOf, insuranceForClass, isLineModule, lineModuleIndex } from '../engine/machines';
 import { andList, inASentence } from '../engine/text';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
@@ -241,7 +241,10 @@ function benchLine(spec: EquipmentSpec, variant: EquipmentVariant): Line {
 /** What a class of shelving holds: the rack's own effect (CLAUDE.md T7 3.6). */
 function holdsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   const sheets = sheetCapacityOf({ specId: spec.id, variantId: variant.id });
-  return sheets > 0 ? `Holds ${plural(sheets, 'sheet', 'sheets')}` : '';
+  if (sheets > 0) return `Holds ${plural(sheets, 'sheet', 'sheets')}`;
+  // A timber store holds boards and never a sheet (CLAUDE.md T29 2.11.1).
+  const boards = boardCapacityOf({ specId: spec.id, variantId: variant.id });
+  return boards > 0 ? `Holds ${plural(boards, 'board', 'boards')}` : '';
 }
 
 /** A class with an extraction demand can take an automatic gate, which is worth this much output

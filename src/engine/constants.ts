@@ -1316,7 +1316,17 @@ export const TIMBER_STAND_INS: Record<string, readonly string[]> = {
   spindleMoulder: ['cnc5', 'windowLine2'],
   sander: ['windowLine3'],
   framePress: ['windowLine4'],
+  // A window or a door asks for a timber store, and either family satisfies it (CLAUDE.md T29
+  // 2.11.3).
+  timberRack: ['timberShelter'],
+  timberShelter: ['timberRack'],
 };
+
+/** The two timber stores. Boards are kept on a timber store and never on a sheet rack (CLAUDE.md
+ *  T29 2.11). */
+export const TIMBER_STORES: readonly string[] = ['timberRack', 'timberShelter'];
+/** The one store the board's wanted list names, written `timber store` (CLAUDE.md T29 2.11.3). */
+export const TIMBER_STORE_WANTED = 'timberRack';
 
 /** The stages after which a timber job stands a night, and what it stands for: the glue cures
  *  after the pressing and the lacquer dries after the finishing [PIOTR: "a bit more complicated";
@@ -1669,6 +1679,9 @@ export const MACHINE_ENDURANCE_HOURS: Record<string, number> = {
   // The high capacity rack's own figure [PIOTR, 03.10] (v69). A rack books no hours, so it is what
   // the card prints and nothing wears it down.
   sheetRackHigh: 100000,
+  // The timber stores book no hours either (CLAUDE.md T29 2.11.1).
+  timberRack: 100000,
+  timberShelter: 100000,
 };
 
 /** The five classes every ladder in this game has, in order: class 5 is always the industrial one
@@ -2139,6 +2152,47 @@ export const SHEET_RACK_HIGH_VARIANTS: EquipmentVariant[] = [
       'The industrial rack with its bays packed twice as tight, in red so nobody takes it for ' +
       'the other one. Three hundred and twenty sheets on the four metres of floor that used to ' +
       'hold a hundred and sixty.',
+  },
+];
+
+/** The timber rack's one class: 40 boards on the hall floor [TUNE: chat] (CLAUDE.md T29 2.11.1). */
+export const TIMBER_RACK_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Timber rack',
+    price: 1200,
+    width: 4,
+    depth: 1,
+    height: 2.5,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    boardCapacity: 40,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A steel cantilever rack, its arms long enough for a window\u0027s boards laid flat, four ' +
+      'metres of them on the hall floor.',
+  },
+];
+
+/** The timber shelter's one class: 400 boards out on the apron, under a roof [TUNE: chat]
+ *  (CLAUDE.md T29 2.11.1). */
+export const TIMBER_SHELTER_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Timber shelter',
+    price: 18000,
+    width: 3,
+    depth: 6,
+    height: 3,
+    zoneWidth: 3,
+    zoneDepth: 6,
+    boardCapacity: 400,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A lean to roof over racks of boards, open at the front, standing outside on the apron so ' +
+      'it takes no floor of the hall.',
   },
 ];
 
@@ -3515,6 +3569,9 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   workbench: WORKBENCH_VARIANTS,
   sheetRack: SHEET_RACK_VARIANTS,
   [SHEET_RACK_HIGH]: SHEET_RACK_HIGH_VARIANTS,
+  // The two timber stores, one class each (CLAUDE.md T29 2.11.1).
+  timberRack: TIMBER_RACK_VARIANTS,
+  timberShelter: TIMBER_SHELTER_VARIANTS,
   edgebander: EDGEBANDER_VARIANTS,
   extractor: EXTRACTOR_VARIANTS,
   compressor: COMPRESSOR_VARIANTS,
@@ -3849,7 +3906,45 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: SHEET_RACK_HIGH,
     sheetCapacity: 320,
     effect: 'Holds 320 sheets on the floor an industrial rack takes for 160.',
+  },  {
+    ...BASE_SPEC,
+    id: 'timberRack',
+    // Off the shelf [TUNE: chat] (CLAUDE.md T29 2.11.1).
+    deliveryDays: 3,
+    folder: 'Timber racks',
+    tab: 'storage',
+    name: 'Timber rack',
+    price: 1200,
+    category: 'storage',
+    width: 4,
+    depth: 1,
+    height: 2.5,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    spriteKey: 'timberRack',
+    boardCapacity: 40,
+    effect: 'Holds the boards of the timber jobs on the hall floor. A sheet never goes on it.',
   },
+  {
+    ...BASE_SPEC,
+    id: 'timberShelter',
+    // Built where it stands [TUNE: chat] (CLAUDE.md T29 2.11.1).
+    deliveryDays: 15,
+    folder: 'Timber shelters',
+    tab: 'storage',
+    name: 'Timber shelter',
+    price: 18000,
+    category: 'storage',
+    width: 3,
+    depth: 6,
+    height: 3,
+    zoneWidth: 3,
+    zoneDepth: 6,
+    spriteKey: 'timberShelter',
+    boardCapacity: 400,
+    effect: 'Holds ten times a rack\u0027s boards outside on the apron, and takes no floor of the hall.',
+  },
+
   {
     ...BASE_SPEC,
     id: 'toolCabinet',
@@ -4757,6 +4852,9 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   edgebander: { x: 13, y: 6 },
   forklift: { x: 18, y: 6 },
   van: { x: 0, y: 7, yard: true },
+  // The timber shelter stands outside on the apron as the van does, its first cell x 0, y 1 of it
+  // (CLAUDE.md T29 2.11.1).
+  timberShelter: { x: 0, y: 1, yard: true },
 };
 
 /** Bench slots, in order, along the middle of the hall clear of the rooms and the personnel door.

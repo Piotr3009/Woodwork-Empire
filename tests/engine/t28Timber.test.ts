@@ -115,6 +115,9 @@ function timberHall(without: string[] = []): GameState {
     ['cuttersSash', 'standard', 0, 0],
     ['cuttersCasement', 'standard', 0, 0],
     ['cuttersDoor', 'standard', 0, 0],
+    // A timber store, which a window asks for from v84 (CLAUDE.md T29 2.11.3): the shelter, out on
+    // the apron, so no cell of the hall moves.
+    ['timberShelter', 'standard', 20, 1],
   ];
   for (const [id, variantId, x, y] of kit) {
     if (without.includes(id)) continue;
@@ -661,6 +664,8 @@ function bigHall(without: string[] = []): GameState {
     ['cuttersSash', 0, 0],
     ['cuttersCasement', 0, 0],
     ['cuttersDoor', 0, 0],
+    // The shelter on the apron, a timber store a window asks for from v84 (CLAUDE.md T29 2.11.3).
+    ['timberShelter', 40, 1],
   ];
   for (const [id, x, y] of kit) {
     if (without.includes(id)) continue;
@@ -752,11 +757,13 @@ describe('timber on the board of the 800 m2 hall (CLAUDE.md T28 2.3)', () => {
     if (enquiry === null || enquiry.templateId !== 'sashWindows') throw new Error('no sash window drawn');
     state.enquiries = [enquiry];
     const html = renderBoard(state, '');
+    // Flipped in v84: the timber store is the last name of the list, and the count says boards
+    // (CLAUDE.md T29 2.11.2, 2.11.3).
     expect(html).toContain(
-      'Needs cross cut saw, four sided planer, spindle moulder, sander, frame press, spray booth, sash window cutter set',
+      'Needs cross cut saw, four sided planer, spindle moulder, sander, frame press, spray booth, sash window cutter set, timber store',
     );
     const job = firstJob(acceptNow(state, enquiry.id));
-    const figure = html.match(/(\d+) sheets? of material/);
+    const figure = html.match(/(\d+) boards? of material/);
     expect(Number(figure?.[1])).toBe(job.sheets);
   });
 

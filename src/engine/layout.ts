@@ -294,6 +294,9 @@ export function canPlace(
     // The outline of a module on order is the module's own floor, as the module is (CLAUDE.md T29
     // 2.9.3).
     if (isLineModule(reserved.specId)) return { ok: false, reason: LINE_STANDS_WHERE_BUILT };
+    // And the outline of kit on order that stands outside is refused as the kit itself is: a
+    // shelter or a van on order is never dragged into the hall (CLAUDE.md T29 2.11.1).
+    if (standsOutsideTheHall(state, reserved)) return { ok: false, reason: 'It stands in the yard' };
     return canPlaceSpec(
       state,
       reserved.specId,

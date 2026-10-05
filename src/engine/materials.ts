@@ -20,7 +20,17 @@ import {
 } from './constants';
 import { addWorkingDays } from './clock';
 import { canAfford, pay } from './economy';
-import { isSold, itemStandsInTheHall, lineModules, sheetCapacityOf } from './machines';
+import {
+  boardCapacityOf,
+  boardRoom,
+  boardsHeld,
+  freeBoardRoom,
+  isSold,
+  itemStandsInTheHall,
+  lineModules,
+  sheetCapacityOf,
+  sheetsOnCounter,
+} from './machines';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
 import { plural } from './text';
@@ -65,7 +75,8 @@ export function sheetsOnRack(state: GameState, item: { id: string }): number {
   const racks = state.equipment.filter(
     (entry) => sheetCapacityOf(entry) > 0 && !isSold(entry) && itemStandsInTheHall(entry),
   );
-  let left = Math.max(0, state.stock.sheets);
+  // The sheets only: the timber jobs' boards are on the timber stores (CLAUDE.md T29 2.11.2).
+  let left = sheetsOnCounter(state);
   for (const [index, rack] of racks.entries()) {
     const here = index === racks.length - 1 ? left : Math.min(left, sheetCapacityOf(rack));
     if (rack.id === item.id) return here;
@@ -74,8 +85,36 @@ export function sheetsOnRack(state: GameState, item: { id: string }): number {
   return 0;
 }
 
-/** Nothing comes off a lorry until there is somewhere to put it (CLAUDE.md T2 3.6). */
-export function canUnload(state: GameState): boolean {
+/** The boards on this one timber store: the boards the timber jobs hold, spread over the stores in
+ *  the order they were bought as `sheetsOnRack` spreads the sheets, anything past the last one's
+ *  room on the last (CLAUDE.md T29 2.11.2). */
+export function boardsOnStore(state: GameState, item: { id: string }): number {
+  const stores = state.equipment.filter(
+    (entry) => boardCapacityOf(entry) > 0 && !isSold(entry) && itemStandsInTheHall(entry),
+  );
+  let left = boardsHeld(state);
+  for (const [index, store] of stores.entries()) {
+    const here = index === stores.length - 1 ? left : Math.min(left, boardCapacityOf(store));
+    if (store.id === item.id) return here;
+    left -= here;
+  }
+  return 0;
+}
+
+/** True for a load of boards: marked so when it was ordered for a timber job, or, for a load of a
+ *  save made before the mark, read from its job (CLAUDE.md T29 2.11.2). */
+export function isBoards(state: GameState, delivery: Delivery): boolean {
+  if (delivery.boards === true) return true;
+  if (delivery.jobId === null) return false;
+  return state.jobs.find((job) => job.id === delivery.jobId)?.timber === true;
+}
+
+/** Nothing comes off a lorry until there is somewhere to put it (CLAUDE.md T2 3.6): a load of
+ *  sheets wants a rack, and a load of boards room on the timber stores for the whole of it, since
+ *  boards come off the lorry whole or not at all (CLAUDE.md T29 2.11.2). Asked without the
+ *  delivery it is the racks' question, as it always was. */
+export function canUnload(state: GameState, delivery?: Delivery): boolean {
+  if (delivery !== undefined && isBoards(state, delivery)) return freeBoardRoom(state) >= delivery.sheets;
   return rackCapacity(state) > 0;
 }
 
@@ -171,12 +210,19 @@ export function stockLines(state: GameState): StockLine[] {
     name: STOCK_LINE_NAME[kind],
     number: stockNumberFor(state, kind),
     free: freeSheets(state),
-    reserved: reservedSheets(state),
-    total: state.stock.sheets,
+    // The sheet line counts sheets only: the boards have a row of their own (CLAUDE.md T29 2.11.2).
+    reserved: Math.max(0, reservedSheets(state) - boardsHeld(state)),
+    total: sheetsOnCounter(state),
     capacity: rackCapacity(state),
     low: stockIsLow(state),
     lowUnder: LOW_STOCK_SHEETS,
   }));
+}
+
+/** The boards' row of the Materials page: what the timber jobs hold and what the timber stores
+ *  hold between them (CLAUDE.md T29 2.11.2). */
+export function boardsLine(state: GameState): { held: number; room: number } {
+  return { held: boardsHeld(state), room: boardRoom(state) };
 }
 
 /** Sheets bought for stock and not yet on the rack. A second Restock before the first lorry has
@@ -322,6 +368,7 @@ export function createDelivery(
   sheets: number,
   bespoke: boolean,
   pricePaid = 0,
+  boards = false,
 ): Delivery {
   const delivery: Delivery = {
     id: makeId(state, 'del'),
@@ -334,6 +381,8 @@ export function createDelivery(
     unloaded: false,
     bespoke,
     overflowSheets: 0,
+    // A load of boards for a timber job says so (CLAUDE.md T29 2.11.2).
+    ...(boards ? { boards: true as const } : {}),
   };
   state.deliveries.push(delivery);
   return delivery;
@@ -362,7 +411,7 @@ export function orderForJob(
   const label =
     orderedBy === null ? `Material for ${job.name}` : `Material for ${job.name}, ordered by ${orderedBy}`;
   pay(state, 'material', label, cost);
-  return createDelivery(state, job.id, sheets, job.bespokeMaterial, cost);
+  return createDelivery(state, job.id, sheets, job.bespokeMaterial, cost, job.timber === true);
 }
 
 /** What a timber job's glass and ironmongery cost: `GLASS_SHARE` of its material, to the penny
@@ -431,7 +480,7 @@ export function arriveDeliveries(state: GameState): Delivery[] {
     delivery.arrived = true;
     createTask(state, {
       kind: 'unload',
-      label: `Unload ${plural(delivery.sheets, 'sheet', 'sheets')}`,
+      label: `Unload ${loadWords(state, delivery)}`,
       // By the size of the load: the first hundred sheets and every hundred past them (v75).
       minutes: unloadMinutes(state, delivery.sheets),
       deliveryId: delivery.id,
@@ -441,9 +490,15 @@ export function arriveDeliveries(state: GameState): Delivery[] {
   return arriving;
 }
 
-/** Room left on the sheet rack. */
+/** A load in the words the player reads it in: `19 boards` for a timber job's, `12 sheets` for the
+ *  rest (CLAUDE.md T29 2.11.2). */
+export function loadWords(state: GameState, delivery: Delivery): string {
+  return isBoards(state, delivery) ? plural(delivery.sheets, 'board', 'boards') : plural(delivery.sheets, 'sheet', 'sheets');
+}
+
+/** Room left on the sheet rack, counted without the boards (CLAUDE.md T29 2.11.2). */
 export function stockFree(state: GameState): number {
-  return Math.max(0, rackCapacity(state) - state.stock.sheets);
+  return Math.max(0, rackCapacity(state) - sheetsOnCounter(state));
 }
 
 /** Buying sheets in advance: cheaper per job, but it ties up cash and rack space. */
@@ -460,6 +515,19 @@ export function buyStock(state: GameState, sheets: number): boolean {
  *  A load for one job is held for that job first; whatever else lands is free for every job with
  *  a shortfall, in the order they were accepted (CLAUDE.md T13 3.3). */
 export function unloadIntoStock(state: GameState, delivery: Delivery): void {
+  const timberJob = isBoards(state, delivery)
+    ? state.jobs.find((entry) => entry.id === delivery.jobId) ?? null
+    : null;
+  if (timberJob !== null) {
+    // Boards come off the lorry whole, onto the timber stores, and never go to the paid store: the
+    // whole load is on the counter and held for its job from the unloading (CLAUDE.md T29 2.11.2).
+    state.stock.sheets += delivery.sheets;
+    delivery.overflowSheets = 0;
+    const held = Math.min(delivery.sheets, shortfallOf(timberJob));
+    if (held > 0) timberJob.sheetsReserved += held;
+    reserveShortfalls(state);
+    return;
+  }
   const room = stockFree(state);
   const fitted = Math.min(delivery.sheets, room);
   state.stock.sheets += fitted;
