@@ -154,8 +154,12 @@ describe('the whole catalogue on one floor', () => {
     let state = emptyHall();
     state.cash = 1000000;
     // Twice round the list, because a line that wants another one first cannot be bought until
-    // that one is standing in the hall.
-    const forSale = EQUIPMENT_SPECS.filter((spec) => !spec.locked);
+    // that one is standing in the hall. What the unit refuses for its size is passed over, and
+    // nothing else: the five axis CNC and the line stand only in the 800 m2 unit (CLAUDE.md T29
+    // 2.5.1).
+    const forSale = EQUIPMENT_SPECS.filter(
+      (spec) => !spec.locked && (spec.minUnitM2 === undefined || spec.minUnitM2 <= state.unit.areaM2),
+    );
     for (let pass = 0; pass < 2; pass += 1) {
       for (const spec of forSale) {
         state = buyNow(state, spec.id);

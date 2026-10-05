@@ -2,21 +2,21 @@
 // choose between them (CLAUDE.md T2 3.2).
 
 import {
-  boardsCostOf,
+  boardsForJob,
   canAccept,
-  findSpec,
   formatReputation,
   has,
   labourValueFor,
   materialCostFor,
   ownerDaysFor,
-  sheetsForCost,
   template,
   websiteReputationBonus,
 } from '../engine/index';
 import { NO_INSURANCE_REASON } from '../engine/constants';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { bigJobCheck, bigJobLine, isBigJob } from '../engine/agency';
+import { storesHoldCheck } from '../engine/board';
+import { wantedKit, wantedName } from '../engine/catalog';
 import { effectiveReputation } from '../engine/index';
 import type { Enquiry, GameState } from '../engine/index';
 import {
@@ -39,11 +39,11 @@ function expiryLine(state: GameState, enquiry: Enquiry): string {
 
 /** What the workshop has to have to take this job on, in plain names: the machines, and a
  *  window's or a door's cutter set after them, which it needs exactly as it needs a machine
- *  (CLAUDE.md T28 2.6). */
+ *  (CLAUDE.md T28 2.6). The whole list, owned or not and whatever stands in (CLAUDE.md T29
+ *  2.5.4). */
 function toolsLine(enquiry: Enquiry): string {
   const entry = template(enquiry.templateId);
-  const wanted = entry.cutters === null ? entry.requiredEquipment : [...entry.requiredEquipment, entry.cutters];
-  const names = wanted.map((specId) => findSpec(specId)?.name ?? specId);
+  const names = wantedKit(entry).map(wantedName);
   return names.length === 0 ? 'nothing special' : names.join(', ').toLowerCase();
 }
 
@@ -71,7 +71,7 @@ function tile(state: GameState, enquiry: Enquiry): string {
   // The boards the job will hold: a window's glass comes from the glazier and is no sheet on the
   // rack, so its share is not counted (CLAUDE.md T28 2.9).
   const timber = template(enquiry.templateId).cutters !== null;
-  const sheets = sheetsForCost(boardsCostOf(materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial), timber));
+  const sheets = boardsForJob(state, materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial), timber);
   // Days of his own time with the machines standing in the hall now, which is the same number
   // the deadline is worked out from (CLAUDE.md T6 3.7).
   const ownerDays =
@@ -115,6 +115,12 @@ function tile(state: GameState, enquiry: Enquiry): string {
     ? '<p class="tile-figures" data-big-job="crew">' +
       `<span class="${bigJobCheck(state, enquiry).ok ? 'good' : 'bad'}">${escapeHtml(bigJobLine(state, enquiry))}</span></p>`
     : '';
+  // A window's boards that the timber stores could not hold even empty: red, in the crew line's
+  // classes, printed only while it is true (CLAUDE.md T29 2.11.3).
+  const stores = storesHoldCheck(state, enquiry);
+  const storesLine = stores.ok
+    ? ''
+    : `<p class="tile-figures" data-stores="short"><span class="bad">${escapeHtml(stores.reason)}</span></p>`;
   const lockLine = enquiry.unreachable
     ? `<p class="lock">Cannot take this: ${escapeHtml(enquiry.blockReason)}</p>`
     : enquiry.lockReason === null
@@ -131,11 +137,12 @@ function tile(state: GameState, enquiry: Enquiry): string {
     `<p class="tile-price">Budget ${money(enquiry.budget)}</p>` +
     `<p class="tile-figures">${escapeHtml(enquiry.finish)} · deadline ` +
     `${days(enquiry.deadlineDays)} · ${escapeHtml(expiryLine(state, enquiry))}</p>` +
-    `<p class="tile-figures">${plural(sheets, 'sheet', 'sheets')} of material · about ` +
+    `<p class="tile-figures">${timber ? plural(sheets, 'board', 'boards') : plural(sheets, 'sheet', 'sheets')} of material · about ` +
     `${plural(ownerDays, 'owner day', 'owner days')}</p>` +
     `<p class="tile-figures">Needs ${escapeHtml(toolsLine(enquiry))}</p>` +
     `<p class="badges">${badges}</p>` +
     crewLine +
+    storesLine +
     lockLine +
     `<div class="tile-action">${action}</div>` +
     '</div>'

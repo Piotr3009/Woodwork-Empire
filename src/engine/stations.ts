@@ -15,12 +15,15 @@ import { isBreak } from './clock';
 import {
   OWNER,
   SPRAY_BOOTH,
+  boardCapacityOf,
+  boardsStrandedBySale,
   isSold,
   itemStandsInTheHall,
   placesOf,
   sheetCapacityOf,
   sheetsStrandedBySale,
 } from './machines';
+import { isBoards } from './materials';
 import { plural } from './text';
 import type { Cell } from './pipes';
 import type { Equipment, GameState, TaskInstance } from './types';
@@ -28,6 +31,9 @@ import { covers, footprintCells, isFree, isWalkable } from './walk';
 
 export const STATION_BENCH = 'bench';
 export const STATION_RACK = 'rack';
+/** The first timber rack on the hall floor, where the man unloading boards walks to (CLAUDE.md
+ *  T29 2.11.2). */
+export const STATION_TIMBER_RACK = 'timberRack';
 export const STATION_GATE = 'gate';
 export const STATION_OFFICE = 'office';
 /** At the desk with the phone in his hand. The same cell as the office: what it says is which
@@ -84,8 +90,26 @@ export function unloadLegAt(task: { minutesTotal: number; minutesRemaining: numb
 /** Where the man unloading a load of sheets stands at this point of it: the pallet at the gate
  *  on an even leg, the rack on an odd one. The "walking in the corner" of Turn 8 is gone: he
  *  walks the path the character system already uses, back and forth (CLAUDE.md T13 3.21). */
-export function unloadStation(task: TaskInstance, sheets: number): string {
-  return unloadLegAt(task, sheets) % 2 === 0 ? STATION_GATE : STATION_RACK;
+export function unloadStation(task: TaskInstance, sheets: number, far: string = STATION_RACK): string {
+  return unloadLegAt(task, sheets) % 2 === 0 ? STATION_GATE : far;
+}
+
+/** The far end of an unloading's walk: the sheet rack for a load of sheets, the first timber rack
+ *  on the floor for a load of boards, and the gate itself for boards with only a shelter, since
+ *  nobody is walked out onto the apron tonight (CLAUDE.md T29 2.11.2). */
+export function unloadFarStation(state: GameState, task: TaskInstance): string {
+  const delivery = task.deliveryId === null ? null : state.deliveries.find((entry) => entry.id === task.deliveryId);
+  if (!delivery || !isBoards(state, delivery)) return STATION_RACK;
+  return firstTimberRack(state) === null ? STATION_GATE : STATION_TIMBER_RACK;
+}
+
+/** The first timber rack standing on the hall floor, or null. */
+export function firstTimberRack(state: GameState): Equipment | null {
+  return (
+    state.equipment.find(
+      (entry) => entry.specId === 'timberRack' && !isSold(entry) && itemStandsInTheHall(entry),
+    ) ?? null
+  );
 }
 
 /** The two rooms a man walks into and is off the hall's drawing while he is in: the office he does
@@ -163,15 +187,22 @@ export function stationNow(state: GameState, who: string): string {
  *  rack is not sold out from under the man loading it (PIOTR, 18.09; CLAUDE.md T20 2.10). The
  *  rack has no places, so the question `canSell` asks of a machine, who is at its places, answers
  *  nothing about it and this is the question instead. */
-export function somebodyAtTheRack(state: GameState): boolean {
-  if (state.owner.station === STATION_RACK) return true;
-  return state.workers.some((worker) => worker.station === STATION_RACK);
+export function somebodyAtTheRack(state: GameState, station: string = STATION_RACK): boolean {
+  if (state.owner.station === station) return true;
+  return state.workers.some((worker) => worker.station === station);
 }
 
 /** Why a rack cannot be sold yet, or an empty string. The one sentence: the button on the Owned
  *  tab prints it and the engine's own refusal reads it (CLAUDE.md T20 2.10). Anything that holds
  *  no sheets, a tool cabinet or a machine, is nothing to do with it. */
 export function storageSaleBlock(state: GameState, item: Equipment): string {
+  // A timber store with boards on it is not sold, in the rack's own words (CLAUDE.md T29 2.11.2).
+  if (boardCapacityOf(item) > 0) {
+    const boards = boardsStrandedBySale(state, item);
+    if (boards > 0) return `Empty it first, ${plural(boards, 'board', 'boards')} on it`;
+    if (somebodyAtTheRack(state, STATION_TIMBER_RACK)) return 'Somebody is standing at it';
+    return '';
+  }
   if (sheetCapacityOf(item) <= 0) return '';
   const stranded = sheetsStrandedBySale(state, item);
   if (stranded > 0) return `Empty it first, ${plural(stranded, 'sheet', 'sheets')} on it`;
@@ -188,7 +219,7 @@ export function stationForTask(state: GameState, task: TaskInstance): string {
       const delivery = task.deliveryId
         ? state.deliveries.find((entry) => entry.id === task.deliveryId)
         : null;
-      return delivery ? unloadStation(task, delivery.sheets) : STATION_GATE;
+      return delivery ? unloadStation(task, delivery.sheets, unloadFarStation(state, task)) : STATION_GATE;
     }
     case 'deliver':
       return STATION_GATE;
@@ -297,6 +328,29 @@ export const STATION_TABLE: Record<string, StationRow> = {
     operator: { side: 'front', along: 0 },
     second: null,
   },
+  // The five axis CNC: the operator at the front, as at the timber machines (CLAUDE.md T29 2.6).
+  cnc5: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  // The line's four modules that do a stage: the men of a timber job at the front of each, as at
+  // any machine of its plan (CLAUDE.md T29 2.9.5).
+  windowLine1: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  windowLine2: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  windowLine3: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  windowLine4: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
   edgebander: {
     // The second cell from the infeed end, which is the left, read off the footprint's width so
     // the row needs no change when the footprint grows to 4 by 1 (CLAUDE.md T16 2.1, 6).
@@ -327,6 +381,8 @@ export const STATION_TABLE: Record<string, StationRow> = {
     second: null,
   },
   sheetRack: { operator: 'freeSide', second: null },
+  // The timber rack is stood at the way every rack is (CLAUDE.md T29 2.11.2).
+  timberRack: { operator: 'freeSide', second: null },
   // The high capacity rack is stood at the way every rack is (v69).
   sheetRackHigh: { operator: 'freeSide', second: null },
   extractor: { operator: 'freeSide', second: null },

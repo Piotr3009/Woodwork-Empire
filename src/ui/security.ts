@@ -12,6 +12,7 @@ import {
   trimmed,
 } from '../engine/index';
 import type { GameState } from '../engine/index';
+import { lineValue } from '../engine/insurance';
 import { button, escapeHtml, lockedButton, money } from './modal';
 
 /** The risk a month as the player reads it: a percentage, or the word for none. */
@@ -39,11 +40,14 @@ export function costLine(state: GameState, spec: SecurityLevelSpec): string {
 export function formulaLine(state: GameState, spec: SecurityLevelSpec): string {
   if (!spec.scaled) return '';
   const parts = securitySubscriptionParts(state, spec.level);
+  // One clause for a company with the line, whose modules are not in the firm's sum (CLAUDE.md T29
+  // 2.10).
+  const line = lineValue(state) > 0 ? ', the production line is not in it' : '';
   return (
     `The firm charges ${money(parts.base)} a month for a hall of ${SECURITY_SCALE_AREA_M2} m² ` +
     `with nothing in it, times the hall's area over that (${parts.areaM2} m², so ` +
     `× ${trimmed(parts.areaFactor, 2)}), times one plus the insured value over ` +
-    `${money(SECURITY_SCALE_VALUE)} (${money(parts.insured)} insured, so × ${trimmed(parts.valueFactor, 2)}): ` +
+    `${money(SECURITY_SCALE_VALUE)} (${money(parts.insured)} insured${line}, so × ${trimmed(parts.valueFactor, 2)}): ` +
     `${money(parts.monthly)} a month.`
   );
 }

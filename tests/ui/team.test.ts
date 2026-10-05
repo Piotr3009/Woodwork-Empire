@@ -82,9 +82,17 @@ describe('the board itself', () => {
     const names = Array.from(workshop.querySelectorAll('[data-candidate]')).map((tile) =>
       tile.getAttribute('data-candidate'),
     );
-    // The joiners and the labourer, and nobody else on the floor (PIOTR, 02.10; CLAUDE.md T26
-    // 2.6): the booth's own trade's four cards went with it.
-    expect(names).toEqual(['joiner.novice', 'joiner.experienced', 'joiner.senior', 'joiner.master', 'helper.']);
+    // The joiners and the labourer on the floor (PIOTR, 02.10; CLAUDE.md T26 2.6): the booth's own
+    // trade's four cards went with it. Flipped in v84: the line engineer's tile after theirs
+    // (CLAUDE.md T29 2.8).
+    expect(names).toEqual([
+      'joiner.novice',
+      'joiner.experienced',
+      'joiner.senior',
+      'joiner.master',
+      'helper.',
+      'lineEngineer.',
+    ]);
     const office = parse(renderTeam(known(), 'office'));
     expect(
       Array.from(office.querySelectorAll('[data-candidate]')).map((tile) =>

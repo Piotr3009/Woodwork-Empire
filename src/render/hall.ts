@@ -32,6 +32,7 @@ import {
   machineIsOut,
   machinesDueService,
   machinesInService,
+  isServiced,
   sawdustPiles,
   serviceIsDue,
 } from '../engine/machines';
@@ -49,12 +50,13 @@ import {
   placeShortages,
   placedMachines,
   placesLine,
+  boardCapacityOf,
   sheetCapacityOf,
   shortageLine,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
 import { drawnPlaces } from '../engine/drawn';
-import { sheetsOnRack } from '../engine/materials';
+import { boardsOnStore, canUnload, loadWords, sheetsOnRack } from '../engine/materials';
 import {
   STATION_BENCH,
   STATION_CLEANING,
@@ -66,6 +68,9 @@ import {
   STATION_OFFICE,
   STATION_PHONE,
   STATION_RACK,
+  STATION_TIMBER_RACK,
+  firstTimberRack,
+  unloadFarStation,
   type Facing as StationFacing,
   boothPlaces,
   facingAt,
@@ -83,7 +88,6 @@ import {
 } from '../engine/stations';
 import { ownerIsAvailable } from '../engine/owner';
 import { crewHasGoneHome, homeCellOf, isSeenOnTheHall } from '../engine/staff';
-import { plural } from '../engine/text';
 import { FIGURE_DEPTH_OFFSET } from '../engine/constants';
 import type { RoomBlock, RoomId } from '../engine/constants';
 import type {
@@ -1013,6 +1017,14 @@ function stationAnchor(
       return { ...cell, facing: facingAt(cell, rack) };
     }
   }
+  // The man unloading boards walks to the first timber rack on the floor (CLAUDE.md T29 2.11.2).
+  if (station === STATION_TIMBER_RACK) {
+    const rack = firstTimberRack(state);
+    if (rack) {
+      const cell = standingCell(state, rack, 'operator');
+      return { ...cell, facing: facingAt(cell, rack) };
+    }
+  }
   if (station === STATION_GATE) {
     // In front of the pallet on the hall side, facing it, never outside (PIOTR, 16.09).
     const cell = palletCell(state);
@@ -1177,6 +1189,7 @@ function stationLabel(station: string, noPlaceFor = ''): string {
   // the mark over his head and his card say too (CLAUDE.md T21 2.6, T25 2.3; v53).
   if (station === STATION_HOME) return noPlaceFor === '' ? 'standing' : placeLine();
   if (station === STATION_RACK) return 'the rack';
+  if (station === STATION_TIMBER_RACK) return 'the timber rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
   if (station === STATION_PHONE) return 'the phone';
@@ -1767,11 +1780,19 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
     const bagLine = item.specId === 'extractor' && store.full ? ' (bags full)' : '';
-    const serviceLine = !item.broken && serviceIsDue(item, state.clock.day) ? ' (service due)' : '';
+    // Only kit that is serviced is ever due one: not a bench, a rack, a cabinet or a module of the
+    // line, which carried a false label once 180 days had passed (CLAUDE.md T29 2.10).
+    const serviceLine =
+      !item.broken && isServiced(item.specId) && serviceIsDue(item, state.clock.day) ? ' (service due)' : '';
     // A rack's name says what is on it and what it holds, the same share its plate is drawn with,
     // and not the whole stock over every rack's room, which read the same on every rack (v54).
+    // A timber store's says the boards on it, its plate the same (CLAUDE.md T29 2.11.2).
     const rackLine =
-      sheetCapacityOf(item) > 0 ? `: ${sheetsOnRack(state, item)} / ${sheetCapacityOf(item)}` : '';
+      sheetCapacityOf(item) > 0
+        ? `: ${sheetsOnRack(state, item)} / ${sheetCapacityOf(item)}`
+        : boardCapacityOf(item) > 0
+          ? `: ${boardsOnStore(state, item)} / ${boardCapacityOf(item)}`
+          : '';
     // A machine that wants a pipe and has none is not served: the hall says so under its name, in
     // the game's red, and never writes "connected" anywhere (CLAUDE.md T16 2.3).
     const unconnected = wantsExtraction(item) && !isConnected(state, item);
@@ -1817,6 +1838,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         }) +
         (unconnected ? notConnectedLabel(stands) : '') +
         (sheetCapacityOf(item) > 0 ? rackCount(item, sheetsOnRack(state, item)) : '') +
+        (boardCapacityOf(item) > 0 ? rackCount(item, boardsOnStore(state, item)) : '') +
         fx.svg +
         (marked === undefined
           ? ''
@@ -1880,14 +1902,29 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // and the rack, and he never stands on it: he touches the pallet and goes, touches the rack
   // and comes back, for as long as the engine has him unloading (PIOTR, 16.09; CLAUDE.md T16
   // 2.2). The page gives the walker both ends of the loop.
-  const unloadingNow = state.deliveries.some((delivery) => delivery.arrived && !delivery.unloaded);
-  const loopEnds = (): string => {
+  // A load that is waiting for room is not being unloaded, however long it waits (CLAUDE.md T29
+  // 2.11.2).
+  const unloadingNow = state.deliveries.some(
+    (delivery) => delivery.arrived && !delivery.unloaded && canUnload(state, delivery),
+  );
+  // The far end is the sheet rack, or for a load of boards the first timber rack, which carries its
+  // own station in the loop (CLAUDE.md T29 2.11.2).
+  const loopEnds = (far: string): string => {
     const gate = stationCell(state, STATION_GATE, { x: 2, y: 5 });
-    const rack = stationCell(state, STATION_RACK, { x: 2, y: 5 });
-    return `${gate.x},${gate.y};${rack.x},${rack.y}`;
+    const end = stationCell(state, far, { x: 2, y: 5 });
+    return far === STATION_RACK ? `${gate.x},${gate.y};${end.x},${end.y}` : `${gate.x},${gate.y};${end.x},${end.y};${far}`;
   };
-  const onTheLoop = (station: string): string =>
-    unloadingNow && (station === STATION_GATE || station === STATION_RACK) ? loopEnds() : '';
+  const onTheLoop = (taskId: string | null, station: string): string => {
+    if (!unloadingNow) return '';
+    if (station === STATION_TIMBER_RACK) return loopEnds(STATION_TIMBER_RACK);
+    if (station !== STATION_GATE && station !== STATION_RACK) return '';
+    const task = taskId === null ? undefined : state.tasks.find((entry) => entry.id === taskId);
+    if (task === undefined || task.kind !== 'unload') return loopEnds(STATION_RACK);
+    const far = unloadFarStation(state, task);
+    // Boards with only a shelter: he stays at the gate, and nobody is walked onto the apron.
+    if (far === STATION_GATE) return '';
+    return loopEnds(far);
+  };
 
   // A machine off the lorry is the same loop walked empty handed: from the gate to the floor
   // held for it and back, as many times as the unload minutes allow, and nobody stands moving
@@ -1964,7 +2001,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         // Joiners have a sheet tonight; everybody else falls back to the capsule until his own
         // one is delivered (CLAUDE.md T9 3.13).
         { role: sheetRoleFor(worker.role, worker.name, characterOptions), station, options: characterOptions },
-        onTheMachineLoop(worker.taskId) || onTheLoop(station),
+        onTheMachineLoop(worker.taskId) || onTheLoop(worker.taskId, station),
         bubble,
         bubble === null ? 0 : markShiftAt(cell),
       ),
@@ -1986,7 +2023,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         // The owner is his sheet where the art side has delivered one (character.owner.*, the
         // boss pack of 14.09), and the capsule where it has not, like every worker.
         { role: 'owner', station: ownerStation, options: characterOptions },
-        onTheMachineLoop(state.owner.currentTaskId) || onTheLoop(ownerStation),
+        onTheMachineLoop(state.owner.currentTaskId) || onTheLoop(state.owner.currentTaskId, ownerStation),
         ownerBubble,
         ownerBubble === null ? 0 : markShiftAt(ownerCell),
       ),
@@ -1996,14 +2033,17 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // A pallet of sheets at the gate while a delivery is waiting to be unloaded: the material
   // arrives as what it is (CLAUDE.md T13 3.21). It keeps the lorry's hook, so a click on it
   // still asks who unloads it.
-  const waiting = state.deliveries.find((delivery) => delivery.arrived && !delivery.unloaded);
+  // The first waiting load that can be unloaded, and the first waiting load when none can: a load of
+  // boards that waits days for room keeps no hook from the loads behind it (CLAUDE.md T29 2.11.2).
+  const atTheGate = state.deliveries.filter((delivery) => delivery.arrived && !delivery.unloaded);
+  const waiting = atTheGate.find((delivery) => canUnload(state, delivery)) ?? atTheGate[0];
   if (waiting) {
     drawables.push({
       depth: depthKey(GATE_LAYOUT.x, GATE_LAYOUT.y),
       svg:
         `<g data-van="${waiting.id}" data-sprite="${PALLET_SPRITE}" class="clickable pallet">` +
         '<title>Click the pallet to decide who unloads it</title>' +
-        palletArt(files, `Delivery: ${plural(waiting.sheets, 'sheet', 'sheets')}`) +
+        palletArt(files, `Delivery: ${loadWords(state, waiting)}`) +
         '</g>',
     });
   }

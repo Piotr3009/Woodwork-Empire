@@ -75,6 +75,7 @@ import {
 } from '../../src/engine/machines';
 import { planPlaces } from '../../src/engine/production';
 import { manPace } from '../../src/engine/stages';
+import { pluralOf } from '../../src/engine/text';
 import { STATION_DOOR, STATION_HOME } from '../../src/engine/stations';
 import { staffOutputFactor } from '../../src/engine/owner';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
@@ -193,7 +194,8 @@ describe('the offer', () => {
     // One of the three pieces the board offers now, of whatever length of work (T17 2.22).
     const piece = CONTRACT_PIECES.find((entry) => entry.id === contract.pieceId);
     expect(piece).toBeDefined();
-    expect(contract.name).toContain(`${piece?.name ?? ''}s for `);
+    // The piece's plural written out, so a drawer box is `Drawer boxes` (CLAUDE.md T29 2.12.6).
+    expect(contract.name).toContain(`${pluralOf(piece?.name ?? '')} for `);
     // The client asks for a week's work: the band in cut sheet packs, converted to this piece.
     // The band of the lowest standing, the one a young shop has (v40).
     const band = CONTRACT_QUANTITY_BANDS[0];
@@ -884,7 +886,9 @@ describe('the lengths of work the board offers (CLAUDE.md T17 2.22)', () => {
     expect(quantityForPiece(long as ContractPieceSpec, 30)).toBe(6);
   });
 
-  it('draws all three over the days, and prices each at its own piece', () => {
+  it('draws all three sheet pieces over the days in the 200 m² unit, never a window or a door, and prices each at its own piece', () => {
+    // Windows and doors are offered only in the 800 m² unit (CLAUDE.md T29 2.12.4).
+    const sheetPieces = CONTRACT_PIECES.filter((entry) => entry.timber !== true);
     const drawn = new Set<string>();
     for (let seed = 1; seed <= 200; seed += 1) {
       const state = newGame({ seed });
@@ -897,6 +901,7 @@ describe('the lengths of work the board offers (CLAUDE.md T17 2.22)', () => {
       expect(contract.pricePerPiece).toBeGreaterThanOrEqual(Math.floor(contractPriceFor(piece) * ANSWER_MIN));
       expect(contract.pricePerPiece).toBeLessThanOrEqual(Math.ceil(contractPriceFor(piece) * ANSWER_MAX));
     }
-    expect(drawn.size).toBe(CONTRACT_PIECES.length);
+    expect(sheetPieces).toHaveLength(3);
+    expect([...drawn].sort()).toEqual(sheetPieces.map((entry) => entry.id).sort());
   });
 });

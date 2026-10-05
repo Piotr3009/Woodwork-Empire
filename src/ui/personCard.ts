@@ -20,7 +20,7 @@ import {
 } from '../engine/index';
 import type { GameState, Job, Worker } from '../engine/index';
 // Straight off their own modules, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import { OWNER } from '../engine/machines';
+import { OWNER, engineerAtTheLine } from '../engine/machines';
 import { contractOfWorker } from '../engine/contracts';
 import { stageLabel } from '../engine/stages';
 import { jobStage } from '../engine/jobs';
@@ -188,6 +188,9 @@ export function workerDoing(state: GameState, worker: Worker): string {
   }
   if (worker.startDay > state.clock.day) return `starts ${formatCalendarDay(worker.startDay)}`;
   if (worker.taskId !== null) return 'on a job of work';
+  // A line engineer is never a man standing about: at the line while a module stands, and waiting
+  // for it while it is on order (CLAUDE.md T29 2.8) [TUNE: the second words].
+  if (worker.role === 'lineEngineer') return engineerAtTheLine(state, worker) ? 'at the line' : 'waiting for the line';
   if (job) return `${night ? 'tonight on' : 'on'} ${job.name}`;
   // A man on a standing contract is the contract's all day, and the column said `free` of him
   // until v62, because a contract is not a job (PIOTR, 02.10: "how is he free?").

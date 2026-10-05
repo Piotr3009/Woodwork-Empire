@@ -20,6 +20,7 @@ import type {
   SoftwareTier,
   StageId,
   StageSpec,
+  TimberStandReason,
   UnitExtension,
   WorkerIdleReason,
   WorkerRole,
@@ -179,12 +180,19 @@ import type {
  *  is moved there when the save is lifted (`standThePlantBehindTheWall`), with no other field of
  *  the save touched. The calendar remembers the closure it last told the player of, none in an
  *  older save, which is then told on its next open before the closure (CLAUDE.md T28 section 4).
- *  Every v12 to v40 save loads. */
-export const STATE_VERSION = 41;
+ *  Every v12 to v40 save loads.
+ *
+ *  Version 42 is v84, Turn 29 (PIOTR, 05.10). A standing contract takes four joiners at the most:
+ *  a running contract of a save with more on it keeps the four put on it first, the men taken off
+ *  are given back to the boss with no job under them, and the player is told by a card at the
+ *  first settle. The glass comes the next working day, and a glass already on its way for a later
+ *  day is brought forward to the next one (CLAUDE.md T29 section 4). Every v12 to v41 save
+ *  loads. */
+export const STATE_VERSION = 42;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v83';
+export const APP_VERSION = 'v84';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -706,8 +714,41 @@ export const CNC_STAGE: StageSpec = { id: 'cnc', label: 'CNC', share: MACHINE_ST
  *  (PIOTR). The tool changer head takes it a little further [TUNE]. */
 export const CNC_STAGE_FACTOR = 2;
 export const CNC_STAGE_FACTOR_WITH_HEAD = 2.1;
+/** [PIOTR, 04.10: "one five axis CNC replaces four spindle moulders"; TUNE: chat: how] While a five
+ *  axis CNC runs, the Moulding of every timber job is done on it at this many times the hall's pace
+ *  at it, the class's pace on top, as the CNC does the Cutting of a sheet job at its two
+ *  (CLAUDE.md T29 2.6). */
+export const CNC5_STAGE_FACTOR = 4;
+/** The unit the biggest kit stands in: the five axis CNC and the production line ask for it
+ *  (CLAUDE.md T29 2.5.1). */
+export const BIG_KIT_UNIT_M2 = 800;
+/** The power a module of the line draws a day, every day as for any machine [TUNE] (CLAUDE.md T29
+ *  2.10). */
+export const LINE_MODULE_POWER_PER_DAY = 60;
+/** Kit built to order, whose order cannot be called off once it is placed: the money is the
+ *  maker's from the click, so an order placed before 30 December and called off in January saves
+ *  no tax (CLAUDE.md T29 2.6, 2.10) [TUNE: chat]. Every other machine is still called off in full
+ *  until the lorry comes (section 8). */
+export const BUILT_TO_ORDER: readonly string[] = [
+  'cnc5',
+  'windowLine1',
+  'windowLine2',
+  'windowLine3',
+  'windowLine4',
+  'windowLine5',
+];
+/** What an order built to order says in place of its refund (CLAUDE.md T29 2.10). */
+export const BUILT_TO_ORDER_LINE = 'Built to order: it cannot be called off';
 /** Parts come off a CNC cut and drilled, so the assembly takes half the minutes (PIOTR). */
 export const CNC_ASSEMBLY_FACTOR = 2;
+/** [PIOTR, 04.10: "the same spray booth at first and later a robot arm that sprays by itself";
+ *  TUNE: chat: how much] While the hall has a spraying robot that stands, is not broken and is not
+ *  away for its service, the Finishing done at a booth goes this many times as fast: the hall's, as
+ *  the tool changer's five per cent is the hall's (CLAUDE.md T29 2.7). */
+export const SPRAY_ROBOT_FINISH_FACTOR = 2;
+/** The booth's robot arm (CLAUDE.md T29 2.7): one for the hall, carried in and stood by a booth,
+ *  making no dust and asking for no extraction or air of its own. */
+export const SPRAY_ROBOT = 'sprayRobot';
 
 /** The piece leaving. It carries no labour: it is the Turn 2 transport, not work at a bench
  *  (CLAUDE.md T7 3.1). The Work Plan drew a bar for it until Turn 9 took the bars away. */
@@ -813,8 +854,9 @@ export const DELIVERY_WORKING_DAYS_STANDARD = 1;
 export const DELIVERY_WORKING_DAYS_BESPOKE = 3;
 
 /** A window's glass is made to size by a glazier and cannot be ordered before the drawing says the
- *  sizes: it is in this many working days after it is ordered (CLAUDE.md T28 2.9) [TUNE: chat]. */
-export const GLASS_DELIVERY_WORKING_DAYS = 10;
+ *  sizes: it is in at the open of the next working day after it is ordered, beside the boards
+ *  ordered with it (CLAUDE.md T28 2.9; PIOTR, 05.10: "the glass, next day", CLAUDE.md T29 2.1). */
+export const GLASS_DELIVERY_WORKING_DAYS = 1;
 /** The share of a timber job's material cost that is glass and ironmongery; the rest is boards
  *  (CLAUDE.md T28 2.9) [TUNE: chat]. */
 export const GLASS_SHARE = 0.35;
@@ -1049,9 +1091,10 @@ export const PIPE_PRICE_PER_METRE = 45;
  *  counts a gated machine only while it is actually running (CLAUDE.md T13 3.11). */
 export const GATE_PRICE = 1000;
 export const GATE_OUTPUT_BONUS = 0.02;
-/** Every machine family is ducted into the extraction except the compressor. The hand tools are
+/** Every machine family is ducted into the extraction except the compressor, and from v84 the
+ *  spraying robot, which asks for no extraction of its own (CLAUDE.md T29 2.7). The hand tools are
  *  not machines at all, so they never appear here (PIOTR). */
-export const NO_DUCTING_SPECS = ['compressor'];
+export const NO_DUCTING_SPECS = ['compressor', 'sprayRobot'];
 /** Skip ahead: the fastest the loop allows, run for the player while the owner is out and until
  *  the task he is out on is over (PIOTR, 13.09; CLAUDE.md T8 3.3). The Turn 4 forced 4x of a move
  *  of the hall is this same run now, so there is one speed the clock is ever taken to and one
@@ -1263,10 +1306,41 @@ export const TIMBER_EQUIPMENT: string[] = [
   'sprayBooth',
 ];
 
-/** The working days a timber enquiry's client gives on top of the deadline every enquiry is given:
- *  the glass's ten and the two nights the glue and the lacquer stand (CLAUDE.md T28 2.10)
+/** What stands in for a machine a window or a door asks for, while it stands in the hall: the
+ *  thing that does that machine's stage of a timber job. The one table `missingEquipment` and the
+ *  board read; the booth is always asked, and a sheet product never reads it (CLAUDE.md T29 2.5.4)
  *  [TUNE: chat]. */
-export const TIMBER_LEAD_DAYS = 12;
+export const TIMBER_STAND_INS: Record<string, readonly string[]> = {
+  crossCut: ['windowLine1'],
+  planer: ['windowLine1'],
+  spindleMoulder: ['cnc5', 'windowLine2'],
+  sander: ['windowLine3'],
+  framePress: ['windowLine4'],
+  // A window or a door asks for a timber store, and either family satisfies it (CLAUDE.md T29
+  // 2.11.3).
+  timberRack: ['timberShelter'],
+  timberShelter: ['timberRack'],
+};
+
+/** The two timber stores. Boards are kept on a timber store and never on a sheet rack (CLAUDE.md
+ *  T29 2.11). */
+export const TIMBER_STORES: readonly string[] = ['timberRack', 'timberShelter'];
+/** The one store the board's wanted list names, written `timber store` (CLAUDE.md T29 2.11.3). */
+export const TIMBER_STORE_WANTED = 'timberRack';
+
+/** The stages after which a timber job stands a night, and what it stands for: the glue cures
+ *  after the pressing and the lacquer dries after the finishing [PIOTR: "a bit more complicated";
+ *  TUNE: chat: the rule] (CLAUDE.md T28 2.8). Here and not in jobs.ts so that the timber lead days
+ *  below are counted off it (CLAUDE.md T29 2.1). */
+export const TIMBER_STANDS: Partial<Record<StageId, TimberStandReason>> = {
+  pressing: 'glue curing',
+  finishing: 'lacquer drying',
+};
+
+/** The working days a timber enquiry's client gives on top of the deadline every enquiry is given:
+ *  the glass's day and the nights the glue and the lacquer stand, three in all, written as their
+ *  sum so it cannot drift from the glass again (CLAUDE.md T28 2.10, T29 2.1) [TUNE: chat]. */
+export const TIMBER_LEAD_DAYS = GLASS_DELIVERY_WORKING_DAYS + Object.keys(TIMBER_STANDS).length;
 
 export const PRODUCT_TEMPLATES: ProductTemplate[] = [
   {
@@ -1501,6 +1575,8 @@ export const DELIVERY_DAYS_BY_CLASS: Record<string, Record<string, number>> = {
   edgebander: { used: 1, budget: 1, standard: 7, pro: 12, industrial: 20 },
   // The Turn 13 ladders [TUNE]: a used CNC is on a lorry in a week, an industrial one is built.
   cnc: { used: 5, budget: 20, standard: 45, pro: 45, industrial: 60 },
+  // The five axis CNC is built to order like the CNC [TUNE] (CLAUDE.md T29 2.6).
+  cnc5: { standard: 45, pro: 45, industrial: 60 },
   spindleMoulder: { used: 1, budget: 3, standard: 7, pro: 12, industrial: 20 },
   sprayBooth: { used: 5, budget: 10, standard: 20, pro: 25, industrial: 30 },
   thicknesser: { used: 1, budget: 5, standard: 5, pro: 7, industrial: 12 },
@@ -1572,6 +1648,8 @@ export const HEAVY_SPECS = [
   'crossCut',
   'sander',
   'framePress',
+  // The five axis CNC comes on a lorry and is unloaded as the CNC is (CLAUDE.md T29 2.6) [TUNE].
+  'cnc5',
 ];
 
 /** Classes of a heavy family that are carried after all: a used or budget compressor is a small
@@ -1601,6 +1679,9 @@ export const MACHINE_ENDURANCE_HOURS: Record<string, number> = {
   // The high capacity rack's own figure [PIOTR, 03.10] (v69). A rack books no hours, so it is what
   // the card prints and nothing wears it down.
   sheetRackHigh: 100000,
+  // The timber stores book no hours either (CLAUDE.md T29 2.11.1).
+  timberRack: 100000,
+  timberShelter: 100000,
 };
 
 /** The five classes every ladder in this game has, in order: class 5 is always the industrial one
@@ -1617,10 +1698,12 @@ export const CLASS_BADGE: Record<string, { label: string; colour: string }> = {
   industrial: { label: 'Industrial', colour: '#7a6a9c' },
 };
 
-/** The families the player chooses a class for: every one of them has exactly five classes in
- *  the order above (CLAUDE.md T13 3.12). Everything else is bought off the catalogue line itself:
- *  a locker, an air dryer, a central system or a tool changer head has one class and never will
- *  have more. */
+/** The families the player chooses a class for: every one of them has an unbroken run of the
+ *  classes above, in their order, two or more (CLAUDE.md T13 3.12; the five axis CNC's three from
+ *  T29 2.5.2), and every family but the five axis CNC has all five. The first class is what its
+ *  catalogue line shows and what a default purchase buys. Everything else is bought off the
+ *  catalogue line itself: a locker, an air dryer, a central system or a tool changer head has one
+ *  class and never will have more. */
 export const CLASS_LADDER_FAMILIES: readonly string[] = [
   'tableSaw',
   // The tool cabinet is a family of five from Turn 22, so its cards wear the class badge and the
@@ -1644,6 +1727,8 @@ export const CLASS_LADDER_FAMILIES: readonly string[] = [
   'planer',
   'sander',
   'framePress',
+  // The five axis CNC's three, standard to industrial (CLAUDE.md T29 2.5.2, 2.6).
+  'cnc5',
 ];
 
 /** Class 3 or above on the spindle moulder is the future gate to timber production. The branch
@@ -1845,6 +1930,16 @@ export const MACHINE_CAPACITY: Record<string, Record<string, number>> = {
   planer: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
   sander: { used: 1, budget: 1, standard: 2, pro: 3, industrial: 4 },
   framePress: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
+  // The five axis CNC [TUNE: chat]: the weak one's twelve are four spindle moulders at three men
+  // each, which is how Piotr counted them on 04.10 (CLAUDE.md T29 2.6).
+  cnc5: { standard: 12, pro: 20, industrial: 32 },
+  // The line's four modules that do a stage [TUNE: chat]: the 800 m2 unit takes 32 joiners and the
+  // owner is counted with them, so 33 is the whole company and the line is never the thing a hall
+  // is short of. Module 5 does no stage and has no row (CLAUDE.md T29 2.9.5).
+  windowLine1: { standard: 33 },
+  windowLine2: { standard: 33 },
+  windowLine3: { standard: 33 },
+  windowLine4: { standard: 33 },
 };
 
 /** The families a hall can be short of: every row of the table but the bench's, whose places
@@ -2059,6 +2154,88 @@ export const SHEET_RACK_HIGH_VARIANTS: EquipmentVariant[] = [
       'hold a hundred and sixty.',
   },
 ];
+
+/** The timber rack's one class: 40 boards on the hall floor [TUNE: chat] (CLAUDE.md T29 2.11.1). */
+export const TIMBER_RACK_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Timber rack',
+    price: 1200,
+    width: 4,
+    depth: 1,
+    height: 2.5,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    boardCapacity: 40,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A steel cantilever rack, its arms long enough for a window\u0027s boards laid flat, four ' +
+      'metres of them on the hall floor.',
+  },
+];
+
+/** The timber shelter's one class: 400 boards out on the apron, under a roof [TUNE: chat]
+ *  (CLAUDE.md T29 2.11.1). */
+export const TIMBER_SHELTER_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Timber shelter',
+    price: 18000,
+    width: 3,
+    depth: 6,
+    height: 3,
+    zoneWidth: 3,
+    zoneDepth: 6,
+    boardCapacity: 400,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A lean to roof over racks of boards, open at the front, standing outside on the apron so ' +
+      'it takes no floor of the hall.',
+  },
+];
+
+/** The spraying robot's one class (CLAUDE.md T29 2.7): 120,000 [TUNE: chat], 8 a day of power
+ *  [TUNE], the art side's metres. */
+export const SPRAY_ROBOT_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Spraying robot',
+    price: 120000,
+    width: 2,
+    depth: 1,
+    height: 2.25,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    enduranceFactor: 1,
+    powerPerDay: 8,
+    description:
+      'A robot arm on a pedestal beside the booth, the gun on the end of it. It lays the coats ' +
+      'on the work in the booth by itself, as even as the last.',
+  },
+];
+
+/** One class of a module of the line, its price the share of the 5 million the brief gives it
+ *  [PIOTR: five stages, 1.5 million to 5 million; TUNE: chat: the share], 60 a day of power
+ *  [TUNE], the art side's metres (CLAUDE.md T29 2.9.1, 2.10). */
+function lineModuleVariants(name: string, price: number, description: string): EquipmentVariant[] {
+  return [
+    {
+      id: STANDARD_VARIANT,
+      name,
+      price,
+      width: 6,
+      depth: 3,
+      height: 2.5,
+      zoneWidth: 6,
+      zoneDepth: 3,
+      enduranceFactor: 1,
+      powerPerDay: LINE_MODULE_POWER_PER_DAY,
+      description,
+    },
+  ];
+}
 
 /** How many men's hand tool sets each class of tool cabinet holds
  *  [PIOTR, 19.09: "weak 1, middle 1, then doubling: 2, 4, 8"]. This number is what a class of
@@ -2461,6 +2638,8 @@ export const EXTRACTION_DEMAND: Record<string, Record<string, number>> = {
   crossCut: { used: 600, budget: 700, standard: 900, pro: 1200, industrial: 1800 },
   planer: { used: 2000, budget: 2200, standard: 2800, pro: 3400, industrial: 4500 },
   sander: { used: 0, budget: 1200, standard: 1500, pro: 2200, industrial: 3500 },
+  // The five axis CNC [TUNE] (CLAUDE.md T29 2.6).
+  cnc5: { standard: 2000, pro: 2400, industrial: 3000 },
 };
 
 /** Piotr's margin on the extraction: the sums have to leave a fifth of the fan spare, so a hall
@@ -2504,6 +2683,13 @@ export const AIR_DEMAND: Record<string, Record<string, { bar: number; litres: nu
   cnc: {
     used: { bar: 6.5, litres: 650 },
     budget: { bar: 6.5, litres: 650 },
+    standard: { bar: 6.5, litres: 650 },
+    pro: { bar: 6.5, litres: 650 },
+    industrial: { bar: 6.5, litres: 650 },
+  },
+  // The five axis CNC wants the CNC's air in every class, and no dry air tonight (CLAUDE.md T29
+  // 2.6) [TUNE].
+  cnc5: {
     standard: { bar: 6.5, litres: 650 },
     pro: { bar: 6.5, litres: 650 },
     industrial: { bar: 6.5, litres: 650 },
@@ -2737,6 +2923,58 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     description:
       'A nesting cell with automatic loading, a second spindle and an offload table. It runs ' +
       'a shift with one man watching it, and it costs what a small factory costs.',
+  },
+];
+
+/** The five axis CNC's three classes [PIOTR, 04.10: "from a weak one at 150 thousand to a fully
+ *  automatic one at 500 thousand"; TUNE: chat: the middle], the metres the art side's (CLAUDE.md
+ *  T29 2.4, 2.6). Its zone is its footprint and a metre more each way [TUNE]; the endurance and
+ *  the power are [TUNE]. */
+export const CNC5_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'standard',
+    name: 'Standard five axis CNC',
+    price: 150000,
+    width: 5,
+    depth: 3,
+    height: 2.5,
+    zoneWidth: 6,
+    zoneDepth: 4,
+    enduranceFactor: 1.2,
+    powerPerDay: 16,
+    description:
+      'An open gantry over a table of consoles and clamps, with one head on five axes and the ' +
+      'blanks put on and taken off by hand.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional five axis CNC',
+    price: 300000,
+    width: 6,
+    depth: 3,
+    height: 2.75,
+    zoneWidth: 7,
+    zoneDepth: 4,
+    enduranceFactor: 1.5,
+    powerPerDay: 24,
+    description:
+      'A closed cabin with sliding doors, a carousel of tools beside the head and clamps that set ' +
+      'themselves for the next frame.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial five axis CNC',
+    price: 500000,
+    width: 8,
+    depth: 4,
+    height: 3,
+    zoneWidth: 9,
+    zoneDepth: 5,
+    enduranceFactor: 2,
+    powerPerDay: 36,
+    description:
+      'Fully automatic: two heads, a loading table at one end and an unloading table at the ' +
+      'other, and a frame out of it while the next goes in.',
   },
 ];
 
@@ -3331,12 +3569,43 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   workbench: WORKBENCH_VARIANTS,
   sheetRack: SHEET_RACK_VARIANTS,
   [SHEET_RACK_HIGH]: SHEET_RACK_HIGH_VARIANTS,
+  // The two timber stores, one class each (CLAUDE.md T29 2.11.1).
+  timberRack: TIMBER_RACK_VARIANTS,
+  timberShelter: TIMBER_SHELTER_VARIANTS,
   edgebander: EDGEBANDER_VARIANTS,
   extractor: EXTRACTOR_VARIANTS,
   compressor: COMPRESSOR_VARIANTS,
   thicknesser: THICKNESSER_VARIANTS,
   cnc: CNC_VARIANTS,
+  cnc5: CNC5_VARIANTS,
   sprayBooth: SPRAY_BOOTH_VARIANTS,
+  [SPRAY_ROBOT]: SPRAY_ROBOT_VARIANTS,
+  // The line's five modules, one class each (CLAUDE.md T29 2.9.1).
+  windowLine1: lineModuleVariants(
+    'Window line, module 1',
+    1500000,
+    'The infeed of the line and a planer that takes the timber to size on all four faces.',
+  ),
+  windowLine2: lineModuleVariants(
+    'Window line, module 2',
+    750000,
+    'A CNC with two heads built into the line, profiling the frames as they pass.',
+  ),
+  windowLine3: lineModuleVariants(
+    'Window line, module 3',
+    750000,
+    'Through feed sanding: the profiled frames go in at one end and out sanded at the other.',
+  ),
+  windowLine4: lineModuleVariants(
+    'Window line, module 4',
+    1000000,
+    'A press and a frame assembly station, squaring and cramping each frame in turn.',
+  ),
+  windowLine5: lineModuleVariants(
+    'Window line, module 5',
+    1000000,
+    'A robot at the end of the line that takes the frames off into a buffer.',
+  ),
   spindleMoulder: SPINDLE_MOULDER_VARIANTS,
   // The cabinet is a family of five from Turn 22, and what a class is for is how many men's hand
   // tools it holds (PIOTR, 19.09; CLAUDE.md T22 2.12).
@@ -3637,7 +3906,45 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: SHEET_RACK_HIGH,
     sheetCapacity: 320,
     effect: 'Holds 320 sheets on the floor an industrial rack takes for 160.',
+  },  {
+    ...BASE_SPEC,
+    id: 'timberRack',
+    // Off the shelf [TUNE: chat] (CLAUDE.md T29 2.11.1).
+    deliveryDays: 3,
+    folder: 'Timber racks',
+    tab: 'storage',
+    name: 'Timber rack',
+    price: 1200,
+    category: 'storage',
+    width: 4,
+    depth: 1,
+    height: 2.5,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    spriteKey: 'timberRack',
+    boardCapacity: 40,
+    effect: 'Holds the boards of the timber jobs on the hall floor. A sheet never goes on it.',
   },
+  {
+    ...BASE_SPEC,
+    id: 'timberShelter',
+    // Built where it stands [TUNE: chat] (CLAUDE.md T29 2.11.1).
+    deliveryDays: 15,
+    folder: 'Timber shelters',
+    tab: 'storage',
+    name: 'Timber shelter',
+    price: 18000,
+    category: 'storage',
+    width: 3,
+    depth: 6,
+    height: 3,
+    zoneWidth: 3,
+    zoneDepth: 6,
+    spriteKey: 'timberShelter',
+    boardCapacity: 400,
+    effect: 'Holds ten times a rack\u0027s boards outside on the apron, and takes no floor of the hall.',
+  },
+
   {
     ...BASE_SPEC,
     id: 'toolCabinet',
@@ -3988,7 +4295,140 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'cncHead',
     requires: ['cnc'],
     effect: 'Bolted to a CNC, no floor of its own. A further 5% out of the CNC\u0027s own stage.',
+  },  {
+    ...BASE_SPEC,
+    id: 'cnc5',
+    // Built to order, as the CNC (CLAUDE.md T29 2.6) [TUNE].
+    deliveryDays: 45,
+    folder: 'Five axis CNCs',
+    tab: 'cncCentre',
+    name: 'Five axis CNC',
+    price: 150000,
+    category: 'machine',
+    width: 5,
+    depth: 3,
+    height: 2.5,
+    zoneWidth: 6,
+    zoneDepth: 4,
+    spriteKey: 'cnc5',
+    usedOn: 'solidWood',
+    requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
+    minUnitM2: BIG_KIT_UNIT_M2,
+    effect:
+      'Moulds the frames of windows and doors on five axes, in place of the spindle moulders. ' +
+      'A sheet job never goes on it.',
+  },  {
+    ...BASE_SPEC,
+    id: 'windowLine1',
+    // Built in by the maker's fitters in a month, every module alike, so none stands before the
+    // one it follows (CLAUDE.md T29 2.9.1) [TUNE: chat].
+    deliveryDays: 30,
+    folder: 'Line module 1',
+    tab: 'line',
+    name: 'Window line, module 1',
+    price: 1500000,
+    category: 'machine',
+    width: 6,
+    depth: 3,
+    height: 2.5,
+    zoneWidth: 6,
+    zoneDepth: 3,
+    spriteKey: 'windowLine1',
+    usedOn: 'solidWood',
+    requires: ['cnc5', 'framePress'],
+    minUnitM2: BIG_KIT_UNIT_M2,
+    effect: 'The start of the window line: the infeed and the planing of windows and doors.',
   },
+  {
+    ...BASE_SPEC,
+    id: 'windowLine2',
+    // Built in by the maker's fitters in a month, every module alike, so none stands before the
+    // one it follows (CLAUDE.md T29 2.9.1) [TUNE: chat].
+    deliveryDays: 30,
+    folder: 'Line module 2',
+    tab: 'line',
+    name: 'Window line, module 2',
+    price: 750000,
+    category: 'machine',
+    width: 6,
+    depth: 3,
+    height: 2.5,
+    zoneWidth: 6,
+    zoneDepth: 3,
+    spriteKey: 'windowLine2',
+    usedOn: 'solidWood',
+    requires: ['windowLine1'],
+    minUnitM2: BIG_KIT_UNIT_M2,
+    effect: 'The window line\u0027s own CNC: the frames of windows and doors are profiled in the line.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'windowLine3',
+    // Built in by the maker's fitters in a month, every module alike, so none stands before the
+    // one it follows (CLAUDE.md T29 2.9.1) [TUNE: chat].
+    deliveryDays: 30,
+    folder: 'Line module 3',
+    tab: 'line',
+    name: 'Window line, module 3',
+    price: 750000,
+    category: 'machine',
+    width: 6,
+    depth: 3,
+    height: 2.5,
+    zoneWidth: 6,
+    zoneDepth: 3,
+    spriteKey: 'windowLine3',
+    usedOn: 'solidWood',
+    requires: ['windowLine2'],
+    minUnitM2: BIG_KIT_UNIT_M2,
+    effect: 'The window line\u0027s sanding: the frames go through it sanded.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'windowLine4',
+    // Built in by the maker's fitters in a month, every module alike, so none stands before the
+    // one it follows (CLAUDE.md T29 2.9.1) [TUNE: chat].
+    deliveryDays: 30,
+    folder: 'Line module 4',
+    tab: 'line',
+    name: 'Window line, module 4',
+    price: 1000000,
+    category: 'machine',
+    width: 6,
+    depth: 3,
+    height: 2.5,
+    zoneWidth: 6,
+    zoneDepth: 3,
+    spriteKey: 'windowLine4',
+    usedOn: 'solidWood',
+    requires: ['windowLine3'],
+    minUnitM2: BIG_KIT_UNIT_M2,
+    effect: 'The window line\u0027s press and frame assembly.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'windowLine5',
+    // Built in by the maker's fitters in a month, every module alike, so none stands before the
+    // one it follows (CLAUDE.md T29 2.9.1) [TUNE: chat].
+    deliveryDays: 30,
+    folder: 'Line module 5',
+    tab: 'line',
+    name: 'Window line, module 5',
+    price: 1000000,
+    category: 'machine',
+    width: 6,
+    depth: 3,
+    height: 2.5,
+    zoneWidth: 6,
+    zoneDepth: 3,
+    spriteKey: 'windowLine5',
+    usedOn: 'solidWood',
+    requires: ['windowLine4'],
+    minUnitM2: BIG_KIT_UNIT_M2,
+    effect: 'The end of the window line: a robot takes the finished frames off it.',
+  },
+
+
   {
     ...BASE_SPEC,
     id: DRYING_RACKS,
@@ -4035,7 +4475,26 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'sprayBooth',
     // Unlocked in Turn 11: two products ask for a sprayed finish now (CLAUDE.md T11 3.7).
     effect: 'Unlocks the lacquer finish. Its own extraction, and dry air for a clean finish.',
+  },  {
+    ...BASE_SPEC,
+    id: SPRAY_ROBOT,
+    // A month for the robot [TUNE] (CLAUDE.md T29 2.7).
+    deliveryDays: 30,
+    folder: 'Spraying robots',
+    tab: 'spraying',
+    name: 'Spraying robot',
+    price: 120000,
+    category: 'machine',
+    width: 2,
+    depth: 1,
+    height: 2.25,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    spriteKey: SPRAY_ROBOT,
+    requires: ['sprayBooth'],
+    effect: 'An arm that sprays by itself at the booth. One is enough for the hall.',
   },
+
   {
     ...BASE_SPEC,
     id: 'dustSystem',
@@ -4136,6 +4595,9 @@ export const EQUIPMENT_TABS: Array<{ id: EquipmentTab; label: string }> = [
   { id: 'extraction', label: 'Extraction and air' },
   { id: 'cnc', label: 'CNC' },
   { id: 'cncCentre', label: 'CNC centre' },
+  // A twelfth tab beside the eleven Piotr named, for the line's five modules (CLAUDE.md T29 2.9.1)
+  // [TUNE: chat].
+  { id: 'line', label: 'Production line' },
   { id: 'handling', label: 'Handling' },
   { id: 'storage', label: 'Storage' },
 ];
@@ -4390,6 +4852,9 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   edgebander: { x: 13, y: 6 },
   forklift: { x: 18, y: 6 },
   van: { x: 0, y: 7, yard: true },
+  // The timber shelter stands outside on the apron as the van does, its first cell x 0, y 1 of it
+  // (CLAUDE.md T29 2.11.1).
+  timberShelter: { x: 0, y: 1, yard: true },
 };
 
 /** Bench slots, in order, along the middle of the hall clear of the rooms and the personnel door.
@@ -4715,6 +5180,44 @@ export const LET_GO_NOTICE_DAYS = 7;
  *  (CLAUDE.md T20 2.7). */
 export const WEEK_JOBS_KEPT = 4;
 
+/** [PIOTR, 05.10: "the cost of running the production line will be considerable: one or two
+ *  engineers at 15k a month, depending on the size of the line"] The line engineer's month, one
+ *  grade (CLAUDE.md T29 2.8). */
+export const LINE_ENGINEER_MONTHLY_WAGE = 15000;
+/** Two engineers keep the whole line, and a third is refused [PIOTR, 05.10: "one or two
+ *  engineers"; TUNE: chat: a third refused] (CLAUDE.md T29 2.8). */
+export const LINE_ENGINEERS_MAX = 2;
+/** The modules of the line its engineers on duty keep running, by how many are on duty: none with
+ *  no engineer, three with one, all five with two [PIOTR: "one or two depending on the size of the
+ *  line"; TUNE: chat: where the second begins] (CLAUDE.md T29 2.8, 2.9.4). */
+export const LINE_MODULES_KEPT: readonly number[] = [0, 3, 5];
+/** The five modules of the production line, in the order they are built (CLAUDE.md T29 2.9.1). */
+export const LINE_MODULES: readonly string[] = ['windowLine1', 'windowLine2', 'windowLine3', 'windowLine4', 'windowLine5'];
+/** The cell module 1 stands on: module N stands six cells along x from the one before, at
+ *  orientation 0, so the line takes the cells x 5 to 34, y 14 to 16, in the half of the hall the
+ *  second extension added. Held by nothing until a module is bought (CLAUDE.md T29 2.9.2)
+ *  [TUNE: chat: the cells]. */
+export const WINDOW_LINE_ORIGIN = { x: 5, y: 14 };
+/** [PIOTR, 04.10: "at each stage output goes up by a percentage"; TUNE: chat: the figures] What
+ *  the line gives every stage of a timber job but the Finishing while it runs at a level, by the
+ *  level: nothing at nought, 1.4 with one module, up to 2.4 with all five (CLAUDE.md T29 2.9.6). */
+export const LINE_FACTOR: readonly number[] = [1, 1.4, 1.6, 1.8, 2.1, 2.4];
+/** [PIOTR, 04.10: "the same percentage idea for materials"; TUNE: chat] The line cuts to a list
+ *  and wastes less: a timber job taken while the line is N modules long is counted this share
+ *  fewer boards for each of them (CLAUDE.md T29 2.9.7). */
+export const LINE_BOARD_SAVING = 0.03;
+/** The module of the line that does each stage of a timber job, by its place in the line: the
+ *  Cross cutting and the Planing on module 1, the Moulding on 2, the Sanding on 3 and the Pressing
+ *  on 4. Module 5 does no stage of its own, and the Finishing and the Glazing are never the line's
+ *  (CLAUDE.md T29 2.9.5) [TUNE: chat]. */
+export const LINE_COVERS: Partial<Record<StageId, number>> = {
+  crossCutting: 1,
+  planing: 1,
+  moulding: 2,
+  sanding: 3,
+  pressing: 4,
+};
+
 export const HIRING_SPECS: HiringSpec[] = [
   ...tieredSpecs(
     'joiner',
@@ -4767,6 +5270,17 @@ export const HIRING_SPECS: HiringSpec[] = [
     monthlyWage: 5135,
     minReputation: 15,
     duties: 'Client calls, and the meeting a big job starts with while there is no draftsman.',
+  },
+  // The line engineer: one grade, no reputation asked, hired on the Workshop tab once the company
+  // has a production line standing or on order (PIOTR, 05.10; CLAUDE.md T29 2.8). His sentence is
+  // `LINE_MODULES_KEPT` in words [TUNE: chat].
+  {
+    role: 'lineEngineer',
+    tier: null,
+    label: 'Line engineer',
+    monthlyWage: LINE_ENGINEER_MONTHLY_WAGE,
+    minReputation: REPUTATION_MIN,
+    duties: 'Keeps the production line running. One keeps up to three modules, two keep all five.',
   },
   // The manager is a tiered role from Turn 23, four grades and four cards like the joiner, on his
   // own wage table (PIOTR, 20.09; CLAUDE.md T23 2.4).
@@ -4872,7 +5386,16 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   thicknesser: 0.25, // two bags a day, it takes 6 to 8 mm off two faces
   cnc: 0.06, // half a bag a day, Piotr's point of reference
   cncHead: 0.06, // the same head, the same chips
+  cnc5: 0.06, // the CNC's figure [TUNE] (CLAUDE.md T29 2.6)
+  // The line's modules have extraction of their own, as the booth has: nothing into the hall's
+  // bags (CLAUDE.md T29 2.10).
+  windowLine1: 0,
+  windowLine2: 0,
+  windowLine3: 0,
+  windowLine4: 0,
+  windowLine5: 0,
   sprayBooth: 0, // its own extraction, off this table
+  sprayRobot: 0, // an arm at the booth: no chips, and the booth's extraction is its own (CLAUDE.md T29 2.7)
   spindleMoulder: 0.12, // a bag a day, the figure the Turn 12 comment kept for it (PIOTR)
   // A compressor moves air and makes no chips. Not on Piotr's list: a zero so that every family
   // of the machine category is on this table and the test can hold it to that [TUNE].
@@ -5020,6 +5543,11 @@ export interface ContractPieceSpec {
    *  the rack like a job's and is never bought as money on the contract line (T17 2.22). Whole
    *  sheets are drawn as the pieces add up, the way a job draws them as it goes. */
   sheets: number;
+  /** T29 2.12.1: a window or a door made for a window company or a builder, who sends the timber
+   *  and the glass. Its `stages` are the timber plan's, it is worked, counted, drawn and worn as a
+   *  timber job is, and it is offered only in the 800 m² unit (2.12.4). Absent on the sheet
+   *  pieces, which are worked exactly as before. */
+  timber?: true;
 }
 
 /** The pieces a contract can be for. `minutes` is owner minutes a piece, `material` the money in
@@ -5059,6 +5587,37 @@ export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
     material: 60,
     sheets: 0.3,
   },
+  // T29 2.12.1 [TUNE: chat]: windows and doors as standing contracts, half a day of the owner's
+  // minutes each, so the slowest man the game has still finishes one in his day (2.12.5). The
+  // client sends the timber and the glass (2.12.2): no material, nothing off the racks or the
+  // stores, nothing ordered, no night stood.
+  {
+    id: 'casementWindow',
+    name: 'Casement window',
+    stages: TIMBER_STAGES.map((stage) => stage.id),
+    minutes: 150,
+    material: 0,
+    sheets: 0,
+    timber: true,
+  },
+  {
+    id: 'sashWindow',
+    name: 'Sash window',
+    stages: TIMBER_STAGES.map((stage) => stage.id),
+    minutes: 190,
+    material: 0,
+    sheets: 0,
+    timber: true,
+  },
+  {
+    id: 'frenchDoor',
+    name: 'French door',
+    stages: TIMBER_STAGES.map((stage) => stage.id),
+    minutes: 180,
+    material: 0,
+    sheets: 0,
+    timber: true,
+  },
 ];
 
 /** What a contract is priced to leave a day, after the man's wages and the wear of his machine,
@@ -5073,6 +5632,11 @@ export const CONTRACT_MARGIN_PER_DAY = 200;
  *  Both are the middle of their ladders [PIOTR, 21.09]. */
 export const CONTRACT_REFERENCE_TIER: WorkerTier = 'experienced';
 export const CONTRACT_REFERENCE_CLASS = 'standard';
+/** The machine a window or a door is priced to wear at the reference, at its reference class: the
+ *  four sided planer, the dearest of the timber plan's standard machines [TUNE] (CLAUDE.md T29
+ *  2.12.5). Its pace is the whole
+ *  timber plan's at the reference class, not the planer's alone. */
+export const CONTRACT_TIMBER_WEAR_FAMILY = 'planer';
 
 /** How many pieces a week the client asks for, in cut sheet packs, by the workshop's standing:
  *  a shop with a name gets asked for more, so a better crew is not throttled by the band
@@ -5106,6 +5670,11 @@ export const CONTRACT_OFFER_DAYS = 5;
 /** [PIOTR, 02.10] At most this many standing contracts run at once: no offer is drawn while they
  *  do, and one already on the board cannot be taken (CLAUDE.md T26 2.12). */
 export const CONTRACTS_MAX = 3;
+/** [PIOTR, 05.10: "three or four at the most; today on sheet goods as many go on as I like and the
+ *  profit is fantastic, which does not happen in life"] A standing contract takes this many joiners
+ *  at the most: the men put on it, whether or not they are in today. A job of work has no such
+ *  limit ("do not touch the normal jobs") (CLAUDE.md T29 2.3). */
+export const CONTRACT_MAX_JOINERS = 4;
 /** [PIOTR, 22.09] From this reputation up a shop rings at least once a week: a week with no
  *  offer on the board and none made in it ends with one, whatever the dice said. Under it the
  *  chance of the day is all there is. */
@@ -5253,11 +5822,30 @@ export const MACHINE_SHORT_WORDS: Record<string, string> = {
   planer: 'planer',
   sander: 'sander',
   framePress: 'press',
+  cnc5: 'five axis CNC',
+  windowLine1: 'line module',
+  windowLine2: 'line module',
+  windowLine3: 'line module',
+  windowLine4: 'line module',
+  windowLine5: 'line module',
 };
 
-/** The four timber families with places (CLAUDE.md T28 2.4, 2.7): a man is drawn at one of them
- *  only while he is on a timber job, so a kitchen man is never seen at the planer. */
-export const TIMBER_FAMILIES: readonly string[] = ['crossCut', 'planer', 'framePress', 'sander'];
+/** The timber families with places (CLAUDE.md T28 2.4, 2.7): a man is drawn at one of them only
+ *  while he is on a timber job, so a kitchen man is never seen at the planer. The five axis CNC is
+ *  one of them, since only a timber job is made on it (CLAUDE.md T29 2.6). */
+export const TIMBER_FAMILIES: readonly string[] = [
+  'crossCut',
+  'planer',
+  'framePress',
+  'sander',
+  'cnc5',
+  // The line's modules: only timber is made on them (CLAUDE.md T29 2.9.5).
+  'windowLine1',
+  'windowLine2',
+  'windowLine3',
+  'windowLine4',
+  'windowLine5',
+];
 
 /** The first use bubbles, one sentence each, keyed by the screen they open on [TUNE wording]
  *  (CLAUDE.md T13 3.22). Dismissed by a click, remembered in the save. */
@@ -5267,7 +5855,7 @@ export const TIPS: Record<string, string> = {
   unconnected:
     'A machine with no pipe to the extraction says so under its name. Open its card to connect it, or hire a production manager and it is done for you.',
   catalogue:
-    'Every machine family has five classes: the effects come first, then the costs, then what it is.',
+    'A machine family comes in classes, up to five: the effects come first, then the costs, then what it is.',
   workPlan: 'One row a job. A red figure on a job is material it does not have yet.',
   stock: 'Free is what a new job can have; reserved is what accepted jobs will use. Restock fills the low lines.',
   board: 'Every enquiry comes with a budget. Say yes and the client answers with a number.',

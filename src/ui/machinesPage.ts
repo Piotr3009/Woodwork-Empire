@@ -12,6 +12,7 @@
 import {
   LIFE_LOW_FRACTION,
   findSpec,
+  isLineModule,
   isServiced,
   isSold,
   itemStandsInTheHall,
@@ -33,6 +34,8 @@ export function machinesInTheHall(state: GameState): Equipment[] {
   return state.equipment.filter((item) => {
     const category = findSpec(item.specId)?.category;
     if (category !== 'machine' && category !== 'extraction') return false;
+    // A module of the line has no life to run out and no service to call (CLAUDE.md T29 2.9.8).
+    if (isLineModule(item.specId)) return false;
     return itemStandsInTheHall(item) && !isSold(item);
   });
 }

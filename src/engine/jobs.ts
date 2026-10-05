@@ -38,6 +38,7 @@ import {
   VAN_REPAIR_FRACTION,
   VAN_VARIANTS,
   VAN_WORN_BREAKDOWN_FACTOR,
+  TIMBER_STANDS,
   WAITING_FOR_GLASS,
   WORKER_MINUTE_RATE_DIVISOR,
   type VanClass,
@@ -65,6 +66,7 @@ import {
 } from './machines';
 import {
   boardsCostOf,
+  boardsForJob,
   glassCostOf,
   materialCostFor,
   orderForJob,
@@ -73,7 +75,6 @@ import {
   releaseReservation,
   reserveSheetsFor,
   sheetsDueFor,
-  sheetsForCost,
   shortfallOf,
 } from './materials';
 import { ownerIsAvailable } from './owner';
@@ -113,7 +114,6 @@ import type {
   JsonValue,
   MaterialKind,
   StageId,
-  TimberStandReason,
   Worker,
   WorkerRole,
 } from './types';
@@ -447,7 +447,7 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     finish: enquiry.finish,
     materialKind: enquiry.materialKind,
     materialCost,
-    sheets: sheetsForCost(boardsCostOf(materialCost, timber)),
+    sheets: boardsForJob(state, materialCost, timber),
     sheetsUsed: 0,
     sheetsReserved: 0,
     kind: enquiry.kind,
@@ -894,6 +894,13 @@ export function dropJob(state: GameState, jobId: string): boolean {
     noteLoss(state, 'material', `Glass written off: ${job.name}`, glassCostOf(job));
   }
   job.sheetsUsed = 0;
+  // A window's boards are written off and leave the workshop with it: off the counter, and every
+  // load of them not yet unloaded, on the road or at the gate, goes with its unloading task (the
+  // tasks of the job go below). They were never free sheets (CLAUDE.md T29 2.11.2).
+  if (job.timber === true) {
+    state.stock.sheets = Math.max(0, state.stock.sheets - job.sheetsReserved);
+    state.deliveries = state.deliveries.filter((delivery) => delivery.jobId !== job.id || delivery.unloaded);
+  }
   // What it held goes back to the free stock (CLAUDE.md T13 3.3).
   releaseReservation(job);
   // Nobody is left standing on a job that is not there any more.
@@ -1346,14 +1353,6 @@ export function addLabour(state: GameState, job: Job, labour: number, stage: Sta
   completeJob(state, job);
   return true;
 }
-
-/** The stages after which a timber job stands a night, and what it stands for: the glue cures
- *  after the pressing and the lacquer dries after the finishing [PIOTR: "a bit more complicated";
- *  TUNE: chat: the rule] (CLAUDE.md T28 2.8). */
-const TIMBER_STANDS: Partial<Record<StageId, TimberStandReason>> = {
-  pressing: 'glue curing',
-  finishing: 'lacquer drying',
-};
 
 /** The moment a timber job fills its pressing or its finishing it stands until the next working day
  *  opens: nothing can be done to a frame meanwhile. A day on the job and never a timer of minutes,

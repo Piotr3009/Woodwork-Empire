@@ -36,7 +36,7 @@ import { canteenLockers, crewLimit, standingOn } from './layout';
 import { findSpec } from './machines';
 import { routePipe } from './pipes';
 import { securitySubscriptionMonthly } from './security';
-import { andList } from './text';
+import { andList, inASentence } from './text';
 import type { ExtensionStage, GameState, UnitExtension, UnitState } from './types';
 
 export interface PremisesCheck {
@@ -291,12 +291,6 @@ export function canteenTerms(state: GameState): CanteenTerms {
     grows: wide.width - built.width,
     clear: { width: box.width, depth: box.depth },
   };
-}
-
-/** A catalogue name inside a sentence: `the extractor`, `the spray booth`, and `the CNC` as it is
- *  written, because a name that opens with capitals is one. */
-function inASentence(name: string): string {
-  return /^[A-Z]{2}/.test(name) ? name : name.charAt(0).toLowerCase() + name.slice(1);
 }
 
 /** What stands on the floor the canteen would grow onto, in the words the card asks for it to be

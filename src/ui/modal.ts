@@ -336,8 +336,9 @@ export function taskStartAction(state: GameState, task: TaskInstance, startLabel
   // again, so a job of work refused for any other reason would sit at the front of it and stop
   // everything behind it.
   // And only when his hands are the one thing in the way: the busy refusal is tested above the
-  // licence, the unloading and the take off, so a job of work with a second reason against it
-  // shows "Busy with X" and nothing else (found by the Turn 19 review).
+  // licence and the take off, so a job of work with a second reason against it shows "Busy with X"
+  // and nothing else (found by the Turn 19 review). An unloading with nowhere to put the load is
+  // refused above it from v84, and shows that reason and no queue (CLAUDE.md T29 2.11.2).
   const canQueue = check.blockingTaskId !== null && canQueueTask(state, task.id);
   const wayOut = canQueue ? queueNextButton(task.id) : '';
   return reasonLabel(check.reason) + wayOut;

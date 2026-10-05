@@ -6,8 +6,10 @@ import {
   PRICE_ROUNDING,
   PRODUCT_TEMPLATES,
   SOLID_WOOD_EQUIPMENT,
+  TIMBER_STAND_INS,
+  TIMBER_STORE_WANTED,
 } from './constants';
-import { findSpec, has } from './machines';
+import { findSpec, has, isLineModule, lineModuleIndex, lineModules } from './machines';
 import type { Finish, GameState, ProductTemplate } from './types';
 
 export function findTemplate(templateId: string): ProductTemplate | null {
@@ -34,10 +36,41 @@ export function templatesForReputation(reputation: number): ProductTemplate[] {
  *  men counts for nothing. A saw that is broken or away for its service is still the shop's saw.
  *  The one reader: the board's lock and the catalogue's grey both ask here. */
 export function missingEquipment(state: GameState, entry: ProductTemplate): string[] {
-  // A window's or a door's cutter set is kit the enquiry needs exactly as a machine is
-  // (CLAUDE.md T28 2.6).
-  const wanted = entry.cutters === null ? entry.requiredEquipment : [...entry.requiredEquipment, entry.cutters];
-  return wanted.filter((specId) => !has(state, specId));
+  // A machine a window or a door asks for is not missing while the thing that does its stage
+  // stands in the hall; a sheet product is held to its own list whatever stands (CLAUDE.md T29
+  // 2.5.4).
+  const timber = entry.cutters !== null;
+  return wantedKit(entry).filter((specId) => !has(state, specId) && !(timber && stoodInFor(state, specId)));
+}
+
+/** Everything a template wants, in the order the board names it: the machines, and a window's or
+ *  a door's cutter set after them, which it needs exactly as it needs a machine (CLAUDE.md T28
+ *  2.6). The one copy of the list: the tile's `Needs` line prints it whole, owned or not, and the
+ *  lock asks it of the hall (CLAUDE.md T29 2.5.4). */
+export function wantedKit(entry: ProductTemplate): string[] {
+  // A window or a door asks for a timber store as it asks for a machine, last of the list
+  // (CLAUDE.md T29 2.11.3).
+  return entry.cutters === null
+    ? entry.requiredEquipment
+    : [...entry.requiredEquipment, entry.cutters, TIMBER_STORE_WANTED];
+}
+
+/** A wanted thing as the board names it: the catalogue's name, and `timber store` for the store,
+ *  which either family satisfies (CLAUDE.md T29 2.11.3). */
+export function wantedName(specId: string): string {
+  if (specId === TIMBER_STORE_WANTED) return 'timber store';
+  return findSpec(specId)?.name ?? specId;
+}
+
+/** True while something that stands in for this machine on a timber product stands in the hall
+ *  (`TIMBER_STAND_INS`): the five axis CNC for the spindle moulder, and the line's modules for the
+ *  machines whose stages they do (CLAUDE.md T29 2.5.4). The CNC stands when the hall has one, as
+ *  every kit the board asks; a module stands while it is one of the unbroken run from module 1
+ *  (`lineModules`), whatever its engineers keep today, so a day off never locks the board. */
+function stoodInFor(state: GameState, specId: string): boolean {
+  return (TIMBER_STAND_INS[specId] ?? []).some((id) =>
+    isLineModule(id) ? lineModuleIndex(id) <= lineModules(state) : has(state, id),
+  );
 }
 
 /** The greyed out reason on the board, or null when the job can be taken as it stands. */
@@ -54,7 +87,7 @@ export function lockReasonFor(state: GameState, entry: ProductTemplate): string 
     );
     return `Needs ${gone.join(' and ')}`;
   }
-  const names = missing.map((specId) => findSpec(specId)?.name ?? specId);
+  const names = missing.map(wantedName);
   return `Needs ${names.join(', ').toLowerCase()}`;
 }
 

@@ -57,6 +57,9 @@ function windowCompany(): GameState {
     ['cuttersSash', 0, 0],
     ['workbench', 16, 12],
     ['workbench', 16, 15],
+    // A timber store, which a window asks for from v84 (CLAUDE.md T29 2.11.3): the shelter, out on
+    // the apron, so no cell of the hall moves.
+    ['timberShelter', 40, 1],
   ];
   kit.forEach(([id, x, y], index) => {
     placeEquipment(state, id, { variantId: 'standard', x, y, id: `kit-t28-${index}` });
@@ -86,7 +89,8 @@ interface WindowRun {
 }
 
 /** Played by the script. `late` leaves the glass until the job has stopped at its Glazing for want
- *  of it, which is the owner who forgot: the job waits the glazier's ten days. */
+ *  of it, which is the owner who forgot: the job waits for the glazier to the next working day
+ *  (ten working days before v84: CLAUDE.md T29 2.1). */
 function playTheWindow(late = false): WindowRun {
   let state = windowCompany();
   const run: WindowRun = { state, seen: [], steps: [], glassOrderedOn: null };
@@ -171,13 +175,14 @@ describe('(vv) the same job with the glass left until the Glazing (CLAUDE.md T28
   const run = playTheWindow(true);
   const window = run.state.jobs.find((entry) => entry.templateId === 'sashWindows');
 
-  it('stops at the Glazing waiting for its glass, ten working days, and then is glazed and paid', () => {
+  it('stops at the Glazing waiting for its glass, to the next working day, and then is glazed and paid', () => {
     expect(run.state.gameOver).toBeNull();
     const waited = [...new Set(run.steps.filter((step) => step.blocked === 'waiting for glass').map((step) => step.day))];
     expect(waited.length).toBeGreaterThan(0);
     const ordered = run.glassOrderedOn ?? Number.NaN;
     expect(Math.min(...waited)).toBeLessThanOrEqual(ordered);
-    expect(window?.glassDay).toBe(addWorkingDays(ordered, 10));
+    // One working day from v84, ten before it (CLAUDE.md T29 2.1).
+    expect(window?.glassDay).toBe(addWorkingDays(ordered, 1));
     for (const day of waited) expect(day).toBeLessThan(window?.glassDay ?? 0);
     expect(window?.stage).toBe('completed');
     expect(window?.balancePaid).toBeGreaterThan(0);

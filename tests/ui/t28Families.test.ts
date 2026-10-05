@@ -32,7 +32,7 @@ import {
   MACHINE_SHORT_WORDS,
   TIMBER_FAMILIES,
 } from '../../src/engine/constants';
-import { canBuy, canSell } from '../../src/engine/game';
+import { canBuy, canSell, orderEquipmentCheck, placeEquipmentOrder } from '../../src/engine/game';
 import type { GameState } from '../../src/engine/index';
 import { hallItems } from '../../src/engine/layout';
 import {
@@ -340,6 +340,31 @@ describe('the cutter sets (CLAUDE.md T28 2.5)', () => {
     const set = placeEquipment(state, 'cuttersSash', { id: 'kit-cutters' });
     expect(hallItems(state).some((item) => item.id === set.id)).toBe(false);
     expect(canSell(state, set.id)).toEqual({ ok: false, reason: 'Nobody buys second hand fittings' });
+  });
+
+  it('are one of a kind: a second, owned or on order, is refused and the card shows why (CLAUDE.md T29 2.2)', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    state.cash = 100000;
+    for (const id of CUTTER_SETS) expect(canBuy(state, id), id).toEqual({ ok: true, reason: '' });
+    // On order: refused by the engine and by the order's own check, which lands the order first.
+    expect(placeEquipmentOrder(state, 'cuttersSash').ok).toBe(true);
+    expect(canBuy(state, 'cuttersSash')).toEqual({ ok: false, reason: 'One set serves every moulder' });
+    expect(orderEquipmentCheck(state, 'cuttersSash')).toEqual({ ok: false, reason: 'One set serves every moulder' });
+    // Owned: the same.
+    const owned = newGame({ difficulty: 'veryEasy' });
+    owned.cash = 100000;
+    placeEquipment(owned, 'cuttersDoor', { id: 'kit-door-cutters' });
+    expect(canBuy(owned, 'cuttersDoor')).toEqual({ ok: false, reason: 'One set serves every moulder' });
+    // A set of the other kinds is still a first of its kind.
+    expect(canBuy(owned, 'cuttersSash').ok).toBe(true);
+    expect(canBuy(owned, 'cuttersCasement').ok).toBe(true);
+    // The card is the card it was: the locked Buy another, and the words under it.
+    const html = renderCatalogue(owned, '', catalogueTabFrom('timberMachines'), 'cuttersDoor');
+    expect(html).toContain('<button class="btn" disabled title="One set serves every moulder">Buy another</button>');
+    expect(html).toContain('<p class="lock">One set serves every moulder</p>');
+    // A save that holds two keeps both.
+    placeEquipment(owned, 'cuttersDoor', { id: 'kit-door-cutters-2' });
+    expect(owned.equipment.filter((item) => item.specId === 'cuttersDoor')).toHaveLength(2);
   });
 
   it('show the empty picture box and where they are kept, on the card and on the Sprite check page', () => {

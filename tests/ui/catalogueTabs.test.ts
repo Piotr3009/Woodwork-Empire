@@ -139,7 +139,8 @@ describe('connect to extraction on the card of a machine in the hall (CLAUDE.md 
 });
 
 describe('the tabs', () => {
-  it('are the eleven Piotr named, in his order, with Owned after them', () => {
+  it('are the eleven Piotr named, in his order, the line s twelfth after CNC centre, with Owned after them', () => {
+    // Flipped in v84: a twelfth tab, Production line, after CNC centre (CLAUDE.md T29 2.9.1).
     expect(EQUIPMENT_TABS.map((tab) => tab.label)).toEqual([
       'Office',
       'Sheet machines',
@@ -150,6 +151,7 @@ describe('the tabs', () => {
       'Extraction and air',
       'CNC',
       'CNC centre',
+      'Production line',
       'Handling',
       'Storage',
     ]);
@@ -180,11 +182,12 @@ describe('the tabs', () => {
     expect(hand.innerHTML).toContain('Hand tool sets');
     expect(hand.innerHTML).not.toContain('Drills');
     expect(hand.innerHTML).not.toContain('Table saws');
-    // The CNC centre has nothing in it tonight; Sanding has its sanders from v83 (CLAUDE.md T28
-    // 2.4).
+    // Sanding has its sanders from v83 (CLAUDE.md T28 2.4); the CNC centre, empty until v84, has
+    // the five axis CNCs (flipped: CLAUDE.md T29 2.6).
     expect(shop(state, 'sanding').innerHTML).toContain('Sanders');
     expect(shop(state, 'sanding').innerHTML).not.toContain('Nothing here yet.');
-    expect(shop(state, 'cncCentre').innerHTML).toContain('Nothing here yet.');
+    expect(shop(state, 'cncCentre').innerHTML).toContain('Five axis CNCs');
+    expect(shop(state, 'cncCentre').innerHTML).not.toContain('Nothing here yet.');
   });
 
   it('holds the folders Piotr named, each one a family (CLAUDE.md T7 3.7)', () => {
@@ -200,6 +203,9 @@ describe('the tabs', () => {
       'sheetRack',
       // The high capacity rack, a line of its own beside the Racks folder (PIOTR, 03.10; v69).
       'sheetRackHigh',
+      // The two timber stores after it, the shelter on the apron (CLAUDE.md T29 2.11.1).
+      'timberRack',
+      'timberShelter',
       'toolCabinet',
       'locker',
     ]);

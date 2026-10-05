@@ -208,8 +208,11 @@ describe('the file on disk and the footprint in the engine', () => {
     // Seventy five from v80, the pack of 03.10: the two better forklifts, the air dryer, and the
     // desk, the chair, the laptop and the locker the catalogue shows. Ninety six from v83: the
     // twenty classes of the timber department's four ladders and the glue table (CLAUDE.md T28
-    // 2.11).
-    expect(checked).toBe(96);
+    // 2.11). Ninety nine from v84: the three five axis CNCs (CLAUDE.md T29 2.4). A hundred with
+    // the spraying robot (CLAUDE.md T29 2.7), a hundred and five with the line's five modules
+    // (CLAUDE.md T29 2.9.1), and a hundred and seven with the two timber stores (CLAUDE.md T29
+    // 2.11.1).
+    expect(checked).toBe(107);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }
@@ -247,7 +250,9 @@ describe('the file on disk and the footprint in the engine', () => {
     // of the four vans and of the electric pallet truck. Seventy six from v80: the two better
     // forklifts' and the air dryer's. Seventy five from v81: the pallet truck's file is deleted.
     // Ninety six from v83: the twenty one turns of the five timber families (CLAUDE.md T28 2.11).
-    expect(turnedFiles).toHaveLength(96);
+    // One hundred and seven from v84: the eleven turns of the five axis CNCs, the robot, the
+    // line's five modules and the two timber stores (CLAUDE.md T29 2.4).
+    expect(turnedFiles).toHaveLength(107);
   });
 
   it('draws the CNC with its tool changer on the CNC s own canvas, both ways round (v56)', () => {

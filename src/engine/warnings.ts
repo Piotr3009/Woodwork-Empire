@@ -29,7 +29,9 @@ import {
 import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
 import { paperworkDone, takeOffOutstanding } from './jobs';
-import { bagStore } from './machines';
+import { bagStore, boardRoom, lineEngineersOnDuty, lineLevel, lineModules } from './machines';
+import { canUnload, isBoards } from './materials';
+import { inWords } from './text';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine, hasOfficeAdmin } from './staff';
@@ -44,11 +46,16 @@ export type WarningKey =
    *  (PIOTR, 18.09; CLAUDE.md T21 2.1, T22 2.2). */
   | 'pastTheLimit'
   | 'nobodyAssigned'
+  /** Modules of the line stand that no engineer on duty keeps (CLAUDE.md T29 2.9.4). */
+  | 'lineNeedsEngineer'
   | 'deadlineAtRisk'
   /** The drawing is finished and the material list is the next thing to do (PIOTR, 03.10; v78). */
   | 'drawingDone'
   /** A window's paperwork is done and its glass is still to order (CLAUDE.md T28 2.9). */
   | 'glassNotOrdered'
+  /** A load of boards stands at the gate for want of room on the timber stores (CLAUDE.md T29
+   *  2.11.2). */
+  | 'boardsAtTheGate'
   | 'noInsurance'
   /** The money speaks before the month end (PIOTR accepted, 17.09; CLAUDE.md T18 2.6). */
   | 'belowZero'
@@ -79,14 +86,20 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   // minute, and this stops the company for good at the next look (CLAUDE.md T21 2.1).
   'pastTheLimit',
   'nobodyAssigned',
+  // Directly under it: a line that stands still or runs short is a hall of kit making nothing
+  // (CLAUDE.md T29 2.9.4) [TUNE].
+  'lineNeedsEngineer',
   'deadlineAtRisk',
   // Under the deadlines and above the standing lines: the job's calendar is running and nothing
   // can be ordered for it until the list is made, where the lines below can stand for weeks and
   // would keep this one from ever being read (v78).
   'drawingDone',
-  // Directly under it: the glass takes ten working days and production reaches the Glazing without
-  // it (CLAUDE.md T28 2.9) [TUNE].
+  // Directly under it: the glass is not ordered and production reaches the Glazing without it
+  // (CLAUDE.md T28 2.9, the glass a day from T29 2.1) [TUNE].
   'glassNotOrdered',
+  // Directly under it: a window's boards at the gate with nowhere to go, which stops the job as
+  // the glass does (CLAUDE.md T29 2.11.2) [TUNE].
+  'boardsAtTheGate',
   'noInsurance',
   'belowZero',
   'spendingOverEarning',
@@ -129,6 +142,19 @@ function pastTheLimitWarning(state: GameState): Warning | null {
     text:
       `Account ${formatMoney(state.cash)} is below the bank's ${formatMoney(limit)} limit: ` +
       `day ${day} of ${BANKRUPTCY_DAYS_BELOW_LIMIT}.`,
+  };
+}
+
+/** Said only while modules stand that no engineer on duty keeps: the line stands still with none,
+ *  and runs as three modules with one (CLAUDE.md T29 2.9.4). */
+function lineNeedsEngineerWarning(state: GameState): Warning | null {
+  const standing = lineModules(state);
+  const level = lineLevel(state);
+  if (standing === 0 || level >= standing) return null;
+  if (level === 0) return { key: 'lineNeedsEngineer', text: 'The line stands still: no engineer on duty' };
+  return {
+    key: 'lineNeedsEngineer',
+    text: `The line runs as ${inWords(level)} modules: ${inWords(lineEngineersOnDuty(state))} engineer on duty`,
   };
 }
 
@@ -187,6 +213,20 @@ function glassNotOrderedWarning(state: GameState): Warning | null {
   );
   if (waiting === undefined) return null;
   return { key: 'glassNotOrdered', text: `Glass not ordered: ${waiting.name}` };
+}
+
+/** A load of boards at the gate that cannot come in, named by its job: no timber store at all, or
+ *  no room on the stores for the whole of it (CLAUDE.md T29 2.11.2). */
+function boardsAtTheGateWarning(state: GameState): Warning | null {
+  const waiting = state.deliveries.find(
+    (delivery) => delivery.arrived && !delivery.unloaded && isBoards(state, delivery) && !canUnload(state, delivery),
+  );
+  if (waiting === undefined) return null;
+  const job = state.jobs.find((entry) => entry.id === waiting.jobId);
+  const name = job?.name ?? 'a job';
+  return boardRoom(state) <= 0
+    ? { key: 'boardsAtTheGate', text: `Boards at the gate, no timber store: ${name}` }
+    : { key: 'boardsAtTheGate', text: `Boards at the gate, no room on the stores: ${name}` };
 }
 
 function noInsuranceWarning(state: GameState): Warning | null {
@@ -305,9 +345,11 @@ const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   bagsFull: bagsFullWarning,
   pastTheLimit: pastTheLimitWarning,
   nobodyAssigned: nobodyAssignedWarning,
+  lineNeedsEngineer: lineNeedsEngineerWarning,
   deadlineAtRisk: deadlineWarning,
   drawingDone: drawingDoneWarning,
   glassNotOrdered: glassNotOrderedWarning,
+  boardsAtTheGate: boardsAtTheGateWarning,
   noInsurance: noInsuranceWarning,
   belowZero: belowZeroWarning,
   spendingOverEarning: spendingOverEarningWarning,

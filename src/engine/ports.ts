@@ -199,6 +199,18 @@ export const PORTS: Record<string, Port> = {
   'sander.standard.r.png': { px: 38, py: 42, cell: { x: 0, y: 1 } },
   'sander.pro.r.png': { px: 127, py: 65, cell: { x: 0, y: 1 } },
   'sander.industrial.r.png': { px: 219, py: 129, cell: { x: 1, y: 3 } },
+  // The five axis CNCs (the art side's pack 3 of 05.10; v84): the mouth of the round duct stub on
+  // the cabin's roof, and of the industrial cell's two stubs the one farther from the camera, as
+  // the CNC's rear stub was taken. The standard class is an open gantry with no stub drawn: its
+  // line is the middle of the top of the head's carriage, above the spindle. Claude's measurements
+  // off the pictures; the cell is the footprint cell under the mouth in the file's own
+  // orientation. [TUNE until Piotr confirms them on the hall.]
+  'cnc5.standard.png': { px: 204, py: 110, cell: { x: 2, y: 1 } },
+  'cnc5.pro.png': { px: 209, py: 83, cell: { x: 1, y: 0 } },
+  'cnc5.industrial.png': { px: 273, py: 84, cell: { x: 2, y: 0 } },
+  'cnc5.standard.r.png': { px: 181, py: 116, cell: { x: 1, y: 2 } },
+  'cnc5.pro.r.png': { px: 152, py: 126, cell: { x: 0, y: 3 } },
+  'cnc5.industrial.r.png': { px: 324, py: 82, cell: { x: 0, y: 2 } },
 };
 
 /** The suffix each orientation's file carries: 0 the base picture, then a quarter turn at a time

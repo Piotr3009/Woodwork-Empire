@@ -49,7 +49,7 @@ import {
 } from './constants';
 import { DAY_END_MINUTE } from './constants';
 import { isBreak, nextWorkingDay, weekOfDay } from './clock';
-import { OWNER, has } from './machines';
+import { OWNER, engineerAtTheLine, has } from './machines';
 import { canUnload } from './materials';
 import { ownerIsAvailable } from './owner';
 import { bookOwnerIdleMinute, bookWorkerIdleMinute } from './production';
@@ -793,14 +793,16 @@ function bookOne(
   week: number,
   band: WeekCategory | null,
   jobName: string | null,
+  atTheLine = false,
 ): { meters: WeekMeters; worked: boolean } | null {
   const meters = weekMetersOf(holder, week);
   if (meters.day === state.clock.day && meters.minute === state.clock.minute) return null;
   const effort = effortSoFar(holder);
   // His task counter goes back to nought every morning, so the day's first sample takes a
-  // baseline off it and credits nothing; the bench counter never goes back.
+  // baseline off it and credits nothing; the bench counter never goes back. A line engineer at
+  // the line works every minute he is in (CLAUDE.md T29 2.8).
   const sameDay = meters.day === state.clock.day;
-  const worked = effort.bench > meters.seenBench || (sameDay && effort.task > meters.seenTask);
+  const worked = atTheLine || effort.bench > meters.seenBench || (sameDay && effort.task > meters.seenTask);
   meters.seenBench = effort.bench;
   meters.seenTask = effort.task;
   meters.day = state.clock.day;
@@ -852,8 +854,12 @@ export function bookWeekMinutes(state: GameState): void {
       // settles, so a man on it is left out of the meters rather than sampled through a day he
       // was asleep for (REPORT-T20.md, what was not done).
       if (!isWorkingToday(state, worker)) continue;
-      const band = bandOf(state, worker.taskId, worker.jobId);
-      const sample = bookOne(state, worker, week, band, jobNameOf(state, worker.jobId));
+      // A line engineer's minute at the line is booked under the desk's band, the band of the work
+      // of a man who makes nothing with his hands; only the bands' sum is ever read (CLAUDE.md T29
+      // 2.8) [TUNE].
+      const atTheLine = engineerAtTheLine(state, worker);
+      const band = atTheLine ? 'desk' : bandOf(state, worker.taskId, worker.jobId);
+      const sample = bookOne(state, worker, week, band, jobNameOf(state, worker.jobId), atTheLine);
       // And the other half of his day, the same way the owner's is taken above: a minute he put
       // nothing into is a minute he stood, and from Turn 23 the commonest reason for it is that
       // nobody has put him on anything (PIOTR, 20.09; CLAUDE.md T23 2.1).
@@ -898,6 +904,15 @@ export function assignStaffTasks(state: GameState): void {
   }
 }
 
+/** True while the load an unloading is for has somewhere to go: a rack for sheets, room on the
+ *  timber stores for the whole of a load of boards (CLAUDE.md T29 2.11.2). An unloading of no load
+ *  asks nothing. */
+function roomToUnload(state: GameState, task: TaskInstance): boolean {
+  if (task.deliveryId === null) return true;
+  const delivery = state.deliveries.find((entry) => entry.id === task.deliveryId);
+  return canUnload(state, delivery);
+}
+
 function handOutTasks(state: GameState, started: readonly Worker[]): void {
   for (const task of state.tasks) {
     if (task.done) continue;
@@ -909,7 +924,7 @@ function handOutTasks(state: GameState, started: readonly Worker[]): void {
       }
       if (task.doneBy !== 'owner' || state.owner.currentTaskId === task.id) continue;
     }
-    if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) continue;
+    if (task.kind === 'unload' && !roomToUnload(state, task)) continue;
     const staff = bestTakerOf(state, started, task);
     if (!staff) continue;
     // He picks it up and works it off as the clock runs, like the owner does.
@@ -957,6 +972,10 @@ export function startTaskCheck(
   // (`callServiceIn`), both of which close this task.
   if (task.kind === 'service') return refused(SERVICE_IS_CALLED_IN);
   if (!ownerIsAvailable(state)) return refused('The owner is not in today');
+  // Nothing comes off the lorry until there is somewhere to put it (CLAUDE.md T2 3.6), asked by
+  // the load and before the labourer, so a load with nowhere to go says so whoever unloads
+  // (CLAUDE.md T29 2.11.2).
+  if (task.kind === 'unload' && !roomToUnload(state, task)) return refused('Nowhere to put it');
   // The unloading, the bags and the cleaning are the labourer's while he is here.
   if (!force && isLabourerTask(state, task)) return refused(WAITING_FOR_LABOURER);
   // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
@@ -973,10 +992,6 @@ export function startTaskCheck(
       (entry) => entry.kind === 'clientMeeting' && entry.jobId === task.jobId && !entry.done,
     );
     if (open) return refused('The client meeting comes first');
-  }
-  // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
-  if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) {
-    return refused('Nowhere to put it');
   }
   // The take off reads the drawing (CLAUDE.md T13 3.8).
   if (task.kind === 'materialTakeOff' && designOutstandingFor(state, task.jobId)) {

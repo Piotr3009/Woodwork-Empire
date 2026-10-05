@@ -69,7 +69,9 @@ describe('the price a piece (v40)', () => {
   });
 
   it('is the material, the entry man\'s wages, the entry machine\'s wear and the day\'s margin over his pieces', () => {
-    const lines = CONTRACT_PIECES.map((piece) => {
+    // The three sheet pieces; the windows and the doors of Turn 29 are priced in
+    // tests/engine/t29TimberContracts.test.ts (CLAUDE.md T29 2.12.5).
+    const lines = CONTRACT_PIECES.filter((piece) => piece.timber !== true).map((piece) => {
       const reference = contractReferenceFor(piece);
       const expected = Math.round(
         piece.material + reference.labourCost + reference.wear + CONTRACT_MARGIN_PER_DAY / reference.piecesPerDay,

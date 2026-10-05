@@ -41,7 +41,7 @@ import {
 } from '../../src/engine/board';
 import { drawBigJob } from '../../src/engine/agency';
 import { deadlineDaysFrom, labourValueFor, ownerDaysFor, stagedJob } from '../../src/engine/jobs';
-import { addWorkingDays } from '../../src/engine/clock';
+import { addWorkingDays, nextWorkingDay } from '../../src/engine/clock';
 import {
   currentStage,
   jobMinutesFor,
@@ -115,6 +115,9 @@ function timberHall(without: string[] = []): GameState {
     ['cuttersSash', 'standard', 0, 0],
     ['cuttersCasement', 'standard', 0, 0],
     ['cuttersDoor', 'standard', 0, 0],
+    // A timber store, which a window asks for from v84 (CLAUDE.md T29 2.11.3): the shelter, out on
+    // the apron, so no cell of the hall moves.
+    ['timberShelter', 'standard', 20, 1],
   ];
   for (const [id, variantId, x, y] of kit) {
     if (without.includes(id)) continue;
@@ -191,8 +194,15 @@ describe('the five windows and doors (CLAUDE.md T28 2.6)', () => {
 });
 
 describe('a timber deadline (CLAUDE.md T28 2.10)', () => {
-  it('is the deadline every enquiry is given, and twelve working days on top', () => {
-    expect(TIMBER_LEAD_DAYS).toBe(12);
+  it('is the deadline every enquiry is given, and three working days on top', () => {
+    // Flipped in v84 from twelve: the glass's one day and the two nights, and written as their sum
+    // (CLAUDE.md T29 2.1).
+    expect(TIMBER_LEAD_DAYS).toBe(3);
+    expect(TIMBER_LEAD_DAYS).toBe(GLASS_DELIVERY_WORKING_DAYS + 2);
+    // Written as the sum and never as a literal, so it cannot drift from the glass again.
+    expect(readFileSync('src/engine/constants.ts', 'utf8')).toContain(
+      'export const TIMBER_LEAD_DAYS = GLASS_DELIVERY_WORKING_DAYS + Object.keys(TIMBER_STANDS).length;',
+    );
     const state = timberHall();
     for (const [id] of FIVE) {
       const entry = template(id);
@@ -204,7 +214,7 @@ describe('a timber deadline (CLAUDE.md T28 2.10)', () => {
           price: entry.basePrice,
           express,
         });
-        expect(enquiryDeadlineDays(state, entry, draw, entry.basePrice, express), `${id} ${express}`).toBe(old + 12);
+        expect(enquiryDeadlineDays(state, entry, draw, entry.basePrice, express), `${id} ${express}`).toBe(old + 3);
       }
     }
     // A sheet template has no lead.
@@ -576,7 +586,7 @@ describe('the glass (CLAUDE.md T28 2.9)', () => {
     expect(autoOrderMaterial(state, job)).toBe(false);
   });
 
-  it('arrives ten working days on, at the open of its day, and stops the Glazing until it does', () => {
+  it('arrives the next working day, at the open of its day, and stops the Glazing until it does', () => {
     const { state, job } = sashJob();
     paperworkOf(state, job);
     const ordered = act(state, { type: 'ORDER_GLASS', jobId: job.id });
@@ -590,14 +600,15 @@ describe('the glass (CLAUDE.md T28 2.9)', () => {
     expect(currentStage(ordered, windowJob)?.id).toBe('assembly');
     expect(hallStops(ordered, windowJob)).toBe(WAITING_FOR_GLASS);
     expect(WAITING_FOR_GLASS).toBe('waiting for glass');
-    // The day before it is due it is still on its way; the morning it is due it is in.
+    // Flipped in v84 (CLAUDE.md T29 2.1): the day it is ordered it is still on its way, and the
+    // next working day's open it is in.
+    expect(GLASS_DELIVERY_WORKING_DAYS).toBe(1);
+    expect(windowJob.glass).toBe('ordered');
+    expect(windowJob.glassDay).toBe(nextWorkingDay(ordered.clock.day));
     let morning = ordered;
-    for (let day = 1; day <= GLASS_DELIVERY_WORKING_DAYS; day += 1) {
-      morning.clock.minute = DAY_END_MINUTE;
-      morning = clearEvents(act(clearEvents(morning), { type: 'END_DAY' }));
-      const glass = firstJob(morning).glass;
-      expect(glass, String(morning.clock.day)).toBe(day < GLASS_DELIVERY_WORKING_DAYS ? 'ordered' : 'in');
-    }
+    morning.clock.minute = DAY_END_MINUTE;
+    morning = clearEvents(act(clearEvents(morning), { type: 'END_DAY' }));
+    expect(firstJob(morning).glass, String(morning.clock.day)).toBe('in');
     expect(morning.clock.day).toBe(windowJob.glassDay);
     expect(hallStops(morning, firstJob(morning))).toBe('');
     expect(materialLine(morning, firstJob(morning))).toContain('Glass is in');
@@ -653,6 +664,8 @@ function bigHall(without: string[] = []): GameState {
     ['cuttersSash', 0, 0],
     ['cuttersCasement', 0, 0],
     ['cuttersDoor', 0, 0],
+    // The shelter on the apron, a timber store a window asks for from v84 (CLAUDE.md T29 2.11.3).
+    ['timberShelter', 40, 1],
   ];
   for (const [id, x, y] of kit) {
     if (without.includes(id)) continue;
@@ -744,11 +757,13 @@ describe('timber on the board of the 800 m2 hall (CLAUDE.md T28 2.3)', () => {
     if (enquiry === null || enquiry.templateId !== 'sashWindows') throw new Error('no sash window drawn');
     state.enquiries = [enquiry];
     const html = renderBoard(state, '');
+    // Flipped in v84: the timber store is the last name of the list, and the count says boards
+    // (CLAUDE.md T29 2.11.2, 2.11.3).
     expect(html).toContain(
-      'Needs cross cut saw, four sided planer, spindle moulder, sander, frame press, spray booth, sash window cutter set',
+      'Needs cross cut saw, four sided planer, spindle moulder, sander, frame press, spray booth, sash window cutter set, timber store',
     );
     const job = firstJob(acceptNow(state, enquiry.id));
-    const figure = html.match(/(\d+) sheets? of material/);
+    const figure = html.match(/(\d+) boards? of material/);
     expect(Number(figure?.[1])).toBe(job.sheets);
   });
 

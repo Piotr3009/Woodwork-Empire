@@ -356,6 +356,9 @@ export const CHARACTER_ROLES: readonly string[] = [
   'salesman',
   'draftsman',
   'productionManager',
+  // No figure exists for him: he stands as the capsule, as the office's three do (CLAUDE.md T29
+  // 2.8).
+  'lineEngineer',
 ];
 
 /** One character sheet as a strip, with the anchor marked and the frames playing. The acceptance

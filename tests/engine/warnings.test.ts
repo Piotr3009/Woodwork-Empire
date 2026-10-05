@@ -396,18 +396,23 @@ describe('the line that counts the days below the bank s limit (CLAUDE.md T22 2.
 });
 
 describe('the order of urgency', () => {
-  it('is bags, past the limit, nobody assigned, overdue, drawing done, glass not ordered, no insurance, below zero, spending over earning, tax coming, closure coming, crew full, first steps', () => {
+  it('is bags, past the limit, nobody assigned, the line with no engineer, overdue, drawing done, glass not ordered, boards at the gate, no insurance, below zero, spending over earning, tax coming, closure coming, crew full, first steps', () => {
     expect(WARNING_ORDER).toEqual([
       'bagsFull',
       // Turn 21: above everything but the bags. The bags stop every machine in the hall this
       // minute; this stops the company for good at the next look at the money (CLAUDE.md T21 2.1).
       'pastTheLimit',
       'nobodyAssigned',
+      // Turn 29: a line no engineer keeps, directly under it (CLAUDE.md T29 2.9.4).
+      'lineNeedsEngineer',
       'deadlineAtRisk',
       // v78 (PIOTR, 03.10): the drawing is done and the material list is next.
       'drawingDone',
       // Turn 28: a window's glass still to order, directly under it (CLAUDE.md T28 2.9).
       'glassNotOrdered',
+      // Turn 29: a window's boards at the gate with nowhere to go, directly under it (CLAUDE.md T29
+      // 2.11.2).
+      'boardsAtTheGate',
       'noInsurance',
       'belowZero',
       'spendingOverEarning',
@@ -421,12 +426,12 @@ describe('the order of urgency', () => {
   });
 
   it('puts every problem in that order when the hall has them all at once', () => {
-    // Eight of the thirteen at once. The first steps line cannot be one of them: it is only said
+    // Eight of the fifteen at once. The first steps line cannot be one of them: it is only said
     // while production has never started, and "a started job nobody is on" is production started.
     // Nor the drawing line of v78: no job of this hall is waiting for its material list. Nor the
     // tax of Turn 27: this is not December, and an account under nought has no tax to take. Nor the
     // closure of Turn 28: this is neither December nor July. Nor a window's glass: there is no
-    // window in this hall.
+    // window in this hall. Nor the line of Turn 29: no module stands in it, nor a load of boards.
     let state = tradedWeek(0, 500);
     state = withStartedJobNobodyOn(state);
     state = withDeadlineAtRisk(state);
@@ -444,7 +449,9 @@ describe('the order of urgency', () => {
           key !== 'drawingDone' &&
           key !== 'glassNotOrdered' &&
           key !== 'taxComing' &&
-          key !== 'closureComing',
+          key !== 'closureComing' &&
+          key !== 'lineNeedsEngineer' &&
+          key !== 'boardsAtTheGate',
       ),
     );
   });

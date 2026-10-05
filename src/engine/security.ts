@@ -16,8 +16,8 @@ import {
 import type { SecurityLevelSpec } from './constants';
 import { canAfford, charge, formatMoney, noteLoss } from './economy';
 import { queueEvent } from './events';
-import { insuredValue } from './insurance';
-import { findSpec, isSold, itemStandsInTheHall, variantFor } from './machines';
+import { insuredValue, lineValue } from './insurance';
+import { findSpec, isLineModule, isSold, itemStandsInTheHall, variantFor } from './machines';
 import { freeSheets } from './materials';
 import { disconnectExtraction } from './pipes';
 import { chance, int } from './rng';
@@ -57,7 +57,9 @@ export function securitySubscriptionParts(
 ): SubscriptionParts {
   const spec = securitySpec(level);
   const areaM2 = state.unit.areaM2;
-  const insured = insuredValue(state);
+  // The insured value less the line's modules: the firm's price is not raised by kit nobody can
+  // carry off (CLAUDE.md T29 2.10).
+  const insured = insuredValue(state) - lineValue(state);
   // A firm charges by the area. A flat level is what it is until the 800 m2 unit, which pays
   // twice it: the firms' month has doubled with the floor, and so has the dogs' (v82).
   const areaFactor = spec.scaled ? areaM2 / SECURITY_SCALE_AREA_M2 : unitCostFactor(state.unit);
@@ -147,7 +149,11 @@ export function burglaryTargets(state: GameState, count: number): Equipment[] {
   return state.equipment
     .filter(
       (item) =>
-        !isSold(item) && itemStandsInTheHall(item) && findSpec(item.specId)?.category === 'machine',
+        !isSold(item) &&
+        itemStandsInTheHall(item) &&
+        findSpec(item.specId)?.category === 'machine' &&
+        // A module of the line is built in and is never carried off (CLAUDE.md T29 2.10).
+        !isLineModule(item.specId),
     )
     .slice()
     .sort((left, right) => right.purchasePrice - left.purchasePrice)

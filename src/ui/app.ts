@@ -74,7 +74,7 @@ import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderContracts } from './contracts';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import { acceptContractCheck, contractManCheck } from '../engine/contracts';
+import { acceptContractCheck, contractCrewFull, contractManCheck, findContract } from '../engine/contracts';
 import { housePictureUrl, renderHouseCard } from './house';
 import { renderMonthEnd, renderMonthlyReport } from './monthEnd';
 import { renderSettings } from './settings';
@@ -105,7 +105,7 @@ import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockS
 import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
-import { OWNER, hasCentralExtraction } from '../engine/machines';
+import { OWNER, hasCentralExtraction, isLineModule } from '../engine/machines';
 import { nextSpriteOrientation } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
@@ -1663,14 +1663,19 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'declineContract':
       dispatch({ type: 'DECLINE_CONTRACT', contractId: id });
       return;
-    case 'assignContract':
+    case 'assignContract': {
       dispatch({
         type: 'ASSIGN_CONTRACT',
         contractId: id,
         workerId: element.dataset.worker ?? '',
         on: element.dataset.on === '1',
       });
+      // The fourth man on fills it: its list is not drawn any more, so it is not left open to
+      // swallow the next Escape (CLAUDE.md T29 2.3).
+      const contract = state === null ? null : findContract(state, id);
+      if (ui.assignOpen === id && contract !== null && contractCrewFull(contract)) ui.assignOpen = null;
       return;
+    }
     case 'setAgency':
       // The Office's switch for the advertising agency (CLAUDE.md T26 2.13).
       dispatch({ type: 'SET_AGENCY', on: id === 'on' });
@@ -2706,6 +2711,8 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   const item =
     state.equipment.find((entry) => entry.id === itemId) ?? reservationById(state, itemId);
   if (item === null || item === undefined) return false;
+  // Setup mode never lifts a module of the line: it stands where it is built (CLAUDE.md T29 2.9.3).
+  if (isLineModule(item.specId)) return false;
   const at = cellUnder(event);
   if (at === null) return false;
   // He has hold of it where he took hold of it, not by its corner.

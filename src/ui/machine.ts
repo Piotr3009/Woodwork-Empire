@@ -47,6 +47,12 @@ import {
   DRYING_RACKS_PLACES_FACTOR,
   GLUE_TABLE,
   GLUE_TABLE_PLACES,
+  CNC5_STAGE_FACTOR,
+  LINE_COVERS,
+  LINE_FACTOR,
+  SPRAY_ROBOT,
+  SPRAY_ROBOT_FINISH_FACTOR,
+  TIMBER_STAGES,
   DUST_WASTE_MONTHLY,
   EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
@@ -58,7 +64,8 @@ import {
   bagsToM3,
   unitCostFactor,
 } from '../engine/constants';
-import { insuranceForClass } from '../engine/machines';
+import { boardCapacityOf, insuranceForClass, isLineModule, lineModuleIndex } from '../engine/machines';
+import { andList, inASentence } from '../engine/text';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import {
@@ -234,7 +241,10 @@ function benchLine(spec: EquipmentSpec, variant: EquipmentVariant): Line {
 /** What a class of shelving holds: the rack's own effect (CLAUDE.md T7 3.6). */
 function holdsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   const sheets = sheetCapacityOf({ specId: spec.id, variantId: variant.id });
-  return sheets > 0 ? `Holds ${plural(sheets, 'sheet', 'sheets')}` : '';
+  if (sheets > 0) return `Holds ${plural(sheets, 'sheet', 'sheets')}`;
+  // A timber store holds boards and never a sheet (CLAUDE.md T29 2.11.1).
+  const boards = boardCapacityOf({ specId: spec.id, variantId: variant.id });
+  return boards > 0 ? `Holds ${plural(boards, 'board', 'boards')}` : '';
 }
 
 /** A class with an extraction demand can take an automatic gate, which is worth this much output
@@ -347,6 +357,29 @@ function figureLines(lines: Line[]): string {
     .join('');
 }
 
+/** A module's own lines, from the constants and never in written figures: the stages it does (or,
+ *  for the fifth, what it does without one), what the line gives with it this long, and for the
+ *  first what it needs beside it (CLAUDE.md T29 2.9.8). */
+function lineModuleLines(spec: EquipmentSpec): Line[] {
+  const index = lineModuleIndex(spec.id);
+  const stages = TIMBER_STAGES.filter((stage) => LINE_COVERS[stage.id] === index).map((stage) => `the ${stage.label}`);
+  const covers =
+    stages.length === 0 ? 'Takes the finished frames off the line' : `Does ${andList(stages)} of windows and doors`;
+  const factor = `With the line this long timber work goes ${LINE_FACTOR[index] ?? 1} times as fast, the Finishing excepted`;
+  const beside = spec.requires.filter((id) => !isLineModule(id)).map((id) => `a ${inASentence(findSpec(id)?.name ?? id)}`);
+  return [
+    line(covers),
+    line(factor),
+    line(beside.length === 0 ? '' : `Needs ${andList(beside)} beside it`),
+  ];
+}
+
+/** What the five axis CNC does, said among its effects off the engine's own factor; the CNC's card
+ *  says nothing of its own two, and that stays (CLAUDE.md T29 2.6). Empty for everything else. */
+function cnc5Line(spec: EquipmentSpec): string {
+  return spec.id === 'cnc5' ? `The Moulding of windows and doors goes ${CNC5_STAGE_FACTOR} times as fast on it` : '';
+}
+
 /** The effects of a class, one line each: what it does to the work, what it makes, what it needs
  *  of the air, how long it lasts, and what its class alone does (a fan pulls and holds bags, a
  *  compressor gives air, a rack holds sheets, a machine with a drop can take a gate)
@@ -362,11 +395,25 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
   if (spec.id === GLUE_TABLE) {
     return [line(`The frame press it stands by keeps ${GLUE_TABLE_PLACES} more men busy`)];
   }
+  // A module of the line says what it covers and what the line gives with it, and no Output, Dust,
+  // Life or men busy line: the line is kept by its engineers and is one thing on the sheets
+  // (CLAUDE.md T29 2.9.8).
+  if (isLineModule(spec.id)) return lineModuleLines(spec);
   const machine = spec.category === 'machine';
   return [
     line(atOnceLine(spec, variant)),
     ...tripLines(spec, variant),
-    ...(machine ? [outputLine(spec, variant), line(dustLine(spec))] : []),
+    // The robot's one line stands in place of the Output line a machine's card has: what it does
+    // is the booth's (CLAUDE.md T29 2.7).
+    ...(machine
+      ? [
+          spec.id === SPRAY_ROBOT
+            ? line(`The Finishing at the booth goes ${SPRAY_ROBOT_FINISH_FACTOR} times as fast`)
+            : outputLine(spec, variant),
+          line(cnc5Line(spec)),
+          line(dustLine(spec)),
+        ]
+      : []),
     line(extractionLine(spec, variant)),
     line(spec.id === COMPRESSOR ? '' : airLine(state, spec, variant)),
     line(lifeLine(spec, variant)),

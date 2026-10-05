@@ -95,6 +95,8 @@ const TRADE_OF_ROLE: Record<WorkerRole, TeamTab> = {
   // draftsman's three grades are its tiles from tonight (CLAUDE.md T26 2.6, 2.8).
   draftsman: 'technical',
   productionManager: 'management',
+  // Hired on the Workshop tab, by the hire tile every role has (CLAUDE.md T29 2.8).
+  lineEngineer: 'workshop',
 };
 
 export function tradeOf(role: WorkerRole): TeamTab {

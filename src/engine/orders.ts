@@ -5,9 +5,10 @@
 // class. This module owns the third of them. The queries are pure; the two writes that need the
 // rest of the world, standing the thing in the hall and giving the money back, live in game.ts.
 
-import { DAY_ONE_KIT, DAY_ONE_SOFTWARE, DAY_ONE_STAND_INS } from './constants';
+import { BUILT_TO_ORDER, BUILT_TO_ORDER_LINE, DAY_ONE_KIT, DAY_ONE_SOFTWARE, DAY_ONE_STAND_INS } from './constants';
 import { addWorkingDays } from './clock';
 import { deliveryDaysFor, findSpec, findVariant, itemStandsInTheHall } from './machines';
+import { loadWords } from './materials';
 import { makeId } from './rng';
 import type { GameState, OnOrderItem } from './types';
 
@@ -170,8 +171,28 @@ export interface OrderLine {
   progress: number;
   /** True from 08:00 of the due day: it is at the gate, not on the road. */
   arrived: boolean;
-  /** Only a machine can be called off, and only before the lorry (CLAUDE.md T8 3.5). */
+  /** Only a machine can be called off, and only before the lorry (CLAUDE.md T8 3.5), and never
+   *  one built to order (CLAUDE.md T29 2.10). */
   canCancel: boolean;
+  /** Why it cannot be, in the words the row prints, when it cannot; left out means the lorry is at
+   *  the gate (CLAUDE.md T29 2.10). */
+  cancelReason?: string;
+}
+
+/** Why this order cannot be called off, or null while it can: at the gate is too late, and kit
+ *  built to order never can be (CLAUDE.md T8 3.5, T29 2.10). The engine's refusal and the row's
+ *  words both come from here. */
+export function cancelRefusal(item: OnOrderItem): string | null {
+  if (item.arrived) return 'It is at the gate';
+  if (BUILT_TO_ORDER.includes(item.specId)) return BUILT_TO_ORDER_LINE;
+  return null;
+}
+
+/** The two fields of an order's row that say whether it can be called off (CLAUDE.md T29 2.10). */
+export function cancelFields(item: OnOrderItem): { canCancel: boolean; cancelReason?: string } {
+  const refusal = cancelRefusal(item);
+  if (refusal === null) return { canCancel: true };
+  return item.arrived ? { canCancel: false } : { canCancel: false, cancelReason: refusal };
 }
 
 /** The job a load of sheets was ordered for, by name, or 'a job' once it is off the books. */
@@ -192,14 +213,15 @@ export function shoppingList(state: GameState): OrderLine[] {
     dueDay: item.dueDay,
     progress: orderProgress(item, day),
     arrived: item.arrived,
-    canCancel: !item.arrived,
+    ...cancelFields(item),
   }));
   for (const delivery of state.deliveries) {
     if (delivery.unloaded) continue;
     lines.push({
       id: delivery.id,
       kind: 'material',
-      name: `${delivery.sheets} sheets`,
+      // `19 boards` for a timber job's load (CLAUDE.md T29 2.11.2).
+      name: loadWords(state, delivery),
       // For stock, or for the job it was ordered for by name (CLAUDE.md T13 3.2, 3.3).
       detail: delivery.jobId === null ? 'for stock' : `for ${jobNameFor(state, delivery.jobId)}`,
       pricePaid: delivery.pricePaid,

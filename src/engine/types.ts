@@ -160,7 +160,9 @@ export type SummaryCadence = 'daily' | 'weekly' | 'monthly';
 
 /** On the floor there are joiners and the labourer, and nobody else (PIOTR, 02.10; CLAUDE.md T26
  *  2.6): the booth's own trade, the man who counted the sheets and the man who ordered them went
- *  with Turn 26, and the lift of `migrate.ts` makes them a joiner and two office admins. */
+ *  with Turn 26, and the lift of `migrate.ts` makes them a joiner and two office admins. The line
+ *  engineer of Turn 29 is hired on the floor's tab and keeps the line, and is never on the floor
+ *  as a man who makes anything (CLAUDE.md T29 2.8). */
 export type WorkerRole =
   | 'joiner'
   /** The labourer. The id is `helper` and stays so: a save carries the id and the art side's
@@ -175,7 +177,11 @@ export type WorkerRole =
   | 'officeAdmin'
   /** The drawings, the site survey and the client meeting, in three grades (CLAUDE.md T26 2.8). */
   | 'draftsman'
-  | 'salesman';
+  | 'salesman'
+  /** The production line's engineer, one grade: one keeps up to three modules running and two keep
+   *  all five. He builds nothing, takes no job, is never drawn on the hall and is not one of the
+   *  men a manager carries (PIOTR, 05.10; CLAUDE.md T29 2.8). */
+  | 'lineEngineer';
 
 /** Which shift a man on the floor works. The second one runs after the day shift, at the night
  *  rate, only while a production manager is on the books (CLAUDE.md T13 3.9). */
@@ -227,6 +233,9 @@ export interface EquipmentVariant {
   zoneDepth?: number;
   /** Sheets this class holds. Left out means the family's own (CLAUDE.md T7 3.6). */
   sheetCapacity?: number;
+  /** Boards this class of timber store holds. Left out means the family's own (CLAUDE.md T29
+   *  2.11.1). */
+  boardCapacity?: number;
   /** What must be owned before this class can be bought. Left out means the family's own: a
    *  floor edgebander wants extraction where a hand one wants a cabinet (CLAUDE.md T7 3.6). */
   requires?: string[];
@@ -250,6 +259,9 @@ export type EquipmentTab =
   | 'computers'
   | 'cnc'
   | 'cncCentre'
+  /** The production line's five modules, a twelfth tab beside the eleven Piotr named (CLAUDE.md
+   *  T29 2.9.1) [TUNE: chat]. */
+  | 'line'
   | 'handling'
   | 'storage';
 
@@ -279,6 +291,9 @@ export interface EquipmentSpec {
   usedOn: MaterialKind | null;
   /** Sheets this item can hold on the rack. 0 for everything that is not shelving. */
   sheetCapacity: number;
+  /** Boards a timber store holds. Left out for everything that is not one: a store is never given
+   *  a `sheetCapacity`, which would make it a sheet rack everywhere (CLAUDE.md T29 2.11.1). */
+  boardCapacity?: number;
   /** Reputation needed to buy. */
   minReputation: number;
   /** Parked for a later stage: shown with a price, buy button disabled. */
@@ -299,6 +314,10 @@ export interface EquipmentSpec {
   variants: EquipmentVariant[];
   /** Hours of use a standard one of these has in it [TUNE]. */
   enduranceHours: number;
+  /** The least unit, in square metres, the family stands in: refused in a smaller one, and shown
+   *  in the catalogue from day 1 as a thing to save for. Left out means any unit (CLAUDE.md T29
+   *  2.5.1). */
+  minUnitM2?: number;
 }
 
 /** Which way a thing on the floor is turned: quarter turns clockwise from the picture as the art
@@ -773,6 +792,10 @@ export interface Delivery {
   bespoke: boolean;
   /** Sheets that did not fit in the rack and still need a decision. */
   overflowSheets: number;
+  /** A load of boards for a timber job, set when it is ordered for one: it goes on a timber store
+   *  and never on a sheet rack. A delivery without the mark is read from its job, so a save's
+   *  deliveries need no lift (CLAUDE.md T29 2.11.2). */
+  boards?: true;
 }
 
 export type TaskKind =
@@ -888,7 +911,11 @@ export type GameEventKind =
    *  (CLAUDE.md T28 2.2.1). */
   | 'closureComing'
   /** The first day back from a closure, in place of the Weekend card (CLAUDE.md T28 2.2.2). */
-  | 'closureOver';
+  | 'closureOver'
+  /** The first settle of a save that had more than four joiners on a standing contract: the men
+   *  past the first four were taken off it by the lift, and this says who (CLAUDE.md T29
+   *  section 4). */
+  | 'contractsTrimmed';
 
 export interface GameEventChoice {
   id: string;

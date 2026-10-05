@@ -31,6 +31,8 @@ import {
   WORKER_HOURS_PER_MONTH,
   WORKER_NAMES,
   WORKER_RATES,
+  LINE_ENGINEERS_MAX,
+  LINE_MODULES,
 } from './constants';
 import {
   addWorkingDays,
@@ -65,7 +67,7 @@ import {
   benchPlacesOwnedOrOnOrder,
   toolSlotsOf,
 } from './machines';
-import { countOwnedOrOnOrder } from './orders';
+import { countOwnedOrOnOrder, onOrderCount } from './orders';
 import { managerOnDuty, managerOnDutyNow, managerTier } from './owner';
 import { effectiveReputation } from './reputation';
 import { hands, machineWantedFor, planPlaces, workMinute } from './production';
@@ -99,6 +101,7 @@ export const ROLE_WORDS: Record<WorkerRole, string> = {
   salesman: 'salesman',
   draftsman: 'draftsman',
   productionManager: 'production manager',
+  lineEngineer: 'line engineer',
 };
 
 /** The same trades, several of them: the plural is written out because a salesman is not a
@@ -110,6 +113,7 @@ export const ROLE_WORDS_MANY: Record<WorkerRole, string> = {
   salesman: 'salesmen',
   draftsman: 'draftsmen',
   productionManager: 'production managers',
+  lineEngineer: 'line engineers',
 };
 
 /** True for a man who produces. The one rule, asked by the board (CLAUDE.md T20 2.3). */
@@ -245,10 +249,12 @@ export function countMonthDaysOff(state: GameState): void {
 /** The office's own people, who work behind its door all day and are never drawn on the hall
  *  (PIOTR, 03.10; v75). They were seen out there only with nothing to do, which read as men
  *  standing about, and how much of each is used is on Our team. The production manager is not on
- *  the list: the hall is his job, and he is seen on it in his white shirt. */
-const NEVER_ON_THE_HALL: WorkerRole[] = ['officeAdmin', 'salesman', 'draftsman'];
+ *  the list: the hall is his job, and he is seen on it in his white shirt. The line engineer is: no
+ *  figure exists for him, as none exists for the office (CLAUDE.md T29 2.8). */
+const NEVER_ON_THE_HALL: WorkerRole[] = ['officeAdmin', 'salesman', 'draftsman', 'lineEngineer'];
 
-/** True for a role the hall draws a figure for: everybody but the office's own three. */
+/** True for a role the hall draws a figure for: everybody but the office's own three and the line
+ *  engineer. */
 export function isSeenOnTheHall(role: WorkerRole): boolean {
   return !NEVER_ON_THE_HALL.includes(role);
 }
@@ -556,6 +562,12 @@ export function hiringOptions(state: GameState): HiringOption[] {
         short.length === 1 && short[0] === BENCH
           ? 'No place at a bench for him: the owner needs one too'
           : `Buy first: ${missing.join(', ')}`;
+    } else if (spec.role === 'lineEngineer' && !hasALine(state)) {
+      // He keeps the production line, so he is hired once a module stands or is on order, and not
+      // before (CLAUDE.md T29 2.8).
+      blockReason = 'The company has no production line';
+    } else if (spec.role === 'lineEngineer' && lineEngineers(state).length >= LINE_ENGINEERS_MAX) {
+      blockReason = 'Two engineers keep the whole line';
     } else if (state.cash < spec.monthlyWage) {
       // Last of the refusals, because it is the only one that changes by the minute: who answers
       // the advert, what the office wants first, the bench and the kit are all standing facts,
@@ -720,8 +732,29 @@ export function dayMeterOf(state: GameState, holder: Worker | OwnerState): DayMe
 export function menCarried(state: GameState): Worker[] {
   const manager = managerOnDutyNow(state);
   if (manager === null || manager.tier === null) return [];
-  const under = state.workers.filter((worker) => worker.id !== manager.id);
+  const under = state.workers.filter((worker) => worker.id !== manager.id && carriedByAManager(worker));
   return under.slice(0, PRODUCTION_MANAGER_CARRIES[manager.tier]);
+}
+
+/** True for a man a production manager carries: everybody on the books but the line's engineers,
+ *  who keep the line and are nobody's men (CLAUDE.md T29 2.8). `menCarried` and Our team's
+ *  `carriedBy` both ask it, so the two never count him differently. */
+export function carriedByAManager(worker: Worker): boolean {
+  return worker.role !== 'lineEngineer';
+}
+
+/** The line engineers on the books, started or not (CLAUDE.md T29 2.8). */
+export function lineEngineers(state: GameState): Worker[] {
+  return state.workers.filter((worker) => worker.role === 'lineEngineer');
+}
+
+/** True while a module of the production line stands or is on order: the line an engineer can be
+ *  hired for. Modules are ordered in sequence and sold only from the end, so the first is asked
+ *  (CLAUDE.md T29 2.8, 2.9.2). An order counts, since the interview is checked again against the
+ *  hall as it stands when it is over. */
+export function hasALine(state: GameState): boolean {
+  const first = LINE_MODULES[0] ?? '';
+  return state.equipment.some((item) => item.specId === first && !isSold(item)) || onOrderCount(state, first) > 0;
 }
 
 /** True while this man has a manager over him: he is one of the men his grade carries. */

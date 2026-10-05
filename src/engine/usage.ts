@@ -15,8 +15,8 @@
 import { PRODUCTION_MANAGER_CARRIES, USAGE_LOW_PERCENT, USAGE_NEAR_FULL_PERCENT } from './constants';
 import { weekOfDay } from './clock';
 import { crewLimit } from './layout';
-import { OWNER } from './machines';
-import { ROLE_WORDS, ROLE_WORDS_MANY, crewCount, weekBeforeOf, weekNowOf, weekWorkedMinutes } from './staff';
+import { OWNER, lineLevel, lineModules } from './machines';
+import { ROLE_WORDS, ROLE_WORDS_MANY, carriedByAManager, crewCount, weekBeforeOf, weekNowOf, weekWorkedMinutes } from './staff';
 import { plural } from './text';
 import type { GameState, Worker, WorkerRole } from './types';
 
@@ -33,6 +33,9 @@ export const USAGE_TRADES: readonly UsageTrade[] = [
   'salesman',
   'draftsman',
   'productionManager',
+  // The line engineer last, after the manager: he keeps the line and is nobody's man (CLAUDE.md
+  // T29 2.8) [TUNE: the place].
+  'lineEngineer',
 ];
 
 /** Where a figure sits: nobody to measure, under `USAGE_LOW_PERCENT`, near full, or between. */
@@ -76,6 +79,9 @@ function isSupport(trade: UsageTrade): boolean {
 
 function bandOf(trade: UsageTrade, percent: number | null): UsageBand {
   if (percent === null) return 'none';
+  // A line engineer keeps the line, and a full week of it asks for nobody: the game may refuse a
+  // third (CLAUDE.md T29 2.8).
+  if (trade === 'lineEngineer') return 'fine';
   // A manager with men to spare is not a man standing about: only the near full end is his.
   if (percent < USAGE_LOW_PERCENT && trade !== 'productionManager') return 'low';
   if (percent >= USAGE_NEAR_FULL_PERCENT && isSupport(trade)) return 'full';
@@ -91,7 +97,7 @@ function share(worked: number, paid: number): number | null {
  *  the order they were taken on, as `menCarried` counts them, whatever the hour is. */
 function carriedBy(state: GameState, manager: Worker): { carried: number; limit: number } {
   const limit = manager.tier === null ? 0 : PRODUCTION_MANAGER_CARRIES[manager.tier];
-  const others = state.workers.filter((worker) => worker.id !== manager.id).length;
+  const others = state.workers.filter((worker) => worker.id !== manager.id && carriedByAManager(worker)).length;
   return { carried: Math.min(others, limit), limit };
 }
 
@@ -153,6 +159,8 @@ const NOBODY_WORDS: Record<WorkerRole, string> = {
   salesman: 'Nobody. The client calls are yours.',
   draftsman: 'Nobody. You draw, measure and meet the clients yourself.',
   productionManager: 'Nobody. You put every man on his job yourself.',
+  // [TUNE: chat] (CLAUDE.md T29 2.8).
+  lineEngineer: 'Nobody. The line does not run without one.',
 };
 
 function labelOf(trade: UsageTrade, count: number): string {
@@ -171,6 +179,14 @@ function wordsOf(state: GameState, trade: UsageTrade, men: readonly ManUsage[], 
   if (trade === 'joiner') {
     const left = crewLimit(state) - crewCount(state);
     return left > 0 ? `${count}, ${plural(left, 'place', 'places')} left in the unit.` : `${count}, the unit is full.`;
+  }
+  if (trade === 'lineEngineer') {
+    // His tile's own sentence, as the manager's has: how much of the line runs (CLAUDE.md T29 2.8)
+    // [TUNE: the words while no module stands].
+    const standing = lineModules(state);
+    return standing === 0
+      ? 'The line is not built yet.'
+      : `The line runs as ${lineLevel(state)} of its ${standing} modules.`;
   }
   if (trade === 'productionManager') {
     const first = men[0];

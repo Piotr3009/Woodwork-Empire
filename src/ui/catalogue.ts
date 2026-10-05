@@ -59,6 +59,7 @@ import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/ind
 import {
   crewAtFamily,
   hallPlaces,
+  isLineModule,
   machineShortWord,
   placeShortages,
   serviceCallCheck,
@@ -68,7 +69,7 @@ import {
 import { BY_HAND_DURATION_FACTOR, CAPACITY_FAMILIES, VAN_CLASSES } from '../engine/constants';
 import { slotsInUseIn } from '../engine/staff';
 import { nextSpriteOrientation } from '../render/sprites';
-import { orderName, orderProgress } from '../engine/orders';
+import { cancelFields, orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
 import { classBadge, classFrame, isMachineFamily, pictureKeyOf, pictureSlot, renderMachine } from './machine';
 import { arrivalLine, cancelButton, progressBar } from './shopping';
@@ -279,7 +280,7 @@ function orderedTile(state: GameState, item: OnOrderItem, spec: EquipmentSpec): 
     dueDay: item.dueDay,
     progress: orderProgress(item, state.clock.day),
     arrived: item.arrived,
-    canCancel: !item.arrived,
+    ...cancelFields(item),
   };
   const lines = [`On order, due ${formatCalendarDay(item.dueDay)}`, arrivalLine(line, state.clock.day)]
     .map((text) => `<p class="tile-figures">${escapeHtml(text)}</p>`)
@@ -359,6 +360,8 @@ function turnAction(state: GameState, item: Equipment): string {
     return `<span class="reason">Sold, collection on ${formatCalendarDay(item.soldOnDay ?? 0)}</span>`;
   }
   if (!itemStandsInTheHall(item)) return '';
+  // A module of the line has no Turn row: it stands where it is built (CLAUDE.md T29 2.9.3).
+  if (isLineModule(item.specId)) return '';
   const spec = findSpec(item.specId);
   if (spec === undefined || spec === null) return '';
   const next = nextSpriteOrientation(spec.spriteKey, item.variantId, item.orientation);

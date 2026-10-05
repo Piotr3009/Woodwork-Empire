@@ -166,9 +166,11 @@ describe('setting the hall out', () => {
 describe('the whole workshop fits on the painted floor', () => {
   it('stands the day 1 kit, a full crew and the big machines side by side', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    // Everything a workshop can own, bought without caring what it costs.
+    // Everything a workshop can own, bought without caring what it costs; what the unit refuses for
+    // its size is passed over (CLAUDE.md T29 2.5.1).
     for (const spec of EQUIPMENT_SPECS) {
       if (spec.category === 'furniture') continue;
+      if (spec.minUnitM2 !== undefined && spec.minUnitM2 > state.unit.areaM2) continue;
       const have = state.equipment.filter((item) => item.specId === spec.id).length;
       const want = spec.perWorker ? 6 : 1;
       for (let index = have; index < want; index += 1) {
@@ -191,8 +193,12 @@ describe('the whole workshop fits on the painted floor', () => {
     // Nineteen again from v69, with the high capacity rack; the drying racks of v73 hold no floor.
     // Eighteen from v83: the pelletiser stands behind the rear wall with the systems (CLAUDE.md T28
     // 2.1). Twenty three with the timber department's five families, each at its used class's zone
-    // and the glue table beside the press it asks for (CLAUDE.md T28 2.4).
-    expect(hallItems(state).length).toBe(23);
+    // and the glue table beside the press it asks for (CLAUDE.md T28 2.4). Twenty four with the
+    // spraying robot beside the booth it asks for (CLAUDE.md T29 2.7); the five axis CNC is passed
+    // over, refused in the 200 m2 unit (2.5.1). Twenty five with the timber rack, which finds its 4 m
+    // by 2 m; the timber shelter stands on the apron and holds no cell of the hall (CLAUDE.md T29
+    // 2.11.1).
+    expect(hallItems(state).length).toBe(25);
     expect(hallItems(state).some((item) => item.specId === 'cncHead')).toBe(false);
   });
 
