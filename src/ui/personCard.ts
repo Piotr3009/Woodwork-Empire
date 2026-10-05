@@ -429,7 +429,7 @@ export function renderPerson(state: GameState, who: string, view: PersonView): s
 }
 
 /** What he costs a month, in the one form of pay the game has (CLAUDE.md T21 2.10). The owner's is
- *  the draw he pays himself, over a month of working days. */
+ *  the draw he pays himself, over a month of weekdays. */
 function wageLine(person: Person): string {
   return `${money(person.monthlyWage)} a month`;
 }

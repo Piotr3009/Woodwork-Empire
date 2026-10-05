@@ -115,8 +115,11 @@ export function closureOf(day: number): Closure | null {
       }
       continue;
     }
+    // Over two months: the later month's days belong to the year the closure began in, the year
+    // before when it runs over the turn of the year.
+    const yearBegun = spec.toMonth < spec.fromMonth ? year - 1 : year;
     if (month === spec.fromMonth && date >= spec.fromDay && year >= spec.firstYear) return spec.id;
-    if (month === spec.toMonth && date <= spec.toDay && year - 1 >= spec.firstYear) return spec.id;
+    if (month === spec.toMonth && date <= spec.toDay && yearBegun >= spec.firstYear) return spec.id;
   }
   return null;
 }
@@ -290,8 +293,10 @@ function workingDaysTo(day: number): number {
  *  Friday with no gap in it, and the first day back follows the last before a closure. A weekend
  *  or a closed day reads as the working day before it, because nothing happens on it and the Work
  *  Plan draws no column for it (CLAUDE.md T10 3.5, T28 2.2). Before day 1 the axis runs on the
- *  week alone. */
+ *  week alone, and a part of a day counts as the whole day it is part of. */
 export function workingDayIndex(day: number): number {
+  // A point that is no day at all (a projection that never ends) is not counted to.
+  if (!Number.isFinite(day)) return day;
   if (day < 1) {
     const weeks = Math.floor((day - 1) / DAYS_PER_WEEK);
     const rest = day - 1 - weeks * DAYS_PER_WEEK;
@@ -303,6 +308,7 @@ export function workingDayIndex(day: number): number {
 /** The calendar day a place on that axis is: the inverse of `workingDayIndex` for every working
  *  day. Only the whole part is a day; a fraction is the part of that day. */
 export function dayOfWorkingIndex(index: number): number {
+  if (!Number.isFinite(index)) return index;
   const whole = Math.floor(index);
   if (whole < 1) {
     const weeks = Math.floor((index - 1) / WORKING_DAYS_PER_WEEK);

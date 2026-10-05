@@ -165,8 +165,9 @@ export function ownerDrawPaidInWindow(state: GameState): number {
   return Math.round(paid * 100) / 100;
 }
 
-/** The working days a thirty calendar day window holds: what the draw is charged on, so the
- *  thirty day sum of a tier is its daily figure over these (CLAUDE.md T13 3.18). */
+/** The weekdays a thirty calendar day window holds: what the draw is charged on, a closure's
+ *  among them, so the thirty day sum of a tier is its daily figure over these (CLAUDE.md T13
+ *  3.18, T28 2.2). */
 export function workingDaysInHouseWindow(): number {
   return Math.round((HOUSE_WINDOW_DAYS * 5) / 7);
 }

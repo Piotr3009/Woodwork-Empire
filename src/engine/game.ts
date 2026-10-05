@@ -1050,15 +1050,16 @@ function advanceToNextDay(state: GameState): void {
   while (!isWorkingDay(day)) day += 1;
   const skipped = daysBetween(state.clock.day, day);
   let weekendCosts = 0;
-  let taxed = 0;
+  let closedCosts = 0;
   for (const weekendDay of skipped) {
     state.clock.day = weekendDay;
     const before = state.cash;
-    const lines = state.ledger.length;
     runDayCosts(state, weekendDay);
     accrueOverdraftInterest(state);
     weekendCosts += before - state.cash;
-    for (const entry of state.ledger.slice(lines)) if (entry.category === 'tax') taxed -= entry.amount;
+    // What left the account that day and nothing that came in, the tax apart: the day's own books,
+    // which `runDayCosts` opens empty, and not the ledger, which keeps only its last lines.
+    closedCosts += state.finance.day.costs + (state.finance.day.byCategory.tax ?? 0);
   }
   state.clock.day = day;
   state.clock.minute = 0;
@@ -1071,7 +1072,7 @@ function advanceToNextDay(state: GameState): void {
   // but the tax, which has its card before it (CLAUDE.md T28 2.2.2).
   const closure = skipped.map((at) => closureOf(at)).find((entry) => entry !== null) ?? null;
   if (closure !== null) {
-    const costs = weekendCosts - taxed;
+    const costs = closedCosts;
     queueEvent(state, {
       kind: 'closureOver',
       title: backFromTitle(closure),

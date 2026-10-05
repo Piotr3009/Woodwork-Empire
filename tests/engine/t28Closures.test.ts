@@ -22,7 +22,17 @@
 // 6 January 2027 is 666, and August 2027 is 871 to 884.
 
 import { describe, expect, it } from 'vitest';
-import { DAY_END_MINUTE, HOUSE_WINDOW_DAYS, MINUTES_PER_WORKING_DAY, STATE_VERSION } from '../../src/engine/constants';
+import {
+  DAY_END_MINUTE,
+  HOUSE_WINDOW_DAYS,
+  LEDGER_MAX_ENTRIES,
+  MINUTES_PER_WORKING_DAY,
+  STATE_VERSION,
+} from '../../src/engine/constants';
+import { scheduleCalls } from '../../src/engine/calls';
+import { takeLoan } from '../../src/engine/finance';
+import { serviceMachine } from '../../src/engine/machines';
+import { canHire, hire } from '../../src/engine/staff';
 import { enquiriesDueToday } from '../../src/engine/board';
 import {
   addWorkingDays,
@@ -42,7 +52,7 @@ import {
 } from '../../src/engine/clock';
 import { drawContract, weekWanted } from '../../src/engine/contracts';
 import { formatMoney, monthlyWageBill, runDayCosts } from '../../src/engine/economy';
-import { deliverJob } from '../../src/engine/jobs';
+import { deliverJob, orderTransport } from '../../src/engine/jobs';
 import { migrateState } from '../../src/engine/migrate';
 import {
   debtOnMorningOf,
@@ -55,7 +65,19 @@ import { workPlan } from '../../src/engine/plan';
 import { taxOn } from '../../src/engine/tax';
 import { WARNING_ORDER, warnings } from '../../src/engine/warnings';
 import type { GameEvent, GameState, Job, LedgerEntry } from '../../src/engine/index';
-import { act, acceptNow, clearEvents, eventsOfKind, firstJob, newGame, placeEnquiry, testJoiner } from '../helpers';
+import {
+  act,
+  acceptNow,
+  benchPlacesFor,
+  buyStartingKit,
+  clearEvents,
+  eventsOfKind,
+  firstJob,
+  newGame,
+  placeEnquiry,
+  placeEquipment,
+  testJoiner,
+} from '../helpers';
 
 const CHRISTMAS_2025 = { from: 292, to: 305 };
 const SUMMER_2026 = { from: 511, to: 524 };
@@ -596,6 +618,22 @@ describe('told on the first day back (CLAUDE.md T28 2.2.2)', () => {
     expect(eventsOfKind(plain, 'closureOver')).toEqual([]);
   });
 
+  it('leaves the tax out of the card when the ledger is full, reading the days and not the ledger', () => {
+    // The ledger keeps its last lines only: a full one loses its oldest as the break's are written,
+    // and the card's figure must not depend on where the tax's line ended up.
+    const state = closingCompany();
+    const old = state.ledger[0];
+    if (old === undefined) throw new Error('no ledger');
+    while (state.ledger.length < LEDGER_MAX_ENTRIES) state.ledger.unshift({ ...old, day: 1 });
+    const seen: GameEvent[] = [];
+    const after = nextMorning(state, seen);
+    expect(after.ledger.length).toBe(LEDGER_MAX_ENTRIES);
+    const card = eventsOfKind(seen, 'closureOver')[0];
+    const out = spentOn(after, 292, 305);
+    expect(card?.body).toBe(`14 days closed. Rent, rates and the bills ran anyway: ${formatMoney(out)} out.`);
+    expect(after.ledger.some((entry) => entry.category === 'tax' && entry.day === 300)).toBe(true);
+  });
+
   it('lets a save standing on a day now closed finish it, and the closure takes the days after', () => {
     // Pins section 2.2's last paragraph: a save on Mon 25 December 2025 opens next on Fri 6 January.
     const seen: GameEvent[] = [];
@@ -605,5 +643,56 @@ describe('told on the first day back (CLAUDE.md T28 2.2.2)', () => {
     const card = eventsOfKind(seen, 'closureOver');
     expect(card).toHaveLength(1);
     expect(card[0]?.data.days).toBe(10);
+  });
+});
+
+describe('what is counted in working days steps over the break (CLAUDE.md T28 2.2)', () => {
+  it('sends the courier, brings the machine back from its service and starts a new man on Fri 6 January', () => {
+    // A booked courier, a machine's return from its service and a new man's first day are counted
+    // in working days, so each of them asked for on Thu 21 December is Fri 6 January.
+    let state = eveningOf(291, 48000);
+    state.clock.minute = 0;
+    const enquiry = placeEnquiry(state, { deadlineDays: 5 });
+    state = acceptNow(state, enquiry.id);
+    const job = firstJob(state);
+    job.stage = 'awaitingTransport';
+    job.finishedDay = 291;
+    expect(orderTransport(state, job.id)).toBe(true);
+    expect(job.deliverOnDay).toBe(306);
+    const machine = placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 5, y: 0 });
+    expect(serviceMachine(state, machine.id)?.inServiceUntilDay).toBe(306);
+    const kitted = benchPlacesFor(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 1);
+    placeEquipment(kitted, 'locker');
+    placeEquipment(kitted, 'toolCabinet', { variantId: 'budget', x: 2, y: 8 });
+    placeEquipment(kitted, 'handToolSet');
+    kitted.clock.day = 291;
+    expect(canHire(kitted, 'joiner', 'novice')).toEqual({ ok: true, reason: '' });
+    expect(hire(kitted, 'joiner', 'novice')?.startDay).toBe(306);
+  });
+
+  it('puts no client call on a closed day', () => {
+    // The client rings on the days the workshop is open: none of a job's calls falls in the break.
+    let state = eveningOf(289, 48000);
+    state.clock.minute = 0;
+    const enquiry = placeEnquiry(state, { deadlineDays: 10, price: 6000 });
+    state = acceptNow(state, enquiry.id);
+    const job = firstJob(state);
+    job.calls = [];
+    scheduleCalls(state, job);
+    expect(job.calls.length).toBeGreaterThan(0);
+    for (const call of job.calls) expect(isWorkingDay(call.day), String(call.day)).toBe(true);
+    expect(job.calls.some((call) => call.day > 305)).toBe(true);
+  });
+
+  it('takes the loan and the security on the closed 1st of January', () => {
+    // The month's paper is taken on a 1st that is closed, as on a Saturday 1st.
+    const state = closingCompany();
+    state.security.level = 3;
+    state.clock.day = 291;
+    expect(takeLoan(state, 10000).ok).toBe(true);
+    const after = nextMorning(state);
+    expect(after.clock.day).toBe(306);
+    expect(linesOn(after, 301, 'security')).toHaveLength(1);
+    expect(after.ledger.some((entry) => entry.day === 301 && (entry.category === 'loan' || entry.category === 'loanInterest'))).toBe(true);
   });
 });

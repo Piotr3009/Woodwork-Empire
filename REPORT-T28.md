@@ -67,6 +67,30 @@ December is flipped to say every 30th is closed, and the order pins of `warnings
 `tax.test.ts` take `closureComing`. 22 new tests in `tests/engine/t28Closures.test.ts`, drafted by
 a sub-agent against the API and checked here.
 
+After the review (one commit more, `T28-B2 the review`): the first day back's money is read off each
+stepped over day's own books (`finance.day`, its costs and not its income, the tax taken out) and
+not off the ledger, which keeps its last 2,000 lines only and so lost the tax from the sum once a
+company's books were full; the axis returns a point that is no day (`Infinity`, a projection that
+never ends) as it is instead of counting to it; and a closure over two months knows which of them
+begins it. Six more tests: a full ledger, the courier, a machine's return from its service, a new
+man's first day, the client's calls, and the loan and the security on the closed 1st. What runs on
+calendar days through a closure, on purpose and unchanged [TUNE: chat], one line each:
+- an enquiry's expiry and a contract offer's: the board is empty on the first day back and fills
+  only as fast as it does on any morning, so the first days back are thin;
+- a standing contract's end day: its term is not made longer;
+- a let go notice: the man leaves on his day, closed or not;
+- a machine's service interval: six months on the calendar;
+- the overdraft's interest and the bank's count of days past the limit: a company far past its
+  limit on the last working day can be closed during the break, which its break card says to an
+  account under nought.
+What is counted on open days, unchanged: the owner's own holiday and a man's days off after an
+accident, so a closure does not use them up, and an insurance claim's daily payments. Edge cases
+left as they are and said here: a v40 save standing on a December day from the 22nd to the 29th
+(2025) opened that day before the closure existed, so that December's wages, due on the 21st, are
+never charged, and the closed day it stands on has no night shift and no paid hours; a job of such
+a save due on a day now closed is one day late on the first day back; a player on the weekly
+summary gets none for the week of 18 to 21 December 2025, whose Friday is closed.
+
 **T28-C1 The pictures in.** The 42 files of `docs/art/incoming/t28/` are `git mv`ed into
 `public/sprites/` as they came [PIOTR, 05.10]: no pixel of them was touched. The manifest is 258
 sprites and not 216, and the two counts of turned pictures read 96 and not 75 (`rotate.test.ts`,
