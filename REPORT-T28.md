@@ -282,3 +282,35 @@ drawn as v82 drew them (`t28Families`). One comment set right (`tax.test.ts`: 6 
 Monday). No `it.skip`, `describe.skip`, `.only` or `.todo` anywhere in `tests/` or `src/`;
 `git diff main --stat -- src/ui/styles.css` is empty; `APP_VERSION` 'v83', `STATE_VERSION` 41,
 `OLDEST_SAVE_VERSION` 12.
+
+**T28-D4 Look and shoot.** Thirteen pictures in `docs/report-t28/`, every one drawn by the game's own
+renderer and UI functions (`renderHall`, `renderEvent` and `renderEventFooter` through `syncModals`,
+`renderTopbar`, `renderWarningStrip`, `renderCatalogue`, `renderBoard`, `renderWorkPlan`,
+`renderSpriteCheck`) from states the engine played or the tests' own helpers set up, in the game's
+stylesheet, and shot in headless Chromium; nothing in the markup is written by hand. The holidays are
+the (ww) company played by the careful script; the window is the (vv) company with four joiners and
+the glue table, played until it was paid, the owner's one click putting his crew on it; the tiles are
+drawn by `generateEnquiry` and `generateUnreachable` off halls short of what each reason names. The
+pages were served by a static server inside the shooting script, which stops it before it exits, and
+the pages themselves were deleted once shot.
+
+## The pictures
+
+The third column is the nearest existing picture of the same screen; what each pair differs by is
+what this turn did to it.
+
+| picture | what it shows | beside |
+| --- | --- | --- |
+| `01-the-pelletiser-behind-the-wall.png` | a day one hall with the flexi and a pelletiser bought today: the pelletiser stands behind the rear wall beside the flexi and takes no cell of the floor. The wall hides about two thirds of it: its picture is 116 px high and the wall's clip line crosses it about 42 px down at its middle, so the top of the hopper is what is seen (2.1 asked for this measure; nothing is done about it) | `report-t26/01-day53-one-minute.png`: a hall of the same skin; there is no picture of the pelletiser on the floor in the tree |
+| `02-the-christmas-break-card-in-december.png` | Friday 1 December 2025, the first two cards of the morning: `Tax is coming` with its new sentence (`The workshop is closed from 22 December, so the last day to spend is Thu 21 December.`), then `Christmas break` | `report-t27/02-the-tax-is-coming-card.png`: the tax's card without the sentence; `docs/mockups/t28/closure-cards.png` |
+| `03-the-strip-line-in-july.png` | Tuesday 19 July 2026: the strip's one line, `Closed from 1 August: 9 working days left`, under the top bar | `report-t27/03-the-strip-line-in-december.png`: the tax's line in the same place; `docs/mockups/t28/closure-cards.png` |
+| `04-the-first-day-back.png` | Friday 6 January 2026: `Tax for 2025` (booked on the closed 30 December), then `Back from the Christmas break`, `14 days closed. Rent, rates and the bills ran anyway: £3,698 out.`, `Back to work`, and no `Weekend` card | `report-t27/04-the-card-after-30-december.png`; `docs/mockups/t28/closure-cards.png` |
+| `05-the-timber-machines-tab.png` | the Timber machines tab of a company in the 800 m2 hall: the thicknesser (its line without the stage it was promised) and the moulder, then cross cut saws, four sided planers, frame presses, glue tables and the three cutter sets | `docs/mockups/t28/timber-catalogue.png`: today's two folders beside the nine |
+| `06-the-planer-folder.png` | the planer's folder open on its five classes, the art side's pictures as they came, each card with its men at once, extraction, life, price, delivery, power, metres and the brief's sentence | `report-t27/06-the-cnc-folder-at-90000-and-144000.png`: a folder of five classes; `docs/mockups/t28/timber-catalogue.png` |
+| `07-the-sanding-tab.png` | the Sanding tab, empty until tonight, with its one folder, Sanders from £400 | `docs/mockups/t28/timber-catalogue.png` (today's empty tab) |
+| `08-a-cutter-set-card.png` | the sash window cutter set's card before and after it is bought: £4,000, five working days, `Kept at the spindle moulders`, and the empty picture box the catalogue shows for a file that is not there yet | `docs/mockups/t28/timber-catalogue.png`: the hand tool set it is kept like |
+| `09-timber-tiles-live-locked-and-greyed.png` | a sash window tile live with its Accept; the same tile locked `Needs sash window cutter set` in a hall without the set; four greyed tiles, one for each reason in `kitBlockFor`'s order: `reputation too low (needs 30)`, `needs a spray booth`, `no cross cut saw, four sided planer`, `no door cutter set` | `docs/mockups/t28/timber-tiles.png`; `report-t26/10-big-job-red-and-green.png` |
+| `10-a-timber-job-card-and-its-glass.png` | the sash window's row of the Work Plan, its head the job card: Friday 5 March with the strip's `Glass not ordered: Sash windows`, the red `Glass not ordered` and `Order glass, £1,960` beside `Order for this job`; the same morning after the owner's click, `Glass ordered, here on Fri 19 March`; and Friday 19 March, `Glass is in` | `docs/mockups/t28/glass-job-card.png` |
+| `11-the-work-plan-glue-curing.png` | Wednesday 17 March: the frame has filled its Pressing, the row says `Pressing, glue curing` and the step `Production: Pressing`, its five men left on it | `docs/mockups/t28/work-plan-stops.png` |
+| `12-the-800-m2-hall-with-the-timber-machines.png` | the 800 m2 hall on Monday 8 March at 09:35 with one of each new machine standing at its standard class and the glue table by the press: the owner at the cross cut saw, Tom at the planer, Ben at the moulder, Sam at the sander, Joe at the frame press. Each machine of the plan wears the `too few places` mark: five men on one window are more than one standard machine of each family holds, which is 2.4's rule and the reason to buy a second | `report-t25/01-four-men-and-one-used-saw.png`: the same mark on the sheet side |
+| `13-the-sprite-check-rows.png` | the Sprite check page's 24 rows of the five families and the three cutter sets: a file, a footprint and no red port line for every class, `no file yet` for the three sets | `report-t22/10-the-sprite-check-page.png` |
