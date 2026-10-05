@@ -82,6 +82,7 @@ import {
 } from './layout';
 import { enlargeCanteen, extendUnit, openExtension } from './premises';
 import { raiseTaxWarning } from './tax';
+import { backFromTitle, raiseClosureWarning } from './closures';
 import {
   createOnOrder,
   findOnOrder,
@@ -91,6 +92,7 @@ import {
   removeOnOrder,
 } from './orders';
 import {
+  closureOf,
   daysBetween,
   formatCalendarDay,
   nextWorkingDay,
@@ -461,6 +463,7 @@ export function createGame(options: NewGameOptions): GameState {
     tips: { seen: [] },
     shift: { second: false },
     monthEndShownFor: 0,
+    closureWarnedFor: null,
     monthlyReports: [],
     lastContractOfferDay: null,
     ledger: [],
@@ -570,6 +573,8 @@ function startDay(state: GameState): void {
   raiseMonthEnd(state);
   // December's warning after the month's report: the taxman comes on the 30th (CLAUDE.md T27 2.3).
   raiseTaxWarning(state);
+  // And the break's after the tax's, so the tax is read first (CLAUDE.md T28 2.2.1).
+  raiseClosureWarning(state);
   // The month's meters first, so the day that starts a month is counted into the new one, and
   // then the days off of this morning (CLAUDE.md T17 2.9).
   startMonthMeters(state);
@@ -1038,18 +1043,22 @@ function finishDay(state: GameState): void {
   });
 }
 
-/** Moves to the next working day, walking over the weekend days on the way. */
+/** Moves to the next working day, walking over the weekend days on the way, and over the days of a
+ *  closure, which are one long weekend to it (CLAUDE.md T28 2.2). */
 function advanceToNextDay(state: GameState): void {
   let day = state.clock.day + 1;
   while (!isWorkingDay(day)) day += 1;
   const skipped = daysBetween(state.clock.day, day);
   let weekendCosts = 0;
+  let taxed = 0;
   for (const weekendDay of skipped) {
     state.clock.day = weekendDay;
     const before = state.cash;
+    const lines = state.ledger.length;
     runDayCosts(state, weekendDay);
     accrueOverdraftInterest(state);
     weekendCosts += before - state.cash;
+    for (const entry of state.ledger.slice(lines)) if (entry.category === 'tax') taxed -= entry.amount;
   }
   state.clock.day = day;
   state.clock.minute = 0;
@@ -1057,7 +1066,22 @@ function advanceToNextDay(state: GameState): void {
   // CLAUDE.md T17 2.19). Not in `startDay`, which a new game calls with the clock stopped for the
   // setting out of the hall.
   state.speed = 1;
-  if (skipped.length > 0) {
+  // The first day back from a closure has the closure's own card where the Weekend card stands:
+  // the days it stepped over, weekends among them, and everything that left the account on them
+  // but the tax, which has its card before it (CLAUDE.md T28 2.2.2).
+  const closure = skipped.map((at) => closureOf(at)).find((entry) => entry !== null) ?? null;
+  if (closure !== null) {
+    const costs = weekendCosts - taxed;
+    queueEvent(state, {
+      kind: 'closureOver',
+      title: backFromTitle(closure),
+      body:
+        `${skipped.length} days closed. Rent, rates and the bills ran anyway: ` +
+        `${formatMoney(costs)} out.`,
+      choices: [{ id: 'ok', label: 'Back to work' }],
+      data: { closure, days: skipped.length, costs: Math.round(costs) },
+    });
+  } else if (skipped.length > 0) {
     queueEvent(state, {
       kind: 'weekend',
       title: 'Weekend',

@@ -5,6 +5,7 @@
 
 import type {
   BubbleKey,
+  ClosureSpec,
   DayCategory,
   Difficulty,
   EquipmentSpec,
@@ -176,7 +177,9 @@ import type {
  *  Version 41 is v83, Turn 28 (PIOTR, 04.10 and 05.10). The pelletiser stands behind the rear wall
  *  with the two central systems, and one on the hall floor of an older save, or on order for it,
  *  is moved there when the save is lifted (`standThePlantBehindTheWall`), with no other field of
- *  the save touched (CLAUDE.md T28 section 4). Every v12 to v40 save loads. */
+ *  the save touched. The calendar remembers the closure it last told the player of, none in an
+ *  older save, which is then told on its next open before the closure (CLAUDE.md T28 section 4).
+ *  Every v12 to v40 save loads. */
 export const STATE_VERSION = 41;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
@@ -282,6 +285,17 @@ export const START_MONTH = 2;
  *  thirty days count the years on from it, so day 301 is 1 January 2026 [PIOTR, 03.10: "we write
  *  the years as well; we start from 2025"] (CLAUDE.md T27 2.1). */
 export const START_YEAR = 2025;
+
+/** The company's holidays, when nobody works and every bill is paid (PIOTR, 05.10: "after a year
+ *  we add holidays: two weeks around Christmas, to 5 January (the costs run, only the people do
+ *  not work), and two weeks in the summer, but that only in the second year"; CLAUDE.md T28 2.2).
+ *  Christmas from 22 December to 5 January, from the December of 2025; the first fortnight of
+ *  August, from 2026 [PIOTR: the fortnights and the years; TUNE: chat: the 22nd, and the first
+ *  fortnight of August]. Told of on the first working day of December and of July. */
+export const CLOSURES: readonly ClosureSpec[] = [
+  { id: 'christmas', fromMonth: 11, fromDay: 22, toMonth: 0, toDay: 5, firstYear: 2025, warnMonth: 11 },
+  { id: 'summer', fromMonth: 7, fromDay: 1, toMonth: 7, toDay: 14, firstYear: 2026, warnMonth: 6 },
+];
 
 // ---------------------------------------------------------------------------
 // 7. The owner
@@ -391,7 +405,7 @@ export const FIRST_STEPS_LAST_DAY = 3;
 // 8.1 Fixed costs and the unit
 // ---------------------------------------------------------------------------
 
-/** The owner's daily draw: what he pays himself, every working day, one of eight thresholds and
+/** The owner's daily draw: what he pays himself, every weekday, one of eight thresholds and
  *  nothing in between (PIOTR: 200, 400, 800, 1,500, 3,000, then up to about 10,000; the three
  *  upper steps are [TUNE] interpolation). It stays daily: money leaks every day, with no bump at
  *  the month end (CLAUDE.md T13 3.18). Index 0 is where every game starts, which is the Turn 1

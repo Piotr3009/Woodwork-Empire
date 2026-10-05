@@ -19,6 +19,7 @@ import {
   SICK_DAYS_MIN,
 } from './constants';
 import {
+  closureBefore,
   isMonday,
   isOvertime,
   isWorkingDay,
@@ -53,10 +54,11 @@ export function labourFactorFor(overtimeDebt: number, breakSkipped: boolean): nu
 }
 
 /** The overtime debt a morning opens with. Monday starts clean, whatever last week cost him
- *  (PIOTR: reset at the weekend). The one place that rule is written, so the evening summary
+ *  (PIOTR: reset at the weekend), and so does the first day back from a closure, whatever day of
+ *  the week it is (CLAUDE.md T28 2.2). The one place that rule is written, so the evening summary
  *  cannot promise a morning something the morning will not do (CLAUDE.md T6 3.4). */
 export function debtOnMorningOf(day: number, overtimeDebt: number): number {
-  return isMonday(day) ? 0 : overtimeDebt;
+  return isMonday(day) || closureBefore(day) !== null ? 0 : overtimeDebt;
 }
 
 /** The factor the next working day will open on, as the evening can already see it. */

@@ -40,3 +40,29 @@ in the 400 and 800 m² units only with nine. A pelletiser turned on the floor ke
 behind the wall, where nothing can turn it back. It breathes behind the wall in
 `machineFx.test.ts` as it did at 14, 7; SPRITES.md section 6 and the first batch test say
 2 × 2 × 2.5 and 192 × 216, and the whole catalogue stands 18 things on the floor and not 19.
+
+**T28-B2 The company's holidays.** `closureOf(day)` in `clock.ts` is the one rule: Christmas from
+22 December to 5 January from December 2025, and 1 to 14 August from 2026 [PIOTR: the fortnights
+and the years; TUNE: chat: the 22nd and the first fortnight], off `CLOSURES` in constants;
+`isWorkingDay` is false on a closed day, so the day loop steps over a closure as over a weekend and
+runs its bills, and every deadline, delivery, courier, return from service and first day of a new
+man steps over it. Done on top of that: the owner's draw on every weekday (`isWeekday`), closed or
+open, so his house keeps its tier; `workingDayIndex` and `dayOfWorkingIndex` count the days
+`isWorkingDay` is true of (a kept count, so the Work Plan pays nothing per call); the first day
+back has its own card, `closureOver` (`Back from the Christmas break`, `14 days closed ... £X
+out.`, `Back to work`), in place of the Weekend card and after the tax's, its money everything that
+left the account on the stepped over days but the tax; the overtime debt is cleared on it
+(`closureBefore`); and `Tax is coming` says `The workshop is closed from 22 December, so the last
+day to spend is Thu 21 December.` before `Invest, or pay.`. The card before, `closureComing`
+(`Christmas break`, every date computed, the overdrawn sentence under nought), is raised after the
+tax's on the first working day of December and of July from 2026, once (`state.closureWarnedFor`,
+null in a v40 save, so a save loaded in the window is told on its next open), and the strip's
+`closureComing` line, `Closed from 22 December: 9 working days left` [TUNE: `1 working day left`
+on the last], stands directly under `taxComing`. The Team page's line on the draw says `paid Monday
+to Friday` and not `paid every working day`, which a closure made untrue. Re-dated honestly, to the
+last working day before the break and the first day back: `tax.test.ts` (the quarter is now of
+what the eight closed days before the 30th leave, read off the ledger), `taxCards.test.ts` and the
+(uu) scenario (15 working days with the strip's line and not 21); the test of a working 30
+December is flipped to say every 30th is closed, and the order pins of `warnings.test.ts` and
+`tax.test.ts` take `closureComing`. 22 new tests in `tests/engine/t28Closures.test.ts`, drafted by
+a sub-agent against the API and checked here.

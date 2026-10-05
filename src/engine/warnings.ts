@@ -34,6 +34,7 @@ import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine, hasOfficeAdmin } from './staff';
 import { taxComingLine } from './tax';
+import { closureComingLine } from './closures';
 import { designOutstandingFor } from './tasks';
 import type { GameState, LedgerCategory } from './types';
 
@@ -52,6 +53,9 @@ export type WarningKey =
   | 'spendingOverEarning'
   /** The taxman comes on 30 December, from the warning to the tax (CLAUDE.md T27 2.3). */
   | 'taxComing'
+  /** The workshop closes for its break, from the card to the last working day (CLAUDE.md T28
+   *  2.2.1). */
+  | 'closureComing'
   | 'crewFull'
   /** The first days say what to do (PIOTR accepted, 17.09; CLAUDE.md T18 2.7). */
   | 'firstSteps';
@@ -84,6 +88,10 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   // Under the money lines and above the crew's: it has a date on it, where the crew line can
   // stand for a year (CLAUDE.md T27 2.3) [TUNE].
   'taxComing',
+  // Directly under the tax's: the strip shows one line, so in December a company with cash to tax
+  // is told of the closure by its card and by the tax card's sentence, and this is the line July
+  // shows (CLAUDE.md T28 2.2.1) [TUNE].
+  'closureComing',
   'crewFull',
   'firstSteps',
 ];
@@ -183,6 +191,13 @@ function taxComingWarning(state: GameState): Warning | null {
   return text === null ? null : { key: 'taxComing', text };
 }
 
+/** The days left before the workshop closes for its break, from the card that said it to the last
+ *  working day (CLAUDE.md T28 2.2.1). The words are the closure's own. */
+function closureComingWarning(state: GameState): Warning | null {
+  const text = closureComingLine(state);
+  return text === null ? null : { key: 'closureComing', text };
+}
+
 function crewFullWarning(state: GameState): Warning | null {
   if (!crewFull(state, 'joiner')) return null;
   return { key: 'crewFull', text: `${crewLine(state)}: no room for another joiner` };
@@ -280,6 +295,7 @@ const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   belowZero: belowZeroWarning,
   spendingOverEarning: spendingOverEarningWarning,
   taxComing: taxComingWarning,
+  closureComing: closureComingWarning,
   crewFull: crewFullWarning,
   firstSteps: firstStepsWarning,
 };

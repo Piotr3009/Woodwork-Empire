@@ -1110,11 +1110,14 @@ function liftToVersion40(state: Raw): void {
   state.version = 40;
 }
 
-/** Version 40 to 41 (v83, Turn 28): nothing in the shape of a save changes for the pelletiser. The
- *  number marks the saves in which a pelletiser may still stand on the hall floor, which
- *  `standThePlantBehindTheWall` moves behind the rear wall once the save is whole (PIOTR, 05.10:
- *  "the pelletiser is to go where the flexi is, outside the building"; CLAUDE.md T28 2.1, 4). */
+/** Version 40 to 41 (v83, Turn 28). The number marks the saves in which a pelletiser may still
+ *  stand on the hall floor, which `standThePlantBehindTheWall` moves behind the rear wall once the
+ *  save is whole (PIOTR, 05.10: "the pelletiser is to go where the flexi is, outside the
+ *  building"; CLAUDE.md T28 2.1, 4), and the calendar has told of no closure yet (2.2.1). */
 function liftToVersion41(state: Raw): void {
+  // No closure has been told of: a save in the month before one is told on its next open (CLAUDE.md
+  // T28 2.2.1, section 4).
+  state.closureWarnedFor = null;
   state.version = 41;
 }
 

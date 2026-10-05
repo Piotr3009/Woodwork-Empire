@@ -16,6 +16,31 @@ export type Speed = 0 | 1 | 4 | 10 | 30 | 100;
 
 export type MaterialKind = 'sheet' | 'solidWood';
 
+/** The company's two holidays (PIOTR, 05.10; CLAUDE.md T28 2.2). */
+export type Closure = 'christmas' | 'summer';
+
+/** One of them, as the calendar knows it: from a day of one month to a day of the same month or
+ *  of the next, every year from its first, and told of in the month before it starts or in its
+ *  own first month (CLAUDE.md T28 2.2, 2.2.1). Months are indices into `MONTH_NAMES`. */
+export interface ClosureSpec {
+  id: Closure;
+  fromMonth: number;
+  fromDay: number;
+  toMonth: number;
+  toDay: number;
+  /** The first calendar year it runs in, by the year of its first day. */
+  firstYear: number;
+  /** The month whose first working day tells the player of it. */
+  warnMonth: number;
+}
+
+/** One closure on the game's own days: the first and the last day it holds. */
+export interface ClosureSpan {
+  closure: Closure;
+  from: number;
+  to: number;
+}
+
 export type Finish = 'laminate' | 'lacquer' | 'veneer';
 
 /** The stages a job goes through in the hall (CLAUDE.md T7 3.1): from v55 one stage a machine,
@@ -818,7 +843,12 @@ export type GameEventKind =
   /** The first working day of December: the taxman comes on the 30th (CLAUDE.md T27 2.3). */
   | 'taxComing'
   /** The open of 30 December took a quarter of the account (CLAUDE.md T27 2.2). */
-  | 'taxPaid';
+  | 'taxPaid'
+  /** The first working day of December, or of July from 2026: the workshop closes for its break
+   *  (CLAUDE.md T28 2.2.1). */
+  | 'closureComing'
+  /** The first day back from a closure, in place of the Weekend card (CLAUDE.md T28 2.2.2). */
+  | 'closureOver';
 
 export interface GameEventChoice {
   id: string;
@@ -1361,6 +1391,10 @@ export interface GameState {
   /** The month whose report has been put in front of the player, so it is shown once
    *  (CLAUDE.md T13 3.20). */
   monthEndShownFor: number;
+  /** The first closed day of the last closure the player was told of, or null before the first:
+   *  it is told once, and on the next open of a save that came into its window without it
+   *  (CLAUDE.md T28 2.2.1, section 4). */
+  closureWarnedFor: number | null;
   /** Every month the company has closed, in the figures its month end card was drawn from, oldest
    *  first. Accounting's Monthly reports tab is this list read back, so a month a player has not
    *  looked at is not lost with the ledger it was added up from (PIOTR, 20.09;
