@@ -13,20 +13,46 @@
 // (CLAUDE.md T28 2.6 to 2.10, 2.3, section 7). Every figure is [TUNE: chat] unless Piotr's.
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   FINISHES_LACQUER,
   MINUTES_PER_WORKING_DAY,
   PRODUCT_TEMPLATES,
   TIMBER_EQUIPMENT,
+  TIMBER_FAMILIES,
+  TIMBER_STAGES,
+  BY_HAND_DURATION_FACTOR,
+  DRAWN_TURN_MINUTES,
   TIMBER_LEAD_DAYS,
 } from '../../src/engine/constants';
 import { lockReasonFor, missingEquipment, template } from '../../src/engine/catalog';
 import { blockFor, enquiryDeadlineDays, kitBlockFor } from '../../src/engine/board';
 import { deadlineDaysFrom, labourValueFor, ownerDaysFor, stagedJob } from '../../src/engine/jobs';
-import { jobMinutesFor } from '../../src/engine/stages';
+import {
+  currentStage,
+  jobMinutesFor,
+  jobOnCnc,
+  stageDoing,
+  stageDone,
+  stageLabel,
+  stagePlanFor,
+  stagesOf,
+} from '../../src/engine/stages';
+import { drawnPlaces } from '../../src/engine/drawn';
+import { migrateState } from '../../src/engine/migrate';
+import { planPlaces } from '../../src/engine/production';
 import { workshopRate } from '../../src/engine/plan';
-import type { GameState } from '../../src/engine/index';
-import { buyStartingKit, newGame, placeEquipment } from '../helpers';
+import type { GameState, Job } from '../../src/engine/index';
+import {
+  acceptNow,
+  buyStartingKit,
+  fillRack,
+  firstJob,
+  newGame,
+  placeEnquiry,
+  placeEquipment,
+  testJoiner,
+} from '../helpers';
 
 const FIVE: Array<[string, string, number, string, number, number[]]> = [
   ['casementWindows', 'Casement windows', 9000, 'cuttersCasement', 25, [0, 0, 12]],
@@ -135,8 +161,9 @@ describe('a timber deadline (CLAUDE.md T28 2.10)', () => {
       const entry = template(id);
       for (const express of [false, true]) {
         const draw = { rng: 12345 };
+        // The rule every enquiry has, off the owner days of the timber job's own plan (2.7).
         const old = deadlineDaysFrom(draw, {
-          ownerDays: ownerDaysFor(state, labourValueFor(entry.basePrice), entry.material),
+          ownerDays: ownerDaysFor(state, labourValueFor(entry.basePrice), entry.material, false, true),
           price: entry.basePrice,
           express,
         });
@@ -158,9 +185,146 @@ describe('a timber deadline (CLAUDE.md T28 2.10)', () => {
   it('holds the workshop s hands against the days without the lead', () => {
     const state = timberHall();
     const entry = template('frenchDoors');
-    const days = jobMinutesFor(state, stagedJob(labourValueFor(entry.basePrice), entry.material, false), workshopRate(state)) / MINUTES_PER_WORKING_DAY;
+    const staged = stagedJob(labourValueFor(entry.basePrice), entry.material, false, 'laminate', false, true);
+    const days = jobMinutesFor(state, staged, workshopRate(state)) / MINUTES_PER_WORKING_DAY;
     const enough = Math.ceil(days);
     expect(blockFor(state, entry, enough + TIMBER_LEAD_DAYS, entry.basePrice)).toBeNull();
     expect(blockFor(state, entry, enough - 1 + TIMBER_LEAD_DAYS, entry.basePrice)?.reason).toBe('too few people for the deadline');
+  });
+});
+
+/** A sash window job taken on in the timber hall, at its first stage. */
+function sashJob(state: GameState = timberHall()): { state: GameState; job: Job } {
+  const enquiry = placeEnquiry(state, {
+    templateId: 'sashWindows',
+    name: 'Sash windows',
+    price: 14000,
+    finish: 'lacquer',
+    materialKind: 'solidWood',
+    needsMeasure: true,
+    deadlineDays: 40,
+  });
+  const next = acceptNow(state, enquiry.id);
+  return { state: next, job: firstJob(next) };
+}
+
+function day149(): GameState {
+  const raw = JSON.parse(readFileSync('tests/fixtures/day149-v25.woodwork.json', 'utf8')) as {
+    state: Record<string, unknown> & { version: number };
+  };
+  const state = migrateState(raw.state, raw.state.version);
+  if (state === null) throw new Error('the day 149 save did not open');
+  return state;
+}
+
+describe('a timber job s stages (CLAUDE.md T28 2.7)', () => {
+  it('has the seven stages in the brief s order and shares, the benches its Glazing', () => {
+    const { state, job } = sashJob();
+    expect(job.timber).toBe(true);
+    expect(stagesOf(state, job)).toEqual(TIMBER_STAGES);
+    const plan = stagePlanFor(state, job);
+    expect(plan.map((stage) => [stage.id, stage.label, stage.share, stage.family])).toEqual([
+      ['crossCutting', 'Cross cutting', 0.08, 'crossCut'],
+      ['planing', 'Planing', 0.12, 'planer'],
+      ['moulding', 'Moulding', 0.25, 'spindleMoulder'],
+      ['pressing', 'Pressing', 0.15, 'framePress'],
+      ['sanding', 'Sanding', 0.12, 'sander'],
+      ['finishing', 'Finishing', 0.13, 'sprayBooth'],
+      ['assembly', 'Glazing', 0.15, 'workbench'],
+    ]);
+    expect(TIMBER_STAGES.reduce((sum, stage) => sum + stage.share, 0)).toBeCloseTo(1, 10);
+    expect(plan[plan.length - 1]?.to).toBeCloseTo(job.labourValue, 6);
+    // The words of a stage say so, on the card and over the man.
+    expect(stageLabel('assembly', job)).toBe('Glazing');
+    expect(stageDoing('assembly', true, true)).toBe('glazing');
+    expect(stageDoing('crossCutting', true, true)).toBe('cross cutting');
+    expect(stageDoing('pressing', true, true)).toBe('pressing');
+    // A sheet job's are what they were.
+    expect(stageLabel('assembly')).toBe('Assembly');
+    expect(stageDoing('assembly', false)).toBe('assembling');
+    // Never on the CNC.
+    placeEquipment(state, 'cnc', { variantId: 'standard', x: 12, y: 3 });
+    expect(jobOnCnc(state, job)).toBe(false);
+  });
+
+  it('goes by hand at the machine stages the hall has no machine for, at the by hand rate', () => {
+    const { state, job } = sashJob(timberHall(['planer']));
+    const planing = stagePlanFor(state, job).find((stage) => stage.id === 'planing');
+    expect(planing?.byHand).toBe(true);
+    expect(planing?.speed).toBeCloseTo(1 / BY_HAND_DURATION_FACTOR, 10);
+    const cross = stagePlanFor(state, job).find((stage) => stage.id === 'crossCutting');
+    expect(cross?.byHand).toBe(false);
+  });
+
+  it('counts the labour in the four new bags once, and the bar moves on past them', () => {
+    const { state, job } = sashJob();
+    const plan = stagePlanFor(state, job);
+    const cross = plan[0];
+    const planing = plan[1];
+    if (cross === undefined || planing === undefined) throw new Error('no plan');
+    const crossLabour = cross.to - cross.from;
+    job.stageLabour = { crossCutting: crossLabour, planing: 1 };
+    job.labourRemaining = job.labourValue - crossLabour - 1;
+    expect(stageDone(job, plan, cross)).toBeCloseTo(crossLabour, 6);
+    expect(stageDone(job, plan, planing)).toBeCloseTo(1, 6);
+    expect(currentStage(state, job)?.id).toBe('planing');
+  });
+
+  it('leaves the oak table s plan as it was, in the day 149 save and in a new job', () => {
+    const state = day149();
+    const oak = state.jobs.find((entry) => entry.templateId === 'oakDiningTable');
+    if (oak === undefined) throw new Error('no oak table in the day 149 save');
+    expect(oak.timber).toBeUndefined();
+    expect(stagePlanFor(state, oak).map((stage) => stage.id)).toEqual(['cutting', 'edging', 'moulding', 'assembly']);
+    expect(stageLabel('assembly', oak)).toBe('Assembly');
+    // And a new one is not a window either.
+    const kitted = timberHall();
+    placeEquipment(kitted, 'thicknesser', { variantId: 'standard', x: 12, y: 6 });
+    const enquiry = placeEnquiry(kitted, { templateId: 'oakDiningTable', name: 'Oak dining table', price: 12000, materialKind: 'solidWood' });
+    const table = firstJob(acceptNow(kitted, enquiry.id));
+    expect(table.timber).toBeUndefined();
+    expect(stagePlanFor(kitted, table).map((stage) => stage.id)).toEqual(['cutting', 'edging', 'moulding', 'assembly']);
+  });
+});
+
+describe('where a window man is drawn (CLAUDE.md T28 2.7)', () => {
+  it('draws him only at the families of his own plan, and a kitchen man never at a timber machine', () => {
+    let state = timberHall();
+    placeEquipment(state, 'edgebander', { variantId: 'standard', x: 12, y: 3, id: 'kit-edge' });
+    const window = placeEnquiry(state, { templateId: 'sashWindows', name: 'Sash windows', price: 14000, finish: 'lacquer', materialKind: 'solidWood', deadlineDays: 40 });
+    state = acceptNow(state, window.id);
+    const kitchen = placeEnquiry(state, { templateId: 'smallKitchen', name: 'Small kitchen', price: 5000, deadlineDays: 40 });
+    state = acceptNow(state, kitchen.id);
+    state = fillRack(state, 60);
+    const windowJob = state.jobs.find((job) => job.templateId === 'sashWindows');
+    const kitchenJob = state.jobs.find((job) => job.templateId === 'smallKitchen');
+    if (windowJob === undefined || kitchenJob === undefined) throw new Error('jobs wanted');
+    for (const job of [windowJob, kitchenJob]) {
+      job.stage = 'inProduction';
+      job.sheetsReserved = job.sheets;
+    }
+    const tom = testJoiner('w-tom', 'Tom');
+    const ben = testJoiner('w-ben', 'Ben');
+    state.workers.push(tom, ben);
+    tom.jobId = windowJob.id;
+    ben.jobId = kitchenJob.id;
+    windowJob.assignees = [tom.id];
+    kitchenJob.assignees = [ben.id];
+    const windowFamilies = new Set(stagePlanFor(state, windowJob).map((stage) => stage.family));
+    let seenTimber = false;
+    for (let hour = 0; hour < 9; hour += 1) {
+      state.clock.minute = hour * DRAWN_TURN_MINUTES;
+      planPlaces(state);
+      for (const entry of drawnPlaces(state)) {
+        if (entry.who === tom.id) {
+          expect(windowFamilies.has(entry.item.specId), `${hour} ${entry.item.specId}`).toBe(true);
+          expect(['edgebander', 'tableSaw'], `${hour}`).not.toContain(entry.item.specId);
+          if (TIMBER_FAMILIES.includes(entry.item.specId)) seenTimber = true;
+        } else {
+          expect(TIMBER_FAMILIES, `${hour} ${entry.who}`).not.toContain(entry.item.specId);
+        }
+      }
+    }
+    expect(seenTimber).toBe(true);
   });
 });

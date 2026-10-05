@@ -146,7 +146,7 @@ export function enquiryDeadlineDays(
   express: boolean,
 ): number {
   const days = deadlineDaysFrom(draw, {
-    ownerDays: ownerDaysFor(state, labourValueFor(basePrice), entry.material),
+    ownerDays: ownerDaysFor(state, labourValueFor(basePrice), entry.material, false, entry.cutters !== null),
     price: basePrice,
     express,
   });
@@ -349,7 +349,7 @@ export function blockFor(
   // gives (CLAUDE.md T9 3.6, T10 3.7).
   const minutes = jobMinutesFor(
     state,
-    stagedJob(labourValueFor(basePrice), entry.material, false),
+    stagedJob(labourValueFor(basePrice), entry.material, false, 'laminate', false, entry.cutters !== null),
     workshopRate(state),
   );
   if (minutes / MINUTES_PER_WORKING_DAY > days) {

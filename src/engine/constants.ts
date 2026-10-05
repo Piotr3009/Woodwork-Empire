@@ -683,6 +683,19 @@ export const FINISHING_STAGE: StageSpec = { id: 'finishing', label: 'Finishing',
 /** Every stage a job can carry, once each, for the lists that name them (the bar's labels, the
  *  bags a save carries). The shares here are the machine stages' quarters and the booth's 15%;
  *  `stagesOf` in stages.ts scales them for the job in hand. */
+/** A timber job's plan (CLAUDE.md T28 2.7) [TUNE: chat: every share; they sum to one]: the glue
+ *  is pressed and the lacquer sprayed before the glass goes in and the ironmongery on, at the
+ *  benches, which on a timber job is the Glazing. A sheet job's plan is untouched. */
+export const TIMBER_STAGES: StageSpec[] = [
+  { id: 'crossCutting', label: 'Cross cutting', share: 0.08 },
+  { id: 'planing', label: 'Planing', share: 0.12 },
+  { id: 'moulding', label: 'Moulding', share: 0.25 },
+  { id: 'pressing', label: 'Pressing', share: 0.15 },
+  { id: 'sanding', label: 'Sanding', share: 0.12 },
+  { id: 'finishing', label: 'Finishing', share: 0.13 },
+  { id: 'assembly', label: 'Glazing', share: 0.15 },
+];
+
 export const PRODUCTION_STAGES: StageSpec[] = [...MACHINE_STAGES, FINISHING_STAGE];
 
 /** A CNC does the cutting of a sheet job instead of the saw: its stage carries the Cutting's share

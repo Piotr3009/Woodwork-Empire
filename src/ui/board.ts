@@ -70,7 +70,13 @@ function tile(state: GameState, enquiry: Enquiry): string {
   // the deadline is worked out from (CLAUDE.md T6 3.7).
   const ownerDays =
     Math.round(
-      ownerDaysFor(state, labourValueFor(enquiry.basePrice), enquiry.materialKind) * 10,
+      ownerDaysFor(
+        state,
+        labourValueFor(enquiry.basePrice),
+        enquiry.materialKind,
+        false,
+        template(enquiry.templateId).cutters !== null,
+      ) * 10,
     ) / 10;
   // A rush is not a warning: Express is the accent orange at the top right (CLAUDE.md T15 2.2).
   const express = enquiry.express

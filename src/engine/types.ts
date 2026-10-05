@@ -48,7 +48,19 @@ export type Finish = 'laminate' | 'lacquer' | 'veneer';
  *  the bench, a quarter each, and Finishing in the booth for a lacquered job [PIOTR, 24.09: "every
  *  machine has its own stage, split evenly"]. `cnc` is the one stage a CNC does instead of Cutting;
  *  `delivery` carries no labour at all. `machining`, the 15% of v53 and before, is gone. */
-export type StageId = 'cutting' | 'edging' | 'moulding' | 'cnc' | 'assembly' | 'finishing' | 'delivery';
+export type StageId =
+  | 'cutting'
+  | 'edging'
+  | 'moulding'
+  | 'cnc'
+  | 'assembly'
+  | 'finishing'
+  | 'delivery'
+  /** The timber department's own four (CLAUDE.md T28 2.7). */
+  | 'crossCutting'
+  | 'planing'
+  | 'pressing'
+  | 'sanding';
 
 /** One stage of the work, as the catalogue of stages holds it. */
 export interface StageSpec {
@@ -645,6 +657,10 @@ export interface Job {
   nightMinutes: number;
   /** The machining is done on the spindle moulder (CLAUDE.md T13 3.13). */
   needsSpindle: boolean;
+  /** True for a job of the timber department's windows and doors, the templates with `cutters`
+   *  (CLAUDE.md T28 2.7): its own plan of seven stages. Absent on every job of a save from before
+   *  them, which is false. Never true of the oak table, which is solid wood and not a window. */
+  timber?: boolean;
   /** Why the job is standing still, in plain English. Empty while nothing is in its way. */
   blockedBy: string;
   bespokeMaterial: boolean;

@@ -16,7 +16,9 @@
 // is seen and what is heard agree with each other.
 
 import { DRAWN_TURN_MINUTES, PACED_FAMILIES, TIMBER_FAMILIES } from './constants';
+import { jobHeldBy } from './jobs';
 import { OWNER, menAtPlaces, placedMachines, placesOf } from './machines';
+import { stagePlanFor } from './stages';
 import type { Equipment, GameState } from './types';
 
 /** A man and the machine or bench he is drawn at, with which of the cells at it is his. */
@@ -60,11 +62,19 @@ function hiringOrder(state: GameState, who: string): number {
 export function drawnPlaces(state: GameState): DrawnPlace[] {
   const working = menAtPlaces(state);
   if (working.length === 0) return [];
-  // The timber department's machines are spots only for a man on a timber job, which no man is
-  // before the timber work is made (CLAUDE.md T28 2.7): every other man is drawn over the rest, as
-  // he was before they stood in the hall.
-  const spots = workSpots(state).filter((item) => !TIMBER_FAMILIES.includes(item.specId));
-  if (spots.length === 0) return working;
+  // The timber department's machines are spots only for a man on a timber job, and a man on a
+  // timber job is drawn only at the families of his own plan; every other man, the men of a
+  // standing contract among them, is drawn over the rest, as he was before they stood in the hall
+  // (CLAUDE.md T28 2.7).
+  const every = workSpots(state);
+  const sheetSpots = every.filter((item) => !TIMBER_FAMILIES.includes(item.specId));
+  const spotsOf = (who: string): Equipment[] => {
+    const job = jobHeldBy(state, who);
+    if (job === null || job.timber !== true) return sheetSpots;
+    const families = new Set(stagePlanFor(state, job).map((stage) => stage.family));
+    return every.filter((item) => families.has(item.specId));
+  };
+  if (every.length === 0) return working;
   const turn = drawnTurn(state);
   const menAt = new Map<string, number>();
   const put = (who: string, item: Equipment): DrawnPlace => {
@@ -73,6 +83,8 @@ export function drawnPlaces(state: GameState): DrawnPlace[] {
     return { who, item, place };
   };
   return working.map((entry) => {
+    const spots = spotsOf(entry.who);
+    if (spots.length === 0) return put(entry.who, entry.item);
     const start = (turn + hiringOrder(state, entry.who)) % spots.length;
     for (let step = 0; step < spots.length; step += 1) {
       const item = spots[(start + step) % spots.length] as Equipment;

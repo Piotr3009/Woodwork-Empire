@@ -149,3 +149,18 @@ window cutter set` [TUNE: the words, the generic lock's]. The deadline is `enqui
 draw is kept, so the stream keeps its shape) and the agency never draws one of the five. Timber
 stays off the board (`TIMBER_ON_THE_BOARD` false) until C8; until C5 a timber enquiry's owner days
 are the oak table's plan. The test of the catalogue opening by 20 says 5 fewer and all of it by 35.
+
+**T28-C5 A timber job's stages.** A job of one of the five carries `timber: true` (set in
+`takeEnquiry` off the template's cutters; absent, so false, on every other job and in every save,
+the oak table's of the day 149 fixture among them), and so does the `StagedJob` an enquiry's owner
+days and its hands against the deadline are read from (`stagedJob`, `ownerDaysFor`, `blockFor`,
+the tile). Its plan is `TIMBER_STAGES`, four new `StageId`s and the two the game has: Cross cutting
+0.08 at the cross cut saw, Planing 0.12 at the planer, Moulding 0.25 at the spindle moulder,
+Pressing 0.15 at the frame press, Sanding 0.12 at the sander, Finishing 0.13 at the booth, and the
+benches' stage labelled `Glazing` (`glazing` over a man) [TUNE: chat: every share]; a sheet job's
+plan and the oak table's are what they were. `stageDone` lists the four new ids, they go by hand at
+the cutting's rate with their machines gone, and a window is never on the CNC (it never was:
+`jobOnCnc` takes sheet work only). `stageLabel` takes the job, so the person card says `glazing`; the
+Company page's line says it through `stageDoing`. A man on a timber job is drawn only at the
+families of his own plan; every other man is drawn over the spots that are not the four new
+families, which is v82's drawing in a hall with no timber job.

@@ -209,7 +209,7 @@ function doingWords(state: GameState, person: Person): string {
   if (person.waiting) return bubbleFor(state, person.id)?.text ?? NEEDS_A_JOB;
   if (person.job !== null) {
     const stage = jobStage(state, person.job);
-    const where = stage === null ? '' : ` (${stageLabel(stage.id).toLowerCase()})`;
+    const where = stage === null ? '' : ` (${stageLabel(stage.id, person.job).toLowerCase()})`;
     // On his job and with every machine he could work at taken: the words over his head (v53).
     const place = person.noPlaceFor === '' ? '' : `, ${placeLine()}`;
     return `${person.job.name}${where}${place}`;
@@ -343,7 +343,7 @@ function weekLines(state: GameState, person: Person): string {
 function onLine(state: GameState, person: Person): string {
   if (person.job === null) return '';
   const stage = jobStage(state, person.job);
-  const where = stage === null ? '' : `${stageLabel(stage.id).toLowerCase()}, `;
+  const where = stage === null ? '' : `${stageLabel(stage.id, person.job).toLowerCase()}, `;
   const done = Math.round(jobProgress(person.job) * 100);
   return (
     '<p class="tile-figures" data-on>' +

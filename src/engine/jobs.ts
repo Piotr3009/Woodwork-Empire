@@ -158,8 +158,12 @@ export function stagedJob(
   byHand: boolean,
   finish: Finish = 'laminate',
   needsSpindle = false,
+  timber = false,
 ): StagedJob {
-  return { labourValue, materialKind, finish, byHand, needsSpindle };
+  // A window or a door carries its mark, and nothing else does (CLAUDE.md T28 2.7).
+  return timber
+    ? { labourValue, materialKind, finish, byHand, needsSpindle, timber }
+    : { labourValue, materialKind, finish, byHand, needsSpindle };
 }
 
 /** Days of the owner's own time this much labour takes with the machines the hall has now: every
@@ -170,8 +174,9 @@ export function ownerDaysFor(
   labourValue: number,
   materialKind: MaterialKind,
   byHand = false,
+  timber = false,
 ): number {
-  const minutes = jobMinutesFor(state, stagedJob(labourValue, materialKind, byHand), 1);
+  const minutes = jobMinutesFor(state, stagedJob(labourValue, materialKind, byHand, 'laminate', false, timber), 1);
   return minutes / MINUTES_PER_WORKING_DAY;
 }
 
@@ -431,6 +436,8 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     budget: enquiry.budget,
     nightMinutes: 0,
     needsSpindle: entry.requiredEquipment.includes('spindleMoulder'),
+    // A window or a door: the template with a cutter set (CLAUDE.md T28 2.7).
+    ...(entry.cutters !== null ? { timber: true } : {}),
     blockedBy: '',
     bespokeMaterial: enquiry.bespokeMaterial,
     express: enquiry.express,

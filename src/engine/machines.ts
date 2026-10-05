@@ -1180,7 +1180,9 @@ function manRow(
   const machine =
     job === null && contract === null ? null : (menAtPlaces(state).find((entry) => entry.who === who)?.item ?? null);
   const doing =
-    job === null || stage === null ? '' : `${stageDoing(stage.id, job.finish === 'lacquer')} ${job.name}`;
+    job === null || stage === null
+      ? ''
+      : `${stageDoing(stage.id, job.finish === 'lacquer', job.timber === true)} ${job.name}`;
   // The job's one pace, the figure `runProductionMinute` reads before the air factor (v53); for a
   // man on a contract his piece's own, the figure `runContractMinute` reads, so the CNC he cuts
   // the packs on is his `machines` and not a remainder called hall (PIOTR, 02.10; CLAUDE.md T26
