@@ -74,15 +74,20 @@ a point that is no day (`Infinity`) is returned as it is.
   laptop's, the locker's and the high rack's pictures that were always on disk.
 - **The lock words** of a window without its set are the generic lock's, `Needs sash window cutter
   set`, with no article [TUNE]; the oak table keeps `Needs a thicknesser and a spindle moulder`.
-- **The tile's `Needs` line** lists the template's machines and not the cutters, as the mockup had
-  it; the lock and the greyed reason name the set.
+- **The tile's `Needs` line** names the template's machines and its cutter set after them, and its
+  sheets line counts the boards only (the material less the glass's 0.35), the figure the job will
+  hold; the mockup's page was written again to say so after the review of the timber tasks.
 - **The timber mark** is optional on a job (`timber?: boolean`), absent meaning false, so a save
   needs no field for it; `curing`, `glass` and `glassDay` are real fields, set by the lift to 41.
 - **Who draws a timber man**: only at the families of his own plan, so a window man is never at an
   edgebander or a table saw, and nobody else at a timber machine.
-- **The Work Plan's row of a standing job** reads the stage the bar has moved on to, `Sanding, glue
-  curing` after the pressing and `Glazing, lacquer drying` after the finishing; the mockup wrote
-  `Pressing, glue curing`. Left so.
+- **The Work Plan's row of a standing job** names the stage the frame stands after, `Pressing, glue
+  curing` and `Finishing, lacquer drying`, as the mockup has it: `jobStage` answers the stood stage
+  while the job stands, and the engine's own walk of the bar (`currentStage`) is not changed by it.
+  The bar counts the night being stood by the open that ends it and not as a whole day, so the
+  projected end does not jump back overnight.
+- **The glass button's reason** names the piece of the paperwork still to do: the drawing, the site
+  measure or the material list.
 - **The glass's admin order**: she orders it with the boards (`autoOrderMaterial`) and, for a job
   whose boards came another way or when the money was short, at the next settle (`refreshMaterial`).
 
@@ -103,9 +108,9 @@ counted on open days and are not used up by a closure.
   day back. Section 4 touches no job of a save; said, not changed.
 - **The weekly summary** shows on a Friday; the week of 18 to 21 December 2025 has its Friday closed
   and shows none.
-- **A frame press, a used sander and the glue table count as ducted for a move** (`needsDucting`:
-  every machine but the compressor), as the spray booth always has, though none of them pulls on
-  the extraction.
+- **A frame press and the used sander are not ducted for a move**: `needsDucting` passes over a
+  timber class with no extraction demand, so moving one asks for no pipe; the glue table is storage
+  and never was. The spray booth of the sheet department is counted as it always was.
 - **The owner can walk onto a standing job** (`jobForTheOwner` has no stop filter) and the engine can
   give free joiners one with nobody on it; the same is true today of a job stopped for want of a
   booth, and the brief writes no new rule for the men of a standing job.

@@ -51,9 +51,9 @@ has moved them the HTML page shows empty boxes there and the PNG keeps the pictu
    locked tile carries none, as today. Each deadline is the old rule's days and twelve working
    days on top. Written by hand: the lock and block reasons, by the rule of 2.6 (the solid wood
    branch passed over, the cutters counted among the kit, in `kitBlockFor`'s order), and the
-   twelve days. Drawn as the code draws it today and left so: the tile's `Needs` line is the
-   template's `requiredEquipment` (the six machines, not the cutters) and its sheets line counts
-   the whole material cost.
+   twelve days. The tile's `Needs` line names the six machines and the template's cutter set after
+   them, and its sheets line counts the boards only, the material less the glass's 0.35 (changed
+   after the review of the timber tasks, and the page written again to say so).
    Nearest existing: `docs/report-t26/10-big-job-red-and-green.png`, `docs/report-t15/02-order-board.jpg`.
 
 3. `glass-job-card.html` (and `glass-job-card.png`): 2.9, the Work Plan in its board skin on Thu 28

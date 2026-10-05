@@ -21,6 +21,7 @@ import {
   DUST_PER_SAWDUST_PILE,
   ENDURANCE_MINUTES_BY_CLASS,
   EQUIPMENT_SPECS,
+  EXTRACTION_DEMAND,
   EXTRACTOR_BAGS,
   EXTRACTOR_BREAKDOWN_CHANCE,
   EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
@@ -57,6 +58,7 @@ import {
   SERVICE_INTERVAL_MONTHS,
   SERVICE_LIFE_EXTENSION,
   TIER_WORDS,
+  TIMBER_FAMILIES,
   TOOL_CABINET,
   TOOL_CABINET_SLOTS,
   UNDER_EXTRACTION_DUST_MULTIPLIER,
@@ -1331,6 +1333,9 @@ export function needsDucting(specId: string, variantId?: string): boolean {
   // Nothing that holds no cell of the floor is ducted: it never stood anywhere to be unplugged
   // from (CLAUDE.md T6 3.5).
   if (!standsInTheHall(specId, variantId)) return false;
+  // A timber machine that pulls on no extraction, a frame press or the sander with its own vacuum,
+  // has no pipe to run again (CLAUDE.md T28 2.4). The sheet department's kit is as it was.
+  if (TIMBER_FAMILIES.includes(specId) && (EXTRACTION_DEMAND[specId]?.[variantId ?? ''] ?? 0) <= 0) return false;
   return findSpec(specId)?.category === 'machine';
 }
 

@@ -176,8 +176,8 @@ card is raised, and the night shift does nothing to it either. A weekend or a cl
 adds nothing (`nextWorkingDay`). The Work Plan counts a working day on the bar and in the latest
 start for each night not yet stood (`nightsLeft`), and leaves them out of the minutes lost. A
 sheet job never stands, lacquered or not; the drying racks and the wet air do what they did. The
-row reads the stage the bar has moved on to, `Sanding, glue curing`, where the mockup wrote
-`Pressing, glue curing`; left so and said. STATE_VERSION 41's lift gives every job of a save
+row reads the stage the frame stands after, `Pressing, glue curing`, as the mockup has it (set
+right by the review of the timber tasks, below). STATE_VERSION 41's lift gives every job of a save
 `curing: null`.
 
 **T28-C7 The glass.** A timber job carries its glass (`job.glass`: `none` on every other job, the
@@ -246,3 +246,23 @@ on it kept `waiting for glass` as its reason; `arriveGlass` now clears it (the r
 moved to `constants.ts` so that `materials.ts` can name them). No figure of any other scenario
 moved in this task; the only scenario figures moved this turn are B2's re-dating of
 `tests/scenarios/turn27.test.ts`.
+
+**T28-C the review.** Four read-only reviewers went over C2 to C8 against the brief and section
+7, and a fifth checked the one finding they rated medium. That one is refuted and left: the engine
+gives a free owner, or a manager's free joiner, a timber job that is standing, as it gives them a
+sheet job stopped for want of a booth; 2.8 makes the stand a booth stop "in every respect" and
+writes no new rule for the men, and `jobForTheOwner` and `jobsInManagerOrder` are main's. Fixed,
+each with its test: the Work Plan's row and the job card's step name the stage the frame stands
+after (`Pressing, glue curing`, `Finishing, lacquer drying`, `Production: Pressing`), as the mockup
+has it (`jobStage` answers the stood stage while it stands; the engine's own walk of the bar is
+`currentStage` and unchanged); the bar counts the night being stood by the open that ends it and
+not as a whole day, so its end no longer jumps back by most of a day overnight and no false
+`deadlineAtRisk` line stands on the strip the evening of a stand; the `Order glass` button names the
+piece of the paperwork still to do (`The drawing is not finished`, `The site measure is not done`,
+`The material list is not made`); a timber tile's sheets line counts the boards only, the figure
+the job will hold, and its `Needs` line ends with the cutter set (the mockup's page written again
+and shot again to say so); a frame press and the used sander, which pull on no extraction, ask for
+no pipe when moved (the sheet department's booth is counted as it was); a window whose glass came
+while nobody was on it no longer keeps `waiting for glass` (D2); the drawn places work a timber
+job's plan out once a job and not once a man. The oak table's no night and no glass, and the
+bubble a standing job's man does not wear, are asserted now.

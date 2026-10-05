@@ -44,6 +44,7 @@ import {
   isHeavy,
   isServiced,
   machinesWord,
+  needsDucting,
   placesAt,
   placesOf,
   poweredMachines,
@@ -187,6 +188,19 @@ describe('the timber department s five families (CLAUDE.md T28 2.4)', () => {
       expect(LIGHT_CLASSES[id], id).toEqual(['used', 'budget']);
       for (const tier of CLASS_ORDER) expect(isHeavy(id, tier), `${id}.${tier}`).toBe(tier !== 'used' && tier !== 'budget');
     }
+  });
+
+  it('runs a pipe again on a move only for a class that pulls on the extraction', () => {
+    for (const tier of CLASS_ORDER) {
+      expect(needsDucting('framePress', tier), tier).toBe(false);
+      expect(needsDucting('planer', tier), tier).toBe(true);
+      expect(needsDucting('crossCut', tier), tier).toBe(true);
+      expect(needsDucting('sander', tier), tier).toBe(tier !== 'used');
+    }
+    expect(needsDucting(GLUE_TABLE, 'standard')).toBe(false);
+    // The sheet department's kit is as it was: the booth is still counted.
+    expect(needsDucting('sprayBooth', 'standard')).toBe(true);
+    expect(needsDucting('tableSaw', 'used')).toBe(true);
   });
 
   it('calls them by the trade s short words, and presses and not presss', () => {

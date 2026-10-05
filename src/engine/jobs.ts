@@ -319,12 +319,23 @@ export function jobProgress(job: Job): number {
 }
 
 /** The stage this job is standing at, with the family it is done on and what that family does to
- *  its minutes. Null only for a job with no labour in it at all. */
+ *  its minutes. Null only for a job with no labour in it at all.
+ *
+ *  A timber job that stands for its glue or its lacquer is still at the stage it filled, so the
+ *  Work Plan's row, the job card's step and a man's card say `Pressing, glue curing` and not the
+ *  stage after it, which nobody has touched (CLAUDE.md T28 2.8; docs/mockups/t28). The engine's own
+ *  walk of the bar asks `currentStage` and is not changed by it. */
 export function jobStage(
   state: GameState,
   job: Job,
   options: StageOptions = {},
 ): StagePlan | null {
+  const stood = standingStageOf(job);
+  if (stood !== null) {
+    const plan = stagePlanFor(state, job, options);
+    const stage = plan.find((entry) => entry.id === stood);
+    if (stage !== undefined) return stage;
+  }
   return currentStage(state, job, options);
 }
 
@@ -662,7 +673,11 @@ export function autoOrderMaterial(state: GameState, job: Job): boolean {
 export function orderGlassCheck(state: GameState, job: Job): { ok: boolean; reason: string } {
   if (job.glass === 'none') return { ok: false, reason: 'No glass in this job' };
   if (job.glass !== 'toOrder') return { ok: false, reason: 'Ordered already' };
-  if (!paperworkDone(state, job)) return { ok: false, reason: 'The drawing is not finished' };
+  // The piece of the paperwork still to do, named, so the button never says the drawing is not
+  // finished on the day the strip says it is.
+  if (designOutstanding(state, job)) return { ok: false, reason: 'The drawing is not finished' };
+  if (measureOutstanding(state, job)) return { ok: false, reason: 'The site measure is not done' };
+  if (takeOffOutstanding(state, job)) return { ok: false, reason: 'The material list is not made' };
   if (!canAfford(state, glassCostOf(job))) return { ok: false, reason: 'Not enough cash' };
   return { ok: true, reason: '' };
 }
@@ -1352,6 +1367,14 @@ function standForTheNight(state: GameState, job: Job, stage: StageId): void {
   job.blockedBy = reason;
 }
 
+/** The stage whose filling a timber job is standing for now, or null when it is not standing. */
+function standingStageOf(job: Job): StageId | null {
+  if (job.curing === null || job.curing === undefined) return null;
+  const reason = job.curing.reason;
+  const found = (Object.keys(TIMBER_STANDS) as StageId[]).find((stage) => TIMBER_STANDS[stage] === reason);
+  return found ?? null;
+}
+
 /** The open of a working day ends every stand whose day it is: the job is free to be worked on
  *  again, whatever its men did in between (CLAUDE.md T28 2.8). */
 export function endTheStands(state: GameState): void {
@@ -1363,8 +1386,9 @@ export function endTheStands(state: GameState): void {
 }
 
 /** The nights a timber job has still to stand: one for a pressing or a finishing not yet filled,
- *  and one for the night it is standing now. The Work Plan counts a working day for each
- *  (CLAUDE.md T28 2.8). Nought for every other job. */
+ *  and one for the night it is standing now. The Work Plan counts a working day for each not yet
+ *  begun, and the one being stood by the day it ends (`standingUntil`) (CLAUDE.md T28 2.8). Nought
+ *  for every other job. */
 export function nightsLeft(state: GameState, job: Job): number {
   if (job.timber !== true) return 0;
   const plan = stagePlanFor(state, job);
@@ -1372,8 +1396,14 @@ export function nightsLeft(state: GameState, job: Job): number {
   for (const stage of plan) {
     if (TIMBER_STANDS[stage.id] !== undefined && stageLeft(job, plan, stage) > WORK_EPSILON) nights += 1;
   }
-  if (job.curing !== null && job.curing !== undefined && state.clock.day < job.curing.untilDay) nights += 1;
+  if (standingUntil(state, job) !== null) nights += 1;
   return nights;
+}
+
+/** The day whose open ends the stand this job is in now, or null when it is not standing. */
+export function standingUntil(state: GameState, job: Job): number | null {
+  if (job.curing === null || job.curing === undefined) return null;
+  return state.clock.day < job.curing.untilDay ? job.curing.untilDay : null;
 }
 
 /** The piece is made. It stands in front of the gate until somebody takes it to the client, and

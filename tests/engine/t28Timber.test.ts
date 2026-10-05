@@ -57,15 +57,18 @@ import {
   autoOrderMaterial,
   dropJob,
   hallStops,
+  lifecycleSteps,
   nightsLeft,
   orderGlassCheck,
   paperworkDone,
   refreshJob,
   WAITING_FOR_GLASS,
 } from '../../src/engine/jobs';
+import { bubbleFor } from '../../src/engine/bubbles';
 import { boardsCostOf, glassCostOf, sheetsForCost } from '../../src/engine/materials';
 import { WARNING_ORDER, warnings } from '../../src/engine/warnings';
 import { materialLine } from '../../src/ui/jobCard';
+import { renderBoard } from '../../src/ui/board';
 import { formatCalendarDay } from '../../src/engine/clock';
 import { workPlan } from '../../src/engine/plan';
 import { migrateState } from '../../src/engine/migrate';
@@ -309,6 +312,15 @@ describe('a timber job s stages (CLAUDE.md T28 2.7)', () => {
     expect(oak.timber).toBeUndefined();
     expect(stagePlanFor(state, oak).map((stage) => stage.id)).toEqual(['cutting', 'edging', 'moulding', 'assembly']);
     expect(stageLabel('assembly', oak)).toBe('Assembly');
+    // It carries no glass and stands no night: lifted to 41 with none, and played through.
+    expect(oak.glass).toBe('none');
+    expect(oak.curing).toBeNull();
+    expect(nightsLeft(state, oak)).toBe(0);
+    let played = state;
+    for (let step = 0; step < 6; step += 1) played = tick(clearEvents(played), 60);
+    const after = played.jobs.find((entry) => entry.id === oak.id);
+    expect(after?.curing ?? null).toBeNull();
+    expect(after?.glass).toBe('none');
     // And a new one is not a window either.
     const kitted = timberHall();
     placeEquipment(kitted, 'thicknesser', { variantId: 'standard', x: 12, y: 6 });
@@ -421,6 +433,15 @@ describe('the two nights (CLAUDE.md T28 2.8)', () => {
     expect(state.dayStats.efficiency.lost.hallStopped).toBeGreaterThan(stopped);
     expect(state.eventQueue.some((event) => event.kind === 'noMaterial')).toBe(false);
     expect(state.activeEvent?.kind === 'noMaterial').toBe(false);
+    // He wears no bubble, and the row and the step name the stage the frame stands after, as the
+    // mockup has it, and not the sanding nobody has begun.
+    expect(bubbleFor(state, 'w-tom')).toBeNull();
+    const row = workPlan(state).rows.find((entry) => entry.jobId === job.id);
+    expect(row?.stage).toBe('Pressing, glue curing');
+    expect(lifecycleSteps(state, job).map((step) => step.label)).toContain('Production: Pressing');
+    // The bar counts the night being stood by the open that ends it: the projected end is where it
+    // will be at that open, so it does not jump back by most of a day overnight.
+    const standingEnd = row?.to ?? Number.NaN;
     // The next working day opens and the frame is free.
     state.clock.minute = DAY_END_MINUTE;
     state = clearEvents(act(clearEvents(state), { type: 'END_DAY' }));
@@ -429,6 +450,9 @@ describe('the two nights (CLAUDE.md T28 2.8)', () => {
     expect(job.curing).toBeNull();
     expect(hallStops(state, job)).toBe('');
     expect(nightsLeft(state, job)).toBe(1);
+    const morning = workPlan(state).rows.find((entry) => entry.jobId === job.id);
+    expect(morning?.to).toBeCloseTo(standingEnd, 2);
+    expect(morning?.stage.startsWith('Sanding')).toBe(true);
   });
 
   it('stands a night after the finishing too: lacquer drying', () => {
@@ -438,6 +462,7 @@ describe('the two nights (CLAUDE.md T28 2.8)', () => {
     expect(job.curing?.reason).toBe('lacquer drying');
     expect(hallStops(state, job)).toBe('lacquer drying');
     expect(nightsLeft(state, job)).toBe(1);
+    expect(workPlan(state).rows.find((entry) => entry.jobId === job.id)?.stage).toBe('Finishing, lacquer drying');
   });
 
   it('never stands a sheet job, lacquered or not', () => {
@@ -504,6 +529,15 @@ describe('the glass (CLAUDE.md T28 2.9)', () => {
     expect(paperworkDone(state, job)).toBe(false);
     expect(orderGlassCheck(state, job)).toEqual({ ok: false, reason: 'The drawing is not finished' });
     expect(materialLine(state, job)).toContain('data-glass="toOrder"');
+    // The button names the piece still to do: never the drawing once the strip says it is done.
+    const finish = (kind: string): void => {
+      for (const task of state.tasks) if (task.jobId === job.id && task.kind === kind) task.done = true;
+    };
+    finish('design');
+    job.designMinutesRemaining = 0;
+    expect(orderGlassCheck(state, job)).toEqual({ ok: false, reason: 'The site measure is not done' });
+    finish('siteMeasure');
+    expect(orderGlassCheck(state, job)).toEqual({ ok: false, reason: 'The material list is not made' });
     paperworkOf(state, job);
     expect(orderGlassCheck(state, job)).toEqual({ ok: true, reason: '' });
     const html = materialLine(state, job);
@@ -699,6 +733,21 @@ describe('timber on the board of the 800 m2 hall (CLAUDE.md T28 2.3)', () => {
     const noBooth = greyed(bigHall(['sprayBooth']), 200).filter((tile) => TIMBER_IDS.includes(tile.templateId));
     expect(noBooth.length).toBeGreaterThan(0);
     for (const tile of noBooth) expect(tile.reason).toBe('needs a spray booth');
+  });
+
+  it('shows on a window s tile the boards the job will hold and the cutter set it needs', () => {
+    const state = bigHall();
+    let enquiry = generateEnquiry(state);
+    for (let at = 0; at < 500 && enquiry?.templateId !== 'sashWindows'; at += 1) enquiry = generateEnquiry(state);
+    if (enquiry === null || enquiry.templateId !== 'sashWindows') throw new Error('no sash window drawn');
+    state.enquiries = [enquiry];
+    const html = renderBoard(state, '');
+    expect(html).toContain(
+      'Needs cross cut saw, four sided planer, spindle moulder, sander, frame press, spray booth, sash window cutter set',
+    );
+    const job = firstJob(acceptNow(state, enquiry.id));
+    const figure = html.match(/(\d+) sheets? of material/);
+    expect(Number(figure?.[1])).toBe(job.sheets);
   });
 
   it('never has the agency draw a window or a door as a big job', () => {

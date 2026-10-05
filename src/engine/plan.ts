@@ -17,6 +17,7 @@ import {
   meetingOutstanding,
   minutesRemainingFor,
   nightsLeft,
+  standingUntil,
 } from './jobs';
 import { ownerIsAvailable } from './owner';
 import { isWorkingToday, joiners, shiftOf } from './staff';
@@ -195,6 +196,11 @@ function rowFor(state: GameState, job: Job): PlanRow {
   // on the bar for each it has not yet stood (CLAUDE.md T28 2.8).
   const nights = nightsLeft(state, job);
   const length = total / MINUTES_PER_WORKING_DAY + nights;
+  // The night it stands now is counted by the open that ends it and not as a whole day, so the bar
+  // does not jump back by most of a day when that open comes.
+  const until = standingUntil(state, job);
+  const standing = until === null ? 0 : Math.max(0, workingDayIndex(until) - now);
+  const ahead = until === null ? nights : nights - 1;
   const duePoint = workingDayIndex(job.dueDay);
   // The work takes working days, so counting back from the deadline counts back over the axis
   // and never over a weekend (CLAUDE.md T10 3.5).
@@ -206,10 +212,10 @@ function rowFor(state: GameState, job: Job): PlanRow {
   // (PIOTR, 15.09; CLAUDE.md T11 3.3).
   const to = notStarted
     ? from + length
-    : Math.max(from, now + left / MINUTES_PER_WORKING_DAY + nights);
+    : Math.max(from, now + standing + left / MINUTES_PER_WORKING_DAY + ahead);
   const barMinutes = Math.max(1, (to - from) * MINUTES_PER_WORKING_DAY);
   // The nights are the plan and not minutes the job's clock lost.
-  const nightMinutes = nights * MINUTES_PER_WORKING_DAY;
+  const nightMinutes = (notStarted ? nights : standing + ahead) * MINUTES_PER_WORKING_DAY;
   const minutesDone = Math.max(0, total - left);
   const overdue = to > duePoint;
   return {

@@ -68,11 +68,17 @@ export function drawnPlaces(state: GameState): DrawnPlace[] {
   // (CLAUDE.md T28 2.7).
   const every = workSpots(state);
   const sheetSpots = every.filter((item) => !TIMBER_FAMILIES.includes(item.specId));
+  // One plan a job, however many of its men are at work: the hall asks this once a machine.
+  const timberSpots = new Map<string, Equipment[]>();
   const spotsOf = (who: string): Equipment[] => {
     const job = jobHeldBy(state, who);
     if (job === null || job.timber !== true) return sheetSpots;
+    const known = timberSpots.get(job.id);
+    if (known !== undefined) return known;
     const families = new Set(stagePlanFor(state, job).map((stage) => stage.family));
-    return every.filter((item) => families.has(item.specId));
+    const spots = every.filter((item) => families.has(item.specId));
+    timberSpots.set(job.id, spots);
+    return spots;
   };
   if (every.length === 0) return working;
   const turn = drawnTurn(state);
