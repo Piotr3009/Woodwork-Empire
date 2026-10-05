@@ -84,8 +84,8 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   // can be ordered for it until the list is made, where the lines below can stand for weeks and
   // would keep this one from ever being read (v78).
   'drawingDone',
-  // Directly under it: the glass takes ten working days and production reaches the Glazing without
-  // it (CLAUDE.md T28 2.9) [TUNE].
+  // Directly under it: the glass is not ordered and production reaches the Glazing without it
+  // (CLAUDE.md T28 2.9, the glass a day from T29 2.1) [TUNE].
   'glassNotOrdered',
   'noInsurance',
   'belowZero',

@@ -38,6 +38,7 @@ import {
   VAN_REPAIR_FRACTION,
   VAN_VARIANTS,
   VAN_WORN_BREAKDOWN_FACTOR,
+  TIMBER_STANDS,
   WAITING_FOR_GLASS,
   WORKER_MINUTE_RATE_DIVISOR,
   type VanClass,
@@ -113,7 +114,6 @@ import type {
   JsonValue,
   MaterialKind,
   StageId,
-  TimberStandReason,
   Worker,
   WorkerRole,
 } from './types';
@@ -1346,14 +1346,6 @@ export function addLabour(state: GameState, job: Job, labour: number, stage: Sta
   completeJob(state, job);
   return true;
 }
-
-/** The stages after which a timber job stands a night, and what it stands for: the glue cures
- *  after the pressing and the lacquer dries after the finishing [PIOTR: "a bit more complicated";
- *  TUNE: chat: the rule] (CLAUDE.md T28 2.8). */
-const TIMBER_STANDS: Partial<Record<StageId, TimberStandReason>> = {
-  pressing: 'glue curing',
-  finishing: 'lacquer drying',
-};
 
 /** The moment a timber job fills its pressing or its finishing it stands until the next working day
  *  opens: nothing can be done to a frame meanwhile. A day on the job and never a timer of minutes,

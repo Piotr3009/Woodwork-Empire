@@ -19,3 +19,10 @@ game's own markup by its own renderers beside the same screen today: four to a c
 trimmed save's card; the five axis CNC and the robot; the Production line tab; the engineer and the
 strip; the timber stores; the sash window contract. (7), the logo, is not drawn: no
 `docs/logo-incoming/` on main.
+
+**T29-B1 The glass the next working day.** `GLASS_DELIVERY_WORKING_DAYS` is 1 [PIOTR, 05.10], and
+`TIMBER_LEAD_DAYS` is written as `GLASS_DELIVERY_WORKING_DAYS + Object.keys(TIMBER_STANDS).length`,
+3, with `TIMBER_STANDS` moved from `jobs.ts` into `constants.ts`; the comments and the three test
+literals (10, 12, 12) say so, and the glass's "day before it is due" half flipped to "ordered today,
+in at the next working day's open". A greyed timber enquiry of an old save drawn with +12 now has 3
+taken off for its hands and may turn takeable at the next settle (stored days, read as stored).

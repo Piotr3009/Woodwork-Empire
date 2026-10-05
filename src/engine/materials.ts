@@ -365,10 +365,10 @@ export function boardsCostOf(materialCost: number, timber: boolean): number {
 }
 
 /** The glass ordered from the glazier: paid in full at the click, one ledger line under the
- *  material, through the overdraft as the boards are, and in at the open of the tenth working day.
- *  No lorry, no unloading and no rack: the glazier carries it to the benches. `orderedBy` names
- *  the admin who placed it without being asked, as the boards' order does (CLAUDE.md T28 2.9).
- *  False when there is nothing to order or not the money for it. */
+ *  material, through the overdraft as the boards are, and in at the open of the next working day
+ *  (CLAUDE.md T29 2.1). No lorry, no unloading and no rack: the glazier carries it to the
+ *  benches. `orderedBy` names the admin who placed it without being asked, as the boards' order
+ *  does (CLAUDE.md T28 2.9). False when there is nothing to order or not the money for it. */
 export function orderGlass(state: GameState, job: Job, orderedBy: string | null = null): boolean {
   if (job.glass !== 'toOrder') return false;
   const cost = glassCostOf(job);

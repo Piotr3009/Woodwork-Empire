@@ -20,6 +20,7 @@ import type {
   SoftwareTier,
   StageId,
   StageSpec,
+  TimberStandReason,
   UnitExtension,
   WorkerIdleReason,
   WorkerRole,
@@ -813,8 +814,9 @@ export const DELIVERY_WORKING_DAYS_STANDARD = 1;
 export const DELIVERY_WORKING_DAYS_BESPOKE = 3;
 
 /** A window's glass is made to size by a glazier and cannot be ordered before the drawing says the
- *  sizes: it is in this many working days after it is ordered (CLAUDE.md T28 2.9) [TUNE: chat]. */
-export const GLASS_DELIVERY_WORKING_DAYS = 10;
+ *  sizes: it is in at the open of the next working day after it is ordered, beside the boards
+ *  ordered with it (CLAUDE.md T28 2.9; PIOTR, 05.10: "the glass, next day", CLAUDE.md T29 2.1). */
+export const GLASS_DELIVERY_WORKING_DAYS = 1;
 /** The share of a timber job's material cost that is glass and ironmongery; the rest is boards
  *  (CLAUDE.md T28 2.9) [TUNE: chat]. */
 export const GLASS_SHARE = 0.35;
@@ -1263,10 +1265,19 @@ export const TIMBER_EQUIPMENT: string[] = [
   'sprayBooth',
 ];
 
+/** The stages after which a timber job stands a night, and what it stands for: the glue cures
+ *  after the pressing and the lacquer dries after the finishing [PIOTR: "a bit more complicated";
+ *  TUNE: chat: the rule] (CLAUDE.md T28 2.8). Here and not in jobs.ts so that the timber lead days
+ *  below are counted off it (CLAUDE.md T29 2.1). */
+export const TIMBER_STANDS: Partial<Record<StageId, TimberStandReason>> = {
+  pressing: 'glue curing',
+  finishing: 'lacquer drying',
+};
+
 /** The working days a timber enquiry's client gives on top of the deadline every enquiry is given:
- *  the glass's ten and the two nights the glue and the lacquer stand (CLAUDE.md T28 2.10)
- *  [TUNE: chat]. */
-export const TIMBER_LEAD_DAYS = 12;
+ *  the glass's day and the nights the glue and the lacquer stand, three in all, written as their
+ *  sum so it cannot drift from the glass again (CLAUDE.md T28 2.10, T29 2.1) [TUNE: chat]. */
+export const TIMBER_LEAD_DAYS = GLASS_DELIVERY_WORKING_DAYS + Object.keys(TIMBER_STANDS).length;
 
 export const PRODUCT_TEMPLATES: ProductTemplate[] = [
   {
