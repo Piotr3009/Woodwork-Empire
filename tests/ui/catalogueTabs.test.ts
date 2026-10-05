@@ -180,11 +180,12 @@ describe('the tabs', () => {
     expect(hand.innerHTML).toContain('Hand tool sets');
     expect(hand.innerHTML).not.toContain('Drills');
     expect(hand.innerHTML).not.toContain('Table saws');
-    // The CNC centre has nothing in it tonight; Sanding has its sanders from v83 (CLAUDE.md T28
-    // 2.4).
+    // Sanding has its sanders from v83 (CLAUDE.md T28 2.4); the CNC centre, empty until v84, has
+    // the five axis CNCs (flipped: CLAUDE.md T29 2.6).
     expect(shop(state, 'sanding').innerHTML).toContain('Sanders');
     expect(shop(state, 'sanding').innerHTML).not.toContain('Nothing here yet.');
-    expect(shop(state, 'cncCentre').innerHTML).toContain('Nothing here yet.');
+    expect(shop(state, 'cncCentre').innerHTML).toContain('Five axis CNCs');
+    expect(shop(state, 'cncCentre').innerHTML).not.toContain('Nothing here yet.');
   });
 
   it('holds the folders Piotr named, each one a family (CLAUDE.md T7 3.7)', () => {

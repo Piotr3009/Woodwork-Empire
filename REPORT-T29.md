@@ -50,3 +50,17 @@ manifest regenerated (280 pictures), the folder and its JSON gone, `docs/art/SPR
 written (the table, why the names changed, the shelter's two views, module 1 drawn with no saw, the
 stores drawn full). The two pins of turned files go 96 to 107; the measured class count moves as
 each family lands. No pixel touched. `tests/ui/t29Families.test.ts` holds the 22 on disk.
+
+**T29-C2 The unit a spec names, a ladder of three, where a timber stage is done, stand ins, and
+the five axis CNC.** `minUnitM2` on a spec, refused in `canBuy` straight after the reputation with
+`Needs the 800 m² unit`. A ladder family is an unbroken run of `CLASS_ORDER` of two or more
+(`variants.test.ts` and `machine.test.ts` flipped by name), `TIPS.catalogue` reworded.
+`stageFamilyIn(state, job, stage)` beside `familyForStage` (untouched) answers a timber job's stage
+off the hall, and `stageSpeed` and `stagePlanFor` read it, so the plan, the places, the men drawn
+and the Work Plan follow. `TIMBER_STAND_INS` is the one table of stand ins; `missingEquipment` reads
+it for a timber product only, and the tile's `Needs` line prints the one `wantedKit` list whole.
+`cnc5` in every side table, its six ports measured off the pictures, its card line from
+`CNC5_STAGE_FACTOR`, its order built to order (`BUILT_TO_ORDER`, `Built to order: it cannot be
+called off`). Pins: the CNC centre tab, ports 37 to 40 and 84 to 90, measured classes 96 to 99, the
+catalogue's metres; the two buy-everything tests pass over what the 200 m² unit refuses for its
+size.

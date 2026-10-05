@@ -299,6 +299,10 @@ export interface EquipmentSpec {
   variants: EquipmentVariant[];
   /** Hours of use a standard one of these has in it [TUNE]. */
   enduranceHours: number;
+  /** The least unit, in square metres, the family stands in: refused in a smaller one, and shown
+   *  in the catalogue from day 1 as a thing to save for. Left out means any unit (CLAUDE.md T29
+   *  2.5.1). */
+  minUnitM2?: number;
 }
 
 /** Which way a thing on the floor is turned: quarter turns clockwise from the picture as the art

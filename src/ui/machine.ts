@@ -47,6 +47,7 @@ import {
   DRYING_RACKS_PLACES_FACTOR,
   GLUE_TABLE,
   GLUE_TABLE_PLACES,
+  CNC5_STAGE_FACTOR,
   DUST_WASTE_MONTHLY,
   EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
@@ -351,6 +352,12 @@ function figureLines(lines: Line[]): string {
  *  of the air, how long it lasts, and what its class alone does (a fan pulls and holds bags, a
  *  compressor gives air, a rack holds sheets, a machine with a drop can take a gate)
  *  (CLAUDE.md T13 3.1). */
+/** What the five axis CNC does, said among its effects off the engine's own factor; the CNC's card
+ *  says nothing of its own two, and that stays (CLAUDE.md T29 2.6). Empty for everything else. */
+function cnc5Line(spec: EquipmentSpec): string {
+  return spec.id === 'cnc5' ? `The Moulding of windows and doors goes ${CNC5_STAGE_FACTOR} times as fast on it` : '';
+}
+
 function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
   // Drying racks are shelving that makes nothing of its own, no dust and no hours: the one thing
   // they do is said in one line, off the engine's own factor (v73).
@@ -366,7 +373,7 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
   return [
     line(atOnceLine(spec, variant)),
     ...tripLines(spec, variant),
-    ...(machine ? [outputLine(spec, variant), line(dustLine(spec))] : []),
+    ...(machine ? [outputLine(spec, variant), line(cnc5Line(spec)), line(dustLine(spec))] : []),
     line(extractionLine(spec, variant)),
     line(spec.id === COMPRESSOR ? '' : airLine(state, spec, variant)),
     line(lifeLine(spec, variant)),

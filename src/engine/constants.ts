@@ -714,6 +714,21 @@ export const CNC_STAGE: StageSpec = { id: 'cnc', label: 'CNC', share: MACHINE_ST
  *  (PIOTR). The tool changer head takes it a little further [TUNE]. */
 export const CNC_STAGE_FACTOR = 2;
 export const CNC_STAGE_FACTOR_WITH_HEAD = 2.1;
+/** [PIOTR, 04.10: "one five axis CNC replaces four spindle moulders"; TUNE: chat: how] While a five
+ *  axis CNC runs, the Moulding of every timber job is done on it at this many times the hall's pace
+ *  at it, the class's pace on top, as the CNC does the Cutting of a sheet job at its two
+ *  (CLAUDE.md T29 2.6). */
+export const CNC5_STAGE_FACTOR = 4;
+/** The unit the biggest kit stands in: the five axis CNC and the production line ask for it
+ *  (CLAUDE.md T29 2.5.1). */
+export const BIG_KIT_UNIT_M2 = 800;
+/** Kit built to order, whose order cannot be called off once it is placed: the money is the
+ *  maker's from the click, so an order placed before 30 December and called off in January saves
+ *  no tax (CLAUDE.md T29 2.6, 2.10) [TUNE: chat]. Every other machine is still called off in full
+ *  until the lorry comes (section 8). */
+export const BUILT_TO_ORDER: readonly string[] = ['cnc5'];
+/** What an order built to order says in place of its refund (CLAUDE.md T29 2.10). */
+export const BUILT_TO_ORDER_LINE = 'Built to order: it cannot be called off';
 /** Parts come off a CNC cut and drilled, so the assembly takes half the minutes (PIOTR). */
 export const CNC_ASSEMBLY_FACTOR = 2;
 
@@ -1272,6 +1287,14 @@ export const TIMBER_EQUIPMENT: string[] = [
   'sprayBooth',
 ];
 
+/** What stands in for a machine a window or a door asks for, while it stands in the hall: the
+ *  thing that does that machine's stage of a timber job. The one table `missingEquipment` and the
+ *  board read; the booth is always asked, and a sheet product never reads it (CLAUDE.md T29 2.5.4)
+ *  [TUNE: chat]. */
+export const TIMBER_STAND_INS: Record<string, readonly string[]> = {
+  spindleMoulder: ['cnc5'],
+};
+
 /** The stages after which a timber job stands a night, and what it stands for: the glue cures
  *  after the pressing and the lacquer dries after the finishing [PIOTR: "a bit more complicated";
  *  TUNE: chat: the rule] (CLAUDE.md T28 2.8). Here and not in jobs.ts so that the timber lead days
@@ -1519,6 +1542,8 @@ export const DELIVERY_DAYS_BY_CLASS: Record<string, Record<string, number>> = {
   edgebander: { used: 1, budget: 1, standard: 7, pro: 12, industrial: 20 },
   // The Turn 13 ladders [TUNE]: a used CNC is on a lorry in a week, an industrial one is built.
   cnc: { used: 5, budget: 20, standard: 45, pro: 45, industrial: 60 },
+  // The five axis CNC is built to order like the CNC [TUNE] (CLAUDE.md T29 2.6).
+  cnc5: { standard: 45, pro: 45, industrial: 60 },
   spindleMoulder: { used: 1, budget: 3, standard: 7, pro: 12, industrial: 20 },
   sprayBooth: { used: 5, budget: 10, standard: 20, pro: 25, industrial: 30 },
   thicknesser: { used: 1, budget: 5, standard: 5, pro: 7, industrial: 12 },
@@ -1590,6 +1615,8 @@ export const HEAVY_SPECS = [
   'crossCut',
   'sander',
   'framePress',
+  // The five axis CNC comes on a lorry and is unloaded as the CNC is (CLAUDE.md T29 2.6) [TUNE].
+  'cnc5',
 ];
 
 /** Classes of a heavy family that are carried after all: a used or budget compressor is a small
@@ -1635,10 +1662,12 @@ export const CLASS_BADGE: Record<string, { label: string; colour: string }> = {
   industrial: { label: 'Industrial', colour: '#7a6a9c' },
 };
 
-/** The families the player chooses a class for: every one of them has exactly five classes in
- *  the order above (CLAUDE.md T13 3.12). Everything else is bought off the catalogue line itself:
- *  a locker, an air dryer, a central system or a tool changer head has one class and never will
- *  have more. */
+/** The families the player chooses a class for: every one of them has an unbroken run of the
+ *  classes above, in their order, two or more (CLAUDE.md T13 3.12; the five axis CNC's three from
+ *  T29 2.5.2), and every family but the five axis CNC has all five. The first class is what its
+ *  catalogue line shows and what a default purchase buys. Everything else is bought off the
+ *  catalogue line itself: a locker, an air dryer, a central system or a tool changer head has one
+ *  class and never will have more. */
 export const CLASS_LADDER_FAMILIES: readonly string[] = [
   'tableSaw',
   // The tool cabinet is a family of five from Turn 22, so its cards wear the class badge and the
@@ -1662,6 +1691,8 @@ export const CLASS_LADDER_FAMILIES: readonly string[] = [
   'planer',
   'sander',
   'framePress',
+  // The five axis CNC's three, standard to industrial (CLAUDE.md T29 2.5.2, 2.6).
+  'cnc5',
 ];
 
 /** Class 3 or above on the spindle moulder is the future gate to timber production. The branch
@@ -1863,6 +1894,9 @@ export const MACHINE_CAPACITY: Record<string, Record<string, number>> = {
   planer: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
   sander: { used: 1, budget: 1, standard: 2, pro: 3, industrial: 4 },
   framePress: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
+  // The five axis CNC [TUNE: chat]: the weak one's twelve are four spindle moulders at three men
+  // each, which is how Piotr counted them on 04.10 (CLAUDE.md T29 2.6).
+  cnc5: { standard: 12, pro: 20, industrial: 32 },
 };
 
 /** The families a hall can be short of: every row of the table but the bench's, whose places
@@ -2479,6 +2513,8 @@ export const EXTRACTION_DEMAND: Record<string, Record<string, number>> = {
   crossCut: { used: 600, budget: 700, standard: 900, pro: 1200, industrial: 1800 },
   planer: { used: 2000, budget: 2200, standard: 2800, pro: 3400, industrial: 4500 },
   sander: { used: 0, budget: 1200, standard: 1500, pro: 2200, industrial: 3500 },
+  // The five axis CNC [TUNE] (CLAUDE.md T29 2.6).
+  cnc5: { standard: 2000, pro: 2400, industrial: 3000 },
 };
 
 /** Piotr's margin on the extraction: the sums have to leave a fifth of the fan spare, so a hall
@@ -2522,6 +2558,13 @@ export const AIR_DEMAND: Record<string, Record<string, { bar: number; litres: nu
   cnc: {
     used: { bar: 6.5, litres: 650 },
     budget: { bar: 6.5, litres: 650 },
+    standard: { bar: 6.5, litres: 650 },
+    pro: { bar: 6.5, litres: 650 },
+    industrial: { bar: 6.5, litres: 650 },
+  },
+  // The five axis CNC wants the CNC's air in every class, and no dry air tonight (CLAUDE.md T29
+  // 2.6) [TUNE].
+  cnc5: {
     standard: { bar: 6.5, litres: 650 },
     pro: { bar: 6.5, litres: 650 },
     industrial: { bar: 6.5, litres: 650 },
@@ -2755,6 +2798,58 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     description:
       'A nesting cell with automatic loading, a second spindle and an offload table. It runs ' +
       'a shift with one man watching it, and it costs what a small factory costs.',
+  },
+];
+
+/** The five axis CNC's three classes [PIOTR, 04.10: "from a weak one at 150 thousand to a fully
+ *  automatic one at 500 thousand"; TUNE: chat: the middle], the metres the art side's (CLAUDE.md
+ *  T29 2.4, 2.6). Its zone is its footprint and a metre more each way [TUNE]; the endurance and
+ *  the power are [TUNE]. */
+export const CNC5_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'standard',
+    name: 'Standard five axis CNC',
+    price: 150000,
+    width: 5,
+    depth: 3,
+    height: 2.5,
+    zoneWidth: 6,
+    zoneDepth: 4,
+    enduranceFactor: 1.2,
+    powerPerDay: 16,
+    description:
+      'An open gantry over a table of consoles and clamps, with one head on five axes. The ' +
+      'blanks go on and come off by hand.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional five axis CNC',
+    price: 300000,
+    width: 6,
+    depth: 3,
+    height: 2.75,
+    zoneWidth: 7,
+    zoneDepth: 4,
+    enduranceFactor: 1.5,
+    powerPerDay: 24,
+    description:
+      'A closed cabin with sliding doors, a carousel of tools beside the head and clamps that set ' +
+      'themselves for the next frame.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial five axis CNC',
+    price: 500000,
+    width: 8,
+    depth: 4,
+    height: 3,
+    zoneWidth: 9,
+    zoneDepth: 5,
+    enduranceFactor: 2,
+    powerPerDay: 36,
+    description:
+      'Fully automatic: two heads, a loading table at one end and an unloading table at the ' +
+      'other, and a frame out of it while the next goes in.',
   },
 ];
 
@@ -3354,6 +3449,7 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   compressor: COMPRESSOR_VARIANTS,
   thicknesser: THICKNESSER_VARIANTS,
   cnc: CNC_VARIANTS,
+  cnc5: CNC5_VARIANTS,
   sprayBooth: SPRAY_BOOTH_VARIANTS,
   spindleMoulder: SPINDLE_MOULDER_VARIANTS,
   // The cabinet is a family of five from Turn 22, and what a class is for is how many men's hand
@@ -4006,7 +4102,30 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'cncHead',
     requires: ['cnc'],
     effect: 'Bolted to a CNC, no floor of its own. A further 5% out of the CNC\u0027s own stage.',
+  },  {
+    ...BASE_SPEC,
+    id: 'cnc5',
+    // Built to order, as the CNC (CLAUDE.md T29 2.6) [TUNE].
+    deliveryDays: 45,
+    folder: 'Five axis CNCs',
+    tab: 'cncCentre',
+    name: 'Five axis CNC',
+    price: 150000,
+    category: 'machine',
+    width: 5,
+    depth: 3,
+    height: 2.5,
+    zoneWidth: 6,
+    zoneDepth: 4,
+    spriteKey: 'cnc5',
+    usedOn: 'solidWood',
+    requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
+    minUnitM2: BIG_KIT_UNIT_M2,
+    effect:
+      'Moulds the frames of windows and doors on five axes, in place of the spindle moulders. ' +
+      'A sheet job never goes on it.',
   },
+
   {
     ...BASE_SPEC,
     id: DRYING_RACKS,
@@ -4890,6 +5009,7 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   thicknesser: 0.25, // two bags a day, it takes 6 to 8 mm off two faces
   cnc: 0.06, // half a bag a day, Piotr's point of reference
   cncHead: 0.06, // the same head, the same chips
+  cnc5: 0.06, // the CNC's figure [TUNE] (CLAUDE.md T29 2.6)
   sprayBooth: 0, // its own extraction, off this table
   spindleMoulder: 0.12, // a bag a day, the figure the Turn 12 comment kept for it (PIOTR)
   // A compressor moves air and makes no chips. Not on Piotr's list: a zero so that every family
@@ -5276,11 +5396,13 @@ export const MACHINE_SHORT_WORDS: Record<string, string> = {
   planer: 'planer',
   sander: 'sander',
   framePress: 'press',
+  cnc5: 'five axis CNC',
 };
 
-/** The four timber families with places (CLAUDE.md T28 2.4, 2.7): a man is drawn at one of them
- *  only while he is on a timber job, so a kitchen man is never seen at the planer. */
-export const TIMBER_FAMILIES: readonly string[] = ['crossCut', 'planer', 'framePress', 'sander'];
+/** The timber families with places (CLAUDE.md T28 2.4, 2.7): a man is drawn at one of them only
+ *  while he is on a timber job, so a kitchen man is never seen at the planer. The five axis CNC is
+ *  one of them, since only a timber job is made on it (CLAUDE.md T29 2.6). */
+export const TIMBER_FAMILIES: readonly string[] = ['crossCut', 'planer', 'framePress', 'sander', 'cnc5'];
 
 /** The first use bubbles, one sentence each, keyed by the screen they open on [TUNE wording]
  *  (CLAUDE.md T13 3.22). Dismissed by a click, remembered in the save. */
@@ -5290,7 +5412,7 @@ export const TIPS: Record<string, string> = {
   unconnected:
     'A machine with no pipe to the extraction says so under its name. Open its card to connect it, or hire a production manager and it is done for you.',
   catalogue:
-    'Every machine family has five classes: the effects come first, then the costs, then what it is.',
+    'A machine family comes in classes, up to five: the effects come first, then the costs, then what it is.',
   workPlan: 'One row a job. A red figure on a job is material it does not have yet.',
   stock: 'Free is what a new job can have; reserved is what accepted jobs will use. Restock fills the low lines.',
   board: 'Every enquiry comes with a budget. Say yes and the client answers with a number.',

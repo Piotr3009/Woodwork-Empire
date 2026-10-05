@@ -17,6 +17,7 @@ import {
 import { NO_INSURANCE_REASON } from '../engine/constants';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { bigJobCheck, bigJobLine, isBigJob } from '../engine/agency';
+import { wantedKit } from '../engine/catalog';
 import { effectiveReputation } from '../engine/index';
 import type { Enquiry, GameState } from '../engine/index';
 import {
@@ -39,11 +40,11 @@ function expiryLine(state: GameState, enquiry: Enquiry): string {
 
 /** What the workshop has to have to take this job on, in plain names: the machines, and a
  *  window's or a door's cutter set after them, which it needs exactly as it needs a machine
- *  (CLAUDE.md T28 2.6). */
+ *  (CLAUDE.md T28 2.6). The whole list, owned or not and whatever stands in (CLAUDE.md T29
+ *  2.5.4). */
 function toolsLine(enquiry: Enquiry): string {
   const entry = template(enquiry.templateId);
-  const wanted = entry.cutters === null ? entry.requiredEquipment : [...entry.requiredEquipment, entry.cutters];
-  const names = wanted.map((specId) => findSpec(specId)?.name ?? specId);
+  const names = wantedKit(entry).map((specId) => findSpec(specId)?.name ?? specId);
   return names.length === 0 ? 'nothing special' : names.join(', ').toLowerCase();
 }
 

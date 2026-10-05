@@ -225,9 +225,13 @@ describe('the tiles inside a folder', () => {
         for (const card of cards) expect(card.querySelector('.badge-class')).toBeNull();
         continue;
       }
-      expect(cards.map((card) => card.getAttribute('data-variant')), spec.id).toEqual([
-        ...CLASS_ORDER,
-      ]);
+      // An unbroken run of the one ladder, in its order: all five for every family but the five
+      // axis CNC, whose three are standard to industrial (flipped in v84: CLAUDE.md T29 2.5.2).
+      const shown = cards.map((card) => card.getAttribute('data-variant') ?? '');
+      const first = CLASS_ORDER.indexOf(shown[0] ?? '');
+      expect(shown.length, spec.id).toBeGreaterThanOrEqual(2);
+      expect(shown, spec.id).toEqual(CLASS_ORDER.slice(first, first + shown.length));
+      expect(shown, spec.id).toEqual(spec.id === 'cnc5' ? ['standard', 'pro', 'industrial'] : [...CLASS_ORDER]);
       for (const card of cards) {
         const classId = card.getAttribute('data-variant') ?? '';
         const badge = card.querySelector('.badge-class');

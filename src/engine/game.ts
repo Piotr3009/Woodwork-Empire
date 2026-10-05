@@ -86,6 +86,7 @@ import { enlargeCanteen, extendUnit, openExtension } from './premises';
 import { raiseTaxWarning } from './tax';
 import { backFromTitle, raiseClosureWarning } from './closures';
 import {
+  cancelRefusal,
   createOnOrder,
   findOnOrder,
   onOrderCount,
@@ -2549,6 +2550,11 @@ export function canBuy(
   if (state.reputation < spec.minReputation) {
     return { ok: false, reason: `Needs reputation ${spec.minReputation}` };
   }
+  // The biggest kit stands only in the biggest unit, and is in the catalogue from day 1 as a thing
+  // to save for (CLAUDE.md T29 2.5.1).
+  if (spec.minUnitM2 !== undefined && state.unit.areaM2 < spec.minUnitM2) {
+    return { ok: false, reason: `Needs the ${spec.minUnitM2} m² unit` };
+  }
   // A class may want something the family does not: a floor edgebander wants extraction where a
   // hand one wants a tool cabinet (CLAUDE.md T7 3.6).
   for (const required of requiresFor(spec, variant)) {
@@ -2916,8 +2922,10 @@ function settleOrders(state: GameState, task: TaskInstance): void {
 export function cancelOrder(state: GameState, orderId: string): BuyCheck {
   const item = findOnOrder(state, orderId);
   if (item) {
-    // At the gate is too late: it is here, and somebody has to take it off the lorry.
-    if (item.arrived) return { ok: false, reason: 'It is at the gate' };
+    // At the gate is too late: it is here, and somebody has to take it off the lorry. And kit built
+    // to order is the maker's from the click (CLAUDE.md T29 2.10).
+    const refusal = cancelRefusal(item);
+    if (refusal !== null) return { ok: false, reason: refusal };
     if (timeIsPaused(state)) state.speed = 1;
     receive(state, 'equipment', `Order cancelled: ${orderName(item)}`, item.pricePaid);
     removeOnOrder(state, item.id);

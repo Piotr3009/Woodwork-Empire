@@ -166,9 +166,11 @@ describe('setting the hall out', () => {
 describe('the whole workshop fits on the painted floor', () => {
   it('stands the day 1 kit, a full crew and the big machines side by side', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    // Everything a workshop can own, bought without caring what it costs.
+    // Everything a workshop can own, bought without caring what it costs; what the unit refuses for
+    // its size is passed over (CLAUDE.md T29 2.5.1).
     for (const spec of EQUIPMENT_SPECS) {
       if (spec.category === 'furniture') continue;
+      if (spec.minUnitM2 !== undefined && spec.minUnitM2 > state.unit.areaM2) continue;
       const have = state.equipment.filter((item) => item.specId === spec.id).length;
       const want = spec.perWorker ? 6 : 1;
       for (let index = have; index < want; index += 1) {

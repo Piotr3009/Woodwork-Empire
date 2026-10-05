@@ -57,7 +57,8 @@ describe('the table covers what a pipe is drawn to (CLAUDE.md T22 2.8)', () => {
     // thicknessers and from v54 the five CNCs (the art side's pack of 24.09): twenty three
     // pictures of machines with a demand have landed. Thirty seven from v83: the five cross cut
     // saws, the five planers and the four sanders that pull on the extraction (CLAUDE.md T28 2.4).
-    expect(checked).toBe(37);
+    // Forty from v84: the three five axis CNCs (CLAUDE.md T29 2.6).
+    expect(checked).toBe(40);
   });
 
   it('has a line for every delivered picture of a fan, and none for a central system', () => {
@@ -89,12 +90,13 @@ describe('the table covers what a pipe is drawn to (CLAUDE.md T22 2.8)', () => {
     }
   });
 
-  it('measures eighty four files and every pixel of them is inside its own file', () => {
+  it('measures ninety files and every pixel of them is inside its own file', () => {
     // Eighteen base pictures, and since v33 the true quarter turn of every one of them (the art
     // side's packs of 19.09 and 20.09); the five thicknessers and their turns from v49; the five
     // CNCs and their turns from v54; from v83 the fourteen timber classes that pull on the
-    // extraction and their turns (CLAUDE.md T28 2.4).
-    expect(measuredFiles()).toHaveLength(84);
+    // extraction and their turns (CLAUDE.md T28 2.4); from v84 the three five axis CNCs and their
+    // turns (CLAUDE.md T29 2.6).
+    expect(measuredFiles()).toHaveLength(90);
     for (const file of measuredFiles()) {
       const port = portFor(file);
       if (port === null) throw new Error(`no line for ${file}`);

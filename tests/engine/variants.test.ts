@@ -80,12 +80,15 @@ describe('every catalogue line is a family', () => {
     }
   });
 
-  it('gives every family of the one ladder exactly five classes, in order, with a badge each', () => {
-    // Five is the number: used, budget, standard, pro, industrial, and class 5 is always the
+  it('gives every family of the one ladder an unbroken run of its classes, in order, with a badge each', () => {
+    // Five is the most: used, budget, standard, pro, industrial, and class 5 is always the
     // industrial one (PIOTR; CLAUDE.md T13 1, 3.12). The thicknesser, the CNC, the spray booth,
     // the drill and the spindle moulder joined the ladder in Turn 13. The timber tool set joined
     // it then as well and is gone from the game: the thicknesser and the spindle moulder are all a
-    // furniture shop needs (PIOTR, 24.09; v53).
+    // furniture shop needs (PIOTR, 24.09; v53). Flipped in v84 from "exactly five": a family on
+    // the ladder has an unbroken run of the classes, in their order, of two or more, and every
+    // family that was on it before v84 still has its five; the five axis CNC has three, standard
+    // to industrial (CLAUDE.md T29 2.5.2).
     expect(CLASS_ORDER).toEqual(['used', 'budget', 'standard', 'pro', 'industrial']);
     for (const family of ['thicknesser', 'cnc', 'sprayBooth', 'spindleMoulder']) {
       expect(CLASS_LADDER_FAMILIES, family).toContain(family);
@@ -95,7 +98,13 @@ describe('every catalogue line is a family', () => {
     for (const family of CLASS_LADDER_FAMILIES) {
       const spec = findSpec(family);
       expect(spec, family).not.toBeNull();
-      expect(spec?.variants.map((variant) => variant.id), family).toEqual([...CLASS_ORDER]);
+      const ids = spec?.variants.map((variant) => variant.id) ?? [];
+      const first = CLASS_ORDER.indexOf(ids[0] ?? '');
+      expect(ids.length, family).toBeGreaterThanOrEqual(2);
+      expect(first, family).toBeGreaterThanOrEqual(0);
+      expect(ids, family).toEqual(CLASS_ORDER.slice(first, first + ids.length));
+      if (family === 'cnc5') expect(ids, family).toEqual(['standard', 'pro', 'industrial']);
+      else expect(ids, family).toEqual([...CLASS_ORDER]);
       for (const variant of spec?.variants ?? []) {
         expect(CLASS_BADGE[variant.id], `${family}.${variant.id}`).toBeDefined();
         // A class carries no dust figure of its own: the dust is the family's (CLAUDE.md T13 10.1).
