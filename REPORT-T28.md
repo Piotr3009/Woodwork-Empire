@@ -132,3 +132,20 @@ cabinet or slot, their card says `Kept at the spindle moulders` where a hand too
 tool cabinet`, and they are never sold (`Nobody buys second hand fittings`, as any tool). No
 picture exists: the card shows the empty picture box, and the Sprite check page lists the three,
 `kept at the spindle moulders`, `no file yet`, so the art side has its rows (`REQUESTS-T28.md`).
+
+**T28-C4 The five products and their deadline.** `casementWindows`, `sashWindows`, `frenchDoors`,
+`patioDoors` and `bifoldDoors` at the prices, standings and weights of 2.6 [PIOTR: the five and that
+they pay better; TUNE: chat: every figure], solid wood, lacquer alone, measured, never by hand,
+`calls` 4 as the kitchens of nearest price, and a new field `cutters` (null on the nine the game
+had). `requiredEquipment` is `TIMBER_EQUIPMENT` (the cross cut saw, the planer, the spindle
+moulder, the sander, the frame press and the booth); `missingEquipment` counts the cutters, and the
+oak table's branch (`SOLID_WOOD_EQUIPMENT`, the thicknesser) is passed over for a template with
+cutters in `lockReasonFor` and `kitBlockFor`, so the reasons come in the brief's order: the
+reputation, the booth, the machines by name with the cutters among them (`no sash window cutter
+set`, the catalogue's link), then the hands. A live tile without its set is locked `Needs sash
+window cutter set` [TUNE: the words, the generic lock's]. The deadline is `enquiryDeadlineDays`:
+`deadlineDaysFrom` with its express factor, and `TIMBER_LEAD_DAYS` 12 on top [TUNE: chat];
+`blockFor` holds the hands against the days without it. A window's material is never bespoke (the
+draw is kept, so the stream keeps its shape) and the agency never draws one of the five. Timber
+stays off the board (`TIMBER_ON_THE_BOARD` false) until C8; until C5 a timber enquiry's owner days
+are the oak table's plan. The test of the catalogue opening by 20 says 5 fewer and all of it by 35.

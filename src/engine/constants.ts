@@ -1229,6 +1229,23 @@ export const FINISHES_SOLID: Finish[] = ['laminate'];
  *  will do (PIOTR, 15.09; CLAUDE.md T11 3.7). */
 export const FINISHES_LACQUER: Finish[] = ['lacquer'];
 
+/** What a window or a door of the timber department is made on (CLAUDE.md T28 2.6): the list that
+ *  locks a live enquiry, the booth among it as the lacquered kitchen has it. The glue table and the
+ *  thicknesser are not asked of it [TUNE: chat]. */
+export const TIMBER_EQUIPMENT: string[] = [
+  'crossCut',
+  'planer',
+  'spindleMoulder',
+  'sander',
+  'framePress',
+  'sprayBooth',
+];
+
+/** The working days a timber enquiry's client gives on top of the deadline every enquiry is given:
+ *  the glass's ten and the two nights the glue and the lacquer stand (CLAUDE.md T28 2.10)
+ *  [TUNE: chat]. */
+export const TIMBER_LEAD_DAYS = 12;
+
 export const PRODUCT_TEMPLATES: ProductTemplate[] = [
   {
     id: 'garageShelves',
@@ -1242,6 +1259,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     minReputation: -50,
     weightsByTier: [50, 20, 8],
     byHandAllowed: false,
+    cutters: null,
   },
   {
     id: 'bookcase',
@@ -1255,6 +1273,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     minReputation: -50,
     weightsByTier: [30, 25, 12],
     byHandAllowed: false,
+    cutters: null,
   },
   {
     id: 'tvUnit',
@@ -1268,6 +1287,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     minReputation: 5,
     weightsByTier: [12, 25, 18],
     byHandAllowed: false,
+    cutters: null,
   },
   {
     id: 'wardrobe',
@@ -1281,6 +1301,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     minReputation: 10,
     weightsByTier: [0, 20, 22],
     byHandAllowed: false,
+    cutters: null,
   },
   {
     id: 'smallKitchen',
@@ -1294,6 +1315,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     minReputation: 20,
     weightsByTier: [0, 8, 25],
     byHandAllowed: false,
+    cutters: null,
   },
   // The two sprayed products (PIOTR, 15.09; CLAUDE.md T11 3.7). The board greys them until there
   // is a booth in the hall, the Finishing is done at the booth, and a booth on wet air takes half
@@ -1313,6 +1335,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     minReputation: 10,
     weightsByTier: [0, 10, 18],
     byHandAllowed: false,
+    cutters: null,
   },
   {
     id: 'lacqueredKitchen',
@@ -1329,6 +1352,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     minReputation: 20,
     weightsByTier: [0, 0, 12],
     byHandAllowed: false,
+    cutters: null,
   },
   // A handleless kitchen: the J profile on the fronts wants the spindle moulder, and it is the
   // second product that does (CLAUDE.md T13 3.13) [TUNE price, four stages like every sheet job].
@@ -1344,6 +1368,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     minReputation: 20,
     weightsByTier: [0, 0, 14],
     byHandAllowed: false,
+    cutters: null,
   },
   {
     id: 'oakDiningTable',
@@ -1357,6 +1382,82 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     minReputation: 10,
     weightsByTier: [0, 2, 15],
     byHandAllowed: true,
+    cutters: null,
+  },
+  // The timber department's windows and doors (PIOTR, 04.10: the five products and that they pay
+  // better; CLAUDE.md T28 2.6) [TUNE: chat: every figure; the calls as the kitchen of nearest
+  // price has them]. Made on the cross cut saw, the planer, the spindle moulder with the cutters
+  // of their kind, the frame press, the sander and the booth, lacquered and nothing else, measured
+  // on site and never by hand. Offered only to a company in the 800 m2 hall (2.3).
+  {
+    id: 'casementWindows',
+    name: 'Casement windows',
+    basePrice: 9000,
+    material: 'solidWood',
+    calls: 4,
+    needsMeasure: true,
+    requiredEquipment: TIMBER_EQUIPMENT,
+    allowedFinishes: FINISHES_LACQUER,
+    minReputation: 25,
+    weightsByTier: [0, 0, 12],
+    byHandAllowed: false,
+    cutters: 'cuttersCasement',
+  },
+  {
+    id: 'sashWindows',
+    name: 'Sash windows',
+    basePrice: 14000,
+    material: 'solidWood',
+    calls: 4,
+    needsMeasure: true,
+    requiredEquipment: TIMBER_EQUIPMENT,
+    allowedFinishes: FINISHES_LACQUER,
+    minReputation: 30,
+    weightsByTier: [0, 0, 10],
+    byHandAllowed: false,
+    cutters: 'cuttersSash',
+  },
+  {
+    id: 'frenchDoors',
+    name: 'French doors',
+    basePrice: 6000,
+    material: 'solidWood',
+    calls: 4,
+    needsMeasure: true,
+    requiredEquipment: TIMBER_EQUIPMENT,
+    allowedFinishes: FINISHES_LACQUER,
+    minReputation: 25,
+    weightsByTier: [0, 0, 10],
+    byHandAllowed: false,
+    cutters: 'cuttersDoor',
+  },
+  {
+    id: 'patioDoors',
+    name: 'Patio doors',
+    basePrice: 10000,
+    material: 'solidWood',
+    calls: 4,
+    needsMeasure: true,
+    requiredEquipment: TIMBER_EQUIPMENT,
+    allowedFinishes: FINISHES_LACQUER,
+    minReputation: 30,
+    weightsByTier: [0, 0, 8],
+    byHandAllowed: false,
+    cutters: 'cuttersDoor',
+  },
+  {
+    id: 'bifoldDoors',
+    name: 'Bifold doors',
+    basePrice: 18000,
+    material: 'solidWood',
+    calls: 4,
+    needsMeasure: true,
+    requiredEquipment: TIMBER_EQUIPMENT,
+    allowedFinishes: FINISHES_LACQUER,
+    minReputation: 35,
+    weightsByTier: [0, 0, 6],
+    byHandAllowed: false,
+    cutters: 'cuttersDoor',
   },
 ];
 

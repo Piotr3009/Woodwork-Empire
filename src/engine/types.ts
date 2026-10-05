@@ -370,6 +370,9 @@ export interface ProductTemplate {
   /** Draw weight per reputation tier, index 0 is the lowest tier. */
   weightsByTier: number[];
   byHandAllowed: boolean;
+  /** The family id of the cutter set a spindle moulder needs for this product, or null: the mark
+   *  of the timber department's windows and doors (CLAUDE.md T28 2.6). */
+  cutters: string | null;
 }
 
 export interface Clock {
