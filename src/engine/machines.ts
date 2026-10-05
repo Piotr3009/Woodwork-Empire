@@ -97,7 +97,7 @@ import {
 import { lockReasonFor, template } from './catalog';
 import { jobHeldBy } from './jobs';
 import { stageOfMan } from './production';
-import { contractOfWorker, contractPiece, contractPieceSpeed, contractStageFamilyOf } from './contracts';
+import { contractFamiliesOf, contractOfWorker, contractPiece, contractPieceSpeed } from './contracts';
 import { jobPace, stageDoing, stagePlanFor } from './stages';
 import { isWorkingToday, managerPaceFor, nightCrew } from './staff';
 import type { StagePlan } from './stages';
@@ -694,7 +694,9 @@ export function crewAtFamily(state: GameState, family: string, shift: 'day' | 'n
     }
     const contract = man.id === OWNER ? null : contractOfWorker(state, man.id);
     if (contract === null) continue;
-    if (contractStageFamilyOf(state, contractPiece(contract), true) === family) count += 1;
+    // A sheet piece's one family, or every family of a window's or a door's plan, as a timber
+    // job's men are counted (CLAUDE.md T29 2.12.3).
+    if (contractFamiliesOf(state, contractPiece(contract)).includes(family)) count += 1;
   }
   return count;
 }

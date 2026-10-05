@@ -128,3 +128,35 @@ the Storage tab's folders, the catalogue's metres, measured classes 105 to 107, 
 (the timber rack finds its 4 m by 2 m on the 200 m² floor; the shelter is outside), `WARNING_ORDER`
 and its all at once list; `timberHall`, `bigHall` and `windowCompany` given a shelter on the apron,
 the tile's `Needs` line and its `boards of material`.
+
+**T29-C7 Windows and doors as standing contracts.** Three pieces appended to `CONTRACT_PIECES`:
+`casementWindow` 150, `sashWindow` 190 and `frenchDoor` 180 minutes. Each has the mark
+`timber: true`, the seven stage ids of `TIMBER_STAGES`, and material and sheets of nought, because
+the client sends the timber and the glass. Nothing comes off the racks or the stores, nothing is
+ordered, and no night is stood.
+
+A piece is worked as a timber job of labour value 1 (`pieceStaged`), at the one pace of the whole
+plan (`jobPace`), so the five axis CNC, the robot and the line show in it. Its men are counted
+against every family of the plan (`contractFamiliesOf`, read by `crewAtFamily` and by the offer's
+hall line). They go round the plan's families, the Glazing at the bench (`contractRoundOf`), and
+are drawn only at them (`drawnPlaces`). The wear is spread over the plan's machines by the stages'
+shares, for the card and the closing report alike. No machine tip is given.
+
+The six `stagedJob(0, 'sheet', false)` sites now ask the piece which kind it is; a sheet piece is
+worked exactly as on v83. Windows and doors are drawn only in the 800 m² unit (`timberOnTheBoard`),
+and `pick` is one draw whatever the length of the list, so a smaller unit draws what v83 drew. That
+is asserted on 200 seeds.
+
+Prices are at the timber plan's pace at the standard class, worn at the standard four sided
+planer (`CONTRACT_TIMBER_WEAR_FAMILY`, [TUNE]): 179, 226 and 214 minutes, two a day, at 218, 249
+and 241 a piece. A novice by hand makes one a day. Contracts are named with `pluralOf`
+(`Drawer boxes for ...`).
+
+The tile, the offer card and the running bar carry the timber words and no sheet word. A fault
+found and fixed: the hall line read a pace that the shortages had taken below nought as full pace
+(`speed > 0 ? speed : 1`). It now takes the floor, as the minute does. A sheet piece never goes
+below nought, so its figures do not move.
+
+Flipped: `contracts.test.ts` (the 200 seeds draw the three sheet pieces; the name is written with
+`pluralOf`) and `contractPrices.test.ts` (the three sheet pieces). New:
+`tests/engine/t29TimberContracts.test.ts`, 15 tests.

@@ -5542,6 +5542,11 @@ export interface ContractPieceSpec {
    *  the rack like a job's and is never bought as money on the contract line (T17 2.22). Whole
    *  sheets are drawn as the pieces add up, the way a job draws them as it goes. */
   sheets: number;
+  /** T29 2.12.1: a window or a door made for a window company or a builder, who sends the timber
+   *  and the glass. Its `stages` are the timber plan's, it is worked, counted, drawn and worn as a
+   *  timber job is, and it is offered only in the 800 m² unit (2.12.4). Absent on the sheet
+   *  pieces, which are worked exactly as before. */
+  timber?: true;
 }
 
 /** The pieces a contract can be for. `minutes` is owner minutes a piece, `material` the money in
@@ -5581,6 +5586,37 @@ export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
     material: 60,
     sheets: 0.3,
   },
+  // T29 2.12.1 [TUNE: chat]: windows and doors as standing contracts, half a day of the owner's
+  // minutes each, so the slowest man the game has still finishes one in his day (2.12.5). The
+  // client sends the timber and the glass (2.12.2): no material, nothing off the racks or the
+  // stores, nothing ordered, no night stood.
+  {
+    id: 'casementWindow',
+    name: 'Casement window',
+    stages: TIMBER_STAGES.map((stage) => stage.id),
+    minutes: 150,
+    material: 0,
+    sheets: 0,
+    timber: true,
+  },
+  {
+    id: 'sashWindow',
+    name: 'Sash window',
+    stages: TIMBER_STAGES.map((stage) => stage.id),
+    minutes: 190,
+    material: 0,
+    sheets: 0,
+    timber: true,
+  },
+  {
+    id: 'frenchDoor',
+    name: 'French door',
+    stages: TIMBER_STAGES.map((stage) => stage.id),
+    minutes: 180,
+    material: 0,
+    sheets: 0,
+    timber: true,
+  },
 ];
 
 /** What a contract is priced to leave a day, after the man's wages and the wear of his machine,
@@ -5595,6 +5631,11 @@ export const CONTRACT_MARGIN_PER_DAY = 200;
  *  Both are the middle of their ladders [PIOTR, 21.09]. */
 export const CONTRACT_REFERENCE_TIER: WorkerTier = 'experienced';
 export const CONTRACT_REFERENCE_CLASS = 'standard';
+/** The machine a window or a door is priced to wear at the reference, at its reference class: the
+ *  four sided planer, the dearest of the timber plan's standard machines [TUNE] (CLAUDE.md T29
+ *  2.12.5). Its pace is the whole
+ *  timber plan's at the reference class, not the planer's alone. */
+export const CONTRACT_TIMBER_WEAR_FAMILY = 'planer';
 
 /** How many pieces a week the client asks for, in cut sheet packs, by the workshop's standing:
  *  a shop with a name gets asked for more, so a better crew is not throttled by the band

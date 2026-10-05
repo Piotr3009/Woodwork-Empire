@@ -7,10 +7,10 @@ export function plural(count: number, one: string, many: string): string {
 }
 
 /** More than one of a thing the game names itself: "drawer boxes", "cut sheet packs", "wardrobe
- *  fronts". Not a dictionary and not meant to be [TUNE]: a name that ends in a hiss takes "es" and
- *  everything else takes "s", which is right for every name in the game and is checked in
- *  `tests/engine/bubbles.test.ts`. It exists because the bubble over a man's head counts the pieces
- *  he is making and the pieces table holds one name each (CLAUDE.md T21 2.6). */
+ *  fronts", "sash windows". Not a dictionary and not meant to be [TUNE]: a name that ends in a hiss
+ *  takes "es" and everything else takes "s", which is right for every name in the game. A standing
+ *  contract is named with it (CLAUDE.md T29 2.12.6), which `tests/engine/t29Contracts.test.ts`
+ *  checks; `name + 's'` had made "Drawer boxs" in Piotr's own save. */
 export function pluralOf(name: string): string {
   return /(s|x|z|ch|sh)$/i.test(name) ? `${name}es` : `${name}s`;
 }

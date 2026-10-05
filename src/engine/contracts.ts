@@ -36,13 +36,15 @@ import {
   ANSWER_MAX,
   ANSWER_MIN,
   CNC_STAGE,
+  CONTRACT_TIMBER_WEAR_FAMILY,
   PRODUCTION_STAGES,
+  TIMBER_STAGES,
   WORKER_RATES,
 } from './constants';
 import type { ContractPieceSpec, ContractQuantityBand } from './constants';
-import { answerSkew, skewed } from './board';
+import { answerSkew, skewed, timberOnTheBoard } from './board';
 import { isBreak, isWorkingDay, weekOfDay, weekday, workedMinutesOfDay } from './clock';
-import { inWords, plural } from './text';
+import { inWords, plural, pluralOf } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { isOnJob, stagedJob, takeOffJob, workerMinuteCost } from './jobs';
@@ -68,7 +70,17 @@ import { chance, float, int, pick } from './rng';
 import type { RngCarrier } from './rng';
 import { crewHasGoneHome, isWorkingToday, joiners, managerPaceFor } from './staff';
 import { STATION_DOOR, STATION_HOME } from './stations';
-import { familyForStage, jobOnCnc, manPace, pacePoints, stageSpeed } from './stages';
+import {
+  familyForStage,
+  jobOnCnc,
+  jobPace,
+  manPace,
+  pacePoints,
+  stageFamilyIn,
+  stagePlanFor,
+  stageSpeed,
+} from './stages';
+import type { StagedJob } from './stages';
 import type { Contract, ContractWeek, Equipment, GameState, StageId, Worker } from './types';
 
 /** What a man on a contract carries in `jobId`, so the jobs leave him alone: not available for
@@ -244,10 +256,42 @@ export function contractQuantityBand(reputation: number): ContractQuantityBand {
 }
 
 /** The family the piece is done on: its first stage's machine, the way `runContractMinute` works
- *  the whole piece at that stage (the other stages of a piece are parked, CLAUDE.md T23 8). */
+ *  the whole piece at that stage (the other stages of a piece are parked, CLAUDE.md T23 8). A
+ *  window or a door is the price's machine of `CONTRACT_TIMBER_WEAR_FAMILY` (CLAUDE.md T29
+ *  2.12.5). */
 function pieceFamily(piece: ContractPieceSpec): string | null {
+  if (piece.timber === true) return CONTRACT_TIMBER_WEAR_FAMILY;
   const first = piece.stages[0] ?? 'cutting';
-  return familyForStage(stagedJob(0, 'sheet', false), first);
+  return familyForStage(pieceStaged(piece), first);
+}
+
+/** The job a piece is worked as. A sheet piece is the empty sheet job it has always been, read at
+ *  its one stage. A window or a door is a timber job of labour value 1, so that its plan has width
+ *  and `jobPace` reads the whole timber plan as the hall stands: the five axis CNC, the robot and
+ *  the line show in it as they show in a job. With a labour value of 0 every stage is skipped and
+ *  the pace is 1 in every hall (CLAUDE.md T29 2.12.3). Solid wood and never sheet, so the sheet
+ *  CNC does not double its Glazing at the bench (2.6). */
+export function pieceStaged(piece: ContractPieceSpec): StagedJob {
+  return piece.timber === true
+    ? stagedJob(1, 'solidWood', false, 'lacquer', false, true)
+    : stagedJob(0, 'sheet', false);
+}
+
+/** The pace of the timber plan with every family of it at the reference class, the booth and the
+ *  bench among them, and no five axis CNC, no robot and no line: the price's fixed reference of a
+ *  window or a door, read off the families `familyForStage` gives with no hall (CLAUDE.md T29
+ *  2.12.5). The same share over speed sum `jobPace` makes. */
+function timberReferencePace(): number {
+  const staged = stagedJob(1, 'solidWood', false, 'lacquer', false, true);
+  let minutes = 0;
+  let labour = 0;
+  for (const stage of TIMBER_STAGES) {
+    const family = familyForStage(staged, stage.id);
+    const speed = family === null ? 1 : classPaceOf({ specId: family, variantId: CONTRACT_REFERENCE_CLASS });
+    minutes += stage.share / (speed > 0 ? speed : 1);
+    labour += stage.share;
+  }
+  return minutes <= 0 ? 1 : labour / minutes;
 }
 
 /** The entry point the price is set at: the man of `CONTRACT_REFERENCE_TIER` on the
@@ -269,7 +313,14 @@ export function contractReferenceFor(piece: ContractPieceSpec): ContractReferenc
   const family = pieceFamily(piece);
   const spec = family === null ? undefined : findSpec(family);
   const standard = spec?.variants.find((variant) => variant.id === CONTRACT_REFERENCE_CLASS);
-  const speed = standard === undefined || family === null ? 1 : classPaceOf({ specId: family, variantId: standard.id });
+  // A window or a door is priced at the pace of the whole timber plan at the reference class, and
+  // its wear at the reference machine's (CLAUDE.md T29 2.12.5).
+  const speed =
+    piece.timber === true
+      ? timberReferencePace()
+      : standard === undefined || family === null
+        ? 1
+        : classPaceOf({ specId: family, variantId: standard.id });
   // His grade times the machine's pace, the arithmetic of the minute and of the card he is costed
   // on (v61), so the entry point and the entry man's card say one thing.
   const minutes = Math.max(1, Math.round(piece.minutes / manPace(rate, speed > 0 ? speed : 1)));
@@ -412,8 +463,11 @@ export function contractMinuteCost(state: GameState, worker: Worker | null): num
  *  loop works at, so the card's minutes are the minutes a man really takes (CLAUDE.md T20 2.1.1;
  *  v53). */
 export function contractPieceSpeed(state: GameState, piece: ContractPieceSpec): number {
+  // A window or a door is worked at the one pace of the whole timber plan, as a timber job is
+  // (CLAUDE.md T29 2.12.3).
+  if (piece.timber === true) return jobPace(state, pieceStaged(piece));
   const { stage } = pieceStage(state, piece);
-  return stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
+  return stageSpeed(state, pieceStaged(piece), stage).speed;
 }
 
 /** The men who would do it, in the order the card draws them: the owner, then every joiner on the
@@ -458,7 +512,10 @@ function resultAtSpeed(
   // The wear is charged on the minutes the man actually stands at the machine and on no other:
   // none on a minute at the bench and none on a minute by hand [PIOTR, 22.09] (CLAUDE.md T24 2.4).
   const machineMinutes = minutes * pieceMachineShare(state, piece);
-  const wear = pence(machineMinutes * wearPerMinute);
+  // A window or a door wears every machine of its plan by the stage's share (CLAUDE.md T29
+  // 2.12.3).
+  const timber = candidate === null && piece.timber === true ? timberWear(state, piece) : null;
+  const wear = timber !== null ? pence(minutes * timber.perMinute) : pence(machineMinutes * wearPerMinute);
   const margin = pence(contract.pricePerPiece - piece.material - labourCost - wear);
   const piecesPerDay = Math.floor(MINUTES_PER_WORKING_DAY / minutes);
   // Every working day of the week, and no ceiling at what the client ordered: the man on a
@@ -474,9 +531,11 @@ function resultAtSpeed(
     machineName:
       candidate !== null
         ? candidate.name
-        : machine === null
-          ? ''
-          : (variantFor(machine)?.name ?? findSpec(machine.specId)?.name ?? ''),
+        : timber !== null
+          ? timber.name
+          : machine === null
+            ? ''
+            : (variantFor(machine)?.name ?? findSpec(machine.specId)?.name ?? ''),
     margin,
     dayResult: pence(piecesPerDay * margin),
     piecesPerDay,
@@ -545,22 +604,26 @@ export function contractHallCapacity(state: GameState, contract: Contract): Hall
   // line counts the four with the highest rate, the earlier hired winning a tie, and four men at
   // the piece's machine in place of the full crew. With four or fewer nothing of it changes
   // (CLAUDE.md T29 2.3).
-  const own = pieceStage(state, piece).family;
+  // A window or a door is counted against every family of its plan (CLAUDE.md T29 2.12.3).
+  const own = contractFamiliesOf(state, piece);
   const crew = joiners(state);
   const capped = crew.length > CONTRACT_MAX_JOINERS;
   const men = capped
     ? [...crew].sort((a, b) => rateOf(b) - rateOf(a)).slice(0, CONTRACT_MAX_JOINERS)
     : crew;
   const atIt = capped ? CONTRACT_MAX_JOINERS : fullCrew(state);
-  const shortages = placeShortages(state, 'day', (family) => (family === own ? atIt : 0));
+  const shortages = placeShortages(state, 'day', (family) => (own.includes(family) ? atIt : 0));
   // The piece's speed and what the saws too few for the crew take off the hall, as points of one
   // sum (v60), the way the minute adds them.
   const speed = pacePoints(contractPieceSpeed(state, piece), ...shortages.map((short) => short.factor));
   const week = MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK;
   let perWeek = 0;
   for (const worker of men) {
-    // His minutes over a piece, rounded the way his card rounds them (`resultAtSpeed`).
-    const minutes = Math.max(1, Math.round(piece.minutes / manPace(rateOf(worker), speed > 0 ? speed : 1)));
+    // His minutes over a piece, rounded the way his card rounds them (`resultAtSpeed`). Points
+    // that add up to less than nothing are the floor, as on the minute (`manPace`): a window's men
+    // short at five families at once stand there, and until v84 the line read such a hall at full
+    // pace (CLAUDE.md T29 2.12.3, section 8). A nought is still read as the piece's own pace.
+    const minutes = Math.max(1, Math.round(piece.minutes / manPace(rateOf(worker), speed === 0 ? 1 : speed)));
     perWeek += Math.floor(week / minutes);
   }
   const wanted = contract.quantityPerWeek;
@@ -603,10 +666,13 @@ export function contractMachineTip(
   who: string,
 ): ContractMachineTip | null {
   const piece = contractPiece(contract);
+  // The tip shortens a piece's first stage by one machine, and has no rule for a plan of seven
+  // families: a window or a door is given none (CLAUDE.md T29 2.12.3).
+  if (piece.timber === true) return null;
   const worker = contractWorkerOf(state, who);
   const now = contractResultFor(state, contract, worker);
   const { stage, family } = pieceStage(state, piece);
-  const staged = stagedJob(0, 'sheet', false);
+  const staged = pieceStaged(piece);
   // The machines that would do this piece's own stage: the family it is done on, and the CNC,
   // which takes the cutting off the saw altogether (CLAUDE.md T7 3.4).
   const candidates: string[] = [];
@@ -679,7 +745,11 @@ export function offerCarrier(state: GameState): RngCarrier {
 /** An offer off the seeded stream: the piece, a round quantity a week in the band, a term in
  *  months, and the piece's price (CLAUDE.md T13 3.16). */
 export function drawContract(state: GameState, carrier: RngCarrier = state): Contract {
-  const piece = pick(carrier, CONTRACT_PIECES) ?? contractPiece({ pieceId: 'cutSheetPack' } as Contract);
+  // Windows and doors are offered only in the 800 m² unit. `pick` is one draw whatever the length
+  // of the list, so a company in a smaller unit draws the same piece off the same stream as before
+  // they were written (CLAUDE.md T29 2.12.4).
+  const pieces = timberOnTheBoard(state) ? CONTRACT_PIECES : CONTRACT_PIECES.filter((entry) => entry.timber !== true);
+  const piece = pick(carrier, pieces) ?? contractPiece({ pieceId: 'cutSheetPack' } as Contract);
   const client = pick(carrier, CONTRACT_CLIENTS) ?? 'a shop';
   // The client asks for a week's work, not a count: the band is drawn in cut sheet packs, the
   // piece it was written for, and turned into pieces of the one that was drawn, so a contract for
@@ -707,7 +777,9 @@ export function drawContract(state: GameState, carrier: RngCarrier = state): Con
     // Named by the day it was offered, one offer a day at most: the id counter is left alone, so
     // the ids of the jobs and the events read the same with and without an offer on the board.
     id: `contract-${state.clock.day}`,
-    name: `${piece.name}s for ${client}`,
+    // The piece's plural written out: `Drawer boxes`, not `Drawer boxs` (CLAUDE.md T29 2.12.6).
+    // A name already in a save stays.
+    name: `${pluralOf(piece.name)} for ${client}`,
     pieceId: piece.id,
     quantityPerWeek,
     termWeeks: termWeeksFor(months),
@@ -904,8 +976,11 @@ export function contractWantsToday(state: GameState, workerId: string): boolean 
  *  a place at it, otherwise the piece's own first stage, through the same reading a job's stages
  *  get. A contract always allows the saw when the CNC has no place (CLAUDE.md T7 3.4). */
 function pieceStageOn(state: GameState, piece: ContractPieceSpec, cnc: boolean): { stage: StageId; family: string | null } {
-  const staged = stagedJob(0, 'sheet', false);
+  const staged = pieceStaged(piece);
   const first = piece.stages[0] ?? 'cutting';
+  // A window or a door begins at its Cross cutting, on the line's module 1 while it covers it
+  // (CLAUDE.md T29 2.5.3, 2.12.3).
+  if (piece.timber === true) return { stage: first, family: stageFamilyIn(state, staged, first) };
   const onCnc = first === 'cutting' && jobOnCnc(state, staged, { cnc });
   const stage: StageId = onCnc ? 'cnc' : first;
   return { stage, family: familyForStage(staged, stage) };
@@ -940,19 +1015,44 @@ export function contractFamilyOf(state: GameState, piece: ContractPieceSpec, cnc
  *  wants no place at all. What his minute is worth is his piece's own pace wherever he stands
  *  (`runContractMinute`), so the round moves the men and not the money. */
 export function contractRoundOf(state: GameState, piece: ContractPieceSpec): string[] {
+  // A window or a door goes round every family of the timber plan as the hall stands, in the order
+  // of its stages, with the same rule for a stage done at a bench, by hand, on a machine the hall
+  // has not got or keeps in a cabinet. The Glazing is at the bench, so the round is never empty
+  // (CLAUDE.md T29 2.12.3) [TUNE].
+  if (piece.timber === true) {
+    const round: string[] = [];
+    for (const stage of stagePlanFor(state, pieceStaged(piece))) {
+      const place = placeOfFamily(state, stage.family);
+      if (!round.includes(place)) round.push(place);
+    }
+    return round;
+  }
   const own = contractFamilyOf(state, piece, true);
   if (own === null) return [];
-  const staged = stagedJob(0, 'sheet', false);
+  const staged = pieceStaged(piece);
   const round = [own];
   for (const stage of piece.stages.slice(1)) {
-    const family = familyForStage(staged, stage);
-    const place =
-      family === null || family === 'workbench' || !has(state, family) || machineIsShared(state, family)
-        ? 'workbench'
-        : family;
+    const place = placeOfFamily(state, familyForStage(staged, stage));
     if (!round.includes(place)) round.push(place);
   }
   return round;
+}
+
+/** The place a stage's family gives a man on a contract: the machine, or a bench for a stage done
+ *  at one, with nothing but hands, or on a machine the hall has not got or keeps in a cabinet. */
+function placeOfFamily(state: GameState, family: string | null): string {
+  return family === null || family === 'workbench' || !has(state, family) || machineIsShared(state, family)
+    ? 'workbench'
+    : family;
+}
+
+/** The families a man on this piece is counted against for the places: the one family of a sheet
+ *  piece's stage, as `crewAtFamily` has always counted him, and every family of the plan for a
+ *  window or a door, as a timber job's men are counted (CLAUDE.md T29 2.12.3). The hall line of an
+ *  offer reckons the places short at the same families. */
+export function contractFamiliesOf(state: GameState, piece: ContractPieceSpec): Array<string | null> {
+  if (piece.timber === true) return stagePlanFor(state, pieceStaged(piece)).map((stage) => stage.family);
+  return [contractStageFamilyOf(state, piece, true)];
 }
 
 /** What one stage of a piece is worth of its work, off the game's own table. A CNC does the cutting
@@ -987,6 +1087,28 @@ function pieceMachine(state: GameState, piece: ContractPieceSpec): Equipment | n
   if (stage === 'cnc') return bestMachineOf(state, 'cnc');
   if (family === null || !has(state, family) || machineIsShared(state, family)) return null;
   return bestMachineOf(state, family);
+}
+
+/** The words the card's wear row names for a window or a door made on any machine of the hall. */
+export const TIMBER_MACHINES_NAME = 'the timber machines';
+
+/** What a window or a door wears a minute of its man's: the best machine of each stage of the plan,
+ *  by the stage's share (`TIMBER_STAGES`), a stage at a bench, by hand or on a machine the hall has
+ *  not got or keeps in a cabinet wearing nothing. Its name is `TIMBER_MACHINES_NAME` while any
+ *  stage stands on a machine, the line's modules among them, which are kept by their engineers and
+ *  wear nothing (2.10), and '' when none does, which the card says is by hand. The card and the
+ *  closing report read this one figure (CLAUDE.md T29 2.12.3). */
+function timberWear(state: GameState, piece: ContractPieceSpec): { perMinute: number; name: string } {
+  let perMinute = 0;
+  let any = false;
+  for (const stage of stagePlanFor(state, pieceStaged(piece))) {
+    if (stage.byHand || stage.family === null || placeOfFamily(state, stage.family) === 'workbench') continue;
+    const machine = bestMachineOf(state, stage.family);
+    if (machine === null) continue;
+    any = true;
+    perMinute += stage.share * machineWearPerMinute(machine);
+  }
+  return { perMinute, name: any ? TIMBER_MACHINES_NAME : '' };
 }
 
 /** Where a man on a contract stands, for the hall: at the canteen door while the contract has no
@@ -1080,9 +1202,9 @@ export function runContractMinute(
       const place = places.get(worker.id);
       if (place === undefined || !place.working) continue;
       // The hall's pace at his piece's stage, or the by hand penalty with no machine of the family
-      // in the hall, through the one reading the stages give (CLAUDE.md T7 3.4, T25 2.4).
-      const { stage } = pieceStage(state, piece);
-      const speed = stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
+      // in the hall, through the one reading the stages give (CLAUDE.md T7 3.4, T25 2.4); for a
+      // window or a door the whole timber plan's pace (T29 2.12.3). The card reads the same.
+      const speed = contractPieceSpeed(state, piece);
       hall ??= hallProductivityFactor(state);
       // His grade times the points, as the job minute is (v61), the manager's among them: a man on
       // a contract is carried by the manager like any other, and until v70 his row printed the
@@ -1185,7 +1307,11 @@ export function closingReport(state: GameState, contract: Contract): ClosingRepo
   // The same rule as the card's: the minutes at the machine and no others (CLAUDE.md T24 2.4), and
   // one a clock minute a machine however many of the contract's men stood at it (T26 2.1).
   const machineMinutes = contract.machineMinutes * pieceMachineShare(state, piece);
-  const machineWear = pence(machineMinutes * (machine === null ? 0 : machineWearPerMinute(machine)));
+  // A window or a door: the plan's wear by the stages' shares, the card's own figure (T29 2.12.3).
+  const machineWear =
+    piece.timber === true
+      ? pence(contract.machineMinutes * timberWear(state, piece).perMinute)
+      : pence(machineMinutes * (machine === null ? 0 : machineWearPerMinute(machine)));
   return {
     pieces: contract.piecesMade,
     revenue: pence(contract.revenue),

@@ -78,9 +78,17 @@ function figureRow(label: string, value: number, signed = true): string {
 }
 
 /** What a piece is, in the words the offer and the bar both use. The material is off the rack
- *  now, so the line says how much of the rack a week of it takes (CLAUDE.md T17 2.22). */
+ *  now, so the line says how much of the rack a week of it takes (CLAUDE.md T17 2.22). A window or
+ *  a door is made of the client's timber and glass, and its line says so with no sheet word in it
+ *  (CLAUDE.md T29 2.12.6). */
 function pieceLine(contract: Contract): string {
   const piece = contractPiece(contract);
+  if (piece.timber === true) {
+    return (
+      `${piece.minutes} minutes of work a piece on the timber machines. ` +
+      'The client sends the timber and the glass: nothing comes off your racks.'
+    );
+  }
   const margin = contract.pricePerPiece - piece.material;
   const week = sheetsForPieces(piece, contract.quantityPerWeek);
   return (
@@ -88,6 +96,14 @@ function pieceLine(contract: Contract): string {
     `${money(piece.material)} of material in it: ${money(margin)} a piece before labour. ` +
     `It comes off the rack: about ${plural(week, 'sheet', 'sheets')} a week.`
   );
+}
+
+/** The sentence after the piece's line on the running bar: the machine stays in the general
+ *  queue, and better ones make more pieces without a click (CLAUDE.md T25 2.2, T29 2.12.6). */
+function queueLine(contract: Contract): string {
+  return contractPiece(contract).timber === true
+    ? 'The timber machines stay in the general queue: better ones make more pieces without a click.'
+    : 'The saw stays in the general queue: a better one makes more pieces without a click.';
 }
 
 /** What the contract makes with this man on it: the price less the material in the piece and less
@@ -208,8 +224,7 @@ function activeBlock(state: GameState, contract: Contract): string {
     `week ${weekOfTerm(contract, day)} of ${contract.termWeeks}, ends ` +
     `${formatCalendarDay(contract.endDay ?? day)} · ` +
     `${money(contract.pricePerPiece)} a piece${escapeHtml(held)}</p>` +
-    `<p class="hint">${escapeHtml(pieceLine(contract))} The saw stays in the general queue: ` +
-    'a better one makes more pieces without a click.</p>' +
+    `<p class="hint">${escapeHtml(pieceLine(contract))} ${queueLine(contract)}</p>` +
     '<h4>People</h4>' +
     // How many are on it, against the four a contract takes, in the engine's words (CLAUDE.md T29
     // 2.3).
@@ -518,7 +533,8 @@ function offerCard(state: GameState, contract: Contract, picked: string | null):
     `${minutes(piece.minutes)} a piece by hand · ${escapeHtml(expiryLine(state, contract))}</p>` +
     manPicker(state, contract, who) +
     countRow('Price a piece', money(contract.pricePerPiece)) +
-    figureRow('Material a piece, from stock', -result.material) +
+    // A window or a door has no material of the workshop's in it (CLAUDE.md T29 2.12.6).
+    (piece.timber === true ? '' : figureRow('Material a piece, from stock', -result.material)) +
     figureRow(`${name === 'You' ? 'Your' : `${name}'s`} labour a piece, ${minutes(result.minutes)}`, -result.labourCost) +
     // The service those minutes cost the machine he stands at, a tenth of its price every
     // service interval: the line the typed prices of v28 to v39 forgot (PIOTR, 21.09; v40).
