@@ -189,7 +189,9 @@ describe('the whole workshop fits on the painted floor', () => {
     // forklift's one family now, and one of it is bought (PIOTR, 24.09). Eighteen from v56: the
     // CNC's tool changer head is bolted to the CNC and holds no floor of its own (PIOTR, 25.09).
     // Nineteen again from v69, with the high capacity rack; the drying racks of v73 hold no floor.
-    expect(hallItems(state).length).toBe(19);
+    // Eighteen from v83: the pelletiser stands behind the rear wall with the systems (CLAUDE.md T28
+    // 2.1).
+    expect(hallItems(state).length).toBe(18);
     expect(hallItems(state).some((item) => item.specId === 'cncHead')).toBe(false);
   });
 

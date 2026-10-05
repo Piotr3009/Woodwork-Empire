@@ -171,8 +171,13 @@ import type {
  *
  *  v82 adds one field and no version: a unit says where its second extension stands, and a save
  *  that does not say so is a unit that has not had one (`secondExtensionOf`), so there is nothing
- *  to lift. */
-export const STATE_VERSION = 40;
+ *  to lift.
+ *
+ *  Version 41 is v83, Turn 28 (PIOTR, 04.10 and 05.10). The pelletiser stands behind the rear wall
+ *  with the two central systems, and one on the hall floor of an older save, or on order for it,
+ *  is moved there when the save is lifted (`standThePlantBehindTheWall`), with no other field of
+ *  the save touched (CLAUDE.md T28 section 4). Every v12 to v40 save loads. */
+export const STATE_VERSION = 41;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -3738,7 +3743,11 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   flexiSystem: { x: 0, y: 4, yard: true, rear: true },
   extractor: { x: 19, y: 0 },
   compressor: { x: 19, y: 1 },
-  pelletiser: { x: 8, y: 2 },
+  // The pelletiser stands where the flexi does, behind the rear wall (PIOTR, 05.10: "the
+  // pelletiser is to go where the flexi is, outside the building"; CLAUDE.md T28 2.1). Behind the
+  // wall `rearYardPlaceFor` gives it the next clear length; the x and the y are only the fallback
+  // of a place `canBuy` has already refused.
+  pelletiser: { x: 8, y: 2, yard: true, rear: true },
   cnc: { x: 2, y: 6 },
   sprayBooth: { x: 7, y: 6 },
   sheetRack: { x: 11, y: 6 },

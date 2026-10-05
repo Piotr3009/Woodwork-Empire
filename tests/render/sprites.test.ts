@@ -64,7 +64,8 @@ describe('the canvas the art side draws on', () => {
       ['cnc', 5, 3, 2, 384, 288],
       ['sprayBooth', 5, 3, 3, 384, 336],
       ['dustSystem', 3, 3, 4, 288, 336],
-      ['pelletiser', 2, 2, 3, 192, 240],
+      // 2.5 m high, as the engine and the delivered picture have it (CLAUDE.md T28 2.1).
+      ['pelletiser', 2, 2, 2.5, 192, 216],
     ];
     for (const [key, width, depth, height, canvasWidth, canvasHeight] of rows) {
       expect(spriteCanvas(width, depth, height), key).toEqual({

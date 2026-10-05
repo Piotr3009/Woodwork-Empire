@@ -129,9 +129,10 @@ describe('a fresh game in this build', () => {
     // v61 and v62 are state 33 as well. v63 is state 34: one kind of man on the floor, the
     // draftsman's three grades and the agency, off (CLAUDE.md T26 section 4). v81 is Turn 27 and
     // state 40: the taxman's two years on the books (CLAUDE.md T27 section 4). v82 is state 40
-    // too: the second extension is a field a save may not carry (PIOTR, 04.10). v83 is Turn 28.
+    // too: the second extension is a field a save may not carry (PIOTR, 04.10). v83 is Turn 28 and
+    // state 41: the pelletiser behind the wall (CLAUDE.md T28 section 4).
     expect(APP_VERSION).toBe('v83');
-    expect(STATE_VERSION).toBe(40);
+    expect(STATE_VERSION).toBe(41);
   });
 
   it('saves through the store, the file and the cloud row on day 1, and loads back three ways', async () => {

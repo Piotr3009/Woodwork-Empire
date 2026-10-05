@@ -22,3 +22,21 @@ break's two cards beside `Tax is coming` and the strip with `closureComing`; the
 locked and greyed; the job card's glass in its three states with `Order glass`; the Timber machines
 and Sanding tabs with the planer's folder open and a cutter set's card; the Work Plan's rows
 `glue curing` and `waiting for glass`.
+
+**T28-B1 The pelletiser behind the wall, STATE_VERSION 41.** `STARTING_LAYOUT.pelletiser` has
+`yard: true, rear: true` [PIOTR, 05.10], and everything the systems have behind the wall follows by
+the code that was there: its place (`rearYardPlaceFor`, a metre further back than a system's, its
+zone being 3 by 3), the refusal `No room behind the hall`, no cell of the floor, no walking,
+dragging or turning, and the clip at the wall; it is in neither `DUCT_SYSTEMS` nor
+`CENTRAL_EXTRACTION_SPECS`. `canBuy` no longer asks free floor of anything `standsOutside` is
+true of (the pelletiser, the two systems and the van) [TUNE: chat]. `STATE_VERSION` 41:
+`liftToVersion41` marks the saves, and `standThePlantBehindTheWall` takes an `only` filter so its
+second gate (`version < 41`, after the `< 38` one) moves the pelletiser alone, on the floor or on
+order, writing the anchor and booking no moving time (a drag of it not yet confirmed is
+forgotten); a system an older lift left on the apron is not tried again, and on the `< 38` path
+the pelletiser goes after the systems, so it never takes a system's place. It stays on the floor
+when the wall has no length left: in a 200 m² unit with four systems already behind the wall, and
+in the 400 and 800 m² units only with nine. A pelletiser turned on the floor keeps its turn
+behind the wall, where nothing can turn it back. It breathes behind the wall in
+`machineFx.test.ts` as it did at 14, 7; SPRITES.md section 6 and the first batch test say
+2 × 2 × 2.5 and 192 × 216, and the whole catalogue stands 18 things on the floor and not 19.

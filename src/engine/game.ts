@@ -2562,8 +2562,10 @@ export function canBuy(
   }
   if (!prepaid && !canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
   // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
-  // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6).
-  if (standsInTheHall(specId, variant.id) && firstFreeCell(state, specId, variant.id) === null) {
+  // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6). What
+  // stands outside asks nothing of the floor: its room is behind the wall or on the apron, asked
+  // above (CLAUDE.md T28 2.1) [TUNE: chat; it follows from Piotr's sentence but he did not say it].
+  if (!standsOutside(specId) && standsInTheHall(specId, variant.id) && firstFreeCell(state, specId, variant.id) === null) {
     const zone = zoneOf(specId, variant.id);
     return { ok: false, reason: `No free ${metresBy(zone)} in the hall` };
   }

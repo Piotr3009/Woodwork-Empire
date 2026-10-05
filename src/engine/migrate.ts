@@ -1051,13 +1051,26 @@ function liftToVersion38(state: Raw): void {
  *  should we move them, behind another wall?"; v73). Every central system standing on the apron,
  *  or on its way to it, is given the next place behind the wall, in the order they were bought;
  *  one the wall has no length left for stays where it is. A pipe run to a thing that moved is laid
- *  again at no charge (`layRunsAgain`). The van stays on the apron. */
-export function standThePlantBehindTheWall(state: GameState): void {
+ *  again at no charge (`layRunsAgain`). The van stays on the apron.
+ *
+ *  From v83 the pelletiser goes there too, off the hall floor or off its order for it (PIOTR,
+ *  05.10; CLAUDE.md T28 2.1). It goes after the systems, so a system the v73 lift would have stood
+ *  behind the wall is never left out by it, and only its anchor is written: a drag of it the
+ *  player had not yet confirmed is forgotten with the place it was dragged to, so no moving time
+ *  is booked for it. `only` names the one kind a later lift moves, so the plant an earlier lift
+ *  left on the apron for want of room is not tried again. */
+export function standThePlantBehindTheWall(state: GameState, only: string | null = null): void {
   const moved = new Set<string>();
-  const things: Array<Equipment | OnOrderItem> = [
-    ...state.equipment.filter((item) => standsBehindTheWall(item.specId)),
-    ...state.onOrder.filter((held) => standsBehindTheWall(held.specId)),
+  const goes = (specId: string): boolean =>
+    standsBehindTheWall(specId) && (only === null || specId === only);
+  const systemsFirst = (things: Array<Equipment | OnOrderItem>): Array<Equipment | OnOrderItem> => [
+    ...things.filter((thing) => thing.specId !== 'pelletiser'),
+    ...things.filter((thing) => thing.specId === 'pelletiser'),
   ];
+  const things = systemsFirst([
+    ...state.equipment.filter((item) => goes(item.specId)),
+    ...state.onOrder.filter((held) => goes(held.specId)),
+  ]);
   for (const thing of things) {
     if (thing.anchorY < 0) continue;
     const at = rearYardPlaceFor(state, thing.specId, thing.variantId, thing.id);
@@ -1065,6 +1078,9 @@ export function standThePlantBehindTheWall(state: GameState): void {
     thing.anchorX = at.x;
     thing.anchorY = at.y;
     moved.add(thing.id);
+  }
+  if (Array.isArray(state.movedItems)) {
+    state.movedItems = state.movedItems.filter((entry) => !moved.has(entry.itemId));
   }
   layRunsAgain(state, moved);
 }
@@ -1092,6 +1108,14 @@ function liftToVersion40(state: Raw): void {
     state.finance.taxWarnedForYear = null;
   }
   state.version = 40;
+}
+
+/** Version 40 to 41 (v83, Turn 28): nothing in the shape of a save changes for the pelletiser. The
+ *  number marks the saves in which a pelletiser may still stand on the hall floor, which
+ *  `standThePlantBehindTheWall` moves behind the rear wall once the save is whole (PIOTR, 05.10:
+ *  "the pelletiser is to go where the flexi is, outside the building"; CLAUDE.md T28 2.1, 4). */
+function liftToVersion41(state: Raw): void {
+  state.version = 41;
 }
 
 const LIFTS: Record<number, (state: Raw) => void> = {
@@ -1123,6 +1147,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   37: liftToVersion38,
   38: liftToVersion39,
   39: liftToVersion40,
+  40: liftToVersion41,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -1168,6 +1193,16 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       standThePlantBehindTheWall(lifted);
     } catch {
       // Not a whole hall: no wall to stand them behind.
+    }
+  } else if (version < 41 && Array.isArray(lifted.equipment) && Array.isArray(lifted.onOrder) && lifted.unit) {
+    // And the pelletiser after them, where the flexi is (v83). A save from before v73 has had it
+    // moved with the systems above; one from v73 on has its systems behind the wall already, so
+    // only the pelletiser goes, and it books no moving time. With no length of the wall left it
+    // stays where it stands (CLAUDE.md T28 2.1).
+    try {
+      standThePlantBehindTheWall(lifted, 'pelletiser');
+    } catch {
+      // Not a whole hall: no wall to stand it behind.
     }
   }
   // Who has a place, worked out the moment the save is open rather than left for the first
