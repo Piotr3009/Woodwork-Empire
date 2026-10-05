@@ -13,3 +13,9 @@ nothing was changed; no commit.
 this turn's brief (first line "Turn 29"), so nothing was moved; the README names the Turn 28 brief,
 `REPORT-T29.md` and `docs/art/REQUESTS-T29.md`. `APP_VERSION` goes v83 to v84 with the two tests
 that name it flipped (`version.test.ts`, `saveCheck.test.ts`); `STATE_VERSION` is B3's.
+
+**T29-A2 The mockups.** Six pages of section 9 into `docs/mockups/t29/` with a README, each the
+game's own markup by its own renderers beside the same screen today: four to a contract and the
+trimmed save's card; the five axis CNC and the robot; the Production line tab; the engineer and the
+strip; the timber stores; the sash window contract. (7), the logo, is not drawn: no
+`docs/logo-incoming/` on main.
