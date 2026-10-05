@@ -178,3 +178,41 @@ whole and none of its four places was touched (CLAUDE.md T29 2.13). No commit.
 
 It leaves two things for Piotr to decide: a figure for the line engineer, and the products on the
 hall. Both files were written by a sub-agent from the repo and read by the lead.
+
+**T29-E2 Scenarios.** The five new scenarios are in `tests/scenarios/turn29.test.ts` (15 tests).
+
+- **(xx)** A whole v41 save with seven on one contract is opened through `migrateState`. It holds
+  the first four. The other three have no marker and are on `freeJoiners`, and the
+  `contractsTrimmed` card opens at the first minute, naming them. A fifth man is refused at the
+  check, on the Orders board's tab (the locked `Put on it`) and on the Work Plan's (the reason in
+  place of the button, no list), and by the action itself. One man is taken off and the fifth is
+  put on.
+- **(yy)** The 800 m² company buys a five axis CNC and a robot through `BUY_EQUIPMENT`. The
+  window's Moulding is on the CNC and its pace is the engine's own sum. With the CNC sent for its
+  service, the Moulding is at the moulders that day. A lacquered kitchen's plan differs only in a
+  Finishing twice as fast.
+- **(zz)** Module 1 is refused for a sheet rack on its cells, then refused while the kit is half
+  shifted. After `END_SETUP` it is ordered (1,500,000, at x 5, y 14). The engineer is hired while
+  it is on order, and the module stands by itself on its due day, 30 working days on, played day by
+  day with nobody to unload it. The Cross cutting and the Planing are on it at 1.4 x 1.12, and the
+  window's pace is the engine's sum. All five with two engineers run at level 5. Each engineer is
+  then let go and his notice worked out: one left gives three modules and the strip's line; none
+  gives `The line stands still` and the old machines at their own pace. Module 3 cannot be sold
+  while 4 stands.
+- **(aaa)** Played by the careful script with a labourer on duty. The window's boards arrive with
+  no store. The card's words and `Leave it at the gate` show, and the strip names the job. A whole
+  day passes with nothing unloaded and nothing sent to the paid store. A timber rack is bought (3
+  working days) and the labourer takes the load in onto it, while the sheet rack's plate counts its
+  20 sheets only. A second window of more boards than the room left stands at the gate, and a third
+  is dropped with its load at the gate, leaving no load, no task and no board. The first window then
+  draws its own, and the second load comes in whole, never over the rack's 40 and never into the
+  paid store.
+- **(bbb)** The 800 m² company is offered `Sash windows for ...` by the weekly ring, declining the
+  other offers, and takes it with four men. Every window is paid at the price with nothing off the
+  counter and nothing ordered. **17 a week without the line and 109 with all five** and two
+  engineers: four men on standard timber machines sit on the floor of section 8's hall. A 400 m²
+  company is offered 120 days of contracts, none a window or a door, each the piece v83's three give
+  off the same stream.
+
+One scenario figure moved: (vv)'s glass waits to the next working day and not ten, restated in B1.
+(vv)'s company was given a shelter on the apron in C6, and no figure of it moved.
