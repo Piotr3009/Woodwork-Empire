@@ -66,3 +66,13 @@ what the eight closed days before the 30th leave, read off the ledger), `taxCard
 December is flipped to say every 30th is closed, and the order pins of `warnings.test.ts` and
 `tax.test.ts` take `closureComing`. 22 new tests in `tests/engine/t28Closures.test.ts`, drafted by
 a sub-agent against the API and checked here.
+
+**T28-C1 The pictures in.** The 42 files of `docs/art/incoming/t28/` are `git mv`ed into
+`public/sprites/` as they came [PIOTR, 05.10]: no pixel of them was touched. The manifest is 258
+sprites and not 216, and the two counts of turned pictures read 96 and not 75 (`rotate.test.ts`,
+`spriteClasses.test.ts`). `docs/art/SPRITES.md` section 12 carries their table (file, metres, file
+size, anchor, pack) and says what they are: pack 1 rendered to the contract, the sanders as
+delivered and off the contract's projection, the presses and the glue table chat's stand ins. Its
+section 2 now says the anchor is at `8 + w × 48` (and `8 + d × 48` in a `.r` file), as the code has
+had it since 14.09; sections 5 and 7 still describe the bottom centre and are left for the art
+side's next brief. The incoming folder and its JSON are gone.

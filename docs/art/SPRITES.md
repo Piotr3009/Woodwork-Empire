@@ -34,9 +34,12 @@ tiles, the 2x canvas is:
 - plus 8 px of transparent padding on every side, so the file is `W + 16` by `H + 16`.
 
 The **anchor** is the bottom corner of the footprint diamond: the lowest point of the object's floor
-outline. It sits at pixel `(W / 2 + 8, H + 8)` counted from the top-left of the file, i.e. horizontally
-centred, 8 px above the bottom edge. The loader places that pixel on the tile corner. If the object
-is drawn off-centre, it will stand in the wrong place in the hall; check this before delivering.
+outline. It sits at pixel `(8 + w × 48, H + 8)` counted from the top-left of the file, 8 px above the
+bottom edge, which is the canvas's middle only when `w` and `d` are equal; in a turned `.r` file the
+footprint is `d` by `w` and the anchor is at `(8 + d × 48, H + 8)` (the code has placed it so since
+14.09, `spriteAnchorIn` in `src/render/sprites.ts`). The loader places that pixel on the tile corner.
+If the object is drawn off its anchor, it will stand in the wrong place in the hall; check this
+before delivering.
 
 The floor outline of the object must fill its footprint diamond: a 4 × 2 machine occupies a diamond
 that is 4 tiles along one edge and 2 along the other, with the long side running down-right. Objects
@@ -472,3 +475,57 @@ Rules for the code side (Turn 11):
   region right of the door; its modal uses the same picture full page with the live text on the
   pinned sheet and the week list on the felt.
 - The floor catalogue goes through the existing slot (`FLOOR_CATALOGUE_SPRITE`).
+
+## 12. The timber department's machines (Turn 28, 05.10.2026)
+
+Piotr's words of 05.10: "put the graphics in as you have them and we will refine them later". The
+42 files below came from the art side on the night of 05.10 as two packs, were named as the game
+names them, and went into `public/sprites/` as they were delivered (CLAUDE.md T28 2.11). No agent
+altered a pixel of any of them. Every file is the engine's own canvas for its class (section 2:
+`(w + d) × 48 + 16` by `(w + d) × 24 + h × 48 + 16`) with its anchor at `(8 + w × 48, H + 8)`, and
+the `.r` file is the art side's 90 degree view of the same machine, its anchor at `(8 + d × 48,
+H + 8)` on the same canvas. Metres are width, depth and height of the class in view 0.
+
+| File in public/sprites/ (and its `.r`) | Metres | File, px | Anchor, view 0 / `.r` | Pack |
+|---|---|---|---|---|
+| `crossCut.used.png` | 2 × 1 × 1.25 | 160 × 148 | 104 / 56, 140 | 1 |
+| `crossCut.budget.png` | 3 × 1 × 1.25 | 208 × 172 | 152 / 56, 164 | 1 |
+| `crossCut.standard.png` | 4 × 1 × 1.5 | 256 × 208 | 200 / 56, 200 | 1 |
+| `crossCut.pro.png` | 5 × 1 × 1.75 | 304 × 244 | 248 / 56, 236 | 1 |
+| `crossCut.industrial.png` | 7 × 2 × 2 | 448 × 328 | 344 / 104, 320 | 1 |
+| `planer.used.png` | 3 × 1 × 1.5 | 208 × 184 | 152 / 56, 176 | 1 |
+| `planer.budget.png` | 3 × 1 × 1.5 | 208 × 184 | 152 / 56, 176 | 1 |
+| `planer.standard.png` | 4 × 1 × 1.5 | 256 × 208 | 200 / 56, 200 | 1 |
+| `planer.pro.png` | 5 × 1 × 1.75 | 304 × 244 | 248 / 56, 236 | 1 |
+| `planer.industrial.png` | 6 × 2 × 2 | 400 × 304 | 296 / 104, 296 | 1 |
+| `sander.used.png` | 2 × 1 × 1 | 160 × 136 | 104 / 56, 128 | 2 |
+| `sander.budget.png` | 2 × 1 × 1.25 | 160 × 148 | 104 / 56, 140 | 2 |
+| `sander.standard.png` | 2 × 1 × 1.5 | 160 × 160 | 104 / 56, 152 | 2 |
+| `sander.pro.png` | 3 × 2 × 1.75 | 256 × 220 | 152 / 104, 212 | 2 |
+| `sander.industrial.png` | 6 × 2 × 2 | 400 × 304 | 296 / 104, 296 | 2 |
+| `framePress.used.png` | 2 × 1 × 1 | 160 × 136 | 104 / 56, 128 | 2, stand in |
+| `framePress.budget.png` | 3 × 1 × 1.25 | 208 × 172 | 152 / 56, 164 | 2, stand in |
+| `framePress.standard.png` | 3 × 1 × 2.25 | 208 × 220 | 152 / 56, 212 | 2, stand in |
+| `framePress.pro.png` | 4 × 1 × 2.5 | 256 × 256 | 200 / 56, 248 | 2, stand in |
+| `framePress.industrial.png` | 5 × 2 × 2.75 | 352 × 316 | 248 / 104, 308 | 2, stand in |
+| `glueTable.standard.png` | 3 × 1 × 1 | 208 × 160 | 152 / 56, 152 | 2, stand in |
+
+What they are:
+
+- **Pack 1, `crossCut` and `planer`, 20 files:** rendered from a model by the art side, exact to
+  the contract. Plainer than the September machines; Piotr has seen that and it stays for now.
+- **Pack 2, `sander`, 10 files:** as the art side delivered them. They are not drawn to the
+  contract's 2 to 1 projection: their rows climb flatter than the hall's, and the industrial pair
+  stands low in its canvas, so the measured ports of these files are right on the picture and
+  their cells approximate.
+- **Pack 2, `framePress` and `glueTable`, 12 files:** the art side's files were cut wrong (half
+  size, off the anchor, with pieces of the neighbouring machine). Chat cut them again from the
+  preview board Piotr approved, scaled each to its canvas and stood it on its anchor line. They are
+  stand ins: the registration is by eye and not by geometry, and `docs/art/REQUESTS-T28.md` asks
+  the art side for the twelve again.
+
+The ports of the classes that want extraction (every cross cut saw, every planer, and the sanders
+from `budget` up; the used sander has a vacuum of its own and the presses and the glue table make
+no dust) are measured off these files, one line a file, `.r` among them, in `src/engine/ports.ts`
+[TUNE until Piotr confirms them on the hall]. The three cutter sets of 2.5 have no picture: the
+catalogue shows its empty picture box for them until the art side delivers.
