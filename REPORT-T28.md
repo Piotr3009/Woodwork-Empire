@@ -100,3 +100,26 @@ delivered and off the contract's projection, the presses and the glue table chat
 section 2 now says the anchor is at `8 + w × 48` (and `8 + d × 48` in a `.r` file), as the code has
 had it since 14.09; sections 5 and 7 still describe the bottom centre and are left for the art
 side's next brief. The incoming folder and its JSON are gone.
+
+**T28-C2 The five families.** `crossCut` (Cross cut saw), `planer` (Four sided planer),
+`framePress` (Frame press) and `glueTable` (Glue table) in the Timber machines tab, and `sander`
+(Sander) in the Sanding tab that was empty, each defined as the thicknesser is: a variant table of
+five classes for the four ladders (the art side's metres, the zone a metre more each way, the
+prices of 2.4 as written, power and endurance on the thicknesser's ladder, the planer's power its
+own, one sentence a class from the picture), its row in `VARIANTS_BY_FAMILY`,
+`DELIVERY_DAYS_BY_CLASS`, `MACHINE_CAPACITY`, `EXTRACTION_DEMAND`, `AIR_DEMAND`,
+`DUST_OUTPUT_M3_PER_HOUR`, `MACHINE_ENDURANCE_HOURS`, `CLASS_LADDER_FAMILIES`, `HEAVY_SPECS` (the
+planer whole, the other three from standard up, their used and budget in `LIGHT_CLASSES`),
+`MACHINE_SHORT_WORDS` (`machinesWord` says `presses`), `STATION_TABLE` (the front, as the moulder)
+and 28 lines of `PORTS`, measured off the pictures by a sub-agent the way v56 measured the CNC's
+[TUNE until Piotr confirms them]. The glue table is storage, one class, 3 by 1 in a 3 by 2 zone
+[TUNE: the metre on the long side], and adds `GLUE_TABLE_PLACES` 2 to one frame press a table by
+the drying racks' line of `placesAt`, refused past the presses with `Every frame press has its glue
+table`. The thicknesser's card loses `and its own stage comes with the timber branch`. Until a
+timber job exists (C5) no man is drawn at the four new families, so a hall with them draws its men
+as v82 did. The Sprite check page now looks for a one class family's class file, so the glue
+table's row (and the air dryer's, the pelletiser's, the systems', the desk's, the chair's, the
+laptop's, the locker's and the high rack's, whose pictures were always there) shows its picture and
+not `no file`. Flipped: the Sanding tab's `Nothing here yet.`, the Timber machines folders, the
+measured class files 75 to 96, the ports 23 to 37 and 56 to 84, the catalogue's metres list, and
+the whole catalogue on the floor 18 to 23.

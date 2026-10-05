@@ -279,6 +279,24 @@ export const STATION_TABLE: Record<string, StationRow> = {
     operator: { side: 'front', along: 0 },
     second: null,
   },
+  // The timber department: the operator at the long side that faces the camera in view 0, as at
+  // the spindle moulder (CLAUDE.md T28 2.4).
+  crossCut: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  planer: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  sander: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  framePress: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
   edgebander: {
     // The second cell from the infeed end, which is the left, read off the footprint's width so
     // the row needs no change when the footprint grows to 4 by 1 (CLAUDE.md T16 2.1, 6).

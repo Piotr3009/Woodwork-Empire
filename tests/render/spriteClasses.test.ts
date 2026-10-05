@@ -206,8 +206,10 @@ describe('the file on disk and the footprint in the engine', () => {
     // Sixty eight from v76: the four vans and the electric pallet truck the pack of 22.09 already
     // held, which the game had no classes for the day it landed (PIOTR, 03.10).
     // Seventy five from v80, the pack of 03.10: the two better forklifts, the air dryer, and the
-    // desk, the chair, the laptop and the locker the catalogue shows.
-    expect(checked).toBe(75);
+    // desk, the chair, the laptop and the locker the catalogue shows. Ninety six from v83: the
+    // twenty classes of the timber department's four ladders and the glue table (CLAUDE.md T28
+    // 2.11).
+    expect(checked).toBe(96);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }

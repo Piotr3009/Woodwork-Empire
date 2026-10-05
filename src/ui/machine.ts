@@ -44,6 +44,8 @@ import {
   COMPRESSOR_WITH_DRYER,
   DRYING_RACKS,
   DRYING_RACKS_PLACES_FACTOR,
+  GLUE_TABLE,
+  GLUE_TABLE_PLACES,
   DUST_WASTE_MONTHLY,
   EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
@@ -351,6 +353,11 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
   // they do is said in one line, off the engine's own factor (v73).
   if (spec.id === DRYING_RACKS) {
     return [line(`The booth they stand in keeps ${DRYING_RACKS_PLACES_FACTOR} times the men busy`)];
+  }
+  // The glue table is a table that makes nothing of its own: what it does is said the racks' way,
+  // off the engine's own figure (CLAUDE.md T28 2.4).
+  if (spec.id === GLUE_TABLE) {
+    return [line(`The frame press it stands by keeps ${GLUE_TABLE_PLACES} more men busy`)];
   }
   const machine = spec.category === 'machine';
   return [

@@ -1385,6 +1385,12 @@ export const DELIVERY_DAYS_BY_CLASS: Record<string, Record<string, number>> = {
   // like the compressors [TUNE] (v54).
   van: { used: 3, budget: 3, standard: 3, pro: 3, industrial: 3 },
   forklift: { used: 1, budget: 2, standard: 5, pro: 5, industrial: 5 },
+  // The timber department [TUNE: chat] (CLAUDE.md T28 2.4). The glue table waits five days on its
+  // own line.
+  crossCut: { used: 1, budget: 3, standard: 5, pro: 10, industrial: 20 },
+  planer: { used: 3, budget: 7, standard: 12, pro: 20, industrial: 30 },
+  sander: { used: 1, budget: 3, standard: 7, pro: 12, industrial: 25 },
+  framePress: { used: 1, budget: 3, standard: 7, pro: 12, industrial: 25 },
 };
 
 /** What a lorry load of heavy kit costs somebody at the gate, before the handling kit shortens
@@ -1437,6 +1443,12 @@ export const HEAVY_SPECS = [
   'flexiSystem',
   'pelletiser',
   'compressor',
+  // The timber department: the planer whole, and the other three from standard up, their used and
+  // budget classes being carried (CLAUDE.md T28 2.4) [TUNE].
+  'planer',
+  'crossCut',
+  'sander',
+  'framePress',
 ];
 
 /** Classes of a heavy family that are carried after all: a used or budget compressor is a small
@@ -1444,6 +1456,11 @@ export const HEAVY_SPECS = [
  *  edgebander needs no entry here, because it holds no cell of the floor at all. */
 export const LIGHT_CLASSES: Record<string, string[]> = {
   compressor: ['used', 'budget'],
+  // A chop saw on a stand, a hand sander, a bench of sash cramps and their budget classes are
+  // carried in (CLAUDE.md T28 2.4) [TUNE].
+  crossCut: ['used', 'budget'],
+  sander: ['used', 'budget'],
+  framePress: ['used', 'budget'],
 };
 
 /** Hours of use a standard machine of each family has in it [TUNE]. Piotr will set the real
@@ -1453,6 +1470,11 @@ export const MACHINE_ENDURANCE_HOURS: Record<string, number> = {
   edgebander: 4000,
   thicknesser: 2500,
   spindleMoulder: 3500,
+  // The timber department [TUNE] (CLAUDE.md T28 2.4).
+  planer: 4000,
+  crossCut: 3000,
+  sander: 3500,
+  framePress: 6000,
   // The high capacity rack's own figure [PIOTR, 03.10] (v69). A rack books no hours, so it is what
   // the card prints and nothing wears it down.
   sheetRackHigh: 100000,
@@ -1494,6 +1516,11 @@ export const CLASS_LADDER_FAMILIES: readonly string[] = [
   // Five vans and one family of pallet trucks and forklifts (PIOTR, 24.09; v54).
   'van',
   'forklift',
+  // The timber department's four ladders (CLAUDE.md T28 2.4).
+  'crossCut',
+  'planer',
+  'sander',
+  'framePress',
 ];
 
 /** Class 3 or above on the spindle moulder is the future gate to timber production. The branch
@@ -1687,6 +1714,14 @@ export const MACHINE_CAPACITY: Record<string, Record<string, number>> = {
   // The bench's own row, Turn 23's places as they stand (T23 2.17): a bench is a place to work and
   // not a machine a hall can be short of, so it is off `CAPACITY_FAMILIES` below.
   workbench: { used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 },
+  // The timber department [TUNE] (CLAUDE.md T28 2.4): a row makes the family one the hall can be
+  // short of, and a hall short of places at a planer is slowed as one short at the saw is, every
+  // man in it. That is the game's rule for every family and it is not softened for timber. The
+  // glue table is no row: it adds places to a frame press (`placesAt`).
+  crossCut: { used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 },
+  planer: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
+  sander: { used: 1, budget: 1, standard: 2, pro: 3, industrial: 4 },
+  framePress: { used: 1, budget: 2, standard: 2, pro: 3, industrial: 4 },
 };
 
 /** The families a hall can be short of: every row of the table but the bench's, whose places
@@ -2298,6 +2333,11 @@ export const EXTRACTION_DEMAND: Record<string, Record<string, number>> = {
   // (CLAUDE.md T13 3.12, 3.13).
   cnc: { used: 1400, budget: 1500, standard: 1600, pro: 2000, industrial: 2400 },
   spindleMoulder: { used: 900, budget: 1000, standard: 1300, pro: 1600, industrial: 2200 },
+  // The timber department [TUNE] (CLAUDE.md T28 2.4). The used sander has a vacuum of its own; the
+  // frame press and the glue table make no dust and are not on the table.
+  crossCut: { used: 600, budget: 700, standard: 900, pro: 1200, industrial: 1800 },
+  planer: { used: 2000, budget: 2200, standard: 2800, pro: 3400, industrial: 4500 },
+  sander: { used: 0, budget: 1200, standard: 1500, pro: 2200, industrial: 3500 },
 };
 
 /** Piotr's margin on the extraction: the sums have to leave a fifth of the fan spare, so a hall
@@ -2328,7 +2368,8 @@ export const COMPRESSOR_AIR: Record<string, { bar: number; litres: number }> = {
 /** What a machine wants of the air while it runs: the pressure it will not start under and the
  *  free air it draws, a minute (PIOTR's bands from the trade, CLAUDE.md T10 3.2). The ladders are
  *  written out in full even where the family has one class tonight. The two hand classes of the
- *  edgebander run on no air at all; the solid wood press is later. */
+ *  edgebander run on no air at all, and neither do the hand presses and saws of the timber
+ *  department (CLAUDE.md T28 2.4). */
 export const AIR_DEMAND: Record<string, Record<string, { bar: number; litres: number }>> = {
   edgebander: {
     standard: { bar: 7, litres: 250 },
@@ -2351,6 +2392,17 @@ export const AIR_DEMAND: Record<string, Record<string, { bar: number; litres: nu
     standard: { bar: 7, litres: 350 },
     pro: { bar: 7, litres: 350 },
     industrial: { bar: 7, litres: 350 },
+  },
+  // The timber department [TUNE] (CLAUDE.md T28 2.4): a hand and a hydraulic frame press cramp on
+  // air, and the two dearest cross cut saws set their stops by it.
+  framePress: {
+    standard: { bar: 6, litres: 100 },
+    pro: { bar: 7, litres: 200 },
+    industrial: { bar: 7, litres: 300 },
+  },
+  crossCut: {
+    pro: { bar: 6, litres: 100 },
+    industrial: { bar: 6, litres: 200 },
   },
 };
 
@@ -2873,6 +2925,284 @@ export const FORKLIFT_VARIANTS: EquipmentVariant[] = [
   },
 ];
 
+// The timber department's machines (PIOTR, 04.10: "timber machines much dearer"; CLAUDE.md T28
+// 2.4). Width, depth and height are the art side's envelope for each class, so the canvas the
+// engine works out fits every file it delivered; the working zone is the footprint and a metre
+// more each way [TUNE]. The used and budget classes are the hand way of doing the job and are cheap
+// on purpose; from standard up timber costs more than sheet [TUNE: chat: every price, final as
+// written]. The power and the endurance are the thicknesser's ladder [TUNE], the planer's power
+// its own. One sentence a class, from what its picture shows.
+export const CROSS_CUT_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used cross cut saw',
+    price: 300,
+    width: 2,
+    depth: 1,
+    height: 1.25,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    enduranceFactor: 0.25,
+    powerPerDay: 3,
+    description: 'A chop saw on a folding stand.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget cross cut saw',
+    price: 2500,
+    width: 3,
+    depth: 1,
+    height: 1.25,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    enduranceFactor: 1,
+    powerPerDay: 3,
+    description: 'A mitre saw on a fixed table with roller tables.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard cross cut saw',
+    price: 8000,
+    width: 4,
+    depth: 1,
+    height: 1.5,
+    zoneWidth: 5,
+    zoneDepth: 2,
+    enduranceFactor: 1.2,
+    powerPerDay: 4,
+    description: 'A pull saw built into a bench with stops on a rail.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional cross cut saw',
+    price: 24000,
+    width: 5,
+    depth: 1,
+    height: 1.75,
+    zoneWidth: 6,
+    zoneDepth: 2,
+    enduranceFactor: 1.5,
+    powerPerDay: 5,
+    description: 'An up cut saw in a closed guard with a positioning stop.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial cross cut saw',
+    price: 60000,
+    width: 7,
+    depth: 2,
+    height: 2,
+    zoneWidth: 8,
+    zoneDepth: 3,
+    enduranceFactor: 2,
+    powerPerDay: 7,
+    description: 'A computer set optimiser with conveyors in and out.',
+  },
+];
+
+export const PLANER_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used four sided planer',
+    price: 6000,
+    width: 3,
+    depth: 1,
+    height: 1.5,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    enduranceFactor: 0.25,
+    powerPerDay: 4,
+    description: 'Four heads, set by hand, second hand.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget four sided planer',
+    price: 14000,
+    width: 3,
+    depth: 1,
+    height: 1.5,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    enduranceFactor: 1,
+    powerPerDay: 5,
+    description: 'Four heads, new and plain.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard four sided planer',
+    price: 28000,
+    width: 4,
+    depth: 1,
+    height: 1.5,
+    zoneWidth: 5,
+    zoneDepth: 2,
+    enduranceFactor: 1.2,
+    powerPerDay: 7,
+    description: 'Five heads with a roller feed.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional four sided planer',
+    price: 60000,
+    width: 5,
+    depth: 1,
+    height: 1.75,
+    zoneWidth: 6,
+    zoneDepth: 2,
+    enduranceFactor: 1.5,
+    powerPerDay: 10,
+    description: 'Six heads in a sound enclosure with readouts.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial four sided planer',
+    price: 120000,
+    width: 6,
+    depth: 2,
+    height: 2,
+    zoneWidth: 7,
+    zoneDepth: 3,
+    enduranceFactor: 2,
+    powerPerDay: 14,
+    description: 'Six heads, set by computer, with an automatic infeed.',
+  },
+];
+
+export const SANDER_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used sander',
+    price: 400,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    enduranceFactor: 0.25,
+    powerPerDay: 3,
+    description: 'A hand sander at a bench with its own vacuum.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget sander',
+    price: 3000,
+    width: 2,
+    depth: 1,
+    height: 1.25,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    enduranceFactor: 1,
+    powerPerDay: 3,
+    description: 'A downdraught sanding table.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard sander',
+    price: 9000,
+    width: 2,
+    depth: 1,
+    height: 1.5,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    enduranceFactor: 1.2,
+    powerPerDay: 4,
+    description: 'An edge belt sander.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional sander',
+    price: 36000,
+    width: 3,
+    depth: 2,
+    height: 1.75,
+    zoneWidth: 4,
+    zoneDepth: 3,
+    enduranceFactor: 1.5,
+    powerPerDay: 5,
+    description: 'A through feed brush and belt sander.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial sander',
+    price: 96000,
+    width: 6,
+    depth: 2,
+    height: 2,
+    zoneWidth: 7,
+    zoneDepth: 3,
+    enduranceFactor: 2,
+    powerPerDay: 7,
+    description: 'An automatic sanding line that takes a whole frame in and out.',
+  },
+];
+
+export const FRAME_PRESS_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used frame press',
+    price: 250,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    enduranceFactor: 0.25,
+    powerPerDay: 3,
+    description: 'A bench with a handful of sash cramps.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget frame press',
+    price: 1500,
+    width: 3,
+    depth: 1,
+    height: 1.25,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    enduranceFactor: 1,
+    powerPerDay: 3,
+    description: 'A cramping table with long cramps fitted.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard frame press',
+    price: 7000,
+    width: 3,
+    depth: 1,
+    height: 2.25,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    enduranceFactor: 1.2,
+    powerPerDay: 4,
+    description: 'A hand frame press.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional frame press',
+    price: 24000,
+    width: 4,
+    depth: 1,
+    height: 2.5,
+    zoneWidth: 5,
+    zoneDepth: 2,
+    enduranceFactor: 1.5,
+    powerPerDay: 5,
+    description: 'A hydraulic frame press.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial frame press',
+    price: 72000,
+    width: 5,
+    depth: 2,
+    height: 2.75,
+    zoneWidth: 6,
+    zoneDepth: 3,
+    enduranceFactor: 2,
+    powerPerDay: 7,
+    description: 'An automatic window press with rollers in and out.',
+  },
+];
 const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   tableSaw: TABLE_SAW_VARIANTS,
   workbench: WORKBENCH_VARIANTS,
@@ -2891,6 +3221,11 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   // Five vans and one family of pallet trucks and forklifts (PIOTR, 24.09; v54).
   van: VAN_VARIANTS,
   forklift: FORKLIFT_VARIANTS,
+  // The timber department's four ladders (CLAUDE.md T28 2.4). The glue table has one class.
+  crossCut: CROSS_CUT_VARIANTS,
+  planer: PLANER_VARIANTS,
+  sander: SANDER_VARIANTS,
+  framePress: FRAME_PRESS_VARIANTS,
 };
 
 /** The spray booth's add on (PIOTR, 03.10: "something that adds to what the booth can take, up to
@@ -2900,6 +3235,12 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
  *  four are twenty four [PIOTR] (v73). */
 export const DRYING_RACKS = 'dryingRacks';
 export const DRYING_RACKS_PLACES_FACTOR = 6;
+
+/** The frame press's add on (CLAUDE.md T28 2.4): a table the glue is spread on beside a press, which
+ *  does for the press what the drying racks do for a booth. Each one adds this many places to one
+ *  frame press, one table counted for each press that stands [TUNE]. */
+export const GLUE_TABLE = 'glueTable';
+export const GLUE_TABLE_PLACES = 2;
 
 const BASE_SPEC = {
   // Nothing comes back in the owner's hands any more: hand tools, cabinets, lockers, seats and
@@ -3295,7 +3636,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     usedOn: 'solidWood',
     effect:
       'Planes and thicknesses timber. With it the workshop takes on solid wood. Timber only: a ' +
-      'sheet job never touches it, and its own stage comes with the timber branch.',
+      'sheet job never touches it.',
   },
   {
     ...BASE_SPEC,
@@ -3319,6 +3660,106 @@ const SPEC_DRAFTS: SpecDraft[] = [
     effect:
       'Moulds a profile on an edge: the J profile of a handleless kitchen and the fronts of a ' +
       'sprayed one on the sheet side, and every moulding on the timber side.',
+  },
+  // The timber department (PIOTR, 04.10; CLAUDE.md T28 2.4): the machines a window or a door is
+  // made on beside the spindle moulder and the booth the game has. In the catalogue from day 1;
+  // the work for them comes with the 800 m2 hall (2.3). The classes are the variant tables above.
+  {
+    ...BASE_SPEC,
+    id: 'crossCut',
+    deliveryDays: 5,
+    folder: 'Cross cut saws',
+    tab: 'timberMachines',
+    name: 'Cross cut saw',
+    price: 300,
+    category: 'machine',
+    width: 2,
+    depth: 1,
+    height: 1.25,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    spriteKey: 'crossCut',
+    usedOn: 'solidWood',
+    effect: 'Cuts the timber of a window or a door to length: the first thing done to it.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'planer',
+    deliveryDays: 12,
+    folder: 'Four sided planers',
+    tab: 'timberMachines',
+    name: 'Four sided planer',
+    price: 6000,
+    category: 'machine',
+    width: 3,
+    depth: 1,
+    height: 1.5,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    spriteKey: 'planer',
+    usedOn: 'solidWood',
+    effect: 'Planes all four faces of the timber in one pass: the second thing done to a window or a door.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'framePress',
+    deliveryDays: 7,
+    folder: 'Frame presses',
+    tab: 'timberMachines',
+    name: 'Frame press',
+    price: 250,
+    category: 'machine',
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    spriteKey: 'framePress',
+    usedOn: 'solidWood',
+    effect: 'Cramps a glued frame square while the glue takes: the pressing of a window or a door.',
+  },
+  {
+    ...BASE_SPEC,
+    id: GLUE_TABLE,
+    deliveryDays: 5,
+    folder: 'Glue tables',
+    tab: 'timberMachines',
+    name: 'Glue table',
+    price: 2500,
+    // A table and not a machine, as the drying racks are shelving: nothing turns on it, so it
+    // draws no power, books no hours and comes due for no service. What it does is places at a
+    // frame press (`placesAt`); being storage it opens no card on the hall.
+    category: 'storage',
+    width: 3,
+    depth: 1,
+    height: 1,
+    // Its footprint and a metre along its long side, where the man spreading the glue stands [TUNE].
+    zoneWidth: 3,
+    zoneDepth: 2,
+    spriteKey: GLUE_TABLE,
+    usedOn: 'solidWood',
+    requires: ['framePress'],
+    effect:
+      'A glue table with a roller spreader, stood by a frame press. The press it stands by keeps ' +
+      'two more men busy.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'sander',
+    deliveryDays: 7,
+    folder: 'Sanders',
+    tab: 'sanding',
+    name: 'Sander',
+    price: 400,
+    category: 'machine',
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    spriteKey: 'sander',
+    usedOn: 'solidWood',
+    effect: 'Sands a frame before it is lacquered: the sanding of a window or a door.',
   },
   {
     ...BASE_SPEC,
@@ -4240,10 +4681,10 @@ export function bagsToM3(bags: number): number {
  *  reference is a CNC cutting all day filling half a bag and a saw four times less, a bag of one
  *  cubic metre and a day of eight hours.
  *
- *  Families that do not exist yet, written here in full so the figures are in place the day the
- *  classes land, the way EXTRACTION_DEMAND does it: spindle moulder 0.12 (a bag a day), planer
- *  0.12 (one face, a bag a day), four sided planer 0.5 (four times the spindle moulder), wide
- *  belt sander 0.03, brush sander 0.03. None of them is a family tonight. */
+ *  The figures the comment here kept for the families that did not exist yet are theirs now
+ *  (CLAUDE.md T28 2.4): the four sided planer 0.5 (four times the spindle moulder) and the sander
+ *  0.03; the cross cut saw 0.02, a little more than the table saw [TUNE]; the frame press and the
+ *  glue table none. A planer of one face, 0.12, is still not a family. */
 export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   tableSaw: 0.015, // an eighth of a bag a day
   edgebander: 0.01, // a bag in about two weeks of use
@@ -4255,6 +4696,12 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   // A compressor moves air and makes no chips. Not on Piotr's list: a zero so that every family
   // of the machine category is on this table and the test can hold it to that [TUNE].
   compressor: 0,
+  // The timber department (CLAUDE.md T28 2.4).
+  planer: 0.5,
+  sander: 0.03,
+  crossCut: 0.02,
+  framePress: 0,
+  glueTable: 0,
 };
 
 /** How full the hall's bags are when a labourer on duty starts emptying them, as a fraction of
@@ -4620,7 +5067,16 @@ export const MACHINE_SHORT_WORDS: Record<string, string> = {
   spindleMoulder: 'moulder',
   edgebander: 'edgebander',
   workbench: 'bench',
+  // The timber department (CLAUDE.md T28 2.4).
+  crossCut: 'cross cut saw',
+  planer: 'planer',
+  sander: 'sander',
+  framePress: 'press',
 };
+
+/** The four timber families with places (CLAUDE.md T28 2.4, 2.7): a man is drawn at one of them
+ *  only while he is on a timber job, so a kitchen man is never seen at the planer. */
+export const TIMBER_FAMILIES: readonly string[] = ['crossCut', 'planer', 'framePress', 'sander'];
 
 /** The first use bubbles, one sentence each, keyed by the screen they open on [TUNE wording]
  *  (CLAUDE.md T13 3.22). Dismissed by a click, remembered in the save. */

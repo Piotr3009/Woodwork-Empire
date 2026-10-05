@@ -15,6 +15,7 @@ import {
   DAY_SUMMARIES_MAX,
   DIFFICULTIES,
   DRYING_RACKS,
+  GLUE_TABLE,
   GATE_LANE,
   GATE_PRICE,
   HAND_TOOL_SET,
@@ -2569,6 +2570,15 @@ export function canBuy(
       state.equipment.filter((item) => item.specId === id && !isSold(item)).length + onOrderCount(state, id);
     if (counted(DRYING_RACKS) >= counted('sprayBooth')) {
       return { ok: false, reason: 'Every spray booth has its drying racks' };
+    }
+  }
+  // A glue table stands by a frame press, one a press, and is refused in the racks' own words when
+  // every press has one (CLAUDE.md T28 2.4).
+  if (specId === GLUE_TABLE) {
+    const counted = (id: string): number =>
+      state.equipment.filter((item) => item.specId === id && !isSold(item)).length + onOrderCount(state, id);
+    if (counted(GLUE_TABLE) >= counted('framePress')) {
+      return { ok: false, reason: 'Every frame press has its glue table' };
     }
   }
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {

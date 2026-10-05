@@ -10,6 +10,8 @@ import {
   CAPACITY_ROLES,
   CENTRAL_EXTRACTION_SPECS,
   DRYING_RACKS,
+  GLUE_TABLE,
+  GLUE_TABLE_PLACES,
   DRYING_RACKS_PLACES_FACTOR,
   DUST_BANDS,
   DUST_HIGH_THRESHOLD,
@@ -426,8 +428,25 @@ export function boothsWithDryingRacks(state: GameState): Set<string> {
  *  card read this; `placesOf` is the class by itself, which is what the catalogue prints. */
 export function placesAt(state: GameState, item: Equipment): number {
   const own = placesOf(item);
+  // A glue table beside a frame press adds its places to the press's, by the same line the racks
+  // add theirs to a booth (CLAUDE.md T28 2.4).
+  if (item.specId === FRAME_PRESS && own > 0) {
+    return framePressesWithGlueTables(state).has(item.id) ? own + GLUE_TABLE_PLACES : own;
+  }
   if (item.specId !== SPRAY_BOOTH || own <= 0) return own;
   return boothsWithDryingRacks(state).has(item.id) ? own * DRYING_RACKS_PLACES_FACTOR : own;
+}
+
+/** The frame presses that have a glue table beside them: the tables the hall owns go to its
+ *  presses one a press, in the order the presses were bought, as the drying racks go to the
+ *  booths (CLAUDE.md T28 2.4). */
+export function framePressesWithGlueTables(state: GameState): Set<string> {
+  const tables = owned(state, GLUE_TABLE).filter((item) => !isSold(item)).length;
+  return new Set(
+    floorMachines(state, FRAME_PRESS)
+      .slice(0, tables)
+      .map((item) => item.id),
+  );
 }
 
 /** The machine the man at this place of the family works at, and which of its own places he
@@ -592,9 +611,11 @@ export function placeShortages(
   return found;
 }
 
-/** The plural of what the trade calls a family: `saws`, `CNCs`, `booths`. */
+/** The plural of what the trade calls a family: `saws`, `CNCs`, `booths`, and `presses`, which a
+ *  word that ends in an s takes (CLAUDE.md T28 2.4). */
 export function machinesWord(family: string): string {
-  return `${machineShortWord(family)}s`;
+  const word = machineShortWord(family);
+  return word.endsWith('s') ? `${word}es` : `${word}s`;
 }
 
 /** The line a machine's card and its hover carry while its family is short for the men whose work
@@ -713,6 +734,8 @@ export const BENCH = 'workbench';
 /** The booth family. The finishing of a lacquered job is done at it, by a joiner like every other
  *  stage (PIOTR, 02.10; CLAUDE.md T26 2.6). */
 export const SPRAY_BOOTH = 'sprayBooth';
+/** The timber department's press, which a glue table adds places to (CLAUDE.md T28 2.4). */
+export const FRAME_PRESS = 'framePress';
 
 /** The benches standing in the hall, in the order they were bought, which is the order the men
  *  fill them in. A broken one is no bench at all, the way a broken machine is no machine. */

@@ -116,6 +116,13 @@ describe('footprints in metres', () => {
       // Turn 13: the spindle moulder is 2 by 1 in a 3 by 3 zone [TUNE] (CLAUDE.md T13 3.13). The
       // pallet truck's one cell went with it into the forklift's family (v54).
       spindleMoulder: [2, 1, 1],
+      // The timber department's machines are the art side's envelope, the cheapest class on the
+      // line (CLAUDE.md T28 2.4).
+      crossCut: [2, 1, 1.25],
+      planer: [3, 1, 1.5],
+      framePress: [2, 1, 1],
+      glueTable: [3, 1, 1],
+      sander: [2, 1, 1],
     };
     // Every line of the catalogue is in one of the two lists: nothing slips in unmeasured.
     expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(

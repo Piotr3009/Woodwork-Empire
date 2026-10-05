@@ -102,7 +102,9 @@ export function spriteTargets(): SpriteTarget[] {
       name: spec.spriteKey,
       specId: spec.id,
       spriteKey: spec.spriteKey,
-      tier: null,
+      // Its one class, so the class file the art side delivers (`glueTable.standard.png`) is found
+      // as the hall finds it, and the family file where there is only that (CLAUDE.md T28 7).
+      tier: spec.variants[0]?.id ?? null,
       width: spec.width,
       depth: spec.depth,
       height: spec.height,

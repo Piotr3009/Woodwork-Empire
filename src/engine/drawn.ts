@@ -15,7 +15,7 @@
 // figures stand. The hall's figures, the blade it spins and the sound it plays read this, so what
 // is seen and what is heard agree with each other.
 
-import { DRAWN_TURN_MINUTES, PACED_FAMILIES } from './constants';
+import { DRAWN_TURN_MINUTES, PACED_FAMILIES, TIMBER_FAMILIES } from './constants';
 import { OWNER, menAtPlaces, placedMachines, placesOf } from './machines';
 import type { Equipment, GameState } from './types';
 
@@ -60,7 +60,10 @@ function hiringOrder(state: GameState, who: string): number {
 export function drawnPlaces(state: GameState): DrawnPlace[] {
   const working = menAtPlaces(state);
   if (working.length === 0) return [];
-  const spots = workSpots(state);
+  // The timber department's machines are spots only for a man on a timber job, which no man is
+  // before the timber work is made (CLAUDE.md T28 2.7): every other man is drawn over the rest, as
+  // he was before they stood in the hall.
+  const spots = workSpots(state).filter((item) => !TIMBER_FAMILIES.includes(item.specId));
   if (spots.length === 0) return working;
   const turn = drawnTurn(state);
   const menAt = new Map<string, number>();
