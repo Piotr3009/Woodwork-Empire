@@ -266,3 +266,19 @@ no pipe when moved (the sheet department's booth is counted as it was); a window
 while nobody was on it no longer keeps `waiting for glass` (D2); the drawn places work a timber
 job's plan out once a job and not once a man. The oak table's no night and no glass, and the
 bubble a standing job's man does not wear, are asserted now.
+
+**T28-D3 Cross check.** Section 7, claim by claim: a read-only sub-agent mapped all 47 claims to the
+expect() that pins each and found none missing and six only partly pinned; the eight tests it
+drafted are in the tree now, each run first on a scratch copy. The break's card once for Christmas
+2026 and the summer of 2027 and its back card once (`t28Closures`); the reputation before the booth
+and the kit before the hands, each with both conditions true at once; the seeded board of the 200
+and the 400 m2 hall and a sheet job's plan, labels and speeds pinned against figures recorded on main
+at v82 (identical: the sub-agent compared the two trees directly too, 150 live draws, 60 greyed and
+20 played days of each hall, and 30 stage plans); the `ORDER_GLASS` action refused before the
+paperwork; the agency's never a window, now also asserting the tier where the five are weighted
+above nought and that it drew something (flipped in place, the weaker test gone); the 42 pictures
+on disk and in the manifest with `docs/art/incoming/` gone, and the men of a hall with no timber job
+drawn as v82 drew them (`t28Families`). One comment set right (`tax.test.ts`: 6 January 2027 is a
+Monday). No `it.skip`, `describe.skip`, `.only` or `.todo` anywhere in `tests/` or `src/`;
+`git diff main --stat -- src/ui/styles.css` is empty; `APP_VERSION` 'v83', `STATE_VERSION` 41,
+`OLDEST_SAVE_VERSION` 12.

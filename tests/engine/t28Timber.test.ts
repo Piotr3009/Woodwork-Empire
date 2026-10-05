@@ -37,6 +37,7 @@ import {
   kitBlockFor,
   offeredOnTheBoard,
   timberOnTheBoard,
+  enquiryQualityTier,
 } from '../../src/engine/board';
 import { drawBigJob } from '../../src/engine/agency';
 import { deadlineDaysFrom, labourValueFor, ownerDaysFor, stagedJob } from '../../src/engine/jobs';
@@ -87,6 +88,7 @@ import {
   placeEnquiry,
   placeEquipment,
   testJoiner,
+  day53Hall,
 } from '../helpers';
 
 const FIVE: Array<[string, string, number, string, number, number[]]> = [
@@ -750,13 +752,131 @@ describe('timber on the board of the 800 m2 hall (CLAUDE.md T28 2.3)', () => {
     expect(Number(figure?.[1])).toBe(job.sheets);
   });
 
-  it('never has the agency draw a window or a door as a big job', () => {
+  it('never has the agency draw a window or a door as a big job, at the tier the windows are weighted at', () => {
     const state = bigHall();
     state.reputation = 90;
+    expect(enquiryQualityTier(state)).toBe(2);
+    for (const id of TIMBER_IDS) expect(template(id).weightsByTier[2], id).toBeGreaterThan(0);
+    let drawnCount = 0;
     for (let seed = 0; seed < 300; seed += 1) {
       const job = drawBigJob(state, { rng: seed * 7919 + 1 });
       if (job === null) continue;
+      drawnCount += 1;
       expect(TIMBER_IDS, job.templateId).not.toContain(job.templateId);
     }
+    expect(drawnCount).toBeGreaterThan(0);
+  });
+});
+
+describe('what the cross check pins besides (CLAUDE.md T28 section 7)', () => {
+  it('puts the reputation before the booth, and the kit before the hands', () => {
+    const sash = template('sashWindows');
+    const short = timberHall(['sprayBooth', 'crossCut', 'cuttersSash']);
+    short.reputation = 20;
+    expect(kitBlockFor(short, sash)).toEqual({ reason: 'reputation too low (needs 30)', where: '' });
+    expect(blockFor(short, sash, 1 + TIMBER_LEAD_DAYS, sash.basePrice)?.reason).toBe('reputation too low (needs 30)');
+    // Short of the cutters and of hands at once: the cutters are said first.
+    expect(blockFor(timberHall(['cuttersSash']), sash, 1 + TIMBER_LEAD_DAYS, sash.basePrice)).toEqual({
+      reason: 'no sash window cutter set',
+      where: 'catalogue',
+    });
+  });
+
+  it('draws the seeded board of the 200 and the 400 m2 hall exactly as v82 drew it', () => {
+    // Recorded on main at v82 with the same set up: the day one kit, reputation 40, the website at
+    // level 3, the default seed; the 400 m2 hall opened the morning after the extension was paid.
+    const golden: Record<number, { live: Array<[string, number, number]>; greyed: Array<[string, string]> }> = {
+      200: {
+        live: [
+          ['smallKitchen', 4260, 5], ['lacqueredKitchen', 12760, 19], ['smallKitchen', 6060, 6],
+          ['lacqueredWardrobe', 6900, 12], ['bookcase', 780, 4], ['handlelessKitchen', 13260, 20],
+          ['tvUnit', 2390, 4], ['tvUnit', 1270, 6], ['garageShelves', 510, 3], ['wardrobe', 2140, 6],
+        ],
+        greyed: [
+          ['lacqueredKitchen', 'needs a spray booth'], ['handlelessKitchen', 'no spindle moulder'],
+          ['lacqueredKitchen', 'needs a spray booth'], ['handlelessKitchen', 'no spindle moulder'],
+          ['lacqueredWardrobe', 'needs a spray booth'], ['handlelessKitchen', 'no spindle moulder'],
+        ],
+      },
+      400: {
+        live: [
+          ['bookcase', 810, 3], ['smallKitchen', 7160, 8], ['handlelessKitchen', 11020, 17],
+          ['bookcase', 980, 5], ['lacqueredKitchen', 18440, 26], ['lacqueredKitchen', 25680, 20],
+          ['wardrobe', 1780, 5], ['bookcase', 1150, 6], ['lacqueredWardrobe', 6610, 11], ['garageShelves', 460, 4],
+        ],
+        greyed: [
+          ['lacqueredWardrobe', 'needs a spray booth'], ['lacqueredKitchen', 'needs a spray booth'],
+          ['handlelessKitchen', 'no spindle moulder'], ['lacqueredWardrobe', 'needs a spray booth'],
+          ['handlelessKitchen', 'no spindle moulder'], ['handlelessKitchen', 'no spindle moulder'],
+        ],
+      },
+    };
+    for (const extend of [false, true]) {
+      let state = newGame({ difficulty: 'veryEasy' });
+      if (extend) {
+        state.cash = 3000000;
+        state = nextDay(act(state, { type: 'EXTEND_UNIT' }));
+      }
+      state = buyStartingKit(state);
+      state.cash = 1000000;
+      state.reputation = 40;
+      state.website.level = 3;
+      state.enquiries = [];
+      const want = golden[state.unit.areaM2];
+      if (want === undefined) throw new Error(`no golden for ${state.unit.areaM2}`);
+      const live = JSON.parse(JSON.stringify(state)) as GameState;
+      const drawnLive = Array.from({ length: 10 }, () => {
+        const enquiry = generateEnquiry(live);
+        return [enquiry?.templateId, enquiry?.price, enquiry?.deadlineDays];
+      });
+      expect(drawnLive, String(state.unit.areaM2)).toEqual(want.live);
+      const grey = JSON.parse(JSON.stringify(state)) as GameState;
+      const drawnGrey = Array.from({ length: 6 }, () => {
+        grey.enquiries = [];
+        const enquiry = generateUnreachable(grey);
+        return [enquiry?.templateId, enquiry?.blockReason];
+      });
+      expect(drawnGrey, String(state.unit.areaM2)).toEqual(want.greyed);
+    }
+  });
+
+  it('leaves a sheet job s plan byte for byte what v82 made it', () => {
+    const sheet = (state: GameState, finish: 'laminate' | 'lacquer') =>
+      stagePlanFor(state, { labourValue: 1000, materialKind: 'sheet', finish, byHand: false, needsSpindle: false }).map(
+        (stage) => [stage.id, stage.label, stage.share, stage.family, Math.round(stage.speed * 10000) / 10000, stage.byHand],
+      );
+    const dayOne = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    expect(sheet(dayOne, 'laminate')).toEqual([
+      ['cutting', 'Cutting', 0.25, 'tableSaw', 0.95, false],
+      ['edging', 'Edging', 0.25, 'edgebander', 1, false],
+      ['moulding', 'Moulding', 0.25, 'spindleMoulder', 0.6667, true],
+      ['assembly', 'Assembly', 0.25, 'workbench', 1, false],
+    ]);
+    expect(sheet(dayOne, 'lacquer')).toEqual([
+      ['cutting', 'Cutting', 0.2125, 'tableSaw', 0.95, false],
+      ['edging', 'Edging', 0.2125, 'edgebander', 1, false],
+      ['moulding', 'Moulding', 0.2125, 'spindleMoulder', 0.6667, true],
+      ['assembly', 'Assembly', 0.2125, 'workbench', 1, false],
+      ['finishing', 'Finishing', 0.15, 'sprayBooth', 1, false],
+    ]);
+    // With a CNC in the hall the cutting is the CNC's, as it was.
+    expect(sheet(day53Hall(), 'lacquer').map(([id, label, share, family]) => [id, label, share, family])).toEqual([
+      ['cnc', 'CNC', 0.2125, 'cnc'],
+      ['edging', 'Edging', 0.2125, 'edgebander'],
+      ['moulding', 'Moulding', 0.2125, 'spindleMoulder'],
+      ['assembly', 'Assembly', 0.2125, 'workbench'],
+      ['finishing', 'Finishing', 0.15, 'sprayBooth'],
+    ]);
+  });
+
+  it('refuses the owner s click on Order glass before the paperwork is done', () => {
+    const { state, job } = sashJob();
+    const cash = state.cash;
+    const lines = state.ledger.length;
+    const after = act(state, { type: 'ORDER_GLASS', jobId: job.id });
+    expect(firstJob(after).glass).toBe('toOrder');
+    expect(firstJob(after).glassDay).toBeNull();
+    expect(after.cash).toBe(cash);
+    expect(after.ledger.length).toBe(lines);
   });
 });

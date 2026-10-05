@@ -696,3 +696,21 @@ describe('what is counted in working days steps over the break (CLAUDE.md T28 2.
     expect(after.ledger.some((entry) => entry.day === 301 && (entry.category === 'loan' || entry.category === 'loanInterest'))).toBe(true);
   });
 });
+
+describe('each closure is warned of once (CLAUDE.md T28 2.2.1, section 7)', () => {
+  it('raises the break s card once for Christmas 2026 and for the summer of 2027, and its back card once', () => {
+    // Fri 28 November 2026 at five to Mon 6 January 2027; Fri 28 June 2027 at five to Wed 15 August 2027.
+    const spans: Array<[number, number, string, string]> = [
+      [628, 666, 'Christmas break', 'Back from the Christmas break'],
+      [838, 885, 'Summer break', 'Back from the summer break'],
+    ];
+    for (const [evening, back, title, overTitle] of spans) {
+      const seen: GameEvent[] = [];
+      let state = nextMorning(eveningOf(evening, 48000), seen);
+      while (state.clock.day < back) state = nextMorning(state, seen);
+      expect(state.clock.day, title).toBe(back);
+      expect(eventsOfKind(seen, 'closureComing').map((event) => event.title), title).toEqual([title]);
+      expect(eventsOfKind(seen, 'closureOver').map((event) => [event.day, event.title]), title).toEqual([[back, overTitle]]);
+    }
+  });
+});

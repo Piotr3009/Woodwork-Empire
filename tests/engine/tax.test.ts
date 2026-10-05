@@ -145,7 +145,7 @@ describe('the tax on 30 December (CLAUDE.md T27 2.2)', () => {
     // Flipped in v83: the 30th falls in the Christmas break from 2025 on, so the tax is always
     // booked in the clock's walk over the closed days, as it was on 2025's Saturday (CLAUDE.md T28
     // 2.2). In 2026 the 30th is a Tuesday and closed; from Friday 19 December the morning is
-    // Tuesday 6 January 2027 and the line stands on day 660.
+    // Monday 6 January 2027 and the line stands on day 660.
     for (const day of [300, 660, 1020]) {
       expect(isTaxDay(day), String(day)).toBe(true);
       expect(isWorkingDay(day), String(day)).toBe(false);

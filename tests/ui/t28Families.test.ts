@@ -14,6 +14,7 @@
 // fourteen prices of v81 and every older family's figures are held by the tests that pin them.
 
 import { describe, expect, it } from 'vitest';
+import { readdirSync } from 'node:fs';
 import {
   AIR_DEMAND,
   CLASS_LADDER_FAMILIES,
@@ -52,7 +53,7 @@ import {
 } from '../../src/engine/machines';
 import { STATION_TABLE } from '../../src/engine/stations';
 import { portFor } from '../../src/engine/ports';
-import { spriteUrl } from '../../src/render/sprites';
+import { spriteFiles, spriteUrl } from '../../src/render/sprites';
 import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 import { floorLine } from '../../src/ui/machine';
 import { catalogueTabFrom, renderCatalogue } from '../../src/ui/catalogue';
@@ -356,5 +357,38 @@ describe('the cutter sets (CLAUDE.md T28 2.5)', () => {
       expect(row?.textContent, id).toContain('kept at the spindle moulders');
       expect(row?.textContent, id).toContain('no file yet');
     }
+  });
+});
+
+describe('the pictures on disk and the men as v82 drew them (CLAUDE.md T28 2.11, section 7)', () => {
+  it('has the forty two pictures on disk and in the manifest, both views of every class, and no incoming folder', () => {
+    const names = [
+      ...LADDERS.flatMap((id) => CLASS_ORDER.flatMap((tier) => [`${id}.${tier}.png`, `${id}.${tier}.r.png`])),
+      `${GLUE_TABLE}.standard.png`,
+      `${GLUE_TABLE}.standard.r.png`,
+    ];
+    expect(names).toHaveLength(42);
+    const files = spriteFiles();
+    const onDisk = new Set(readdirSync('public/sprites'));
+    for (const name of names) {
+      expect(files, name).toContain(name);
+      expect(onDisk.has(name), name).toBe(true);
+    }
+    expect(readdirSync('docs/art')).not.toContain('incoming');
+  });
+
+  it('draws the men of a hall with no timber job exactly as v82 drew them', () => {
+    // Recorded on main at v82: the day 53 hall, the first three turns of the day.
+    const golden = [
+      'staff-1@hall-tableSaw-5,staff-2@hall-spindleMoulder-6,staff-3@hall-edgebander-7,staff-4@hall-edgebander-8,staff-5@hall-sprayBooth-9,staff-6@hall-workbench-10,staff-10@hall-workbench-11',
+      'staff-1@hall-spindleMoulder-6,staff-2@hall-edgebander-7,staff-3@hall-edgebander-8,staff-4@hall-sprayBooth-9,staff-5@hall-workbench-10,staff-6@hall-workbench-11,staff-10@hall-workbench-12',
+      'staff-1@hall-edgebander-7,staff-2@hall-edgebander-8,staff-3@hall-sprayBooth-9,staff-4@hall-workbench-10,staff-5@hall-workbench-11,staff-6@hall-workbench-12,staff-10@hall-cnc-4',
+    ];
+    const state = day53Hall();
+    golden.forEach((line, hour) => {
+      state.clock.minute = hour * DRAWN_TURN_MINUTES;
+      planPlaces(state);
+      expect(drawnPlaces(state).map((entry) => `${entry.who}@${entry.item.id}`).join(','), String(hour)).toBe(line);
+    });
   });
 });
