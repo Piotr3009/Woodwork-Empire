@@ -26,3 +26,8 @@ strip; the timber stores; the sash window contract. (7), the logo, is not drawn:
 literals (10, 12, 12) say so, and the glass's "day before it is due" half flipped to "ordered today,
 in at the next working day's open". A greyed timber enquiry of an old save drawn with +12 now has 3
 taken off for its hands and may turn takeable at the next settle (stored days, read as stored).
+
+**T29-B2 One cutter set of a kind.** `canBuy` refuses a cutter set of a kind the company has or has
+on order, in the tool changer's shape (owned and not sold, plus on order), with `One set serves
+every moulder`; the card shows its locked `Buy another` and the words under it with no change to the
+card, and a save that holds two keeps both. Asserted in `t28Families.test.ts`, owned and on order.

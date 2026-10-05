@@ -14,6 +14,7 @@ import {
   DAY_LOGS_KEPT,
   DAY_SUMMARIES_MAX,
   DIFFICULTIES,
+  CUTTER_SETS,
   DRYING_RACKS,
   GLUE_TABLE,
   GATE_LANE,
@@ -2591,6 +2592,12 @@ export function canBuy(
     if (counted(GLUE_TABLE) >= counted('framePress')) {
       return { ok: false, reason: 'Every frame press has its glue table' };
     }
+  }
+  // One cutter set serves every moulder the company has and a set is never sold: a second of a
+  // kind, owned or on its way, would be money thrown away (CLAUDE.md T29 2.2) [TUNE: chat].
+  if (CUTTER_SETS.includes(specId)) {
+    const counted = state.equipment.filter((item) => item.specId === specId && !isSold(item)).length + onOrderCount(state, specId);
+    if (counted > 0) return { ok: false, reason: 'One set serves every moulder' };
   }
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
