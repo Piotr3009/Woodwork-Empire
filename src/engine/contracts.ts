@@ -11,6 +11,7 @@ import {
   CONTRACT_MIN_TIER,
   CONTRACT_OFFER_DAYS,
   CONTRACTS_MAX,
+  CONTRACT_MAX_JOINERS,
   CONTRACT_PIECES,
   CONTRACT_QUANTITY_BANDS,
   CONTRACT_REFERENCE_CLASS,
@@ -41,7 +42,7 @@ import {
 import type { ContractPieceSpec, ContractQuantityBand } from './constants';
 import { answerSkew, skewed } from './board';
 import { isBreak, isWorkingDay, weekOfDay, weekday, workedMinutesOfDay } from './clock';
-import { plural } from './text';
+import { inWords, plural } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { isOnJob, stagedJob, takeOffJob, workerMinuteCost } from './jobs';
@@ -114,6 +115,26 @@ export function contractsFull(state: GameState): boolean {
 /** The one line an offer card says when the shop is full of contracts. */
 export function contractsFullLine(): string {
   return `${plural(CONTRACTS_MAX, 'contract', 'contracts')} running: the most the shop takes on`;
+}
+
+/** True while a contract holds as many joiners as a contract takes: the men put on it, whether or
+ *  not they are in today, so a man off after an accident or on the second shift holds his place
+ *  (PIOTR, 05.10; CLAUDE.md T29 2.3). */
+export function contractCrewFull(contract: Contract): boolean {
+  return contract.assigned.length >= CONTRACT_MAX_JOINERS;
+}
+
+/** The one line that refuses a man a full contract, beside `contractsFullLine`, so the screens
+ *  print the engine's words (CLAUDE.md T29 2.3). */
+export function contractCrewFullLine(): string {
+  return `A contract takes ${inWords(CONTRACT_MAX_JOINERS)} joiners at the most`;
+}
+
+/** The count of a running contract's men against what it takes: "3 of 4", and "4 of 4, the most a
+ *  contract takes" once it is full (CLAUDE.md T29 2.3). */
+export function contractCrewLine(contract: Contract): string {
+  const count = `${contract.assigned.length} of ${CONTRACT_MAX_JOINERS}`;
+  return contractCrewFull(contract) ? `${count}, the most a contract takes` : count;
 }
 
 /** Terms that are over, with the renew answer still to be given. */
@@ -490,7 +511,10 @@ export function contractResultFor(
  *  contract is for two men at the least"; v51). Never under one. */
 export function contractMenNeeded(state: GameState, contract: Contract, worker: Worker | null): number {
   const result = contractResultFor(state, contract, worker);
-  return Math.max(1, Math.ceil(result.piecesNeededPerDay / Math.max(1, result.piecesPerDay)));
+  // Never more than a contract takes: the line says the men it is for, and it takes four at the
+  // most (CLAUDE.md T29 2.3).
+  const men = Math.max(1, Math.ceil(result.piecesNeededPerDay / Math.max(1, result.piecesPerDay)));
+  return Math.min(CONTRACT_MAX_JOINERS, men);
 }
 
 /** What the hall makes of this contract's piece in a week at full crew, against what the term
@@ -499,7 +523,8 @@ export function contractMenNeeded(state: GameState, contract: Contract, worker: 
  *  the working days of a week. Nobody waits for a place, so every joiner counts (v53). No new rule,
  *  the arithmetic the engine already has [PIOTR, 21.09: "we take a contract and we do not know
  *  whether the hall can do it"] (CLAUDE.md T25 2.7). The owner is not in it, because a contract is
- *  work for a joiner. */
+ *  work for a joiner. From v84 it is four joiners at the most, as a contract takes (CLAUDE.md T29
+ *  2.3). */
 export interface HallCapacity {
   /** Pieces a week, whole. */
   perWeek: number;
@@ -507,27 +532,44 @@ export interface HallCapacity {
   wanted: number;
   /** True when the term wants more than the hall makes: the line is red. */
   short: boolean;
+  /** True when the company has more joiners than a contract takes, so the figure is for the four
+   *  of them with the highest rate and not for the whole crew (CLAUDE.md T29 2.3). */
+  capped: boolean;
 }
 
 export function contractHallCapacity(state: GameState, contract: Contract): HallCapacity {
   const piece = contractPiece(contract);
   // At full crew: every joiner on the books at the piece's own machine, whoever is at work this
   // minute (v54), and nobody at any other family, whose machines this piece never touches (v55).
+  // A contract takes four joiners at the most (PIOTR, 05.10): with more than four on the books the
+  // line counts the four with the highest rate, the earlier hired winning a tie, and four men at
+  // the piece's machine in place of the full crew. With four or fewer nothing of it changes
+  // (CLAUDE.md T29 2.3).
   const own = pieceStage(state, piece).family;
-  const shortages = placeShortages(state, 'day', (family) => (family === own ? fullCrew(state) : 0));
+  const crew = joiners(state);
+  const capped = crew.length > CONTRACT_MAX_JOINERS;
+  const men = capped
+    ? [...crew].sort((a, b) => rateOf(b) - rateOf(a)).slice(0, CONTRACT_MAX_JOINERS)
+    : crew;
+  const atIt = capped ? CONTRACT_MAX_JOINERS : fullCrew(state);
+  const shortages = placeShortages(state, 'day', (family) => (family === own ? atIt : 0));
   // The piece's speed and what the saws too few for the crew take off the hall, as points of one
   // sum (v60), the way the minute adds them.
   const speed = pacePoints(contractPieceSpeed(state, piece), ...shortages.map((short) => short.factor));
   const week = MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK;
   let perWeek = 0;
-  for (const worker of joiners(state)) {
-    const rate = worker.rate > 0 ? worker.rate : 1;
+  for (const worker of men) {
     // His minutes over a piece, rounded the way his card rounds them (`resultAtSpeed`).
-    const minutes = Math.max(1, Math.round(piece.minutes / manPace(rate, speed > 0 ? speed : 1)));
+    const minutes = Math.max(1, Math.round(piece.minutes / manPace(rateOf(worker), speed > 0 ? speed : 1)));
     perWeek += Math.floor(week / minutes);
   }
   const wanted = contract.quantityPerWeek;
-  return { perWeek, wanted, short: wanted > perWeek };
+  return { perWeek, wanted, short: wanted > perWeek, capped };
+}
+
+/** A man's rate as the hall line counts it: a man with none on his record counts as the owner. */
+function rateOf(worker: Worker): number {
+  return worker.rate > 0 ? worker.rate : 1;
 }
 
 /** The line the offer card and the Contracts tab both carry, off `contractHallCapacity`
@@ -537,7 +579,8 @@ export function contractHallLine(
   contract: Contract,
 ): { text: string; hall: string; wants: string; short: boolean } {
   const capacity = contractHallCapacity(state, contract);
-  const hall = `Your hall makes about ${capacity.perWeek} of these a week at full crew`;
+  const crew = capacity.capped ? `with ${inWords(CONTRACT_MAX_JOINERS)} on it` : 'at full crew';
+  const hall = `Your hall makes about ${capacity.perWeek} of these a week ${crew}`;
   const wants = `this term wants ${capacity.wanted}`;
   return { text: `${hall}; ${wants}`, hall, wants, short: capacity.short };
 }
@@ -779,7 +822,14 @@ export function contractManCheck(state: GameState, who: string): ContractCheck {
  *  running, and then it is the one rule about the man. */
 export function contractAssignCheck(state: GameState, contract: Contract, who: string): ContractCheck {
   if (contract.status !== 'active') return { ok: false, reason: 'Not an active contract' };
-  return contractManCheck(state, who);
+  const man = contractManCheck(state, who);
+  if (!man.ok) return man;
+  // Four at the most (PIOTR, 05.10). A man who is on it always passes, so `assignContract`, which
+  // asks this before it takes a man off, can always take him off (CLAUDE.md T29 2.3).
+  if (!contract.assigned.includes(who) && contractCrewFull(contract)) {
+    return { ok: false, reason: contractCrewFullLine() };
+  }
+  return OK;
 }
 
 function takeOff(contract: Contract, worker: Worker): void {

@@ -31,3 +31,16 @@ taken off for its hands and may turn takeable at the next settle (stored days, r
 on order, in the tool changer's shape (owned and not sold, plus on order), with `One set serves
 every moulder`; the card shows its locked `Buy another` and the words under it with no change to the
 card, and a save that holds two keeps both. Asserted in `t28Families.test.ts`, owned and on order.
+
+**T29-B3 Four joiners to a contract, and STATE_VERSION 42.** `CONTRACT_MAX_JOINERS` 4 [PIOTR,
+05.10], asked in `contractAssignCheck` after the man's own check and passed by a man already on it,
+so a full contract always lets a man off and a refused mover stays where he was; `contractCrewLine`
+puts `On it` on both tabs, the Orders board locks a free man's `Put on it` with `A contract takes
+four joiners at the most`, the Work Plan puts that reason in place of `Assign to this contract` and
+never draws the list for a full contract (and the click that fills it shuts the list, so Escape is
+not swallowed); `contractMenNeeded` is four at the most, and the hall line counts the four of the
+highest rate with four at the machine and reads `with four on it` for a company of more than four
+(v83 to the figure at four or fewer). The lift to 42 trims a running contract to the first four,
+frees the rest and queues `contractsTrimmed` for the first settle; it brings a glass on its way
+forward to the next working day. `contractHall.test.ts` restated for six joiners: 144 to 104, 144
+and 180 to 104 and 128, 162 and 144 to 128 and 104, 156 and 168 to 112 and 128.

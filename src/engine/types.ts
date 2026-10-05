@@ -888,7 +888,11 @@ export type GameEventKind =
    *  (CLAUDE.md T28 2.2.1). */
   | 'closureComing'
   /** The first day back from a closure, in place of the Weekend card (CLAUDE.md T28 2.2.2). */
-  | 'closureOver';
+  | 'closureOver'
+  /** The first settle of a save that had more than four joiners on a standing contract: the men
+   *  past the first four were taken off it by the lift, and this says who (CLAUDE.md T29
+   *  section 4). */
+  | 'contractsTrimmed';
 
 export interface GameEventChoice {
   id: string;

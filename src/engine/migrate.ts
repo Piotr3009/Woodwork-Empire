@@ -8,6 +8,7 @@
 
 import {
   CABINET_SLOT_LAYOUT,
+  CONTRACT_MAX_JOINERS,
   EQUIPMENT_SPECS,
   HIRING_SPECS,
   LOCKER_SLOT_LAYOUT,
@@ -19,7 +20,9 @@ import {
   WEBSITE_START_LEVEL,
   WORKER_RATES,
 } from './constants';
+import { nextWorkingDay } from './clock';
 import { receive } from './economy';
+import { andList, inWords } from './text';
 import { layRunsAgain } from './premises';
 import { standsOutsideTheHall } from './walk';
 import {
@@ -1127,6 +1130,60 @@ function liftToVersion41(state: Raw): void {
   state.version = 41;
 }
 
+/** Version 41 to 42 (v84, Turn 29). A standing contract takes four joiners at the most (PIOTR,
+ *  05.10): a running contract with more on it keeps the four put on it first (the list is in the
+ *  order they were put on), and every man taken off is given back to the boss with no job under
+ *  him, so the lists of free men see him from the first minute. The player is told once, by a card
+ *  queued here that opens at the first settle, as every queued event does, and not the next
+ *  morning; no card for a save in which nobody was taken off. And the glass comes the next working
+ *  day: one ordered for a later day is brought forward to it (CLAUDE.md T29 2.1, section 4). Nothing
+ *  else of a save is touched. */
+function liftToVersion42(state: Raw): void {
+  const workers = records(state.workers);
+  const lines: string[] = [];
+  for (const contract of records(state.contracts)) {
+    if (contract.status !== 'active' || !Array.isArray(contract.assigned)) continue;
+    if (contract.assigned.length <= CONTRACT_MAX_JOINERS) continue;
+    const marker = `contract:${String(contract.id)}`;
+    const off: unknown[] = contract.assigned.slice(CONTRACT_MAX_JOINERS);
+    contract.assigned = contract.assigned.slice(0, CONTRACT_MAX_JOINERS);
+    const names: string[] = [];
+    for (const id of off) {
+      const worker = workers.find((entry) => entry.id === id);
+      if (worker === undefined) continue;
+      if (worker.jobId === marker) worker.jobId = null;
+      names.push(String(worker.name ?? id));
+    }
+    if (names.length > 0) lines.push(`Taken off ${String(contract.name)}: ${andList(names)}.`);
+  }
+  const clock = isRecord(state.clock) ? state.clock : {};
+  const today = typeof clock.day === 'number' ? clock.day : 1;
+  const next = nextWorkingDay(today);
+  for (const job of records(state.jobs)) {
+    if (job.glass === 'ordered' && typeof job.glassDay === 'number' && job.glassDay > next) job.glassDay = next;
+  }
+  if (lines.length > 0) {
+    const id = typeof state.nextId === 'number' ? state.nextId : 1;
+    state.nextId = id + 1;
+    const event = {
+      id: `event-${id}`,
+      kind: 'contractsTrimmed',
+      title: `Contracts take ${inWords(CONTRACT_MAX_JOINERS)} joiners`,
+      body: [
+        `A standing contract takes ${inWords(CONTRACT_MAX_JOINERS)} joiners at the most from now on.`,
+        ...lines,
+        'They are waiting for work.',
+      ].join(' '),
+      choices: [{ id: 'ok', label: 'Right' }],
+      data: {},
+      day: today,
+      minute: typeof clock.minute === 'number' ? clock.minute : 0,
+    };
+    state.eventQueue = [...(Array.isArray(state.eventQueue) ? state.eventQueue : []), event];
+  }
+  state.version = 42;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -1157,6 +1214,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   38: liftToVersion39,
   39: liftToVersion40,
   40: liftToVersion41,
+  41: liftToVersion42,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

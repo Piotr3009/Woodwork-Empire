@@ -34,6 +34,9 @@ import {
   renewContractCheck,
   contractAssignCheck,
   contractCandidates,
+  contractCrewFull,
+  contractCrewFullLine,
+  contractCrewLine,
   contractMachineTip,
   contractManCheck,
   contractManOf,
@@ -208,6 +211,9 @@ function activeBlock(state: GameState, contract: Contract): string {
     `<p class="hint">${escapeHtml(pieceLine(contract))} The saw stays in the general queue: ` +
     'a better one makes more pieces without a click.</p>' +
     '<h4>People</h4>' +
+    // How many are on it, against the four a contract takes, in the engine's words (CLAUDE.md T29
+    // 2.3).
+    countRow('On it', contractCrewLine(contract)) +
     peopleRows(state, contract) +
     historyRows(contract) +
     '</div>'
@@ -565,12 +571,17 @@ function runningPeople(state: GameState, contract: Contract, open: boolean): str
     })
     .join('');
   const nobody = chips === '' ? '<span class="assign-none">Nobody is on it</span>' : '';
-  const opener =
-    `<button class="btn btn-primary assign-open" data-do="${open ? 'closeAssign' : 'openAssign'}" ` +
-    `data-id="${contract.id}">Assign to this contract</button>`;
+  // A full contract offers nobody else: the reason stands in place of the button and the list is
+  // never opened for it, so it can never say that nobody is free with free men standing by
+  // (CLAUDE.md T29 2.3).
+  const full = contractCrewFull(contract);
+  const opener = full
+    ? reasonLabel(contractCrewFullLine())
+    : `<button class="btn btn-primary assign-open" data-do="${open ? 'closeAssign' : 'openAssign'}" ` +
+      `data-id="${contract.id}">Assign to this contract</button>`;
   return (
     `<span class="row-action assign-line">${nobody}${chips}${opener}</span>` +
-    (open ? contractAssignList(state, contract) : '')
+    (open && !full ? contractAssignList(state, contract) : '')
   );
 }
 
@@ -614,6 +625,7 @@ function runningCard(state: GameState, contract: Contract, assignOpen: string | 
     `<div class="contract-track"><span class="contract-fill${share < 100 ? '' : ' is-full'}" ` +
     `style="width:${share}%"></span></div>` +
     runningPeople(state, contract, assignOpen === contract.id) +
+    countRow('On it', contractCrewLine(contract)) +
     countRow(
       'This week',
       `${pace.made} of ${pace.wanted}, ${pace.onCourse ? 'on course' : 'short'}`,

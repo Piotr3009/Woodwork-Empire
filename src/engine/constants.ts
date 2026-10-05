@@ -180,8 +180,15 @@ import type {
  *  is moved there when the save is lifted (`standThePlantBehindTheWall`), with no other field of
  *  the save touched. The calendar remembers the closure it last told the player of, none in an
  *  older save, which is then told on its next open before the closure (CLAUDE.md T28 section 4).
- *  Every v12 to v40 save loads. */
-export const STATE_VERSION = 41;
+ *  Every v12 to v40 save loads.
+ *
+ *  Version 42 is v84, Turn 29 (PIOTR, 05.10). A standing contract takes four joiners at the most:
+ *  a running contract of a save with more on it keeps the four put on it first, the men taken off
+ *  are given back to the boss with no job under them, and the player is told by a card at the
+ *  first settle. The glass comes the next working day, and a glass already on its way for a later
+ *  day is brought forward to the next one (CLAUDE.md T29 section 4). Every v12 to v41 save
+ *  loads. */
+export const STATE_VERSION = 42;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -5117,6 +5124,11 @@ export const CONTRACT_OFFER_DAYS = 5;
 /** [PIOTR, 02.10] At most this many standing contracts run at once: no offer is drawn while they
  *  do, and one already on the board cannot be taken (CLAUDE.md T26 2.12). */
 export const CONTRACTS_MAX = 3;
+/** [PIOTR, 05.10: "three or four at the most; today on sheet goods as many go on as I like and the
+ *  profit is fantastic, which does not happen in life"] A standing contract takes this many joiners
+ *  at the most: the men put on it, whether or not they are in today. A job of work has no such
+ *  limit ("do not touch the normal jobs") (CLAUDE.md T29 2.3). */
+export const CONTRACT_MAX_JOINERS = 4;
 /** [PIOTR, 22.09] From this reputation up a shop rings at least once a week: a week with no
  *  offer on the board and none made in it ends with one, whatever the dice said. Under it the
  *  chance of the day is all there is. */

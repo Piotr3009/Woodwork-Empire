@@ -48,8 +48,9 @@ describe('GameState', () => {
     // v57 is 33: the timber offers taken off the board until the timber branch (PIOTR, 25.09).
     // v63 is 34: one kind of man on the floor, the draftsman's grades and the agency (CLAUDE.md T26
     // section 4). v81 is 40: the taxman's two years on the books (CLAUDE.md T27 section 4).
-    // v83 is 41: the pelletiser behind the wall (CLAUDE.md T28 section 4).
-    expect(STATE_VERSION).toBe(41);
+    // v83 is 41: the pelletiser behind the wall (CLAUDE.md T28 section 4). v84 is 42: four
+    // joiners to a contract, and the glass a day (CLAUDE.md T29 section 4).
+    expect(STATE_VERSION).toBe(42);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

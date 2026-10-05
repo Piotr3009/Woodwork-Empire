@@ -34,6 +34,16 @@ export function metresBy(size: { width: number; depth: number }): string {
   return `${size.width} m by ${size.depth} m`;
 }
 
+/** A small count in words, the way a sentence of the game says it: "four joiners", "three
+ *  modules", "one engineer". Past twelve it is the figure [TUNE] (CLAUDE.md T29 2.3, 2.9.4). */
+export function inWords(count: number): string {
+  return SMALL_NUMBERS[count] ?? String(count);
+}
+
+const SMALL_NUMBERS: readonly string[] = [
+  'nought', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
+];
+
 /** Names in a sentence: `Pete`, `Pete and Eddie`, `Pete, Eddie and Ben`. */
 export function andList(names: readonly string[]): string {
   if (names.length <= 1) return names.join('');
