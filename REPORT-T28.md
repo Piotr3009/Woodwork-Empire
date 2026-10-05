@@ -123,3 +123,12 @@ laptop's, the locker's and the high rack's, whose pictures were always there) sh
 not `no file`. Flipped: the Sanding tab's `Nothing here yet.`, the Timber machines folders, the
 measured class files 75 to 96, the ports 23 to 37 and 56 to 84, the catalogue's metres list, and
 the whole catalogue on the floor 18 to 23.
+
+**T28-C3 The cutter sets.** `cuttersSash` (Sash window cutter set, £4,000), `cuttersCasement`
+(Casement window cutter set, £3,000) and `cuttersDoor` (Door cutter set, £5,000), five days each, in
+the Timber machines tab with folders of their own, category `tools`, one class, no zone [TUNE: chat:
+the idea is Piotr's "ok", every figure chat's]. Kept as a hand tool set is kept and asking for no
+cabinet or slot, their card says `Kept at the spindle moulders` where a hand tool says `Kept in a
+tool cabinet`, and they are never sold (`Nobody buys second hand fittings`, as any tool). No
+picture exists: the card shows the empty picture box, and the Sprite check page lists the three,
+`kept at the spindle moulders`, `no file yet`, so the art side has its rows (`REQUESTS-T28.md`).

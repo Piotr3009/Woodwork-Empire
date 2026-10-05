@@ -213,6 +213,10 @@ describe('the tabs', () => {
       'planer',
       'framePress',
       'glueTable',
+      // And the three cutter sets (CLAUDE.md T28 2.5).
+      'cuttersSash',
+      'cuttersCasement',
+      'cuttersDoor',
     ]);
     expect(folders('sanding')).toEqual(['sander']);
     // Every line of the catalogue is in exactly one folder of exactly one tab, except the shared

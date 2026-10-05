@@ -2,7 +2,7 @@
 // placeholder box, and the picture beside it when the art side has delivered one. This page is
 // the acceptance tool of docs/art/SPRITES.md item 7 (CLAUDE.md T3 3.6).
 
-import { CNC_TOOL_CHANGER_SPRITE, EQUIPMENT_SPECS } from '../engine/constants';
+import { CNC_TOOL_CHANGER_SPRITE, CUTTER_SETS, EQUIPMENT_SPECS } from '../engine/constants';
 import {
   HALL_CANVAS,
   HALL_LAYERS,
@@ -97,7 +97,9 @@ export function spriteTargets(): SpriteTarget[] {
       }
       continue;
     }
-    if (!standsInTheHall(spec.id)) continue;
+    // A cutter set holds no floor and is still a picture the art side owes, for the catalogue: its
+    // row says where it is kept (CLAUDE.md T28 2.5).
+    if (!standsInTheHall(spec.id) && !CUTTER_SETS.includes(spec.id)) continue;
     add({
       name: spec.spriteKey,
       specId: spec.id,
@@ -231,7 +233,9 @@ function shot(target: SpriteTarget): string {
 
 /** What the class says about the floor, in the words the catalogue uses (CLAUDE.md T7 3.7). */
 function zoneLine(target: SpriteTarget): string {
-  if (target.zoneWidth <= 0 || target.zoneDepth <= 0) return 'kept in a tool cabinet';
+  if (target.zoneWidth <= 0 || target.zoneDepth <= 0) {
+    return CUTTER_SETS.includes(target.specId) ? 'kept at the spindle moulders' : 'kept in a tool cabinet';
+  }
   return `works in ${metresBy({ width: target.zoneWidth, depth: target.zoneDepth })}`;
 }
 

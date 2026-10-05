@@ -18,6 +18,8 @@ import {
   AIR_DEMAND,
   CLASS_LADDER_FAMILIES,
   CLASS_ORDER,
+  CUTTER_SETS,
+  DRAWN_TURN_MINUTES,
   DUST_OUTPUT_M3_PER_HOUR,
   EXTRACTION_DEMAND,
   GLUE_TABLE,
@@ -27,8 +29,9 @@ import {
   MACHINE_CAPACITY,
   MACHINE_ENDURANCE_HOURS,
   MACHINE_SHORT_WORDS,
+  TIMBER_FAMILIES,
 } from '../../src/engine/constants';
-import { canBuy } from '../../src/engine/game';
+import { canBuy, canSell } from '../../src/engine/game';
 import type { GameState } from '../../src/engine/index';
 import { hallItems } from '../../src/engine/layout';
 import {
@@ -51,9 +54,9 @@ import { portFor } from '../../src/engine/ports';
 import { spriteUrl } from '../../src/render/sprites';
 import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 import { floorLine } from '../../src/ui/machine';
+import { catalogueTabFrom, renderCatalogue } from '../../src/ui/catalogue';
 import { drawnPlaces } from '../../src/engine/drawn';
 import { planPlaces } from '../../src/engine/production';
-import { DRAWN_TURN_MINUTES, TIMBER_FAMILIES } from '../../src/engine/constants';
 import { buyStartingKit, day53Hall, newGame, placeEquipment } from '../helpers';
 
 const LADDERS = ['crossCut', 'planer', 'sander', 'framePress'] as const;
@@ -287,6 +290,57 @@ describe('where the men are drawn with timber machines in the hall (CLAUDE.md T2
       expect(drawn.map((entry) => [entry.who, entry.item.id])).toEqual(
         drawnPlaces(without).map((entry) => [entry.who, entry.item.id]),
       );
+    }
+  });
+});
+
+describe('the cutter sets (CLAUDE.md T28 2.5)', () => {
+  const SETS: Array<[string, string, string, number, string]> = [
+    ['cuttersSash', 'Sash window cutter set', 'Sash cutters', 4000, 'sash windows'],
+    ['cuttersCasement', 'Casement window cutter set', 'Casement cutters', 3000, 'casement windows'],
+    ['cuttersDoor', 'Door cutter set', 'Door cutters', 5000, 'doors'],
+  ];
+
+  it('are three single class tools of the Timber machines tab, at the brief s prices', () => {
+    expect([...CUTTER_SETS]).toEqual(SETS.map(([id]) => id));
+    for (const [id, name, folder, price, what] of SETS) {
+      expect(spec(id), id).toMatchObject({ name, folder, price, tab: 'timberMachines', category: 'tools', requires: [] });
+      expect(spec(id).variants.map((variant) => variant.id), id).toEqual(['standard']);
+      expect(deliveryDaysFor(id, 'standard'), id).toBe(5);
+      expect(zoneOf(id, 'standard'), id).toEqual({ width: 0, depth: 0 });
+      expect(spec(id).effect, id).toBe(
+        `The profile cutters for ${what}. Without the set the workshop cannot take them.`,
+      );
+      expect(floorLine(id, 'standard'), id).toBe('Kept at the spindle moulders');
+    }
+    // The hand tool set keeps its cabinet.
+    expect(floorLine('handToolSet', 'standard')).toBe('Kept in a tool cabinet');
+  });
+
+  it('ask for no cabinet and no slot, stand nowhere on the hall, and are never sold', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    state.cash = 100000;
+    expect(state.equipment.some((item) => item.specId === 'toolCabinet')).toBe(false);
+    expect(canBuy(state, 'cuttersSash')).toEqual({ ok: true, reason: '' });
+    const set = placeEquipment(state, 'cuttersSash', { id: 'kit-cutters' });
+    expect(hallItems(state).some((item) => item.id === set.id)).toBe(false);
+    expect(canSell(state, set.id)).toEqual({ ok: false, reason: 'Nobody buys second hand fittings' });
+  });
+
+  it('show the empty picture box and where they are kept, on the card and on the Sprite check page', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    const card = document.createElement('div');
+    card.innerHTML = renderCatalogue(state, '', catalogueTabFrom('timberMachines'), 'cuttersSash');
+    expect(card.querySelector('.tile-picture[data-sprite="cuttersSash"] .tile-picture-box')).not.toBeNull();
+    expect(card.textContent).toContain('Kept at the spindle moulders');
+    expect(card.textContent).toContain('£4,000');
+    const page = document.createElement('div');
+    page.innerHTML = renderSpriteCheck();
+    for (const [id] of SETS) {
+      const row = page.querySelector(`[data-sprite-target="${id}"]`);
+      expect(row, id).not.toBeNull();
+      expect(row?.textContent, id).toContain('kept at the spindle moulders');
+      expect(row?.textContent, id).toContain('no file yet');
     }
   });
 });

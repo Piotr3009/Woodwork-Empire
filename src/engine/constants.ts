@@ -3240,6 +3240,10 @@ export const DRYING_RACKS_PLACES_FACTOR = 6;
  *  does for the press what the drying racks do for a booth. Each one adds this many places to one
  *  frame press, one table counted for each press that stands [TUNE]. */
 export const GLUE_TABLE = 'glueTable';
+
+/** The three cutter sets of the timber department, kept at the spindle moulders (CLAUDE.md T28
+ *  2.5). */
+export const CUTTER_SETS: readonly string[] = ['cuttersSash', 'cuttersCasement', 'cuttersDoor'];
 export const GLUE_TABLE_PLACES = 2;
 
 const BASE_SPEC = {
@@ -3760,6 +3764,65 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'sander',
     usedOn: 'solidWood',
     effect: 'Sands a frame before it is lacquered: the sanding of a window or a door.',
+  },
+  // The cutter sets (CLAUDE.md T28 2.5) [TUNE: chat; Piotr said "ok" to the idea, not to a
+  // figure]: a spindle moulder cuts a profile with the cutters it is given, and each kind of
+  // timber product wants its own set. Kept as a hand tool set is kept, at the spindle moulders: no
+  // cell of the floor, nothing drawn on the hall, no cabinet and no slot, and, being tools, never
+  // sold. One set serves every moulder the company has.
+  {
+    ...BASE_SPEC,
+    id: 'cuttersSash',
+    deliveryDays: 5,
+    folder: 'Sash cutters',
+    tab: 'timberMachines',
+    name: 'Sash window cutter set',
+    price: 4000,
+    category: 'tools',
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 0,
+    zoneDepth: 0,
+    spriteKey: 'cuttersSash',
+    usedOn: 'solidWood',
+    effect: 'The profile cutters for sash windows. Without the set the workshop cannot take them.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'cuttersCasement',
+    deliveryDays: 5,
+    folder: 'Casement cutters',
+    tab: 'timberMachines',
+    name: 'Casement window cutter set',
+    price: 3000,
+    category: 'tools',
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 0,
+    zoneDepth: 0,
+    spriteKey: 'cuttersCasement',
+    usedOn: 'solidWood',
+    effect: 'The profile cutters for casement windows. Without the set the workshop cannot take them.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'cuttersDoor',
+    deliveryDays: 5,
+    folder: 'Door cutters',
+    tab: 'timberMachines',
+    name: 'Door cutter set',
+    price: 5000,
+    category: 'tools',
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 0,
+    zoneDepth: 0,
+    spriteKey: 'cuttersDoor',
+    usedOn: 'solidWood',
+    effect: 'The profile cutters for doors. Without the set the workshop cannot take them.',
   },
   {
     ...BASE_SPEC,

@@ -123,6 +123,10 @@ describe('footprints in metres', () => {
       framePress: [2, 1, 1],
       glueTable: [3, 1, 1],
       sander: [2, 1, 1],
+      // The cutter sets hold no floor, like the hand tool set: a cell by name (CLAUDE.md T28 2.5).
+      cuttersSash: [1, 1, 1],
+      cuttersCasement: [1, 1, 1],
+      cuttersDoor: [1, 1, 1],
     };
     // Every line of the catalogue is in one of the two lists: nothing slips in unmeasured.
     expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(
