@@ -15,6 +15,7 @@ import {
   DAY_SUMMARIES_MAX,
   DIFFICULTIES,
   DRYING_RACKS,
+  GLUE_TABLE,
   GATE_LANE,
   GATE_PRICE,
   HAND_TOOL_SET,
@@ -82,6 +83,7 @@ import {
 } from './layout';
 import { enlargeCanteen, extendUnit, openExtension } from './premises';
 import { raiseTaxWarning } from './tax';
+import { backFromTitle, raiseClosureWarning } from './closures';
 import {
   createOnOrder,
   findOnOrder,
@@ -91,6 +93,7 @@ import {
   removeOnOrder,
 } from './orders';
 import {
+  closureOf,
   daysBetween,
   formatCalendarDay,
   nextWorkingDay,
@@ -192,6 +195,8 @@ import {
   resolveClientOffer,
   runBookedTransport,
   dropJob,
+  endTheStands,
+  orderGlassFor,
   BUILDING_ROLES,
   takeOffJob,
   takeOverJob,
@@ -199,6 +204,7 @@ import {
 } from './jobs';
 import {
   arriveDeliveries,
+  arriveGlass,
   buyStock,
   canUnload,
   deliveriesArrivingOn,
@@ -461,6 +467,7 @@ export function createGame(options: NewGameOptions): GameState {
     tips: { seen: [] },
     shift: { second: false },
     monthEndShownFor: 0,
+    closureWarnedFor: null,
     monthlyReports: [],
     lastContractOfferDay: null,
     ledger: [],
@@ -563,6 +570,9 @@ function startDay(state: GameState): void {
   // An extension paid for yesterday is there this morning, before the day is charged: its first
   // day is paid for at the bigger unit's rent (PIOTR, 03.10; v67).
   openExtension(state);
+  // The glue has cured and the lacquer dried overnight: the frames that stood are free (CLAUDE.md
+  // T28 2.8).
+  endTheStands(state);
   // The month's paper before the day's: the loan, the covers and the security run with the
   // monthly items, and the report is put in front of the player before the board (T13 3.20).
   runDayCosts(state, state.clock.day);
@@ -570,6 +580,8 @@ function startDay(state: GameState): void {
   raiseMonthEnd(state);
   // December's warning after the month's report: the taxman comes on the 30th (CLAUDE.md T27 2.3).
   raiseTaxWarning(state);
+  // And the break's after the tax's, so the tax is read first (CLAUDE.md T28 2.2.1).
+  raiseClosureWarning(state);
   // The month's meters first, so the day that starts a month is counted into the new one, and
   // then the days off of this morning (CLAUDE.md T17 2.9).
   startMonthMeters(state);
@@ -598,6 +610,8 @@ function startDay(state: GameState): void {
     });
   }
   const arriving = arriveDeliveries(state);
+  // The glass due today is at the benches, carried in by the glazier (CLAUDE.md T28 2.9).
+  arriveGlass(state);
   const kit = arriveEquipmentOrders(state);
   collectSoldMachines(state);
   runBookedTransport(state);
@@ -1038,18 +1052,23 @@ function finishDay(state: GameState): void {
   });
 }
 
-/** Moves to the next working day, walking over the weekend days on the way. */
+/** Moves to the next working day, walking over the weekend days on the way, and over the days of a
+ *  closure, which are one long weekend to it (CLAUDE.md T28 2.2). */
 function advanceToNextDay(state: GameState): void {
   let day = state.clock.day + 1;
   while (!isWorkingDay(day)) day += 1;
   const skipped = daysBetween(state.clock.day, day);
   let weekendCosts = 0;
+  let closedCosts = 0;
   for (const weekendDay of skipped) {
     state.clock.day = weekendDay;
     const before = state.cash;
     runDayCosts(state, weekendDay);
     accrueOverdraftInterest(state);
     weekendCosts += before - state.cash;
+    // What left the account that day and nothing that came in, the tax apart: the day's own books,
+    // which `runDayCosts` opens empty, and not the ledger, which keeps only its last lines.
+    closedCosts += state.finance.day.costs + (state.finance.day.byCategory.tax ?? 0);
   }
   state.clock.day = day;
   state.clock.minute = 0;
@@ -1057,7 +1076,22 @@ function advanceToNextDay(state: GameState): void {
   // CLAUDE.md T17 2.19). Not in `startDay`, which a new game calls with the clock stopped for the
   // setting out of the hall.
   state.speed = 1;
-  if (skipped.length > 0) {
+  // The first day back from a closure has the closure's own card where the Weekend card stands:
+  // the days it stepped over, weekends among them, and everything that left the account on them
+  // but the tax, which has its card before it (CLAUDE.md T28 2.2.2).
+  const closure = skipped.map((at) => closureOf(at)).find((entry) => entry !== null) ?? null;
+  if (closure !== null) {
+    const costs = closedCosts;
+    queueEvent(state, {
+      kind: 'closureOver',
+      title: backFromTitle(closure),
+      body:
+        `${skipped.length} days closed. Rent, rates and the bills ran anyway: ` +
+        `${formatMoney(costs)} out.`,
+      choices: [{ id: 'ok', label: 'Back to work' }],
+      data: { closure, days: skipped.length, costs: Math.round(costs) },
+    });
+  } else if (skipped.length > 0) {
     queueEvent(state, {
       kind: 'weekend',
       title: 'Weekend',
@@ -2204,6 +2238,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'ACCEPT_ENQUIRY':
       acceptEnquiry(next, action.enquiryId, action.byHand);
       break;
+    case 'ORDER_GLASS':
+      orderGlassFor(next, action.jobId);
+      break;
     case 'ORDER_FOR_JOB':
       // The job's shortfall, bought at the ad hoc price for that job (CLAUDE.md T13 3.3).
       orderShortfall(next, action.jobId);
@@ -2546,6 +2583,15 @@ export function canBuy(
       return { ok: false, reason: 'Every spray booth has its drying racks' };
     }
   }
+  // A glue table stands by a frame press, one a press, and is refused in the racks' own words when
+  // every press has one (CLAUDE.md T28 2.4).
+  if (specId === GLUE_TABLE) {
+    const counted = (id: string): number =>
+      state.equipment.filter((item) => item.specId === id && !isSold(item)).length + onOrderCount(state, id);
+    if (counted(GLUE_TABLE) >= counted('framePress')) {
+      return { ok: false, reason: 'Every frame press has its glue table' };
+    }
+  }
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
   }
@@ -2562,8 +2608,10 @@ export function canBuy(
   }
   if (!prepaid && !canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
   // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
-  // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6).
-  if (standsInTheHall(specId, variant.id) && firstFreeCell(state, specId, variant.id) === null) {
+  // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6). What
+  // stands outside asks nothing of the floor: its room is behind the wall or on the apron, asked
+  // above (CLAUDE.md T28 2.1) [TUNE: chat; it follows from Piotr's sentence but he did not say it].
+  if (!standsOutside(specId) && standsInTheHall(specId, variant.id) && firstFreeCell(state, specId, variant.id) === null) {
     const zone = zoneOf(specId, variant.id);
     return { ok: false, reason: `No free ${metresBy(zone)} in the hall` };
   }

@@ -27,7 +27,8 @@ import {
   SIZE_MULTIPLIER_MAX,
   SIZE_MULTIPLIER_MIN,
   SOLID_WOOD_EQUIPMENT,
-  TIMBER_ON_THE_BOARD,
+  secondExtensionOf,
+  TIMBER_LEAD_DAYS,
   UNREACHABLE_MAX,
   UNREACHABLE_MIN,
   WORKING_DAYS_PER_WEEK,
@@ -45,6 +46,7 @@ import {
   templatesForReputation,
 } from './catalog';
 import { deadlineDaysFrom, drawDeadline, labourValueFor, ownerDaysFor, stagedJob } from './jobs';
+import type { DeadlineDraw } from './jobs';
 import { jobMinutesFor } from './stages';
 import { workshopRate } from './plan';
 import { effectiveReputation, reputationTier } from './reputation';
@@ -77,15 +79,28 @@ export function enquiryQualityTier(state: GameState): number {
   return Math.max(0, Math.min(top, tier));
 }
 
-/** True for a template the board offers: every one but timber, until the timber branch lands
- *  [PIOTR, 25.09] (v57). */
-export function offeredOnTheBoard(entry: ProductTemplate): boolean {
-  return TIMBER_ON_THE_BOARD || entry.material !== 'solidWood';
+/** True once the board offers the timber department's windows and doors: a company in the 800 m2
+ *  hall, the second extension open [PIOTR, 04.10: era 3 is the 800 m2 hall] (CLAUDE.md T28 2.3).
+ *  The machines and the cutter sets are in the catalogue from day 1; the work for them is not. */
+export function timberOnTheBoard(state: GameState): boolean {
+  return secondExtensionOf(state.unit) === 'open';
+}
+
+/** True for a template the board offers, live or greyed: all the sheet work, and the windows and
+ *  doors once timber is on the board. The oak table, the one solid wood template the game had, stays
+ *  off it [TUNE: chat; it is not a window or a door] (v57, CLAUDE.md T28 2.3). Before the 800 m2
+ *  hall the five are nowhere on the board, so no draw of the seeded stream moves for a smaller
+ *  company. */
+export function offeredOnTheBoard(state: GameState, entry: ProductTemplate): boolean {
+  if (entry.material !== 'solidWood') return true;
+  return entry.cutters !== null && timberOnTheBoard(state);
 }
 
 function drawTemplate(state: GameState): ProductTemplate | null {
   const tier = enquiryQualityTier(state);
-  const candidates = templatesForReputation(effectiveReputation(state)).filter(offeredOnTheBoard);
+  const candidates = templatesForReputation(effectiveReputation(state)).filter((entry) =>
+    offeredOnTheBoard(state, entry),
+  );
   return pickWeighted(state, candidates, (entry) => entry.weightsByTier[tier] ?? 0);
 }
 
@@ -133,6 +148,24 @@ export function drawOffer(state: GameState, enquiry: Enquiry): number {
   return priceFor(enquiry.budget * factor, 1, 0, 1);
 }
 
+/** The working days an enquiry of this template gives: the deadline every enquiry is given by
+ *  `deadlineDaysFrom`, off the work in it, the express factor in it, and for a window or a door
+ *  the timber lead on top, because the client knows windows take longer (CLAUDE.md T28 2.10). */
+export function enquiryDeadlineDays(
+  state: GameState,
+  entry: ProductTemplate,
+  draw: DeadlineDraw,
+  basePrice: number,
+  express: boolean,
+): number {
+  const days = deadlineDaysFrom(draw, {
+    ownerDays: ownerDaysFor(state, labourValueFor(basePrice), entry.material, false, entry.cutters !== null),
+    price: basePrice,
+    express,
+  });
+  return days + (entry.cutters !== null ? TIMBER_LEAD_DAYS : 0);
+}
+
 function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null {
   const express = chance(state, expressProbability());
   // The uplift is drawn either way, so an express job and a standard one take the same number of
@@ -155,7 +188,9 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
   // stream is the same shape for residential and commercial work; the days are read off it
   // below, once the size of the work is known (CLAUDE.md T6 3.7, T13 3.15).
   const deadlineDraw = drawDeadline(state);
-  const bespokeMaterial = chance(state, BESPOKE_PROBABILITY);
+  // Drawn for every enquiry so the stream keeps its shape; a window's or a door's material is
+  // never bespoke (CLAUDE.md T28 2.6).
+  const bespokeMaterial = chance(state, BESPOKE_PROBABILITY) && entry.cutters === null;
   const expiryDays = express ? EXPIRY_EXPRESS_DAYS : EXPIRY_STANDARD_DAYS;
   // Commercial work is two to three times the residential budget, and two to three times the
   // work with it (CLAUDE.md T13 3.15). The factor is drawn either way, like the express uplift,
@@ -167,11 +202,7 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
   const budget = priceFor(price * scale, 1, 0, 1);
   // The deadline comes off the work in the job now, not off the kind of thing it is
   // (CLAUDE.md T6 3.7): the larger work of a commercial job gets the days it takes.
-  const deadlineDays = deadlineDaysFrom(deadlineDraw, {
-    ownerDays: ownerDaysFor(state, labourValueFor(scaledBase), entry.material),
-    price: scaledBase,
-    express,
-  });
+  const deadlineDays = enquiryDeadlineDays(state, entry, deadlineDraw, scaledBase, express);
   return {
     id: makeId(state, 'enq'),
     templateId: entry.id,
@@ -296,7 +327,8 @@ export function kitBlockFor(state: GameState, entry: ProductTemplate): BoardBloc
     return { reason: `reputation too low (needs ${entry.minReputation})`, where: '' };
   }
 
-  if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => has(state, id))) {
+  // The oak table's rule; a window or a door is held to its own list below (CLAUDE.md T28 2.6).
+  if (entry.material === 'solidWood' && entry.cutters === null && !SOLID_WOOD_EQUIPMENT.every((id) => has(state, id))) {
     return { reason: 'no timber machines', where: 'catalogue' };
   }
   // Standing in the hall and nothing less: a machine on the lorry takes no work until it has
@@ -323,14 +355,17 @@ export function blockFor(
 ): BoardBlock | null {
   const short = kitBlockFor(state, entry);
   if (short !== null) return short;
+  // The hands are held against the days without the timber lead: the glass and the nights are not
+  // the workshop's work (CLAUDE.md T28 2.10).
+  const days = deadlineDays - (entry.cutters !== null ? TIMBER_LEAD_DAYS : 0);
   // The Turn 9 latest start arithmetic: what this workshop averages against the days the client
   // gives (CLAUDE.md T9 3.6, T10 3.7).
   const minutes = jobMinutesFor(
     state,
-    stagedJob(labourValueFor(basePrice), entry.material, false),
+    stagedJob(labourValueFor(basePrice), entry.material, false, 'laminate', false, entry.cutters !== null),
     workshopRate(state),
   );
-  if (minutes / MINUTES_PER_WORKING_DAY > deadlineDays) {
+  if (minutes / MINUTES_PER_WORKING_DAY > days) {
     return { reason: 'too few people for the deadline', where: 'team' };
   }
   return null;
@@ -344,7 +379,7 @@ export function generateUnreachable(state: GameState): Enquiry | null {
   const already = new Set(
     state.enquiries.filter((other) => other.unreachable).map((other) => other.templateId),
   );
-  const left = PRODUCT_TEMPLATES.filter((entry) => offeredOnTheBoard(entry) && !already.has(entry.id));
+  const left = PRODUCT_TEMPLATES.filter((entry) => offeredOnTheBoard(state, entry) && !already.has(entry.id));
   if (left.length === 0) return null;
   const short = left.filter((entry) => kitBlockFor(state, entry) !== null);
   // Where it is short of nothing, the only reason left is the hands against the deadline, and

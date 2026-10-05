@@ -20,6 +20,7 @@ import {
   MACHINE_STAGES,
   OWNER_LABOUR_PER_MINUTE,
   PRODUCTION_STAGES,
+  TIMBER_STAGES,
   WORK_EPSILON,
 } from './constants';
 import { SPRAY_BOOTH, familyRuns, hallPace, has } from './machines';
@@ -42,6 +43,8 @@ export interface StagedJob {
   /** Kept on the job since Turn 13 (a handleless kitchen's J profile, a sprayed kitchen's fronts):
    *  from v55 every job has its Moulding on the spindle moulder and this changes nothing. */
   needsSpindle: boolean;
+  /** A window or a door of the timber department: the seven stages of 2.7. Absent is false. */
+  timber?: boolean;
 }
 
 /** One stage of one job: the share of the labour it carries, where that share sits in the job,
@@ -62,9 +65,19 @@ export interface StagePlan {
   byHand: boolean;
 }
 
-export function stageLabel(id: StageId): string {
+export function stageLabel(id: StageId, job: { timber?: boolean } | null = null): string {
   if (id === CNC_STAGE.id) return CNC_STAGE.label;
-  return PRODUCTION_STAGES.find((stage) => stage.id === id)?.label ?? id;
+  // A timber job's bench stage is its Glazing, and its four own stages are on its own plan
+  // (CLAUDE.md T28 2.7).
+  if (job?.timber === true) {
+    const own = TIMBER_STAGES.find((stage) => stage.id === id);
+    if (own !== undefined) return own.label;
+  }
+  return (
+    PRODUCTION_STAGES.find((stage) => stage.id === id)?.label ??
+    TIMBER_STAGES.find((stage) => stage.id === id)?.label ??
+    id
+  );
 }
 
 /** What a man says he is doing at this stage, in the trade's own word: "cutting Small kitchen",
@@ -78,12 +91,17 @@ export function stageLabel(id: StageId): string {
  *  "spraying" is true of a lacquered job and of no other: everything else is sanded and waxed or
  *  oiled by hand, which is the same division the hall's own sound already makes
  *  (`hallLoops`, lacquer to the booth and the rest to the sander). */
-export function stageDoing(id: StageId, lacquer: boolean): string {
+export function stageDoing(id: StageId, lacquer: boolean, timber = false): string {
   if (id === 'cutting' || id === CNC_STAGE.id) return 'cutting';
   if (id === 'edging') return 'edging';
   if (id === 'moulding') return 'moulding';
-  if (id === 'assembly') return 'assembling';
+  // On a timber job the bench puts the glass in and the ironmongery on (CLAUDE.md T28 2.7).
+  if (id === 'assembly') return timber ? 'glazing' : 'assembling';
   if (id === 'finishing') return lacquer ? 'spraying' : 'sanding';
+  if (id === 'crossCutting') return 'cross cutting';
+  if (id === 'planing') return 'planing';
+  if (id === 'pressing') return 'pressing';
+  if (id === 'sanding') return 'sanding';
   return stageLabel(id).toLowerCase();
 }
 
@@ -96,8 +114,9 @@ export interface StageOptions {
 
 /** True when this job is made on the CNC: a sheet job, not one made by hand, in a hall with a CNC
  *  that runs this minute (CLAUDE.md T7 3.4). With the CNC broken or away for its service the job
- *  goes on the saw and the edgebander and waits for nothing (PIOTR, 24.09; v53). Timber still goes
- *  on the saw and the thicknesser. */
+ *  goes on the saw and the edgebander and waits for nothing (PIOTR, 24.09; v53). Solid wood is
+ *  never put on it: the oak table goes on the saw, and a window or a door on its own plan
+ *  (CLAUDE.md T28 2.7). */
 export function jobOnCnc(state: GameState, job: StagedJob, options: StageOptions = {}): boolean {
   if (job.byHand || job.materialKind !== 'sheet') return false;
   if (!has(state, 'cnc') || !familyRuns(state, 'cnc')) return false;
@@ -115,11 +134,18 @@ export function cncFactor(state: GameState): number {
  *  branch: a job never sends a man to it. */
 export function familyForStage(job: StagedJob, stage: StageId): string | null {
   if (stage === 'cnc') return 'cnc';
+  // The timber department's own four (CLAUDE.md T28 2.7).
+  if (stage === 'crossCutting') return 'crossCut';
+  if (stage === 'planing') return 'planer';
+  if (stage === 'pressing') return 'framePress';
+  if (stage === 'sanding') return 'sander';
   if (stage === 'cutting') return 'tableSaw';
   if (stage === 'edging') return 'edgebander';
   if (stage === 'moulding') return 'spindleMoulder';
   if (stage === 'assembly') return 'workbench';
-  if (stage === 'finishing') return job.finish === 'lacquer' ? SPRAY_BOOTH : null;
+  // A window or a door is lacquered and nothing else, so its Finishing is the booth's whatever the
+  // plan of an enquiry not yet given a finish says (CLAUDE.md T28 2.6, 2.7).
+  if (stage === 'finishing') return job.finish === 'lacquer' || job.timber === true ? SPRAY_BOOTH : null;
   return null;
 }
 
@@ -127,7 +153,18 @@ export function familyForStage(job: StagedJob, stage: StageId): string | null {
  *  for is done by hand at the by hand pace, which is what a machine is bought for [PIOTR, 24.09;
  *  v55]. A bench is not a speed: without one nothing is made at all, which the hall says for
  *  itself (CLAUDE.md T4 3.4). */
-const BY_HAND_STAGES: StageId[] = ['cutting', 'edging', 'moulding', 'cnc'];
+const BY_HAND_STAGES: StageId[] = [
+  'cutting',
+  'edging',
+  'moulding',
+  'cnc',
+  // A timber job's own four go by hand at the same rate with their machines all broken or away
+  // (CLAUDE.md T28 2.7).
+  'crossCutting',
+  'planing',
+  'pressing',
+  'sanding',
+];
 
 /** What the hall does to the minutes of one stage: the hall's pace for the family it is done on
  *  (CLAUDE.md T25 2.4), or the by hand penalty when the family is not in the hall or none of it
@@ -159,6 +196,8 @@ export function stageSpeed(
  *  sharing the rest [PIOTR, 24.09] (v55). A CNC does the cutting instead of the saw
  *  (CLAUDE.md T7 3.4). */
 export function stagesOf(state: GameState, job: StagedJob, options: StageOptions = {}): StageSpec[] {
+  // A window or a door has a plan of its own, its shares fixed (CLAUDE.md T28 2.7).
+  if (job.timber === true) return TIMBER_STAGES;
   const lacquer = job.finish === 'lacquer';
   const scale = lacquer ? 1 - FINISHING_STAGE.share : 1;
   const machines = MACHINE_STAGES.map((stage) => {
@@ -250,7 +289,21 @@ export function stageDone(job: Job, plan: readonly StagePlan[], stage: StagePlan
     return put(entry.id);
   };
   let loose = labourDone(job);
-  for (const id of ['cutting', 'edging', 'moulding', 'cnc', 'assembly', 'finishing', 'delivery'] as StageId[]) {
+  // Every stage id there is, the timber department's four among them, or the labour in their bags is
+  // poured a second time (CLAUDE.md T28 2.7).
+  for (const id of [
+    'cutting',
+    'edging',
+    'moulding',
+    'cnc',
+    'assembly',
+    'finishing',
+    'delivery',
+    'crossCutting',
+    'planing',
+    'pressing',
+    'sanding',
+  ] as StageId[]) {
     loose -= put(id);
   }
   let done = 0;

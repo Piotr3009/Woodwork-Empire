@@ -26,6 +26,7 @@ import { calendarMonthIndex, calendarYearOf, dayOfMonth, monthOfDay } from './cl
 // safe.
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
+import { lastDayToSpendSentence } from './closures';
 import type { GameState } from './types';
 
 /** The day the taxman comes in words, `30 December`, the way every line of the tax says it. */
@@ -98,6 +99,9 @@ export function raiseTaxWarning(state: GameState): void {
     body:
       `On ${taxDayWords()} the taxman takes ${shareWords()} of whatever is in the account` +
       `${figure} Money spent on machines or on the workshop before then is not taxed. ` +
+      // The workshop closes on the 22nd, so the last day money can be spent is the last working
+      // day before it (CLAUDE.md T28 2.2, item 5).
+      lastDayToSpendSentence(day) +
       'Invest, or pay.',
     data: { year, amount },
   });

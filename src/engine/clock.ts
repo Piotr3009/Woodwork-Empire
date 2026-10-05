@@ -2,11 +2,14 @@
 // work with the hour of dinner between them, and then overtime to 19:00 at the latest. The break
 // is the one part of the day nobody works through, unless the owner says he will, and then the
 // hour is his and nobody else's.
-// Weekends are skipped by the day advance in game.ts, which still charges their calendar costs.
+// Weekends are skipped by the day advance in game.ts, which still charges their calendar costs, and
+// so are the company's two holidays, Christmas and the first fortnight of August, which are one long
+// weekend to the day loop: nobody works and every bill is paid (PIOTR, 05.10; CLAUDE.md T28 2.2).
 
 import {
   BREAK_MINUTES,
   BREAK_START_MINUTE,
+  CLOSURES,
   DAYS_PER_MONTH,
   DAYS_PER_WEEK,
   DAY_END_MINUTE,
@@ -22,7 +25,7 @@ import {
   WEEKDAY_NAMES,
   WORKING_DAYS_PER_WEEK,
 } from './constants';
-import type { Clock, GameState, Speed } from './types';
+import type { Clock, Closure, ClosureSpan, GameState, Speed } from './types';
 
 /** 0 is Monday. Day 1 is a Monday (CLAUDE.md 6.1). */
 export function weekday(day: number): number {
@@ -33,8 +36,16 @@ export function weekdayName(day: number): string {
   return WEEKDAY_NAMES[weekday(day)] ?? 'Mon';
 }
 
-export function isWorkingDay(day: number): boolean {
+/** True on a Monday to a Friday, whether the workshop is open or closed: the days the owner draws
+ *  his pay on (CLAUDE.md T28 2.2). */
+export function isWeekday(day: number): boolean {
   return weekday(day) < WORKING_DAYS_PER_WEEK;
+}
+
+/** True on a day the workshop is open: a weekday that no closure holds. A closed day is a day
+ *  nobody works, as a Saturday is, and every bill is paid on it (PIOTR, 05.10; CLAUDE.md T28 2.2). */
+export function isWorkingDay(day: number): boolean {
+  return isWeekday(day) && closureOf(day) === null;
 }
 
 export function isFriday(day: number): boolean {
@@ -86,6 +97,68 @@ export function yearOfDay(day: number): number {
  *  (PIOTR, 03.10; CLAUDE.md T27 2.1). `yearOfDay` counts the company's own years and stays. */
 export function calendarYearOf(day: number): number {
   return START_YEAR + Math.floor((START_MONTH + monthOfDay(day) - 1) / MONTHS_PER_YEAR);
+}
+
+/** Which of the company's holidays this day falls in, or null: the one place the calendar is asked
+ *  whether the workshop is closed. Christmas holds 22 December to 5 January of every winter from
+ *  December 2025, its January days belonging to the winter that began the December before; the
+ *  summer holds 1 to 14 August of every year from 2026 (PIOTR, 05.10; CLAUDE.md T28 2.2). */
+export function closureOf(day: number): Closure | null {
+  if (day < 1) return null;
+  const month = calendarMonthIndex(monthOfDay(day));
+  const date = dayOfMonth(day);
+  const year = calendarYearOf(day);
+  for (const spec of CLOSURES) {
+    if (spec.fromMonth === spec.toMonth) {
+      if (month === spec.fromMonth && date >= spec.fromDay && date <= spec.toDay && year >= spec.firstYear) {
+        return spec.id;
+      }
+      continue;
+    }
+    // Over two months: the later month's days belong to the year the closure began in, the year
+    // before when it runs over the turn of the year.
+    const yearBegun = spec.toMonth < spec.fromMonth ? year - 1 : year;
+    if (month === spec.fromMonth && date >= spec.fromDay && year >= spec.firstYear) return spec.id;
+    if (month === spec.toMonth && date <= spec.toDay && yearBegun >= spec.firstYear) return spec.id;
+  }
+  return null;
+}
+
+/** The whole of the closure this day is in, its first and its last day, or null on an open day. */
+export function closureSpan(day: number): ClosureSpan | null {
+  const closure = closureOf(day);
+  if (closure === null) return null;
+  let from = day;
+  while (closureOf(from - 1) === closure) from -= 1;
+  let to = day;
+  while (closureOf(to + 1) === closure) to += 1;
+  return { closure, from, to };
+}
+
+/** The closure the player is told of in this day's month and that has not begun: Christmas through
+ *  December to the 21st, the summer through July from 2026. Null on any other day (CLAUDE.md T28
+ *  2.2.1). */
+export function closureAhead(day: number): ClosureSpan | null {
+  if (day < 1) return null;
+  const month = calendarMonthIndex(monthOfDay(day));
+  for (const spec of CLOSURES) {
+    if (month !== spec.warnMonth) continue;
+    for (let at = day; at <= day + 2 * DAYS_PER_MONTH; at += 1) {
+      if (closureOf(at) !== spec.id) continue;
+      return at > day ? closureSpan(at) : null;
+    }
+  }
+  return null;
+}
+
+/** The closure among the days the workshop has just stepped over to open this one, or null: what
+ *  makes a morning the first day back (CLAUDE.md T28 2.2). */
+export function closureBefore(day: number): Closure | null {
+  for (let at = day - 1; at > 0 && !isWorkingDay(at); at -= 1) {
+    const closure = closureOf(at);
+    if (closure !== null) return closure;
+  }
+  return null;
 }
 
 /** The minute of the game so far, for putting in order two things that happened on different
@@ -152,6 +225,13 @@ export function formatCalendarDay(day: number): string {
   return `${weekdayName(safe)} ${dayOfMonth(safe)} ${monthName(monthOfDay(safe))}`;
 }
 
+/** The day of its month and the month, `22 December`, with no weekday: how a closure's own days are
+ *  said (CLAUDE.md T28 2.2.1). */
+export function dayMonthWords(day: number): string {
+  const safe = Math.max(1, Math.round(day));
+  return `${dayOfMonth(safe)} ${monthName(monthOfDay(safe))}`;
+}
+
 /** The top bar's line: the date with its year, then the clock, `Mon 26 May 2027 · 11:17`. The
  *  year is the bar's and the tax's own words alone; every other screen prints `formatCalendarDay`
  *  (PIOTR, 03.10; CLAUDE.md T27 2.1). */
@@ -198,21 +278,56 @@ export function workingDaysBetween(from: number, to: number): number {
   return -count;
 }
 
+/** How many of the days from day 1 to this one the workshop is open, kept as it is counted: the
+ *  calendar never changes under a game, so the count is the same every time it is asked. */
+const WORKING_DAYS_TO: number[] = [0];
+
+function workingDaysTo(day: number): number {
+  for (let at = WORKING_DAYS_TO.length; at <= day; at += 1) {
+    WORKING_DAYS_TO.push((WORKING_DAYS_TO[at - 1] ?? 0) + (isWorkingDay(at) ? 1 : 0));
+  }
+  return WORKING_DAYS_TO[day] ?? 0;
+}
+
 /** Where a calendar day sits on an axis of working days only, counting from day 1: Monday follows
- *  Friday with no gap in it. A weekend day reads as the Friday before it, because nothing happens
- *  on it and the Work Plan draws no column for it (CLAUDE.md T10 3.5). */
+ *  Friday with no gap in it, and the first day back follows the last before a closure. A weekend
+ *  or a closed day reads as the working day before it, because nothing happens on it and the Work
+ *  Plan draws no column for it (CLAUDE.md T10 3.5, T28 2.2). Before day 1 the axis runs on the
+ *  week alone, and a part of a day counts as the whole day it is part of. */
 export function workingDayIndex(day: number): number {
-  const weeks = Math.floor((day - 1) / DAYS_PER_WEEK);
-  const rest = day - 1 - weeks * DAYS_PER_WEEK;
-  return weeks * WORKING_DAYS_PER_WEEK + Math.min(rest + 1, WORKING_DAYS_PER_WEEK);
+  // A point that is no day at all (a projection that never ends) is not counted to.
+  if (!Number.isFinite(day)) return day;
+  if (day < 1) {
+    const weeks = Math.floor((day - 1) / DAYS_PER_WEEK);
+    const rest = day - 1 - weeks * DAYS_PER_WEEK;
+    return weeks * WORKING_DAYS_PER_WEEK + Math.min(rest + 1, WORKING_DAYS_PER_WEEK);
+  }
+  return workingDaysTo(Math.floor(day));
 }
 
 /** The calendar day a place on that axis is: the inverse of `workingDayIndex` for every working
  *  day. Only the whole part is a day; a fraction is the part of that day. */
 export function dayOfWorkingIndex(index: number): number {
-  const weeks = Math.floor((index - 1) / WORKING_DAYS_PER_WEEK);
-  const rest = index - 1 - weeks * WORKING_DAYS_PER_WEEK;
-  return weeks * DAYS_PER_WEEK + rest + 1;
+  if (!Number.isFinite(index)) return index;
+  const whole = Math.floor(index);
+  if (whole < 1) {
+    const weeks = Math.floor((index - 1) / WORKING_DAYS_PER_WEEK);
+    const rest = index - 1 - weeks * WORKING_DAYS_PER_WEEK;
+    return weeks * DAYS_PER_WEEK + rest + 1;
+  }
+  let last = WORKING_DAYS_TO.length - 1;
+  while ((WORKING_DAYS_TO[last] ?? 0) < whole) {
+    last += 1;
+    workingDaysTo(last);
+  }
+  let low = 1;
+  let high = last;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if ((WORKING_DAYS_TO[middle] ?? 0) >= whole) high = middle;
+    else low = middle + 1;
+  }
+  return low + (index - whole);
 }
 
 /** Every calendar day strictly between `from` and `to`. */

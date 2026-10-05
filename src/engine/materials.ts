@@ -5,6 +5,8 @@ import {
   BESPOKE_COST_UPLIFT,
   DELIVERY_WORKING_DAYS_BESPOKE,
   DELIVERY_WORKING_DAYS_STANDARD,
+  GLASS_DELIVERY_WORKING_DAYS,
+  GLASS_SHARE,
   LOW_STOCK_SHEETS,
   MATERIAL_FRACTION,
   SHEET_PRICE_LADDER,
@@ -13,6 +15,7 @@ import {
   TEMP_STORAGE_COST,
   STOCK_LINE_NAME,
   STOCK_LINE_KINDS,
+  WAITING_FOR_GLASS,
 } from './constants';
 import { addWorkingDays } from './clock';
 import { canAfford, pay } from './economy';
@@ -346,6 +349,45 @@ export function orderForJob(
     orderedBy === null ? `Material for ${job.name}` : `Material for ${job.name}, ordered by ${orderedBy}`;
   pay(state, 'material', label, cost);
   return createDelivery(state, job.id, sheets, job.bespokeMaterial, cost);
+}
+
+/** What a timber job's glass and ironmongery cost: `GLASS_SHARE` of its material, to the penny
+ *  (CLAUDE.md T28 2.9). */
+export function glassCostOf(job: { materialCost: number }): number {
+  return Math.round(job.materialCost * GLASS_SHARE * 100) / 100;
+}
+
+/** The boards of a timber job's material: what is left of it once the glass is taken out, so the
+ *  two add up to the whole to the penny. A job with no glass is all boards (CLAUDE.md T28 2.9). */
+export function boardsCostOf(materialCost: number, timber: boolean): number {
+  if (!timber) return materialCost;
+  return Math.round((materialCost - glassCostOf({ materialCost })) * 100) / 100;
+}
+
+/** The glass ordered from the glazier: paid in full at the click, one ledger line under the
+ *  material, through the overdraft as the boards are, and in at the open of the tenth working day.
+ *  No lorry, no unloading and no rack: the glazier carries it to the benches. `orderedBy` names
+ *  the admin who placed it without being asked, as the boards' order does (CLAUDE.md T28 2.9).
+ *  False when there is nothing to order or not the money for it. */
+export function orderGlass(state: GameState, job: Job, orderedBy: string | null = null): boolean {
+  if (job.glass !== 'toOrder') return false;
+  const cost = glassCostOf(job);
+  if (!canAfford(state, cost)) return false;
+  const label = orderedBy === null ? `Glass for ${job.name}` : `Glass for ${job.name}, ordered by ${orderedBy}`;
+  pay(state, 'material', label, cost);
+  job.glass = 'ordered';
+  job.glassDay = addWorkingDays(state.clock.day, GLASS_DELIVERY_WORKING_DAYS);
+  return true;
+}
+
+/** The open of a working day: the glass due today is at the benches, and a window that stood for
+ *  it no longer says so (CLAUDE.md T28 2.9). */
+export function arriveGlass(state: GameState): void {
+  for (const job of state.jobs) {
+    if (job.glass !== 'ordered' || job.glassDay === null || job.glassDay > state.clock.day) continue;
+    job.glass = 'in';
+    if (job.blockedBy === WAITING_FOR_GLASS) job.blockedBy = '';
+  }
 }
 
 export function findDelivery(state: GameState, deliveryId: string): Delivery | null {

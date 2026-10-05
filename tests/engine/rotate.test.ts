@@ -244,8 +244,10 @@ describe('what turning does to the picture', () => {
     // Seventy three from v76: the four vans and the electric pallet truck of the pack of 22.09.
     // Seventy six from v80: the two better forklifts and the air dryer of the pack of 03.10.
     // Seventy five from v81: the pallet truck's turned file of v49 is deleted at last (T27-A1).
+    // Ninety six from v83: the twenty one turns of the timber department's machines, the cross cut
+    // saws, the planers, the sanders, the frame presses and the glue table (CLAUDE.md T28 2.11).
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    expect(turned).toHaveLength(75);
+    expect(turned).toHaveLength(96);
     for (const family of ['cnc', 'cncToolChanger', 'compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'sprayBooth', 'tableSaw', 'toolCabinet', 'workbench']) {
       for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
         expect(turned, `${family}.${tier}`).toContain(`${family}.${tier}.r.png`);

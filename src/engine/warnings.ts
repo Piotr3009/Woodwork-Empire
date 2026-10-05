@@ -28,12 +28,13 @@ import {
 } from './constants';
 import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
-import { takeOffOutstanding } from './jobs';
+import { paperworkDone, takeOffOutstanding } from './jobs';
 import { bagStore } from './machines';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine, hasOfficeAdmin } from './staff';
 import { taxComingLine } from './tax';
+import { closureComingLine } from './closures';
 import { designOutstandingFor } from './tasks';
 import type { GameState, LedgerCategory } from './types';
 
@@ -46,12 +47,17 @@ export type WarningKey =
   | 'deadlineAtRisk'
   /** The drawing is finished and the material list is the next thing to do (PIOTR, 03.10; v78). */
   | 'drawingDone'
+  /** A window's paperwork is done and its glass is still to order (CLAUDE.md T28 2.9). */
+  | 'glassNotOrdered'
   | 'noInsurance'
   /** The money speaks before the month end (PIOTR accepted, 17.09; CLAUDE.md T18 2.6). */
   | 'belowZero'
   | 'spendingOverEarning'
   /** The taxman comes on 30 December, from the warning to the tax (CLAUDE.md T27 2.3). */
   | 'taxComing'
+  /** The workshop closes for its break, from the card to the last working day (CLAUDE.md T28
+   *  2.2.1). */
+  | 'closureComing'
   | 'crewFull'
   /** The first days say what to do (PIOTR accepted, 17.09; CLAUDE.md T18 2.7). */
   | 'firstSteps';
@@ -78,12 +84,19 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   // can be ordered for it until the list is made, where the lines below can stand for weeks and
   // would keep this one from ever being read (v78).
   'drawingDone',
+  // Directly under it: the glass takes ten working days and production reaches the Glazing without
+  // it (CLAUDE.md T28 2.9) [TUNE].
+  'glassNotOrdered',
   'noInsurance',
   'belowZero',
   'spendingOverEarning',
   // Under the money lines and above the crew's: it has a date on it, where the crew line can
   // stand for a year (CLAUDE.md T27 2.3) [TUNE].
   'taxComing',
+  // Directly under the tax's: the strip shows one line, so in December a company with cash to tax
+  // is told of the closure by its card and by the tax card's sentence, and this is the line July
+  // shows (CLAUDE.md T28 2.2.1) [TUNE].
+  'closureComing',
   'crewFull',
   'firstSteps',
 ];
@@ -165,6 +178,17 @@ function drawingDoneWarning(state: GameState): Warning | null {
   };
 }
 
+/** A window or a door whose paperwork is done and whose glass is still to order, the first of them
+ *  by name (CLAUDE.md T28 2.9). Said with an admin on the books too: she orders it with the boards,
+ *  and a line that stays up says she could not. */
+function glassNotOrderedWarning(state: GameState): Warning | null {
+  const waiting = state.jobs.find(
+    (job) => job.glass === 'toOrder' && job.stage !== 'completed' && paperworkDone(state, job),
+  );
+  if (waiting === undefined) return null;
+  return { key: 'glassNotOrdered', text: `Glass not ordered: ${waiting.name}` };
+}
+
 function noInsuranceWarning(state: GameState): Warning | null {
   const commercial = state.enquiries.find(
     (enquiry) => enquiry.kind === 'commercial' && enquiry.blockReason === NO_INSURANCE_REASON,
@@ -181,6 +205,13 @@ function noInsuranceWarning(state: GameState): Warning | null {
 function taxComingWarning(state: GameState): Warning | null {
   const text = taxComingLine(state);
   return text === null ? null : { key: 'taxComing', text };
+}
+
+/** The days left before the workshop closes for its break, from the card that said it to the last
+ *  working day (CLAUDE.md T28 2.2.1). The words are the closure's own. */
+function closureComingWarning(state: GameState): Warning | null {
+  const text = closureComingLine(state);
+  return text === null ? null : { key: 'closureComing', text };
 }
 
 function crewFullWarning(state: GameState): Warning | null {
@@ -276,10 +307,12 @@ const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   nobodyAssigned: nobodyAssignedWarning,
   deadlineAtRisk: deadlineWarning,
   drawingDone: drawingDoneWarning,
+  glassNotOrdered: glassNotOrderedWarning,
   noInsurance: noInsuranceWarning,
   belowZero: belowZeroWarning,
   spendingOverEarning: spendingOverEarningWarning,
   taxComing: taxComingWarning,
+  closureComing: closureComingWarning,
   crewFull: crewFullWarning,
   firstSteps: firstStepsWarning,
 };

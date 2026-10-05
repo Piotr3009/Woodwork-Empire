@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { hasMeasuredPort, renderHall } from '../../src/render/hall';
 import { machineInUse, tick } from '../../src/engine/index';
+import { outsidePlaceFor } from '../../src/engine/layout';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
   acceptNow,
@@ -95,10 +96,14 @@ describe('the other machines', () => {
     // of its own answers for the base picture it falls back to, and that one is measured. This is
     // why 2.11 lets Rotate reach only the orientations that have a file.
     expect(hasMeasuredPort({ ...unit, orientation: 2 })).toBe(true);
-    // And it really does breathe, standing in the hall with the saw running beside it: the rule
-    // of 2.9 took the swell off the things a pipe is fixed to and off nothing else.
+    // And it really does breathe, standing behind the rear wall with the saw running in the hall:
+    // the rule of 2.9 took the swell off the things a pipe is fixed to and off nothing else. It
+    // stood on the floor at 14, 7 until the pelletiser went where the flexi is (CLAUDE.md T28 2.1).
     const withPelletiser = state;
-    const pelletiser = placeEquipment(withPelletiser, 'pelletiser', { x: 14, y: 7 });
+    const behind = outsidePlaceFor(withPelletiser, 'pelletiser');
+    if (behind === null) throw new Error('no room behind the wall');
+    expect(behind.y).toBeLessThan(0);
+    const pelletiser = placeEquipment(withPelletiser, 'pelletiser', behind);
     expect(hasMeasuredPort(pelletiser)).toBe(false);
     expect(machineInUse(withPelletiser, pelletiser)).toBe(true);
     const svg = renderHall(withPelletiser);

@@ -2,6 +2,7 @@
 // choose between them (CLAUDE.md T2 3.2).
 
 import {
+  boardsCostOf,
   canAccept,
   findSpec,
   formatReputation,
@@ -36,11 +37,13 @@ function expiryLine(state: GameState, enquiry: Enquiry): string {
   return `expires in ${days(left)}`;
 }
 
-/** What the workshop has to have to take this job on, in plain names. */
+/** What the workshop has to have to take this job on, in plain names: the machines, and a
+ *  window's or a door's cutter set after them, which it needs exactly as it needs a machine
+ *  (CLAUDE.md T28 2.6). */
 function toolsLine(enquiry: Enquiry): string {
-  const names = template(enquiry.templateId).requiredEquipment.map(
-    (specId) => findSpec(specId)?.name ?? specId,
-  );
+  const entry = template(enquiry.templateId);
+  const wanted = entry.cutters === null ? entry.requiredEquipment : [...entry.requiredEquipment, entry.cutters];
+  const names = wanted.map((specId) => findSpec(specId)?.name ?? specId);
   return names.length === 0 ? 'nothing special' : names.join(', ').toLowerCase();
 }
 
@@ -65,12 +68,21 @@ function tile(state: GameState, enquiry: Enquiry): string {
   const allowed = canAccept(state, enquiry);
   const locked = enquiry.lockReason !== null;
   const byHand = !enquiry.unreachable && locked && enquiry.byHandAvailable;
-  const sheets = sheetsForCost(materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial));
+  // The boards the job will hold: a window's glass comes from the glazier and is no sheet on the
+  // rack, so its share is not counted (CLAUDE.md T28 2.9).
+  const timber = template(enquiry.templateId).cutters !== null;
+  const sheets = sheetsForCost(boardsCostOf(materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial), timber));
   // Days of his own time with the machines standing in the hall now, which is the same number
   // the deadline is worked out from (CLAUDE.md T6 3.7).
   const ownerDays =
     Math.round(
-      ownerDaysFor(state, labourValueFor(enquiry.basePrice), enquiry.materialKind) * 10,
+      ownerDaysFor(
+        state,
+        labourValueFor(enquiry.basePrice),
+        enquiry.materialKind,
+        false,
+        timber,
+      ) * 10,
     ) / 10;
   // A rush is not a warning: Express is the accent orange at the top right (CLAUDE.md T15 2.2).
   const express = enquiry.express

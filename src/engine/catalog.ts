@@ -34,14 +34,19 @@ export function templatesForReputation(reputation: number): ProductTemplate[] {
  *  men counts for nothing. A saw that is broken or away for its service is still the shop's saw.
  *  The one reader: the board's lock and the catalogue's grey both ask here. */
 export function missingEquipment(state: GameState, entry: ProductTemplate): string[] {
-  return entry.requiredEquipment.filter((specId) => !has(state, specId));
+  // A window's or a door's cutter set is kit the enquiry needs exactly as a machine is
+  // (CLAUDE.md T28 2.6).
+  const wanted = entry.cutters === null ? entry.requiredEquipment : [...entry.requiredEquipment, entry.cutters];
+  return wanted.filter((specId) => !has(state, specId));
 }
 
 /** The greyed out reason on the board, or null when the job can be taken as it stands. */
 export function lockReasonFor(state: GameState, entry: ProductTemplate): string | null {
   const missing = missingEquipment(state, entry);
   if (missing.length === 0) return null;
-  if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => has(state, id))) {
+  // The oak table's own rule; the timber department's windows and doors are held to their own list
+  // and not to it (CLAUDE.md T28 2.6) [TUNE: chat].
+  if (entry.material === 'solidWood' && entry.cutters === null && !SOLID_WOOD_EQUIPMENT.every((id) => has(state, id))) {
     // Timber needs the thicknesser and the spindle moulder; the lock names the ones missing
     // (PIOTR, 24.09; v54).
     const gone = SOLID_WOOD_EQUIPMENT.filter((id) => !has(state, id)).map(

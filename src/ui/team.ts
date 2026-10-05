@@ -303,7 +303,7 @@ function ownerCard(state: GameState): string {
   return (
     '<div class="tile owner-card" data-owner-card>' +
     '<h3 class="tile-name">You</h3>' +
-    `<p class="tile-text">Your draw: ${money(ownerDrawPerDay(state))} a day, paid every working day.</p>` +
+    `<p class="tile-text">Your draw: ${money(ownerDrawPerDay(state))} a day, paid Monday to Friday.</p>` +
     drawTiers(state) +
     `<p class="tile-figures house-tier" data-house-tier="${tier}">Home: tier ${tier} of ${OWNER_DRAW_TIERS.length}, ` +
     `${escapeHtml(name)}. Paid yourself ${money(paid)} in the last thirty days.${escapeHtml(nextLine)}</p>` +

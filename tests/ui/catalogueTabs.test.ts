@@ -180,8 +180,10 @@ describe('the tabs', () => {
     expect(hand.innerHTML).toContain('Hand tool sets');
     expect(hand.innerHTML).not.toContain('Drills');
     expect(hand.innerHTML).not.toContain('Table saws');
-    // Sanding and the CNC centre have nothing in them tonight.
-    expect(shop(state, 'sanding').innerHTML).toContain('Nothing here yet.');
+    // The CNC centre has nothing in it tonight; Sanding has its sanders from v83 (CLAUDE.md T28
+    // 2.4).
+    expect(shop(state, 'sanding').innerHTML).toContain('Sanders');
+    expect(shop(state, 'sanding').innerHTML).not.toContain('Nothing here yet.');
     expect(shop(state, 'cncCentre').innerHTML).toContain('Nothing here yet.');
   });
 
@@ -202,8 +204,21 @@ describe('the tabs', () => {
       'locker',
     ]);
     // The timber tool set's folder is gone with the family: the thicknesser and the spindle
-    // moulder are all a furniture shop needs (PIOTR, 24.09; v53).
-    expect(folders('timberMachines')).toEqual(['thicknesser', 'spindleMoulder']);
+    // moulder are all a furniture shop needs (PIOTR, 24.09; v53). From v83 the timber department's
+    // machines beside them (CLAUDE.md T28 2.4).
+    expect(folders('timberMachines')).toEqual([
+      'thicknesser',
+      'spindleMoulder',
+      'crossCut',
+      'planer',
+      'framePress',
+      'glueTable',
+      // And the three cutter sets (CLAUDE.md T28 2.5).
+      'cuttersSash',
+      'cuttersCasement',
+      'cuttersDoor',
+    ]);
+    expect(folders('sanding')).toEqual(['sander']);
     // Every line of the catalogue is in exactly one folder of exactly one tab, except the shared
     // spindle moulder, which is in both machine tabs (CLAUDE.md T13 3.13).
     const all = EQUIPMENT_TABS.flatMap((tab) => folders(tab.id));
