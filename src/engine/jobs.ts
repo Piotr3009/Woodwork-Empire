@@ -53,7 +53,7 @@ import {
   nextWorkingDay,
   workingDaysBetween,
 } from './clock';
-import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
+import { canAfford, chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
   OWNER,
@@ -63,8 +63,11 @@ import {
   isSold,
 } from './machines';
 import {
+  boardsCostOf,
+  glassCostOf,
   materialCostFor,
   orderForJob,
+  orderGlass,
   rackCanSupply,
   releaseReservation,
   reserveSheetsFor,
@@ -419,6 +422,9 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
   const price = enquiry.offer ?? enquiry.price;
   const materialCost = materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial);
   const labourValue = labourValueFor(enquiry.basePrice);
+  // A window's or a door's material is boards and glass: the boards are ordered and racked as any
+  // timber is, the glass is ordered from the glazier on its own (CLAUDE.md T28 2.9).
+  const timber = entry.cutters !== null;
   const job: Job = {
     id: makeId(state, 'job'),
     templateId: enquiry.templateId,
@@ -429,7 +435,7 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     finish: enquiry.finish,
     materialKind: enquiry.materialKind,
     materialCost,
-    sheets: sheetsForCost(materialCost),
+    sheets: sheetsForCost(boardsCostOf(materialCost, timber)),
     sheetsUsed: 0,
     sheetsReserved: 0,
     kind: enquiry.kind,
@@ -438,7 +444,7 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     nightMinutes: 0,
     needsSpindle: entry.requiredEquipment.includes('spindleMoulder'),
     // A window or a door: the template with a cutter set (CLAUDE.md T28 2.7).
-    ...(entry.cutters !== null ? { timber: true } : {}),
+    ...(timber ? { timber: true } : {}),
     blockedBy: '',
     bespokeMaterial: enquiry.bespokeMaterial,
     express: enquiry.express,
@@ -474,6 +480,8 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     rating: null,
     overdueWarned: false,
     curing: null,
+    glass: timber ? 'toOrder' : 'none',
+    glassDay: null,
   };
   state.jobs.push(job);
   removeEnquiry(state, enquiryId);
@@ -641,7 +649,29 @@ export function autoOrderMaterial(state: GameState, job: Job): boolean {
   if (admin === null) return false;
   if (orderForJob(state, job, admin.name) === null) return false;
   job.stage = 'materialOrdered';
+  // And a window's glass with its boards, the moment she orders them (CLAUDE.md T28 2.9).
+  if (paperworkDone(state, job)) orderGlass(state, job, admin.name);
   return true;
+}
+
+/** Why a window's glass cannot be ordered now, or that it can: it has to be a job with glass to
+ *  order, its paperwork done, because the glazier makes it to the drawing's sizes, and the money
+ *  there for it (CLAUDE.md T28 2.9). The card asks this before it draws the button and the action
+ *  asks it again. */
+export function orderGlassCheck(state: GameState, job: Job): { ok: boolean; reason: string } {
+  if (job.glass === 'none') return { ok: false, reason: 'No glass in this job' };
+  if (job.glass !== 'toOrder') return { ok: false, reason: 'Ordered already' };
+  if (!paperworkDone(state, job)) return { ok: false, reason: 'The drawing is not finished' };
+  if (!canAfford(state, glassCostOf(job))) return { ok: false, reason: 'Not enough cash' };
+  return { ok: true, reason: '' };
+}
+
+/** The owner's click on the job card: the glass ordered, no minutes of his day (CLAUDE.md T28
+ *  2.9). */
+export function orderGlassFor(state: GameState, jobId: string): boolean {
+  const job = findJob(state, jobId);
+  if (job === null || !orderGlassCheck(state, job).ok) return false;
+  return orderGlass(state, job);
 }
 
 /** The site measure costs a taxi while there is no van (CLAUDE.md 8.10), and with one it is a
@@ -795,6 +825,12 @@ export function onDeliveryUnloaded(state: GameState, jobId: string | null): void
 export function refreshMaterial(state: GameState): void {
   for (const job of state.jobs) {
     if (job.stage === 'materialPending') refreshJob(state, job);
+    // A window's glass still to order once the boards are on their way or in: the admin on duty
+    // orders it as she would have with them, when the money is there (CLAUDE.md T28 2.9).
+    if (job.glass === 'toOrder' && job.stage !== 'completed' && paperworkDone(state, job)) {
+      const admin = firstOnDutyOf(state, MATERIAL_ORDER_ROLES);
+      if (admin !== null) orderGlass(state, job, admin.name);
+    }
   }
 }
 
@@ -833,9 +869,13 @@ export function dropJob(state: GameState, jobId: string): boolean {
   // was never ordered has nothing to write off, whatever mode it was set to.
   const orderedIn = state.deliveries.some((delivery) => delivery.jobId === job.id);
   if (orderedIn) {
-    noteLoss(state, 'material', `Material written off: ${job.name}`, job.materialCost);
+    noteLoss(state, 'material', `Material written off: ${job.name}`, boardsCostOf(job.materialCost, job.timber === true));
   } else {
     state.stock.sheets += left;
+  }
+  // A window's glass, ordered for it and made to its sizes, is lost with it (CLAUDE.md T28 2.9).
+  if (job.glass === 'ordered' || job.glass === 'in') {
+    noteLoss(state, 'material', `Glass written off: ${job.name}`, glassCostOf(job));
   }
   job.sheetsUsed = 0;
   // What it held goes back to the free stock (CLAUDE.md T13 3.3).
@@ -866,6 +906,9 @@ export function dropJob(state: GameState, jobId: string): boolean {
  *  hand or not (CLAUDE.md T4 3.4). */
 export const BENCHLESS_HALL = 'the hall has no workbench';
 
+/** What a window at its Glazing says while its glass is not in (CLAUDE.md T28 2.9). */
+export const WAITING_FOR_GLASS = 'waiting for glass';
+
 /** Everything in the hall that stops a job for everybody on it: no extraction in the hall at all,
  *  or no bench in it. Nothing about one stage's machine stops a job any more: a machine broken, away
  *  for its service, still on the lorry, short of air or making dust with the bags full has no
@@ -884,6 +927,10 @@ export function hallStops(state: GameState, job: Job): string {
   // Finishing before the booth is in the hall. It stops there, for the booth (v53).
   if (job.finish === 'lacquer' && currentStage(state, job)?.id === 'finishing' && !has(state, 'sprayBooth')) {
     return 'no spray booth';
+  }
+  // A window at its Glazing with the glass not in: a stop of the same kind (CLAUDE.md T28 2.9).
+  if (job.glass !== undefined && job.glass !== 'none' && job.glass !== 'in' && currentStage(state, job)?.id === 'assembly') {
+    return WAITING_FOR_GLASS;
   }
   return '';
 }

@@ -179,3 +179,22 @@ sheet job never stands, lacquered or not; the drying racks and the wet air do wh
 row reads the stage the bar has moved on to, `Sanding, glue curing`, where the mockup wrote
 `Pressing, glue curing`; left so and said. STATE_VERSION 41's lift gives every job of a save
 `curing: null`.
+
+**T28-C7 The glass.** A timber job carries its glass (`job.glass`: `none` on every other job, the
+oak table's among them, then `toOrder`, `ordered`, `in`, and `job.glassDay`), and its material is
+`GLASS_SHARE` 0.35 glass and ironmongery and the rest boards (`glassCostOf`, `boardsCostOf`, to the
+penny), the boards ordered, delivered, racked and drawn as the oak table's are (`sheets` is
+`sheetsForCost` of the boards) [TUNE: chat: the rule and the figures]. The glass can be ordered
+once the paperwork is done (`orderGlassCheck`: `The drawing is not finished`, `Not enough cash`,
+`Ordered already`): by the office admin the moment she orders the boards (`autoOrderMaterial`,
+and `refreshMaterial` for one whose boards came another way), or by the owner's `Order glass,
+£X` beside `Order for this job`, a click of the same kind and no minutes of his day
+(`ORDER_GLASS`). It is paid in full at the click, one line under `material`, `Glass for <job>`
+(`, ordered by Sue` when the admin did), through the overdraft as the boards are, and is in at the
+open of the tenth working day after (`GLASS_DELIVERY_WORKING_DAYS`, `arriveGlass`): no lorry, no
+unloading, no rack, no card. The card says `Glass not ordered` in red, `Glass ordered, here on Thu
+12 March`, then `Glass is in` in green. Production starts without it; at the Glazing with the glass
+not in, `hallStops` says `waiting for glass`, a stop of the same kind as the nights. A job dropped
+after its glass was ordered writes it off (`Glass written off`), its boards as before, and the drop
+card adds the two. The strip's `glassNotOrdered`, `Glass not ordered: Sash windows`, stands
+directly under `drawingDone` [TUNE]. STATE_VERSION 41's lift gives every job `glass: 'none'`.

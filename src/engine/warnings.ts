@@ -28,7 +28,7 @@ import {
 } from './constants';
 import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
-import { takeOffOutstanding } from './jobs';
+import { paperworkDone, takeOffOutstanding } from './jobs';
 import { bagStore } from './machines';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
@@ -47,6 +47,8 @@ export type WarningKey =
   | 'deadlineAtRisk'
   /** The drawing is finished and the material list is the next thing to do (PIOTR, 03.10; v78). */
   | 'drawingDone'
+  /** A window's paperwork is done and its glass is still to order (CLAUDE.md T28 2.9). */
+  | 'glassNotOrdered'
   | 'noInsurance'
   /** The money speaks before the month end (PIOTR accepted, 17.09; CLAUDE.md T18 2.6). */
   | 'belowZero'
@@ -82,6 +84,9 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   // can be ordered for it until the list is made, where the lines below can stand for weeks and
   // would keep this one from ever being read (v78).
   'drawingDone',
+  // Directly under it: the glass takes ten working days and production reaches the Glazing without
+  // it (CLAUDE.md T28 2.9) [TUNE].
+  'glassNotOrdered',
   'noInsurance',
   'belowZero',
   'spendingOverEarning',
@@ -171,6 +176,17 @@ function drawingDoneWarning(state: GameState): Warning | null {
     key: 'drawingDone',
     text: `${waiting.name}: the drawing is done. Now make the material list and order the material.`,
   };
+}
+
+/** A window or a door whose paperwork is done and whose glass is still to order, the first of them
+ *  by name (CLAUDE.md T28 2.9). Said with an admin on the books too: she orders it with the boards,
+ *  and a line that stays up says she could not. */
+function glassNotOrderedWarning(state: GameState): Warning | null {
+  const waiting = state.jobs.find(
+    (job) => job.glass === 'toOrder' && job.stage !== 'completed' && paperworkDone(state, job),
+  );
+  if (waiting === undefined) return null;
+  return { key: 'glassNotOrdered', text: `Glass not ordered: ${waiting.name}` };
 }
 
 function noInsuranceWarning(state: GameState): Warning | null {
@@ -291,6 +307,7 @@ const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   nobodyAssigned: nobodyAssignedWarning,
   deadlineAtRisk: deadlineWarning,
   drawingDone: drawingDoneWarning,
+  glassNotOrdered: glassNotOrderedWarning,
   noInsurance: noInsuranceWarning,
   belowZero: belowZeroWarning,
   spendingOverEarning: spendingOverEarningWarning,

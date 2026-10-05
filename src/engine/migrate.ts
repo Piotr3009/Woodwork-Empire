@@ -1119,7 +1119,11 @@ function liftToVersion41(state: Raw): void {
   // T28 2.2.1, section 4).
   state.closureWarnedFor = null;
   // And no job stands a night (2.8): every job of a save is sheet work or the oak table.
-  for (const job of records(state.jobs)) job.curing = null;
+  for (const job of records(state.jobs)) {
+    job.curing = null;
+    job.glass = 'none';
+    job.glassDay = null;
+  }
   state.version = 41;
 }
 

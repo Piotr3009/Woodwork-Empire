@@ -196,6 +196,7 @@ import {
   runBookedTransport,
   dropJob,
   endTheStands,
+  orderGlassFor,
   BUILDING_ROLES,
   takeOffJob,
   takeOverJob,
@@ -203,6 +204,7 @@ import {
 } from './jobs';
 import {
   arriveDeliveries,
+  arriveGlass,
   buyStock,
   canUnload,
   deliveriesArrivingOn,
@@ -608,6 +610,8 @@ function startDay(state: GameState): void {
     });
   }
   const arriving = arriveDeliveries(state);
+  // The glass due today is at the benches, carried in by the glazier (CLAUDE.md T28 2.9).
+  arriveGlass(state);
   const kit = arriveEquipmentOrders(state);
   collectSoldMachines(state);
   runBookedTransport(state);
@@ -2233,6 +2237,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'ACCEPT_ENQUIRY':
       acceptEnquiry(next, action.enquiryId, action.byHand);
+      break;
+    case 'ORDER_GLASS':
+      orderGlassFor(next, action.jobId);
       break;
     case 'ORDER_FOR_JOB':
       // The job's shortfall, bought at the ad hoc price for that job (CLAUDE.md T13 3.3).

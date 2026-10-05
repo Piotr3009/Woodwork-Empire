@@ -811,6 +811,13 @@ export const STOCK_NUMBER_PREFIX: Record<MaterialKind, string> = {
 export const DELIVERY_WORKING_DAYS_STANDARD = 1;
 /** [TUNE] bespoke material takes three working days and costs 15% more. */
 export const DELIVERY_WORKING_DAYS_BESPOKE = 3;
+
+/** A window's glass is made to size by a glazier and cannot be ordered before the drawing says the
+ *  sizes: it is in this many working days after it is ordered (CLAUDE.md T28 2.9) [TUNE: chat]. */
+export const GLASS_DELIVERY_WORKING_DAYS = 10;
+/** The share of a timber job's material cost that is glass and ironmongery; the rest is boards
+ *  (CLAUDE.md T28 2.9) [TUNE: chat]. */
+export const GLASS_SHARE = 0.35;
 export const BESPOKE_COST_UPLIFT = 0.15;
 /** Temporary storage for a delivery that does not fit (PIOTR). */
 export const TEMP_STORAGE_COST = 150;

@@ -77,6 +77,8 @@ function job(partial: Partial<Job>): Job {
     rating: null,
     overdueWarned: false,
     curing: null,
+    glass: 'none',
+    glassDay: null,
     ...partial,
   };
 }

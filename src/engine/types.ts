@@ -48,6 +48,9 @@ export type Finish = 'laminate' | 'lacquer' | 'veneer';
  *  the bench, a quarter each, and Finishing in the booth for a lacquered job [PIOTR, 24.09: "every
  *  machine has its own stage, split evenly"]. `cnc` is the one stage a CNC does instead of Cutting;
  *  `delivery` carries no labour at all. `machining`, the 15% of v53 and before, is gone. */
+/** Where a timber job's glass is (CLAUDE.md T28 2.9). */
+export type GlassState = 'none' | 'toOrder' | 'ordered' | 'in';
+
 /** What a timber job stands for overnight (CLAUDE.md T28 2.8). */
 export type TimberStandReason = 'glue curing' | 'lacquer drying';
 
@@ -727,6 +730,11 @@ export interface Job {
    *  the lacquer dries: the reason the hall says and the day whose open ends it. Null on every
    *  other job and between the two (CLAUDE.md T28 2.8). */
   curing: TimberStand | null;
+  /** A window's or a door's glass: `none` on every other job, then to order, ordered and in
+   *  (CLAUDE.md T28 2.9). */
+  glass: GlassState;
+  /** The working day the glass ordered for it is in, at that day's open; null until it is ordered. */
+  glassDay: number | null;
 }
 
 /** One call from the client: when he rings, and what happened when he did. */
@@ -1487,6 +1495,8 @@ export type GameAction =
   | { type: 'BOOT_LAPTOP' }
   /** Buys a job's shortfall at the ad hoc price, for that job (CLAUDE.md T13 3.3). */
   | { type: 'ORDER_FOR_JOB'; jobId: string }
+  /** A window's glass, ordered from the glazier (CLAUDE.md T28 2.9). */
+  | { type: 'ORDER_GLASS'; jobId: string }
   /** Orders sheets onto the rack: the number the player typed, capped at the free places in it
    *  (CLAUDE.md T13 3.2, T17 2.20). */
   | { type: 'RESTOCK'; sheets?: number }

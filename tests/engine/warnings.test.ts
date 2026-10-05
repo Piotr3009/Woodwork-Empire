@@ -396,7 +396,7 @@ describe('the line that counts the days below the bank s limit (CLAUDE.md T22 2.
 });
 
 describe('the order of urgency', () => {
-  it('is bags, past the limit, nobody assigned, overdue, drawing done, no insurance, below zero, spending over earning, tax coming, closure coming, crew full, first steps', () => {
+  it('is bags, past the limit, nobody assigned, overdue, drawing done, glass not ordered, no insurance, below zero, spending over earning, tax coming, closure coming, crew full, first steps', () => {
     expect(WARNING_ORDER).toEqual([
       'bagsFull',
       // Turn 21: above everything but the bags. The bags stop every machine in the hall this
@@ -406,6 +406,8 @@ describe('the order of urgency', () => {
       'deadlineAtRisk',
       // v78 (PIOTR, 03.10): the drawing is done and the material list is next.
       'drawingDone',
+      // Turn 28: a window's glass still to order, directly under it (CLAUDE.md T28 2.9).
+      'glassNotOrdered',
       'noInsurance',
       'belowZero',
       'spendingOverEarning',
@@ -419,11 +421,12 @@ describe('the order of urgency', () => {
   });
 
   it('puts every problem in that order when the hall has them all at once', () => {
-    // Eight of the twelve at once. The first steps line cannot be one of them: it is only said
+    // Eight of the thirteen at once. The first steps line cannot be one of them: it is only said
     // while production has never started, and "a started job nobody is on" is production started.
     // Nor the drawing line of v78: no job of this hall is waiting for its material list. Nor the
     // tax of Turn 27: this is not December, and an account under nought has no tax to take. Nor the
-    // closure of Turn 28: this is neither December nor July.
+    // closure of Turn 28: this is neither December nor July. Nor a window's glass: there is no
+    // window in this hall.
     let state = tradedWeek(0, 500);
     state = withStartedJobNobodyOn(state);
     state = withDeadlineAtRisk(state);
@@ -437,7 +440,11 @@ describe('the order of urgency', () => {
     expect(warnings(state).map((warning) => warning.key)).toEqual(
       WARNING_ORDER.filter(
         (key) =>
-          key !== 'firstSteps' && key !== 'drawingDone' && key !== 'taxComing' && key !== 'closureComing',
+          key !== 'firstSteps' &&
+          key !== 'drawingDone' &&
+          key !== 'glassNotOrdered' &&
+          key !== 'taxComing' &&
+          key !== 'closureComing',
       ),
     );
   });

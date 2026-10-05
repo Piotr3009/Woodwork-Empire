@@ -20,8 +20,10 @@ import {
   leadAssignee,
   lifecycleSteps,
   onTheBooksToday,
+  glassCostOf,
   orderForJobCheck,
   orderForJobCost,
+  orderGlassCheck,
   shortfallOf,
   showsStartProduction,
   startProductionCheck,
@@ -225,7 +227,11 @@ export function materialLine(state: GameState, job: Job): string {
     short > 0
       ? `<span class="row-figure bad shortfall">${short} of ${sheets} short</span>`
       : `<span class="row-figure good sheets-reserved">${held} of ${sheets} in hand</span>`;
-  if (short <= 0) return figure;
+  if (short <= 0) {
+    // The boards are in hand: a window's glass may still be to order.
+    const glass = glassControl(state, job);
+    return figure + glassFigure(job) + (glass === '' ? '' : `<span class="row-action">${glass}</span>`);
+  }
   const why = timber
     ? '<span class="hint">Timber is ordered for the job: the racks hold sheets.</span>'
     : '';
@@ -233,7 +239,33 @@ export function materialLine(state: GameState, job: Job): string {
   const control = check.ok
     ? button('orderForJob', `Order for this job, ${money(orderForJobCost(job))}`, `data-id="${job.id}"`)
     : lockedButton('Order for this job', check.reason);
-  return figure + why + `<span class="row-action">${control}</span>`;
+  return figure + why + glassFigure(job) + `<span class="row-action">${control}${glassControl(state, job)}</span>`;
+}
+
+/** A window's glass on its card, in the classes the boards' line wears: red while it is to order,
+ *  plain while it is on its way, green once it is in. Nothing for a job with no glass
+ *  (CLAUDE.md T28 2.9; docs/mockups/t28/glass-job-card.html). */
+function glassFigure(job: Job): string {
+  if (job.glass === 'toOrder') {
+    return '<span class="row-figure bad shortfall" data-glass="toOrder">Glass not ordered</span>';
+  }
+  if (job.glass === 'ordered' && job.glassDay !== null) {
+    return `<span class="row-figure" data-glass="ordered">Glass ordered, here on ${formatCalendarDay(job.glassDay)}</span>`;
+  }
+  if (job.glass === 'in') {
+    return '<span class="row-figure good sheets-reserved" data-glass="in">Glass is in</span>';
+  }
+  return '';
+}
+
+/** The owner's button beside `Order for this job`, a click of the same kind: the glass from the
+ *  glazier, greyed with its one reason until it can be ordered (CLAUDE.md T28 2.9). */
+function glassControl(state: GameState, job: Job): string {
+  if (job.glass !== 'toOrder') return '';
+  const check = orderGlassCheck(state, job);
+  return check.ok
+    ? button('orderGlass', `Order glass, ${money(glassCostOf(job))}`, `data-id="${job.id}"`)
+    : lockedButton('Order glass', check.reason);
 }
 
 /** Dropping the project: one button, which opens the card that says what the drop costs. The card
