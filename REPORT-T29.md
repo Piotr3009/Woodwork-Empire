@@ -160,3 +160,21 @@ below nought, so its figures do not move.
 Flipped: `contracts.test.ts` (the 200 seeds draw the three sheet pieces; the name is written with
 `pluralOf`) and `contractPrices.test.ts` (the three sheet pieces). New:
 `tests/engine/t29TimberContracts.test.ts`, 15 tests.
+
+**T29-D1 The logo.** Not done: `docs/logo-incoming/` is not on main, so the section was skipped
+whole and none of its four places was touched (CLAUDE.md T29 2.13). No commit.
+
+**T29-E1 Notes and requests.** `docs/notes-t29.md` covers four things:
+- where each task lives;
+- what the lift does and the fields added;
+- the readings of the brief taken beyond its figures;
+- how to read the line and the one counter of stock, and what of section 8 the turn touched.
+
+`docs/art/REQUESTS-T29.md` asks the art side for:
+- the line modules, which stand about 38 px short of their corners;
+- a saw at module 1's infeed;
+- the two timber stores drawn empty;
+- Turn 28's twelve stand-ins and three cutter sets, again.
+
+It leaves two things for Piotr to decide: a figure for the line engineer, and the products on the
+hall. Both files were written by a sub-agent from the repo and read by the lead.
