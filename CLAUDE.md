@@ -1,601 +1,1038 @@
-# Turn 28: the timber department, the holidays, and the pelletiser outside
+# Turn 29: the production line, the five axis CNC, the timber stores, and four to a contract
 
-Woodwork Empire. Autonomous session brief for Claude Code (cloud, one agent, serial, effort high).
-Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), written 05.10.2026 from Piotr's
-words of 04.10 and of that night, against main at v82.
+Woodwork Empire. Autonomous session brief for Claude Code (cloud, one writer, serial, effort
+high). Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), written 05.10.2026 from
+Piotr's words of that afternoon, against main at v83.
 
-Read this whole file (first line must say "Turn 28"; if the root CLAUDE.md does not, stop and
-report), then REPORT-T27.md section 0 and its "what was not done", then docs/ui-style.md, then the
-archived briefs in docs/ (docs/turn-27-brief.md is the last). Where files disagree, this one wins.
-All standing rules apply (no em or en dashes anywhere, scope 1:1, one code path, constants never
-in the UI, [TUNE] for every figure you choose and [PIOTR] for his, kill background processes, PR
-without merge, end the session, no PR watching, npm run check gated on its own exit code, every
-click single, one APP_VERSION bump, delete the old track and never write a parallel one, flip a
-test and never keep it beside a new one). The rule relaxed in Turn 26 stays relaxed [PIOTR,
-01.10]: a scenario figure that moves is restated with ONE line of reason; a test that pins an
-exact pound of a played month may be loosened to a range when the exact figure says nothing about
-the rule under test, and the comment says so.
+Read this whole file (first line must say "Turn 29"; if the root CLAUDE.md does not, stop and
+report), then REPORT-T28.md section 0 and its "what was not done", then docs/notes-t28.md, then
+docs/ui-style.md, then the archived briefs in docs/ (docs/turn-28-brief.md is the last). Where
+files disagree, this one wins. All standing rules apply (no em or en dashes anywhere, scope 1:1,
+one code path, constants never in the UI, [TUNE] for every figure you choose and [PIOTR] for his,
+kill background processes, PR without merge, end the session, no PR watching, npm run check gated
+on its own exit code, every click single, one APP_VERSION bump, delete the old track and never
+write a parallel one, flip a test and never keep it beside a new one, the Skylon Development Ltd
+header on every new code file). The rule relaxed in Turn 26 stays relaxed [PIOTR, 01.10]: a
+scenario figure that moves is restated with ONE line of reason; a test that pins an exact pound of
+a played month may be loosened to a range when the exact figure says nothing about the rule under
+test, and the comment says so.
 
 Before a line is written: clone, read what is there, and build with it. Every screen, card, tile,
 tab, chip, modal and strip line this turn needs already has its kind in the repo (the catalogue's
-folders and class cards, the board's tiles and their greyed reasons, the job card's lines, the
-event modal, the warning strip, the Work Plan's reasons). Nothing here asks for a second version
-of any of them, and none is to be written [PIOTR, 18.09: one game, one look].
+folders and class cards, the hire tile, the board's tiles and their greyed reasons, the contract
+tiles and their rows, the job card's lines, the Materials page's rows, the event modal, the
+warning strip). Nothing here asks for a second version of any of them, and none is to be written
+[PIOTR, 18.09: one game, one look].
 
-Precondition. main carries Turn 27 merged and the chat fix v82: APP_VERSION 'v82', STATE_VERSION
-40. If APP_VERSION is not 'v82', stop and report. v82 went onto main with `tsc`, lint, the build
-and about sixty of the test files run, and never the whole suite: task A0 below runs it and
-settles it before anything else is touched. What v82 changed is in section 2.0.
-
-Nothing runs beside this session. No file is fenced off.
+Precondition. main carries Turn 28 merged: APP_VERSION 'v83', STATE_VERSION 41. If APP_VERSION is
+not 'v83', stop and report. Turn 28 ended green (2,652 tests in 278 files); task A0 below runs
+the suite once more before anything is touched.
 
 The four rules of 18.09 bind every agent: one game, one look; nothing visual without a mockup;
 no sound without a recorded file; every modal, popover and list has the cross, Escape and click
-outside. The mockups this turn needs are in section 9, into docs/mockups/t28/ before the code
-that makes them true. Piotr asked for this turn in one night and has not seen those mockups: they
+outside. The mockups this turn needs are in section 9, into docs/mockups/t29/ before the code
+that makes them true. Piotr asked for this turn in one go and has not seen those mockups: they
 are built only of what the game already draws, and the report shows each beside its nearest
-existing screen so he can judge them in the morning.
+existing screen so he can judge them afterwards.
 
 **What chat decided for Piotr and he has not yet confirmed** is marked [TUNE: chat] throughout
 and gathered in section 10, so the report can repeat it in one place. His own words are [PIOTR].
 
-## 0. What this turn is for (PIOTR, 04.10 and 05.10)
+**The root CLAUDE.md of Turn 28 forbade and parked most of what this turn builds** (the five
+axis CNC, the robot, the line, timber contracts, the logo). That was Turn 28's fence and it is
+down: this file is the brief now.
 
-Piotr's company has a hall of 800 m² since v82, half of it empty, and more money than things to
-spend it on. On 04.10 he wrote the next era himself: a timber department that makes windows and
-doors beside the sheet work, with machines "much dearer" and work that pays better. On the night
-of 05.10 the first two packs of its machines came from the art side and he said: "you have the
-graphics, so go; we are going to expand", and "put the graphics in as you have them and we will
-refine them later".
+## 0. What this turn is for (PIOTR, 05.10, the afternoon)
 
-Three things, then.
+Turn 28 gave the company a timber department. Piotr played it the same day and said six things.
 
-**The pelletiser goes outside.** "The pelletiser is to go where the flexi is, outside the
-building."
+**The line.** "I do not see the production line for the millions anywhere." It was never built:
+no picture of it existed. The art side has now delivered it, with the five axis CNC, the
+spraying robot and two timber stores, and Piotr sent the pack with: "you have it in the zip",
+"put everything into the next turn". On what the line gives at each step: "work it out and
+propose." On what it costs to run: "the cost of running the production line will be
+considerable: one or two engineers at 15k a month, depending on the size of the line."
 
-**The company has holidays.** "After a year we add holidays: two weeks around Christmas, to
-5 January (the costs run, only the people do not work), and two weeks in the summer, but that
-only in the second year."
+**The glass.** "The glass, next day; ten working days will complicate things for us if we order
+right after the drawing."
 
-**The timber department.** Sash and casement windows, french, patio and bifold doors, made on
-cross cut saws, four sided planers, the spindle moulders the game has, frame presses, sanders and
-the spray booths the game has. And his other sentence of that night: "think how to make it a bit
-more complicated now, so that it is not so easy." Three things make timber harder than sheet,
-all of them true of a real joinery: a set of cutters for each kind of product, the glass that is
-ordered from outside and takes two weeks, and two nights a job stands still while the glue and
-the lacquer dry.
+**Four to a contract.** "There should be a limit on the men put on one order, three or four at
+the most; today on sheet goods as many go on as I like and the profit is fantastic, which does
+not happen in life." And, when chat read that as jobs: "I mean the standing orders, the
+contracts; do not touch the normal jobs." Asked which, he said four. Asked whether pieces past
+the week's order should still be paid, he said: "no, we pay as it is now", so every piece is
+still paid.
 
-What this turn is not: the five axis CNC, the spraying robot and the production line (era 4; no
-picture of them exists yet), a product drawn on the hall (no picture exists), and anything of
-the sheet department, which works beside the timber exactly as it does today [PIOTR, 04.10].
+**Windows and doors as standing contracts.** "Are we doing something like standing orders for
+windows and doors?" Chat said yes and how; he put it in the turn.
+
+**The logo.** "Do the logo too." His logo pack is not in this ZIP; section 2.13 says what to do
+when it is there and when it is not.
+
+And one thing Turn 28's own report found: a second cutter set of the same kind can be bought and
+does nothing.
+
+What this turn is not: any change to a normal job's crew, a sheet job's plan, a wage, the tax's
+arithmetic, the loan, the bank's rules, the security firm's price for a company with no line, or
+the questions Piotr still has open after v82 (section 8).
 
 ## 1. Rules restated (short)
 
-Everything from Turns 1 to 27 and the chat fixes to v82. Tonight in addition:
+Everything from Turns 1 to 28 and the chat fixes to v82. Tonight in addition:
 
-- APP_VERSION = 'v83'. STATE_VERSION 41, once (section 4); every save that loads today loads
+- APP_VERSION = 'v84'. STATE_VERSION 42, once (section 4); every save that loads today loads
   (`OLDEST_SAVE_VERSION` is 12), the fixtures in tests/fixtures among them.
-- **The sheet department is not touched** [PIOTR]. No sheet template, stage share, price, place
-  count or pace of an existing family moves.
-- **A closed day is a day nobody works and every bill is paid** [PIOTR].
-- **Timber work is offered only to a company in the 800 m² hall** [PIOTR, 04.10: era 3].
-- **The art side's pictures go in as they are** [PIOTR, 05.10]. No agent draws, repaints, trims
-  or scales a picture.
+- **A job takes as many men as the boss puts on it** [PIOTR, 17.09 and 05.10: "do not touch the
+  normal jobs"]. Nothing of `addToJob`, `assignJob` or `canBuild` is touched, and the three
+  tests that say a job has no limit stay as they are: `takes as many as the player wants, with
+  no limit at all` in `tests/engine/assignees.test.ts`, `puts all three on it with no limit, and
+  each keeps his own place` in `tests/scenarios/turn19.test.ts`, and the block `the row says who
+  is on it` in `tests/ui/workPlan.test.ts`.
+- **A standing contract takes four joiners at the most** [PIOTR, 05.10].
+- **Every piece of a contract is paid, past the week's order too** [PIOTR, 21.09 and 05.10].
+- **The sheet department is not touched**, with one exception said in 2.7: a spraying robot
+  speeds the Finishing of a lacquered sheet job too, for the company that buys one.
+- **The art side's pictures go in as they are** [PIOTR, 05.10, as in Turn 28]. No agent draws,
+  repaints, trims or scales a picture. Chat renamed files and nothing else (2.4).
 
 ## 2. Changes to the design (the contract)
 
-### 2.0 What the chat fix v82 changed (for A0's reasons)
+### 2.0 What Turn 28 left (for A0's reasons)
 
-- The second extension: `UNIT_SECOND_EXTENSION_PRICE` 1,000,000, `secondExtensionOf(unit)`,
-  `UnitState.secondExtension?` (optional, so STATE_VERSION stayed 40), `EXTEND_UNIT { stage? }`,
-  the Premises card `extendSecond`. The hall becomes 40 by 20 cells the morning after.
-- `M2_PER_PERSON` 25 and not 24, so the crew is 8, 16 and 32. `CANTEEN_LOCKERS_DEEP` 32, and the
-  canteen room shows sixteen plates a page (`canteenPages`, `ui.canteenPage`).
-- `unitCostFactor(unit)`: rent, rates, the hall's fixed power and the security firm follow the
-  area; both insurance covers and the flat security level are doubled at 800 m².
-- `hallBackgroundDeep.png`, `HALL_CANVAS_DEEP`, `hallLayersOf(unit)`.
-- Its own tests sit at the end of `tests/engine/v67.test.ts` and `tests/ui/v67.test.ts`.
+- v83 is green on its own exit code: lint, the build, 2,652 tests in 278 files, none skipped.
+- `tests/ui/app.test.ts` plays the game in real time and failed nine of its tests in two of Turn
+  28's checks while a sub-agent ran the suite beside the lead. On a quiet machine it passes.
+  Tonight no sub-agent runs `npm test`, `npm run build` or `npm run check` while the lead's
+  check is running (section 3).
+- `tests/ui/t28Families.test.ts` asserts that `docs/art` holds no folder called `incoming`.
+  The pictures of this turn are therefore in `docs/pictures-t29/` (2.4).
 
 ### A. The suite
 
-**2.0.1 A0.** Run `npm run check` on main as it stands. Every failing test is one of three
-things, exactly as in Turn 27's A0: a figure v82 moved (re-pin it, one line of reason); a
-scenario the bank now closes (the smallest change in the scenario's own policy, never in the
-engine); a real fault (fix it if the fix is plainly what v82 meant, otherwise leave it red, stop
-that thread and put it first in section 0 of the report). Nothing of the engine is touched in A0
-beyond that. One commit.
+**2.0.1 A0.** Run `npm run check` on main as it stands. It is expected green. A failing test is
+handled exactly as Turn 27's A0 handled it: a moved figure re-pinned with one line of reason, a
+scenario the bank closes given the smallest change of its own policy, a real fault fixed if the
+fix is plain and otherwise left red, that thread stopped and put first in section 0 of the
+report. Nothing of the engine is touched in A0 beyond that. One commit, or none if nothing moved.
 
-### B. Two small things
+### B. Three small things
 
-**2.1 The pelletiser stands behind the rear wall [PIOTR, 05.10].** `STARTING_LAYOUT.pelletiser`
-gets `yard: true, rear: true`, and everything the two central systems have behind the wall
-follows by the code that is already there: the place (`rearYardPlaceFor`), the refusal `No room
-behind the hall`, no cell of the floor, no walking, no dragging, no turning, the clip at the
-wall. It is not added to `DUCT_SYSTEMS` or `CENTRAL_EXTRACTION_SPECS`, which mean something else.
+**2.1 The glass comes the next working day [PIOTR, 05.10].** `GLASS_DELIVERY_WORKING_DAYS` is 1
+and not 10: a glass ordered today is in at the open of the next working day, beside the boards
+ordered with it. Everything else of the glass is as Turn 28 built it: ordered once the paperwork
+is done, by the admin with the boards or by the owner's click, paid at the order, the stop
+`waiting for glass` at the Glazing for the owner who forgot, the strip's `glassNotOrdered`.
 
-- A pelletiser that stands on the hall floor in a save, or is on order for it, moves behind the
-  wall when the save is lifted to 41, by `standThePlantBehindTheWall`, whose call is gated on
-  `version < 38` today and gets a second gate. It writes the anchor and books no moving time.
-  With no room left behind the wall it stays where it is; say in the report when that can be.
-- Kit that stands outside does not ask for free floor in the hall. Today `canBuy` refuses any
-  kit with a zone with `No free 3 m by 3 m in the hall` (the zone's own metres), the two systems
-  among them, which never stand there. That refusal is dropped for everything `standsOutside`
-  is true of [TUNE: chat; it follows from Piotr's sentence but he did not say it].
-- Its zone stays 3 by 3 [TUNE]. By chat's arithmetic most of a 2.5 m machine is hidden by the
-  wall; one of the report's pictures shows how much of it is seen, and nothing is done about it
-  tonight.
-- `docs/art/SPRITES.md` section 6 still has it at 3 m high; the engine has 2.5. Put the line
-  right.
-- `tests/render/machineFx.test.ts` stands one in the hall at 14, 7 to see it breathe; it breathes
-  behind the wall as it did on the floor, and the test is moved there, not kept beside a new one.
+- `TIMBER_LEAD_DAYS` is 3 and not 12: the glass's day and the two nights [TUNE: chat: it follows
+  from his sentence; with twelve left standing every window would have nine idle days in its
+  deadline]. It is a literal of its own today; write it so that it cannot drift from the glass
+  again. `TIMBER_STANDS` is a private constant of `src/engine/jobs.ts`, and `constants.ts`
+  imports types only while `jobs.ts` imports it: move `TIMBER_STANDS` into `constants.ts` and
+  write `TIMBER_LEAD_DAYS = GLASS_DELIVERY_WORKING_DAYS + Object.keys(TIMBER_STANDS).length`.
+- An enquiry already on the board keeps the days it was drawn with, and a job already taken
+  keeps its due day: both are stored.
+- A glass already on its way in a save is brought forward by the lift of section 4 to the next
+  working day, so that nobody waits out an old ten days.
+- The words that say ten or twelve are put right: the comments at `TIMBER_LEAD_DAYS`, at
+  `orderGlass` and in `warnings.ts`, the test titles, the one literal 10
+  (`tests/scenarios/turn28.test.ts`) and the two literal 12 (`tests/engine/t28Timber.test.ts`).
+  The half of the test that says "the day before it is due it is still on its way" has lost its
+  premise at one day: flip it to say what is true now.
 
-**2.2 The company's holidays [PIOTR, 05.10].** The workshop is closed twice a year:
+**2.2 One cutter set of a kind [TUNE: chat; found by Turn 28's report].** One set serves every
+moulder the company has, a set is never sold, and the card still offers `Buy another`: the second
+is money thrown away. `canBuy` refuses a cutter set of a kind the company already has or has on
+order, in the shape the tool changer's refusal has (owned and not sold, plus on order), with the
+words `One set serves every moulder`. The card then shows the locked `Buy another` and the words
+under it, with no change to the card. A save that holds two keeps both.
 
-| Closure | Closed, both days counted | From |
-|---|---|---|
-| Christmas | 22 December to 5 January | December 2025, every winter |
-| Summer | 1 August to 14 August | August 2026, every summer; not in 2025 |
+**2.3 A standing contract takes four joiners at the most [PIOTR, 05.10].**
+`CONTRACT_MAX_JOINERS` 4.
 
-[PIOTR: two weeks around Christmas ending on 5 January, from the first year's end; two weeks in
-the summer from the second year. TUNE: chat: the 22nd, and the first fortnight of August.]
+Where it is asked. `contractAssignCheck` is the one door every path goes through (the engine's
+`assignContract`, the Orders board's Contracts tab, the Work Plan's Contracts tab). It refuses a
+man who is NOT on the contract when the contract already holds four, with the engine's own line,
+`A contract takes four joiners at the most` (a function beside `contractsFullLine`, so the UI
+prints the engine's words). Two things about that door:
 
-The rule is one function. `closureOf(day)` in `clock.ts` says `'christmas'`, `'summer'` or
-`null`, and `isWorkingDay(day)` is false on a closed day as it is on a Saturday. `clock.ts` is
-the only file that asks it of the calendar (`tests/engine/turn27CrossCheck.test.ts` pins who may
-call `calendarYearOf`; keep to it). The day loop already steps over every day that is not a
-working day and runs that day's bills, so a closure is one long weekend and most of what Piotr
-asked follows with no more code. Checked by chat on the code; assert each:
+- `assignContract` runs the same check before it takes a man OFF. The cap must never stop that:
+  a man who is on the contract always passes.
+- The four are the men put on it, whether or not they are in today. A man off after an accident
+  or on the second shift holds his place.
 
-- Nobody works, nothing is made, no enquiry, call, delivery or event arrives.
-- Rent, rates and power run every closed day; the monthly bills, the loan, the insurance and the
-  security are taken on a 1st that is closed; the tax is booked on 30 December inside the
-  closure, as it already is on a Saturday.
-- The month's wages go out on the last working day of the month, which in December is the last
-  working day before the 22nd.
-- A client's deadline, a delivery, a booked courier, a machine's return from service and a new
-  man's first day are counted in working days, so each steps over the closure. A closed day is
-  never a day late.
-- A standing contract's week is wanted pro rata by its open days, so a wholly closed week wants
-  nothing and costs no reputation.
+What the player reads, on both tabs, in the classes those tabs already have:
 
-What does not follow, and is done tonight:
+- A count on every running contract, the engine's line, through `countRow`: `On it: 3 of 4`
+  and, when full, `On it: 4 of 4, the most a contract takes`.
+- Orders board tab, a free joiner's row on a full contract: the locked `Put on it` the tab
+  already has for a refusal, which is the one allowed disabled button, its reason the line above.
+- Work Plan tab, a full contract: the reason stands in place of `Assign to this contract`
+  (`reasonLabel`), and the popover is not opened for it. Today that popover would open and say
+  `Nobody is free: every joiner is on a job or a contract` with free men standing by: that
+  sentence must never be shown for a contract that is merely full.
+- The two lines that count men for a contract count four at the most: `contractMenNeeded`
+  (never `for 5 men at the least`), and the hall line of the offer (`contractHallCapacity` and
+  `contractHallLine`). Today that line sums every joiner on the books and reckons the places
+  the hall is short of with `fullCrew` standing at the piece's machine (the owner and every
+  joiner who is in today). With four or fewer joiners on the books nothing of it changes, the
+  figure or the words `at full crew`. With more than four it sums the four joiners with the
+  highest rate, the earlier hired winning a tie, reckons the places short with four men at the
+  piece's machine in place of `fullCrew`, and reads `Your hall makes about N of these a week
+  with four on it`.
 
-1. **The owner's draw is paid on every weekday of a closure** [PIOTR: the costs run]. Today it is
-   charged on working days only, and a fortnight without it would also take his house down a
-   tier (`houseTierFor` reads the last thirty days). It is charged on Monday to Friday whether
-   the workshop is open or closed; Saturdays and Sundays stay as they are.
-2. **The Work Plan's axis.** `workingDayIndex` and `dayOfWorkingIndex` are five in seven
-   arithmetic and know no closure, so a bar, a due point and a latest start would sit up to ten
-   days wrong and the `deadlineAtRisk` line with them. They count the days `isWorkingDay` is
-   true of. A closed day is not a column, as a Saturday is not.
-3. **The card on the first day back.** The `Weekend` card would say `14 days off` and `Monday
-   then` on a Friday. When the days stepped over hold a closure the card is the closure's
-   (section 2.2.2).
-4. **The overtime debt** is cleared on the first day back from a closure as it is on a Monday.
-5. **The tax's warning.** With the workshop closed from the 22nd, the last day money can be
-   spent is the last working day before it. The `Tax is coming` card gets one sentence more,
-   before `Invest, or pay.`: `The workshop is closed from 22 December, so the last day to spend
-   is Thu 21 December.` (the day computed, never written out). Nothing else of the tax moves.
+What does not change: the offer, the price, the week, the short week, the renewal, the three a
+shop runs at once, the material, and the payment of every piece. A job is not touched (section 1).
 
-What keeps running through a closure on calendar days, on purpose, as it does through a weekend
-today; say each in the report in one line and change none [TUNE: chat]: an enquiry's and a
-contract offer's expiry (the board is empty on the first day back and fills only as fast as it
-does on any morning, so the first days back are thin); a standing contract's end day (its term
-is not made longer); a let go notice; a machine's service interval; the overdraft's interest and
-the bank's count of days past the limit.
-That last one means a company far past its limit on the last working day can be closed by the
-bank during the break; the warning card of 2.2.1 says so to a company that is under nought.
+A save with more than four on a contract is trimmed by the lift of section 4, and the player is
+told.
 
-A save whose clock already stands on a day that is now closed finishes that day as it is and the
-closure takes the days after it. The owner's own holiday (`TAKE_HOLIDAY`) and a man's days off
-after an accident are counted on opened days, so a closure does not use them up; unchanged.
+### C. The big kit
 
-**2.2.1 Told before.** On the first working day of December, and from 2026 on the
-first working day of July, an event card, once for that closure:
+**2.4 The pictures [PIOTR, 05.10].** The art side delivered 22 files in three packs (the robot
+and the five axis CNC; the line's five modules; two timber stores). They are in
+`docs/pictures-t29/`, already named as the game names them, with `pictures-t29.json` (metres,
+file size and anchor of each, checked by chat against `src/render/sprites.ts`: all 22 fit with no
+table of pixels). `git mv` them into `public/sprites/`, run `npm run sprites:manifest`, and
+delete the folder with its JSON once section 13 of `docs/art/SPRITES.md` carries the table. They
+are not on main's `public/sprites/` already because three assertions in two test files pin
+counts of pictures (the turned ones, 96, become 107 here, in `tests/engine/rotate.test.ts` and
+`tests/render/spriteClasses.test.ts`; the measured class files, 96, become 107 as the families
+land).
 
-- title `Christmas break` (or `Summer break`);
-- body `The workshop is closed from 22 December to 5 January. Nobody works; wages, rent and the
-  bills are paid as always. The last working day is Thu 21 December and the first day back is
-  Fri 6 January. A client's deadline does not count the closed days.` (every date computed);
-- with the account under nought one sentence more: `The account is overdrawn, and the bank's
-  clock does not stop for the break.`;
-- one choice, `Right`.
-
-In December it is queued after the `Tax is coming` card, so the tax is read first. And from that
-day to the last working day before the closure a line on the warning strip, a new `WarningKey`
-`closureComing`: `Closed from 22 December: 9 working days left` (today counted). Its place in
-`WARNING_ORDER` is directly under `taxComing` [TUNE]. The strip shows one line, so in December a
-company with cash to tax reads the tax's line and is told of the closure by its card and by the
-tax card's new sentence; the closure's line is what the strip shows in July, and in December to
-a company with nothing to tax. That is known and is left so. `tests/engine/warnings.test.ts`
-pins the whole order and `tests/engine/tax.test.ts` pins `crewFull` directly after `taxComing`;
-both are flipped. A save loaded after the card's day and before the closure
-gets its card on the next day's open and not never (section 4).
-
-**2.2.2 Told on the first day back.** In place of the `Weekend` card: title `Back from the
-Christmas break` (or `the summer break`), body `14 days closed. Rent, rates and the bills ran
-anyway: £3,480 out.` (the days and the money are what was stepped over, weekend days on either
-side among them), one choice `Back to work`. A new event kind, so `weekend` keeps the meaning
-its tests pin. It is queued where the `Weekend` card is queued today, after the cards of the days
-stepped over, so the `Tax for 2025` card, when the tax was booked inside, is met before it, as
-it is met before the `Weekend` card today. The money on the break's card is everything that left
-the account on the days stepped over but the tax, which has a card of its own.
-
-### C. The timber department
-
-**2.3 When it opens [PIOTR, 04.10: era 3 is the 800 m² hall].** Timber enquiries come onto the
-board once the second extension is open: `secondExtensionOf(state.unit) === 'open'`. The constant
-`TIMBER_ON_THE_BOARD` becomes a question asked of the state. The machines and the cutter sets
-can be bought on any day, by any company: they are in the catalogue from day 1.
-
-Before the hall is 800 m² the five products of 2.6 are nowhere on the board: not offered and
-not among what a greyed tile is drawn from (`generateUnreachable`). So no draw of the seeded
-stream moves for a company in the 200 or the 400 m² hall, and no scenario of such a company
-shifts by this turn. In the 800 m² hall they are templates like any other, live or greyed. The
-advertising agency never draws one of the five as a big job: `drawBigJob` leaves them out
-(section 8). The
-oak dining table, the one solid wood template the game already has, stays off the board as it is
-today [TUNE: chat; it is not a window or a door].
-
-The crew is one crew [TUNE: chat; Piotr has not answered]. A joiner works on a timber job as he
-works on a sheet job, at his own rate; there is no timber trade, no second team, no second
-canteen, and the crew limit and the lockers are what v82 made them. That is what the code is
-since Turn 26 took the trades out, and it is the least that can be built.
-
-**2.4 Five families of machine.** Each is defined as the thicknesser and the spindle moulder are
-(`SPEC_DRAFTS`, a variants array, `VARIANTS_BY_FAMILY`, and its row in every side table). The
-classes are the five the game has. Width, depth and height are per class and are the art side's
-envelope, so the engine's own canvas and anchor arithmetic fits every file with no table of
-pixels: chat checked all 42 files against it (docs/art/incoming/t28/timber-machines.json).
-
-| Family id | Name | Folder | Tab |
+| File in `docs/pictures-t29/` (and its `.r`) | Family | Metres | The art side called it |
 |---|---|---|---|
-| `crossCut` | Cross cut saw | Cross cut saws | `timberMachines` |
-| `planer` | Four sided planer | Four sided planers | `timberMachines` |
-| `framePress` | Frame press | Frame presses | `timberMachines` |
-| `glueTable` | Glue table | Glue tables | `timberMachines` |
-| `sander` | Sander | Sanders | `sanding` (it exists, empty) |
+| `cnc5.standard.png`, `cnc5.pro.png`, `cnc5.industrial.png` | `cnc5` | 5 x 3 x 2.5, 6 x 3 x 2.75, 8 x 4 x 3 | the same |
+| `sprayRobot.standard.png` | `sprayRobot` | 2 x 1 x 2.25 | the same |
+| `windowLine1.standard.png` to `windowLine5.standard.png` | `windowLine1` to `windowLine5` | 6 x 3 x 2.5 each | `windowLine.stage1` to `stage5` |
+| `timberRack.standard.png` | `timberRack` | 4 x 1 x 2.5 | `timberStorage.rack` |
+| `timberShelter.standard.png` | `timberShelter` | 3 x 6 x 3 | `timberStorage.shelter` |
 
-Metres, width by depth by height, in view 0 [the art side's, fixed]:
+Why the names changed. A family in this game has the five classes or one class called
+`standard`, and two test files hold it to that. Five modules at five prices and two stores of two
+shapes are therefore seven families of one class each, the way the high capacity rack is a family
+of its own beside the rack, and their files carry `.standard`. Chat renamed them and touched no
+pixel.
 
-| Family | used | budget | standard | pro | industrial |
+The shelter's two views changed places. The art side drew it 6 m long by 3 m deep. It stands
+outside on the apron, which is 3 m wide (2.11), so the game declares it 3 wide by 6 deep: the art
+side's 90 view is `timberShelter.standard.png` and its 0 view is the `.r`. Kit outside is never
+turned, so the `.r` is on disk for the tests and the Sprite check page and is never drawn on the
+hall. Say so in SPRITES.md.
+
+What they are, said plainly in SPRITES.md section 13 and in the report: all 22 are rendered from
+models by the art side, exact to the contract, in the plainer look of Turn 28's pack 1 and not in
+the look of the September machines; Piotr has seen that and it stays for now. No agent alters a
+pixel. If one sits badly on its footprint in the Sprite check page, the report shows it and
+`docs/art/REQUESTS-T29.md` names it.
+
+Two places where the pictures and the game part, to be said in the same two places. Module 1 is
+drawn as an infeed and a planer with no saw (the art side's own table: feeding, planing and
+profiling). The game gives it the Cross cutting all the same [TUNE: chat]: Piotr's first stage
+needs a five axis CNC and a press beside it and nothing else, and with the Cross cutting left at
+the saws every man on the line would still be counted against the cross cut saws' two or three
+places. Its card says what the game does, and a saw at module 1's infeed is on E1's list for the
+art side. And the two timber stores are drawn full of timber, with no empty picture and no
+layer: a store bought this morning shows a full load over a plate of `0 / 40`. That is known and
+stays tonight; the stores drawn empty are on the same list.
+
+**2.5 Three rules the new kit needs first.** Each is small, each is used by several sections
+below, and each is written once.
+
+*2.5.1 Kit that stands only in the big unit.* A spec may name the least unit it stands in. The
+five axis CNC and the line's five modules name the 800 m² unit. `canBuy` refuses them in a
+smaller one with `Needs the 800 m² unit`, straight after the reputation's refusal, and the card
+shows the locked button and the words as it does for any refusal: they are in the catalogue from
+day 1, as a thing to save for. No other family names a unit.
+
+*2.5.2 A ladder of fewer than five classes.* `tests/engine/variants.test.ts` and
+`tests/ui/machine.test.ts` allow a family exactly the five classes or exactly `standard`. The
+five axis CNC has three: `standard`, `pro`, `industrial`. Flip both tests to the rule that a
+family on `CLASS_LADDER_FAMILIES` has an unbroken run of `CLASS_ORDER`, in order, of two classes
+or more; every family that is on the list today still has its five. The first class of a family
+is what its catalogue line shows and what a default purchase buys: for `cnc5` that is `standard`.
+The catalogue's first use tip says `Every machine family has five classes`, which the `cnc5`
+makes false: `TIPS.catalogue` becomes `A machine family comes in classes, up to five: the
+effects come first, then the costs, then what it is.` [TUNE: the wording].
+
+*2.5.3 Where a stage of a timber job is done is asked of the hall.* Today `familyForStage(job,
+stage)` knows nothing of what stands in the hall, and a timber job's plan is the constant
+`TIMBER_STAGES`. Two things of tonight do a stage that another machine does today: the five axis
+CNC does the Moulding (2.6), and a module of the line does the stages it covers (2.9). So for a
+timber job, and for a timber job only, the family of a stage becomes a question asked of the
+state. `familyForStage` has five call sites, three of them in `contracts.ts`, and every one has
+the state at hand or is the price's fixed reference. Leave `familyForStage` and its two
+arguments as they are (five test files call it so, `tests/scenarios/turn19.test.ts` among them,
+which section 1 says is not touched) and write the one function beside it that has the state;
+let `stageSpeed`, `stagePlanFor` and through them `jobPace`, `crewAtFamily`, `drawnPlaces` and
+the Work Plan read that one answer.
+No new `StageId` is made: the stage is still the Moulding or the Planing, its bar, its bag of
+labour, its label and its night are what they were, and only the machine under it changes. A
+sheet job's stage is done where it is done today whatever stands in the hall: the plan of a
+sheet job with a five axis CNC, a robot and a whole line in the hall is, stage for stage and
+family for family, what it is on v83, the robot's Finishing of 2.7 excepted.
+
+The order of the answer for a timber job's stage, first that applies:
+
+1. the line's module that covers it, while the line runs at that level (2.9);
+2. for the Moulding, the five axis CNC, while one runs (2.6);
+3. the family it has today.
+
+*2.5.4 What a timber product asks for, when something stands in for it* [TUNE: chat].
+`TIMBER_EQUIPMENT` asks a window for a cross cut saw, a planer, a spindle moulder, a sander, a
+frame press and a booth, each tested with `has`. From tonight a machine on that list is not
+missing while the thing that does its stage stands in the hall: a `cnc5` for the spindle
+moulder; module 1 for the cross cut saw and the planer; module 2 for the spindle moulder; module
+3 for the sander; module 4 for the frame press. The booth is always asked: nothing stands in
+for it. "Stands" is `has` for the `cnc5`, as for every kit the board asks. For a module
+it is being one of the unbroken run from module 1 (`lineModules`, 2.9.4): the modules that
+stand, not the level the line runs at today, so that an engineer's day off never locks the
+board. One table says who stands in for whom, and `missingEquipment`, `lockReasonFor`,
+`kitBlockFor` and the second copy of the wanted list in `src/ui/board.ts` read it.
+
+The words do not change with a stand in. A lock or a grey reason names only what is missing
+with nothing standing in for it. The tile's `Needs` line prints everything the job wants,
+owned or not, and goes on printing the list it prints today (with the timber store of 2.11.3
+after it), whatever stands in the hall.
+
+**2.6 The five axis CNC [PIOTR, 04.10: "one five axis CNC replaces four spindle moulders, from a
+weak one at 150 thousand to a fully automatic one at 500 thousand"].** A family `cnc5`, name
+`Five axis CNC`, folder `Five axis CNCs`, tab `cncCentre` (the tab `CNC centre` exists, is
+empty, and a test pins it empty: flip it). Category `machine`. Three classes.
+
+| | standard | pro | industrial |
+|---|---|---|---|
+| Price [PIOTR: 150 and 500; TUNE: chat: the middle] | 150,000 | 300,000 | 500,000 |
+| Metres [the art side's] | 5 x 3 x 2.5 | 6 x 3 x 2.75 | 8 x 4 x 3 |
+| Men it keeps busy (`MACHINE_CAPACITY`) [TUNE: chat] | 12 | 20 | 32 |
+| Extraction wanted, m³ an hour [TUNE] | 2,000 | 2,400 | 3,000 |
+| Power a day [TUNE] | 16 | 24 | 36 |
+| Delivery, working days [TUNE] | 45 | 45 | 60 |
+
+What it does [PIOTR: "one replaces four"; TUNE: chat: how]. While a five axis CNC runs, the
+Moulding of every timber job is done on it and not at the spindle moulders, and goes at
+`CNC5_STAGE_FACTOR` 4 times the hall's pace at it, the class's pace on top as for every family:
+the CNC's own way with the Cutting of a sheet job, with a four where that has a two. The twelve
+of the weak one is four moulders at three men each, which is how Piotr counted them on 04.10.
+
+- "Runs" is `familyRuns`: one that is broken, away for its service, short of air or stopped by
+  full bags does not, and the Moulding goes back to the moulders that minute, or by hand if
+  there are none. Nobody waits.
+- A timber job's men count against its places and not against the spindle moulders' while it
+  runs; that follows from the plan (`crewAtFamily`) and needs no line of its own.
+- A sheet job's Moulding stays at the spindle moulder. Nothing else of a timber job changes: the
+  bench does not go faster for it, as it does behind the sheet CNC.
+- It stands in for the spindle moulder on the board (2.5.4). The cutter sets are still asked:
+  it cuts with them too.
+- Each class card says what it does in one line among its effects, from the constant: `The
+  Moulding of windows and doors goes 4 times as fast on it`. The sheet CNC's card says nothing
+  of its own two, and that stays.
+
+The rest of its rows [TUNE], on the CNC's pattern unless said: the 800 m² unit (2.5.1); zone its
+footprint and a metre more each way; `requiresOneOf` the extractor or a central system, as the
+CNC; dust 0.06 as the CNC; air 6.5 bar and 650 litres in every class as the CNC; no dry air
+asked tonight; `enduranceFactor` 1.2, 1.5, 2 on the default hours; `HEAVY_SPECS`; serviced,
+broken and repaired as any machine; `MACHINE_SHORT_WORDS` `five axis CNC`; `STATION_TABLE` the
+front; `PORTS` one line a picture file, `.r` among them, measured off the pictures as Turn 28's
+were, and the Sprite check page shows no red line; on the list that keeps sheet men from being
+drawn at timber machines (`TIMBER_FAMILIES`), since only a timber job is made on it. An order
+for one cannot be called off (2.10). One sentence a class in the catalogue's voice, from the
+picture: an open gantry over a table of consoles and clamps, one head, loaded by hand; a closed
+cabin with sliding doors, a carousel of tools and automatic clamps; fully automatic, with
+loading and unloading tables and two heads.
+
+**2.7 The spraying robot [PIOTR, 04.10: "the same spray booth at first and later a robot arm
+that sprays by itself"].** A family `sprayRobot`, name `Spraying robot`, folder `Spraying
+robots`, tab `spraying`, category `machine`, one class, 2 x 1 x 2.25 m in a zone of 3 by 2, price
+120,000 [TUNE: chat], delivery 30 working days, power 8 a day, `requires: ['sprayBooth']`.
+
+What it does [TUNE: chat]. While the hall has a robot that stands, is not broken and is not away
+for its service, the Finishing done at a booth goes `SPRAY_ROBOT_FINISH_FACTOR` 2 times as fast.
+It is the hall's, as the tool changer's five per cent is the hall's: the engine has no way to
+say which booth a man's minute was at, and none is to be invented. So:
+
+- It is written once, in `stageSpeed`, where the bench is doubled behind a CNC. The plan, the
+  board's days, the Work Plan and the deadline then see it. It is NOT written into the two
+  production minutes the way wet air is.
+- One robot is enough, and a second would do nothing: `canBuy` refuses a second with `The hall
+  has its spraying robot`.
+- It speeds the Finishing of a lacquered sheet job too (about eight per cent on the whole job).
+  That is meant, and it is the one thing of tonight a sheet job can feel.
+- It has no places and no man stands at it: no row in `MACHINE_CAPACITY`. Its dust is nought (a
+  row of nought in `DUST_OUTPUT_M3_PER_HOUR`, which a test asks of every machine family), it
+  asks for no extraction and no air of its own. It is carried in, not unloaded as heavy kit.
+- Its card says what it does in one line of its own, from the constant, in place of the Output
+  line a machine's card has: `The Finishing at the booth goes 2 times as fast`. It has no line
+  on the Output sheet, where the loop over the machine families would give it `best in the
+  hall` at nought, and no row in `machineSavings`.
+- Nobody stands at it, so no hours are booked to it and its life does not run down; it is
+  serviced by the calendar as every machine is. Known and left tonight [TUNE].
+- Wet air does to the Finishing what it does today, and the night the lacquer dries stands as
+  it stands: the robot brings that night forward and never removes it.
+- With no booth that runs it does nothing.
+
+**2.8 The line engineer [PIOTR, 05.10: "one or two engineers at 15k a month, depending on the
+size of the line"].** A new `WorkerRole`, `lineEngineer`: label `Line engineer`, one grade (no
+tier), 15,000 a month [PIOTR], no reputation asked, duties `Keeps the production line running.
+One keeps up to three modules, two keep all five.` [TUNE: chat: where the second begins].
+
+- Hired on the Workshop tab, by the hire tile every role has.
+- Two refusals of his own, in `hiringOptions` with the others: `The company has no production
+  line` while no module stands and none is on order; `Two engineers keep the whole line` once
+  two are on the books. Then the bank's line as for anybody.
+- He builds nothing, takes no task and no job, needs no bench, locker or tools, and is not
+  counted in the crew: all of that follows from the lists he is not on.
+- He is not one of the men the production manager carries. They are counted twice, by
+  `menCarried` (`src/engine/staff.ts`) and by `carriedBy` (`src/engine/usage.ts`, for Our
+  team), and both pass over him.
+- He is never drawn on the hall: no figure exists for him, as none exists for the office. Who
+  is drawn is decided by `NEVER_ON_THE_HALL` (`src/engine/staff.ts`), and he goes on it.
+- His eight hours a day are in the hours the company pays for, as everybody's on the books
+  are, so the month's `real work out of paid for` reads lower for a company with a line; and
+  he is a head for the liability premium. Both are meant and neither is touched.
+- He is never called idle. Wherever the game would say a man with nothing in his hands is
+  standing (the mark over a man, the line under his name, `free` on his card, `standing most of
+  the week` on Our team), an engineer on duty in a company with a module that stands is `at the
+  line`, and his week is a full week.
+- On Our team his tile has a sentence of its own, as the manager's has: `The line runs as 3 of
+  its 5 modules.` A full week would otherwise print `Near full. More work of this kind wants a
+  second man.` for him, which asks for a man the game may refuse.
+- "On duty" is on the books today: started, and not absent. It holds for the second shift too:
+  the line runs at night under the engineers of the day.
+- The tables the compiler forces (`ROLE_WORDS`, `ROLE_WORDS_MANY`, `NOBODY_WORDS`,
+  `TRADE_OF_ROLE`) and the lists that decide silently (`USAGE_TRADES`, so that Our team has his
+  tile; `CHARACTER_ROLES`, the Sprite check page's list of every role, where he stands as the
+  capsule the office's three stand as; `NEVER_ON_THE_HALL`) each get him; the tests that pin
+  the set of roles, the Workshop tab's candidates and the roles with no figure are flipped, by
+  name, in the report.
+
+**2.9 The production line [PIOTR, 04.10: "a production line through the whole hall, no spraying,
+in five stages from 1.5 million to 5 million; it is extended, not replaced; the first is small
+and needs a five axis CNC and a press beside it; the later ones stop needing the CNC, then the
+sander, and so on; at each stage output goes up by a percentage, and the same percentage idea
+for materials and labour"; 05.10: "work it out and propose"].**
+
+*2.9.1 Five modules.* Five families of one class each, category `machine`, each 6 x 3 x 2.5 m,
+its zone its footprint and not a cell more (the pictures butt end to end), in a new tab `line`,
+label `Production line`, after `CNC centre` [TUNE: chat: a twelfth tab beside the eleven Piotr
+named; the test that pins the eleven, and its title, are flipped].
+
+| Family | Name | Folder | Price | Line so far | What it is, and the stage it does |
 |---|---|---|---|---|---|
-| crossCut | 2 x 1 x 1.25 | 3 x 1 x 1.25 | 4 x 1 x 1.5 | 5 x 1 x 1.75 | 7 x 2 x 2 |
-| planer | 3 x 1 x 1.5 | 3 x 1 x 1.5 | 4 x 1 x 1.5 | 5 x 1 x 1.75 | 6 x 2 x 2 |
-| sander | 2 x 1 x 1 | 2 x 1 x 1.25 | 2 x 1 x 1.5 | 3 x 2 x 1.75 | 6 x 2 x 2 |
-| framePress | 2 x 1 x 1 | 3 x 1 x 1.25 | 3 x 1 x 2.25 | 4 x 1 x 2.5 | 5 x 2 x 2.75 |
-| glueTable | one class, `standard`: 3 x 1 x 1 | | | | |
+| `windowLine1` | Window line, module 1 | Line module 1 | 1,500,000 | 1,500,000 | Infeed and planing: the Cross cutting and the Planing |
+| `windowLine2` | Window line, module 2 | Line module 2 | 750,000 | 2,250,000 | A CNC with two heads in the line: the Moulding |
+| `windowLine3` | Window line, module 3 | Line module 3 | 750,000 | 3,000,000 | Through feed sanding: the Sanding |
+| `windowLine4` | Window line, module 4 | Line module 4 | 1,000,000 | 4,000,000 | A press and frame assembly: the Pressing |
+| `windowLine5` | Window line, module 5 | Line module 5 | 1,000,000 | 5,000,000 | A robot takes the frames off into a buffer: no stage of its own |
 
-The working zone of every class is its footprint and one metre more each way: `width + 1` by
-`depth + 1` [TUNE]. The glue table's is its footprint and a metre on the long side.
+[PIOTR: five stages, 1.5 million to 5 million. TUNE: chat: that the 5 million is what the whole
+line has cost, and how the 3.5 million between is shared.]
 
-Prices, in pounds [PIOTR: "timber machines much dearer"; TUNE: chat: every figure]. The used
-and budget classes are the hand way of doing the job and are cheap on purpose; it is from
-`standard` up that timber costs more than sheet. They are final as written: the twenty per cent
-of v81 is not put on them again.
+Every module is delivered in 30 working days [TUNE: chat], one figure for all five. A module can
+be ordered only once the one before it is ordered (2.9.2), so with equal days none stands before
+the one it follows, and the modules that stand are always an unbroken run from module 1. With a
+shorter wait for the later ones, modules 2 to 5 would stand for days with no module 1.
 
-| Family | used | budget | standard | pro | industrial |
+*2.9.2 Buying a module.* The refusals a module can meet in `canBuy`, in the order they are
+asked:
+
+1. `Needs the 800 m² unit` (2.5.1), straight after the reputation's.
+2. What it `requires`, where every kit's is asked and in the words that has. Module 1 requires
+   a five axis CNC and a frame press [PIOTR]. Module 2 requires module 1, and so on: `Needs
+   Window line, module 1 first`. A thing on order meets a `requires`, as it does for all kit
+   (an order is checked against the hall as it will be once everything on the road has landed),
+   so a company with the money may order all five in one morning.
+3. One of each: a module the company has, or has on order, is refused with `The line has this
+   module`, beside the tool changer's refusal and in its shape.
+4. `Not enough cash`, as for all kit.
+5. Its own piece of floor must be clear. That is asked in place of the question every other
+   machine is asked last: `No free 6 m by 3 m in the hall` is never said of a module. The line
+   stands in one place, chosen by the game: `WINDOW_LINE_ORIGIN` is the cell (5, 14), module N
+   stands at x = 5 + 6 x (N - 1), y = 14, six cells along x and three along y, at orientation
+   0, so the whole line takes the cells x 5 to 34, y 14 to 16, in the half of the hall the
+   second extension added [TUNE: chat: the cells]. `anchorFor` gives a module those cells by a
+   case of its own, before the default anchor is asked. They are NOT written as
+   `STARTING_LAYOUT` slots: `tests/engine/metres.test.ts` stands every slot that is not `yard`
+   on the 200 m² floor. If anything stands on a module's cells or is on order for them, the
+   purchase is refused in the shape the canteen's enlargement has, through `standingOn`: the
+   catalogue's own names as that refusal writes them (`andList`, and `inASentence`, which is
+   private to `src/engine/premises.ts` today) and the module's metres as `metresBy` writes
+   them, `Move the four sided planer and the sheet rack off the line's 6 m by 3 m`; and,
+   while kit is half shifted, `The kit is half shifted. Finish the move first`. Nothing holds
+   the cells of a module not yet bought: the refusal is the hold.
+
+*2.9.3 A module is not ordinary kit.*
+
+- It is never moved and never turned: `canPlace` refuses both, for the module that stands and
+  for the outline of one on order (both branches of that function), with `The line stands where
+  it is built`; its card has no Turn row and setup mode does not drag it.
+- It is built in by the maker's fitters and stands in its place on the morning it is due: it is
+  not heavy kit, there is no unloading task and no picture of it at the gate.
+- It is sold only from the end: a module with a later one standing or on order is refused with
+  `Sell the module after it first`. The last one sells for half its price, as any machine.
+- Men do not walk across it, as they do not walk across any machine's picture.
+- Kit that stands within two metres behind a module can be painted over it, as behind any long
+  machine. That is known: show it in the report if it is seen, and do not mend it tonight.
+
+*2.9.4 How much of the line runs.* `lineModules(state)` is the unbroken run from module 1 of
+modules that stand: 1, 2 and 4 standing are 2. `lineLevel(state)` is what of that run its
+engineers keep today: nothing with no engineer on duty, three modules at the most with one, all
+five with two (2.8). So a line of five with one engineer in runs as a line of three, and a line
+with none stands still: its stages go back to the machines that did them before, if they still
+stand, and by hand if not, exactly as when any machine does not run.
+
+A new line on the warning strip, `lineNeedsEngineer`, directly under `nobodyAssigned` [TUNE]:
+`The line stands still: no engineer on duty`, or `The line runs as three modules: one engineer
+on duty`. It is said only while modules stand that no engineer keeps.
+
+*2.9.5 What a module covers.* While the line runs at level L, the stages of modules 1 to L are
+done on those modules, for timber jobs and timber contract pieces and for nothing else (2.5.3):
+
+| Stage of a timber job | Done on, from level |
+|---|---|
+| Cross cutting, Planing | `windowLine1`, from 1 (it is drawn with no saw: 2.4) |
+| Moulding | `windowLine2`, from 2 (at level 1 it is on the five axis CNC, which module 1 required) |
+| Sanding | `windowLine3`, from 3 |
+| Pressing | `windowLine4`, from 4 |
+| Finishing | the booth, always: the line does not spray [PIOTR] |
+| Glazing | the benches, always |
+
+A covered stage goes at the pace of an industrial machine [TUNE: chat], whatever class of the old
+machine the company has or had, and the Moulding on module 2 at `CNC5_STAGE_FACTOR` times that:
+a module is never slower than the best machine it stands in for. It is written in the one place
+a family's pace is read: `classPaceOf` answers `MACHINE_PACE.industrial` for the module
+families. Their one class is called `standard`, so left to the table a covered stage would run
+at 1.05 and three screens would say so; with the one line in `classPaceOf`, `hallPace`,
+`stageSpeed` and every screen agree.
+
+Modules 1 to 4 each have a row in `MACHINE_CAPACITY` of 33 places [TUNE: chat: the 800 m² unit
+takes 32 joiners and `crewAtFamily` counts the owner with them, so 33 is the whole company: the
+line is never the thing a hall is short of]; module 5 has none. `MACHINE_SHORT_WORDS` gives all
+five the words `line module`. The men of a timber job are drawn at the modules of their plan as
+they are drawn at any machine of it (`TIMBER_FAMILIES`, `STATION_TABLE` the front).
+
+What the line does not take off the hall: the booths. The Finishing is at the booth at every
+level, so every man on timber is still counted against the booths' places, as the game counts
+them today (section 8).
+
+*2.9.6 What the line gives* [PIOTR: "output up by a percentage at each stage"; TUNE: chat: the
+figures, which he asked chat to work out]. While the line runs at level L, every stage of a
+timber job but the Finishing goes `LINE_FACTOR` times as fast, the stages the line does not
+cover among them (below level 4 the stages still at their old machines, and at every level the
+Glazing at the benches): the line is the department's flow, and what it feeds is fed faster. A
+job made by hand uses no machine at any stage and feels none of it.
+
+| Level | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|
-| crossCut | 300 | 2,500 | 8,000 | 24,000 | 60,000 |
-| planer | 6,000 | 14,000 | 28,000 | 60,000 | 120,000 |
-| sander | 400 | 3,000 | 9,000 | 36,000 | 96,000 |
-| framePress | 250 | 1,500 | 7,000 | 24,000 | 72,000 |
-| glueTable | 2,500 | | | | |
+| `LINE_FACTOR` | 1.4 | 1.6 | 1.8 | 2.1 | 2.4 |
+| The same crew's windows, beside a hall with a `pro` five axis CNC, industrial machines elsewhere and no line (chat's arithmetic) | +32% | +46% | +60% | +79% | +97% |
 
-Men at once (`MACHINE_CAPACITY`) [TUNE]. A row here makes the family one the hall can be short
-of (`placeShortages`), and a hall short of places at a planer is slowed as a hall short at the
-saw is, every man in it. That is the game's rule for every family and it is the reason to buy a
-second machine or a better one; it is not changed and not softened for timber.
+It is written once, in `stageSpeed`, on a timber job's stages, so the plan, the board's days,
+the Work Plan, the deadline and a timber contract's piece all read it. The second row is what
+the first comes to on the engine's own sums in that one hall, with nothing else on the minute
+and no family short of places (a `standard` five axis CNC gives +32, +47, +60, +79 and +97, an
+`industrial` one +32, +46, +60, +79 and +96). Assert the first row and print the second in the
+report from the built game, with the figure the built game gives if it differs.
 
-| Family | used | budget | standard | pro | industrial |
-|---|---|---|---|---|---|
-| crossCut | 1 | 1 | 2 | 2 | 3 |
-| planer | 1 | 2 | 2 | 3 | 4 |
-| sander | 1 | 1 | 2 | 3 | 4 |
-| framePress | 1 | 2 | 2 | 3 | 4 |
+*2.9.7 The timber the line saves* [PIOTR: "the same percentage idea for materials"; TUNE: chat].
+The line cuts to a list and wastes less. A timber job taken while the line is N modules long
+(`lineModules`, 2.9.4: the modules that stand, whatever the engineers keep today) is counted
+`LINE_BOARD_SAVING` 3 per cent fewer boards for each of them, 15 per cent with all five.
 
-The glue table is not a row of that table. It does for a frame press what the drying racks do
-for a booth, and by the same line of `placesAt`: each glue table adds `GLUE_TABLE_PLACES` 2 to
-the places of one frame press, one table counted for each press that stands [TUNE]. A glue table
-beyond the number of frame presses that stand is refused, as a drying rack beyond the booths is
-and in that refusal's words. Its catalogue card says what it does; being `storage` it opens no
-card on the hall.
+One function counts a timber job's boards, and `takeEnquiry` and the board tile both read it.
+Today each counts them for itself (`src/engine/jobs.ts`, `src/ui/board.ts`) and a test holds
+the two equal only in a hall with no module. The saving comes off the boards' cost before the
+boards are rounded up, never below one board: `sheetsForCost` of the boards' cost less the
+saving. Nineteen boards with one module are eighteen (3,640 less 3 per cent, over 200, rounded
+up). The job's `materialCost` is not changed and the glass's share is what it was: what is
+saved is the boards that are not ordered. A job already taken is not recounted, and a
+contract's piece is not touched (its timber is the client's, 2.12).
 
-Extraction wanted, cubic metres an hour (`EXTRACTION_DEMAND`) [TUNE]:
+*2.9.8 Its cards, and the sheets that list machines.* Each module's card says, from the
+constants and never in written figures, what it covers and what the line gives with it: `Does
+the Cross cutting and the Planing of windows and doors`, and `With the line this long timber
+work goes 1.4 times as fast, the Finishing excepted`. Module 5, which covers no stage, says
+`Takes the finished frames off the line` for the first. Module 1's says what it needs beside
+it. These lines stand in place of the lines a machine's card has, by a case of its own beside
+the glue table's: a module's card prints no Output, Dust, Life or `Keeps up to N men busy`
+line. What every card prints of its costs (the wait, the power, the insurance, the floor) is
+unchanged.
 
-| Family | used | budget | standard | pro | industrial |
-|---|---|---|---|---|---|
-| crossCut | 600 | 700 | 900 | 1,200 | 1,800 |
-| planer | 2,000 | 2,200 | 2,800 | 3,400 | 4,500 |
-| sander | 0 | 1,200 | 1,500 | 2,200 | 3,500 |
+On the sheets that list machines the line is one thing and never five:
 
-The used sander has a vacuum of its own; the press and the glue table make no dust. Dust made
-(`DUST_OUTPUT_M3_PER_HOUR`): planer 0.5 and sander 0.03, the figures the table's own comment has
-kept for them; crossCut 0.02; framePress 0; glueTable 0 [TUNE]. Air (`AIR_DEMAND`): framePress
-standard 6 bar and 100 litres, pro 7 and 200, industrial 7 and 300; crossCut pro 6 and 100,
-industrial 6 and 200; the rest none [TUNE].
+- The Output sheet has one line for the line, `Production line, 3 modules`, worth `LINE_FACTOR`
+  less one at the level it runs at today, acting on `timber work, the Finishing excepted`, and
+  none for a module (its loop over the machine families would give each `best in the hall`).
+- The top bar's plate (`paceLines`) the same: one line `Production line, 3 modules` with its
+  per cent, and none for a module (each would read `Line module, standard`).
+- A module is not on the Machines page: it has no life to run out and no service to call.
+- A module has no row in `machineSavings` (the Company page's machine hours and the month's
+  end): no hours are booked to kit that is not serviced.
 
-The rest of each family's rows, all [TUNE] and all on the pattern of the thicknesser unless said:
-pace by class is the one ladder every paced family has; `enduranceFactor` 0.25, 1, 1.2, 1.5, 2;
-`MACHINE_ENDURANCE_HOURS` planer 4,000, crossCut 3,000, sander 3,500, framePress 6,000;
-`powerPerDay` 3, 3, 4, 5, 7, and the planer's 4, 5, 7, 10, 14; delivery days by class crossCut
-1, 3, 5, 10, 20, planer 3, 7, 12, 20, 30, sander and framePress 1, 3, 7, 12, 25, glueTable 5;
-`CLASS_LADDER_FAMILIES` gets the four families with classes; `HEAVY_SPECS` gets the planer whole
-and the other three from `standard` up (`LIGHT_CLASSES` holds their `used` and `budget`);
-`MACHINE_SHORT_WORDS`: `cross cut saw`, `planer`, `sander`, `press`, and `machinesWord` gives
-`presses` and not `presss`; category `machine` for the four, and `storage` for the glue table,
-as the drying racks are.
+Say in the report how each reads.
 
-One sentence of description a class, in the catalogue's voice, from what the picture shows:
+**2.10 What the dear kit costs to own.** Category `machine` brings a service at a tenth of the
+price twice a year, a breakdown once a service is due, a repair at a twentieth, a burglar who
+takes the dearest machine first, and a place in the security firm's price, which has no ceiling:
+by the game's rules as they stand, five million of line would cost about 83,000 a month in
+services, 51,000 to 122,000 a month in security, and could be carried off in a night. None of
+that is what Piotr meant by "one or two engineers at 15k a month". So, for the five modules of
+the line and for nothing else [TUNE: chat, all of it]:
 
-- crossCut: a chop saw on a folding stand; a mitre saw on a fixed table with roller tables; a
-  pull saw built into a bench with stops on a rail; an up cut saw in a closed guard with a
-  positioning stop; a computer set optimiser with conveyors in and out.
-- planer: four heads, set by hand, second hand; four heads, new and plain; five heads with a
-  roller feed; six heads in a sound enclosure with readouts; six heads, set by computer, with an
-  automatic infeed.
-- sander: a hand sander at a bench with its own vacuum; a downdraught sanding table; an edge
-  belt sander; a through feed brush and belt sander; an automatic sanding line that takes a
-  whole frame in and out.
-- framePress: a bench with a handful of sash cramps; a cramping table with long cramps fitted;
-  a hand frame press; a hydraulic frame press; an automatic window press with rollers in and out.
-- glueTable: a glue table with a roller spreader.
+- **Kept by its engineers.** A module is not serviced, has no life in hours and never breaks
+  down. Two lines make that true and both are needed: `isServiced` is false of it, and
+  `overdueBreakdownChance` is nought for it, as it is for the central systems. `isServiced`
+  alone keeps it out of the day's roll only: the night's roll (`rollNightBreakdowns`) asks
+  nothing but that chance of every machine a second shift man stood at, and for kit that is
+  never serviced a service reads as due for ever once 180 days have passed. The hall's
+  `(service due)` under a name asks `isServiced` too, as the Machines page does. That one line
+  also takes a false `(service due)` off every bench, rack and tool cabinet older than 180
+  days, which carry it on v83: meant, and the one thing of this section other kit feels.
+  This is what the engineers are paid for, and without them the line does not run at all
+  (2.9.4).
+- **Not carried off.** A module is never a burglar's target (`burglaryTargets`).
+- **Not in the security firm's price.** The firm's price reads the insured value less the
+  modules. The Security page's sentence that shows the sum says so in one clause, only for a
+  company that has a module: `the production line is not in it`.
+- **Insured like everything.** A module is in the insured value and so in the property cover's
+  premium at the game's own rate: about 5,000 a month for module 1 and 16,700 for all five, in
+  the 800 m² unit. Not changed.
+- **Power** 60 a day a module [TUNE], every day as for any machine.
+- **Extraction of its own**, as the booth has: no row in `EXTRACTION_DEMAND`, a row of nought
+  in `DUST_OUTPUT_M3_PER_HOUR` (a test asks one of every machine family), no port, no air,
+  nothing into the hall's bags.
+- **Built to order.** An order for a module cannot be called off: `Built to order: it cannot
+  be called off`, in place of the refund. The same for the five axis CNC. Today any order is
+  refunded in full until the lorry comes, and the tax takes a quarter of the cash on
+  30 December: a million and a half ordered before Christmas and called off in January would
+  save 375,000 of tax for nothing. The same hole is open for every other machine and is NOT
+  closed tonight (section 8); say so in the report.
 
-`STATION_TABLE`: the operator stands at the long side that faces the camera in view 0, the
-`front` side, as the spindle moulder's row has it. `PORTS`: one line a picture file, `.r` among
-them, for every class that wants extraction, measured off the picture as v56 measured the CNC's;
-the Sprite check page shows a
-red line for any that is missing and must show none. `machineFx`: nothing new.
+So the line of five costs, a month, in the 800 m² unit: two engineers 30,000, power about
+9,000, the property cover about 16,700 if the company holds it. Print the built game's own
+figures for each level in the report.
 
-**2.5 The cutter sets [TUNE: chat; Piotr said "ok" to the idea, not to a figure].** A spindle
-moulder cuts a profile with the cutters it is given, and each kind of product has its own set.
-Three single class families, tab `timberMachines`, category `tools`, kept as a hand tool set is
-kept: no cell of the floor, nothing drawn on the hall, and, like a hand tool set, never sold.
-They ask for no cabinet and no slot, so the line that says `Kept in a tool cabinet` of kit with
-no zone reads `Kept at the spindle moulders` for these three (the catalogue's card and the
-Sprite check's row).
+The five axis CNC and the robot are ordinary machines in every one of these respects: serviced,
+repaired, insured, in the firm's price and a burglar's target, like the CNC. The one exception
+is the five axis CNC's order, which cannot be called off.
 
-| Family id | Name | Folder | Price | Delivery days |
+**2.11 The timber stores [PIOTR, 05.10: sent with "you have it in the zip"; TUNE: chat: what
+they do, which he has not said].** Boards are kept on a timber store and never on a sheet rack.
+
+*2.11.1 Two families*, category `storage`, tab `storage`, one class each.
+
+| | `timberRack` | `timberShelter` |
+|---|---|---|
+| Name, folder | Timber rack, Timber racks | Timber shelter, Timber shelters |
+| Metres | 4 x 1 x 2.5, zone 4 by 2 | 3 x 6 x 3, zone its footprint |
+| Where | on the hall floor, placed like a rack | outside on the apron, placed by the game |
+| Boards it holds (`boardCapacity`, a field of its own) | 40 | 400 |
+| Price | 1,200 | 18,000 |
+| Delivery, working days | 3 | 15 |
+
+A store is never given a `sheetCapacity`: that would make it a sheet rack everywhere. A spec key
+called `capacity` is forbidden by a test; `boardCapacity` is not.
+
+The shelter stands on the apron as the van does (`STARTING_LAYOUT`, `yard: true`, its first cell
+x 0, y 1 of the apron), found a place by `apronPlaceFor` and refused with `No room on the apron`
+when there is none. Like all kit outside it takes no cell of the hall, is never moved or turned,
+and asks no free floor. It is not heavy kit: it is put up where it stands.
+
+`canPlace` refuses the outline of kit on order that stands outside as it refuses the kit itself,
+with `It stands in the yard`. Today only the branch for kit that stands refuses, the outline of
+everything on the apron is drawn with the drag hook, and the shelter is fifteen working days on
+order: its outline could be dragged into the hall. The same line closes it for a van on order.
+
+*2.11.2 One counter, two kinds of storage.* The engine keeps one figure for sheets and boards
+(`state.stock.sheets`), and it keeps it tonight: no second counter, no second stock. A board is
+never free stock; it is always a timber job's own, ordered for it and held for it. So the boards
+in the workshop are what the timber jobs hold (`job.timber` and its `sheetsReserved`), and
+everything else in the counter is sheets. From that one reading:
+
+- **Room.** The sheet racks hold the sheets and the timber stores hold the boards. A delivery
+  for a timber job is unloaded onto the stores and needs room there. A delivery of sheets needs
+  a rack, as today, and the racks' room is counted without the boards. `canUnload`, `stockFree`
+  and `unloadIntoStock` ask by the delivery's kind. (`canUnload` is asked without the delivery
+  in three places today: where the tasks are handed out, the owner's own start, and the lorry's
+  card.) A delivery says whether it is boards (an optional mark set when it is made for a
+  timber job, so a save's deliveries need no lift; one without the mark is read from its job).
+- **Boards come off the lorry whole or not at all, and never go to the paid store** [TUNE:
+  chat]. A load of sheets that does not fit leaves its overflow in the paid store for the
+  night, while the job it was ordered for holds the whole of it from the unloading. For boards
+  that would put the counter and the jobs' holdings apart by the overflow until the morning's
+  fetch, and every reading of this section wrong by that much. So boards are unloaded only
+  while the timber stores have room for the whole load. Until then the task is not handed out
+  and the lorry stands at the gate. Once it is unloaded the whole load is on the counter and
+  held for its job, and `moveOverflowToStorage` is never reached for boards. (Two loads begun
+  in the same hour may leave a store over its figure until a job draws: the plate then says
+  so, as a rack's does.)
+- **A load that cannot come in is never silent** [TUNE: chat]. Today it is, wherever a labourer
+  is on duty: the lorry's card is not raised for a load whose unloading is the labourer's
+  (`unloadIsNotTheOwners`), at arrival or on a click on the pallet, and the owner's row says
+  `Waiting for the labourer`, because `startTaskCheck` asks that before the room. A company
+  with timber keeps a labourer. So from tonight, for boards and by the same lines for sheets
+  with no rack: the card of a load that cannot be unloaded is raised at arrival and on the
+  click whoever unloads; `startTaskCheck` asks the room before the labourer, so the row says
+  `Nowhere to put it`; and the strip carries a line while a load of boards stands at the gate
+  for want of room, `boardsAtTheGate`, directly under `glassNotOrdered`, the first of them by
+  its job: `Boards at the gate, no timber store: Sash windows for Mrs Patel`, or `Boards at the
+  gate, no room on the stores: Sash windows for Mrs Patel`. The pallet drawn at the gate is the
+  first waiting load that can be unloaded, and the first waiting load when none can: today it
+  is always the first, and a load that waits for days would keep its hook from every load
+  behind it.
+- **The lorry's card**, in the shape it has for sheets. With room: `19 boards have arrived.
+  Nothing can be made until they are inside.` With no timber store: `19 boards have arrived and
+  there is no timber store to put them on. Buy one from the catalogue.` With the stores too
+  full: `19 boards have arrived and the timber stores have room for 16. They wait at the gate
+  until a job uses its boards or another store is bought.` The last two carry the one choice
+  the card has today with no rack, `Leave it at the gate`.
+- **The plates and the page.** A sheet rack's plate and the Materials page's sheet line count
+  sheets only. Each timber store's plate carries the boards on it, spread over the stores in
+  the order they were bought as `sheetsOnRack` spreads sheets. The Materials page has one row
+  more, in the rows it has, `Timber boards`, held and room.
+- **The word.** Where a count of boards is printed with the word `sheets` today it says
+  `boards`: the task `Unload 19 boards`, the pallet's `Delivery: 19 boards`, the ledger's
+  `Order cancelled: 19 boards`, the Orders list's `19 boards`, a timber job's and a timber
+  delivery's rows on the Materials page, the job card's count and the board tile's `19 boards
+  of material`. Two more readings of the counter count sheets only from tonight: the Low stock
+  card (`N sheets left of M`, which prints the whole counter today) and the mark over a
+  contract man waiting for sheets (`held by jobs`, which sums every job's holding). The day
+  summary's line for tomorrow's lorries is built from bare numbers kept in the day's record
+  and goes on saying `sheets`: known, left tonight, and on the report's list. The paid store's
+  own three lines (`Temporary storage for`, `Fetch N sheets from storage`, `are in paid
+  storage`) stay as they are: no board goes there from tonight.
+- **A job that is dropped.** Its boards are written off and leave the workshop: off the counter
+  when the job goes, and every delivery of the job that is not yet unloaded, on the road or at
+  the gate, is removed with its unloading task. The books already write the material off
+  (`Material written off`); what changes is the boards themselves. Today the boards a job held
+  stay behind as free sheets of MFC, which they never were, and a load at the gate loses its
+  task with the job and stands there for ever with the pallet's hook.
+- **Selling.** A timber store with boards on it is not sold: `Empty it first, 12 boards on it`,
+  the rack's own refusal. A sheet rack's refusal counts sheets only.
+- **The walk.** An unloading has one station today, the rack, which the hall resolves to the
+  first sheet rack in every place that draws or walks the man. The man who unloads boards
+  walks to a timber rack: a second station, given by `unloadStation` from the delivery's kind
+  and resolved to the first timber rack on the floor. With a shelter and no rack he stays at
+  the gate: nobody is walked out onto the apron tonight.
+- **What does not change.** How many boards a job needs (but for 2.9.7), how they are ordered
+  and paid, the day they come, how the job draws them, the insurer's reading of the stock and
+  the burglar's (he takes free sheets, and a board is never free). The oak dining table, which
+  is solid wood and not a timber job, is on the racks as it is today.
+
+*2.11.3 The board asks for a store.* The five products ask for a timber store as they ask for a
+machine: either family satisfies it (2.5.4's table: each stands in for the other), standing and
+nothing less. It is the last name of the wanted list and is written `timber store`, in the form
+the list has (lower case, no article, commas). A live tile without one is locked with `Needs
+timber store` or, with a planer missing as well, `Needs four sided planer, timber store`; a
+greyed one says `no timber store`, or `no four sided planer, timber store`. The tile's `Needs`
+line prints what it prints today and `timber store` after it.
+
+And the stores must be able to hold the job [TUNE: chat]. A load comes in whole (2.11.2), a big
+commercial job's boards are more than two racks hold, and a job whose boards the company's
+stores could not take even when empty would stand at the gate until another store was bought
+and had come. So an enquiry is not taken while its boards (the one count of 2.9.7) are more
+than the timber stores that stand hold between them. It is asked of the enquiry, in `canAccept`,
+beside the big job's question of the crew and in its shape: a line of its own on the tile, in
+the classes that line has, red, printed only while it is true, `113 boards, and the timber
+stores hold 40`, and no Accept while it stands.
+
+*2.11.4 A save.* Nothing a save holds is lost and nothing is moved by a lift: its timber jobs
+hold their boards, the stores' plates show them from the first minute whether or not there is a
+store or room on it, and it is the next delivery that needs the room. A timber job whose boards
+are already in is finished without a store. One whose boards are still on the lorry or at the
+gate needs a store before they can come in, like every load of boards from tonight, and the
+card and the strip say so. Boards that a v41 save has in the paid store come back when the
+fetch is done, as they do today; until then the plates read high by them, and a count of sheets
+is never printed below nought. Known, and left. The board asks for the store at the next
+enquiry.
+
+**2.12 Windows and doors as standing contracts [PIOTR, 05.10: "are we doing something like
+standing orders for windows and doors?"; TUNE: chat: everything below].**
+
+*2.12.1 Three pieces*, appended to `CONTRACT_PIECES` after the three there are, in this order.
+`ContractPieceSpec` gets an optional mark, `timber: true`. Its `stages` is a required field,
+read in four places of `contracts.ts` and printed by the tile: for these three it is the seven
+ids of `TIMBER_STAGES`, in its order.
+
+| id | name | minutes | material | sheets |
 |---|---|---|---|---|
-| `cuttersSash` | Sash window cutter set | Sash cutters | 4,000 | 5 |
-| `cuttersCasement` | Casement window cutter set | Casement cutters | 3,000 | 5 |
-| `cuttersDoor` | Door cutter set | Door cutters | 5,000 | 5 |
+| `casementWindow` | Casement window | 150 | 0 | 0 |
+| `sashWindow` | Sash window | 190 | 0 | 0 |
+| `frenchDoor` | French door | 180 | 0 | 0 |
 
-Effect line: `The profile cutters for sash windows. Without the set the workshop cannot take
-them.` and its like. One set serves every moulder the company has. No picture of them exists:
-the catalogue shows the empty picture box it shows for any file that is missing, and
-`docs/art/REQUESTS-T28.md` asks the art side for three.
+*2.12.2 The client sends the timber and the glass.* A window company or a builder gives the
+making out and supplies the material, which is how such work is given out: nothing comes off the
+racks or the stores, nothing is ordered, the piece's price is the making alone. That is the
+table's two noughts, and it is the path the engine already has for a piece with no sheets. No
+glass is ordered and no night is stood on a contract. A contract is the plain way of making
+windows: the making alone, nothing to order, no night to wait, and four men at the most. A job
+is the whole of it.
 
-**2.6 Five products.** Five `ProductTemplate`s, material `solidWood`, `allowedFinishes`
-`['lacquer']` and nothing else, `needsMeasure` true, `byHandAllowed` false, and one new field,
-`cutters`, the family id of the set the product wants (`null` on every template the game has).
+*2.12.3 A timber piece is made as a timber job is made.* Today a piece is worked at the pace of
+its first stage only, its men are counted against that one family, drawn at the sheet machines
+and worn on one machine. For a piece with the mark, and for no other:
 
-| id | name | basePrice | cutters | minReputation | weightsByTier |
-|---|---|---|---|---|---|
-| `casementWindows` | Casement windows | 9,000 | `cuttersCasement` | 25 | [0, 0, 12] |
-| `sashWindows` | Sash windows | 14,000 | `cuttersSash` | 30 | [0, 0, 10] |
-| `frenchDoors` | French doors | 6,000 | `cuttersDoor` | 25 | [0, 0, 10] |
-| `patioDoors` | Patio doors | 10,000 | `cuttersDoor` | 30 | [0, 0, 8] |
-| `bifoldDoors` | Bifold doors | 18,000 | `cuttersDoor` | 35 | [0, 0, 6] |
+- its minute is the one pace of the whole timber plan as the hall stands: `jobPace` of a timber
+  `StagedJob` of labour value 1, so every machine of the department, the five axis CNC, the
+  robot and the line all show in it as they show in a job. The labour value matters: all six
+  sites build their job with a labour value of 0 today, a plan's stages are as wide as the
+  labour value, `jobPace` passes over a stage of no width, and the pace of an empty job is 1 in
+  every hall, with no machine in it at all;
+- its men count against every family of that plan, as a timber job's men do (`crewAtFamily`),
+  and the hall line of its offer (2.3) reckons the places short at every family of the plan;
+- its men go round the families of that plan and are drawn at them (`contractRoundOf`,
+  `drawnPlaces`);
+- the wear the card and the closing report figure is spread over the plan's stages by their
+  shares (`TIMBER_STAGES`), not read as nought. `pieceMachineShare` is where it is nought
+  today: it reads the shares off `PRODUCTION_STAGES`, which has no timber stage;
+- `contractMachineTip`, one of the six sites, tips the one machine that would shorten a piece's
+  first stage and has no rule for a plan of seven families: for a timber piece it answers
+  null, and no tip is printed.
 
-[PIOTR: the five products and that they pay better. TUNE: chat: every figure; `calls` as the
-kitchen of nearest price has it.] The size multiplier, the express uplift, the commercial budget,
-the client's answer, the deposit, the forty, forty and twenty of the price: all as every job has
-them. A timber job's material is never bespoke.
+Wherever `contracts.ts` builds `stagedJob(0, 'sheet', false)` (six places) it asks the piece
+which kind it is. A sheet piece is worked, counted, drawn and worn exactly as on v83.
 
-`requiredEquipment` of all five: `crossCut`, `planer`, `spindleMoulder`, `sander`, `framePress`
-and `sprayBooth` (the lacquered kitchen has the booth in its list too: it is the list that locks
-a live enquiry). The cutters are kit the enquiry needs exactly as a machine is:
-`missingEquipment` and `lockReasonFor` count the template's `cutters`, so a live tile without
-the set is locked and a greyed one says why. These five are not held to `SOLID_WOOD_EQUIPMENT`:
-its branch in `kitBlockFor` and in `lockReasonFor` is passed over for a template with `cutters`,
-and the thicknesser is not asked of them [TUNE: chat]. What a company in the 800 m² hall is
-short of is said in the order `kitBlockFor` already has: the reputation; the spray booth; the
-machines by name (`no cross cut saw, four sided planer`); the cutters among them (`no sash
-window cutter set`, link to the catalogue); and then `blockFor`'s hands against the deadline.
+*2.12.4 The offer.* Timber pieces are offered only to a company in the 800 m² unit
+(`timberOnTheBoard`). The draw must not move for anybody else: `drawContract` picks from the
+first three pieces below the 800 m² unit and from all six in it. Its `pick` is one draw
+whatever the length of the list, so a company in a smaller unit draws the same piece from the
+same stream as on v83. Two tests count `CONTRACT_PIECES` and are flipped to the three sheet
+pieces: `tests/engine/contracts.test.ts` (200 seeded games in the 200 m² unit must draw every
+piece) and `tests/engine/contractPrices.test.ts` (`toHaveLength(3)`).
 
-**2.7 How a timber job is made.** From here to 2.10 "a timber job" is a job of one of the five
-templates of 2.6, the ones with `cutters`, and nothing else. `Job` and `StagedJob` carry a mark
-for it. The oak dining table is `solidWood` too and is NOT one: in a save (the day 149 fixture
-has one in production) and in every test it keeps the four stage plan, the deadline and the
-material it has today, stands no night and has no glass.
+Like every contract, a timber contract asks for no machine, no cutters and no store [PIOTR,
+03.10: "standing contracts stay as they are"]: without the machines its men work by hand at the
+by hand pace, and make little at it. One offer at a time, three contracts at once, the weekly
+ring, the term, the short week and the renewal are shared with the sheet pieces and unchanged.
 
-A timber job has a plan of its own in `stagesOf`, and four new `StageId`s. The model is the one
-every job has: all its men at one pace, every minute booked onto the bar's stage in the plan's
-order.
+*2.12.5 The price and the minutes.* By `contractPriceFor`, as for every piece: the experienced
+man at the standard class, a day's 200 of margin over the whole pieces he makes in a day. For a
+timber piece the reference pace is the timber plan's with every family of the plan at its
+standard class, the booth and the bench among them (1.05 throughout: no five axis CNC, no
+robot, no line), and the reference machine for the wear is the standard four sided planer
+[TUNE]. With the experienced man that is 179, 226 and 214 minutes a piece, two a day each, and
+still two a day if the bench and the booth are read at 1.00 (188, 238 and 225). Assert two a
+day for each at the reference. The quantity a week comes off the same bands through
+`quantityForPiece`. Print the three reference prices in the report.
 
-| Order | Stage id | Label | Share | Family |
-|---|---|---|---|---|
-| 1 | `crossCutting` | Cross cutting | 0.08 | `crossCut` |
-| 2 | `planing` | Planing | 0.12 | `planer` |
-| 3 | `moulding` | Moulding | 0.25 | `spindleMoulder` |
-| 4 | `pressing` | Pressing | 0.15 | `framePress` |
-| 5 | `sanding` | Sanding | 0.12 | `sander` |
-| 6 | `finishing` | Finishing | 0.13 | `sprayBooth` |
-| 7 | `assembly` | Glazing | 0.15 | `workbench` |
+Why the pieces are half a day and no longer [TUNE: chat]. The cards count a contract by the day,
+in whole pieces (`resultAtSpeed`, `contractMenNeeded`, `weekPace`): a man whose piece takes
+more than his day reads no piece a day, nothing a day, a week or a term, and `short` all week,
+while in the hall he goes on finishing them. That arithmetic is v83's and is not changed
+tonight. At these minutes the slowest man the game has, a novice working by hand, still
+finishes each in a day (375, 475 and 450 minutes), so no card of a timber piece reads nought.
 
-[TUNE: chat: every share; they sum to one.] The seventh is the stage the game has, at the
-benches, and on a timber job its label is `Glazing` and its doing word `glazing`: the glass goes
-in and the ironmongery on. `stageLabel` and `stageDoing` are asked with the job so that they can
-say so (the person card prints both). `stageDone` lists the stage ids by hand: the four new ones
-join it, or labour in their bags is counted twice.
-A timber job is never put on the CNC (`jobOnCnc`). The speed of a stage is its family's pace as
-for every stage; with the family's machines all broken or away, the four new stages go by hand
-at the rate cutting, edging and moulding go by hand today. The thicknesser has no stage, as it
-has none today.
+*2.12.6 The words.* A contract's name is the piece's plural written out and not `name + 's'`,
+which made `Drawer boxs` in Piotr's own save: `Drawer boxes`, `Sash windows`, `French doors`
+(`pluralOf` is in `src/engine/text.ts`). Names already in a save stay. On a timber piece's tile
+and cards the sheet words are not printed:
 
-Where the men are drawn. Since v66 every working man is drawn going round every machine that
-has a row in `MACHINE_CAPACITY`, whatever his job (`workSpots`, `drawnPlaces`), and four new rows
-would send kitchen men to the planer. So: the four new families are spots only for a man on a
-timber job, and a man on a timber job is drawn only at the families of his own plan. Every other
-man, the men of a standing contract among them, is drawn exactly as today over the spots that
-are not the four new families. Standing contracts are sheet work and are not touched.
+- the tile's line (`pieceLine`) reads `150 minutes of work a piece on the timber machines. The
+  client sends the timber and the glass: nothing comes off your racks.` No raw stage ids, no
+  `£0 of material in it` clause and no `It comes off the rack` sentence;
+- the offer card has no `Material a piece, from stock` row, and its wear row reads `Machine
+  wear a piece, the timber machines`, or `by hand` as today when the hall has none of them;
+- `The timber machines stay in the general queue: better ones make more pieces without a
+  click` for the saw's sentence.
 
-The thicknesser's catalogue sentence promises it a stage "with the timber branch". It gets none
-tonight (section 8): cut that clause and leave the rest of its card.
+### D. The logo
 
-**2.8 Two nights [PIOTR: "a bit more complicated"; TUNE: chat: the rule].** Glue cures and
-lacquer dries, and nothing can be done to a frame meanwhile. When the bar of a timber job fills
-its `pressing` stage, and again when it fills `finishing`, the job stands until the next working
-day opens. While it stands it is stopped by `hallStops` with the reason `glue curing` or `lacquer
-drying`, and it is a hall stop like the one for want of a booth in every respect: the minutes
-are booked as `hallStopped`, the reason is on the Work Plan's row and on the job card through
-`blockedBy`, its men stay on the job, are not moved by the engine and wear no bubble, and the
-`No material` card is not raised. The player, or his manager, puts them on other work for the
-rest of the day or leaves them standing: that is the difficulty, and no new rule is written for
-them. The stand is a day on the job (`job.curing`: the reason
-and the day it ends), never a timer of minutes.
+**2.13 The logo [PIOTR, 04.10: "the logo everywhere"; 05.10: "do the logo too"].** Piotr's pack
+(`Woodwork-Empire-Tycoon-Logo-FINAL.zip`) was not in chat's hands when this was written. If the
+folder `docs/logo-incoming/` exists on main with files in it, he has put the pack there: do this
+section, last of all. If it does not exist or is empty, skip the section whole, touch none of
+the four places, and say so first in section 0 of the report.
 
-- The stand is over when the day it names opens, whatever the men do in between; a closure or a
-  weekend in between is more than enough and adds nothing.
-- The Work Plan's projection of a timber job (`rowFor`, its bar and its latest start) counts one
-  working day for each night it has not yet stood.
-- The drying racks do nothing for it, and wet air is what it is for any lacquer job [TUNE].
-- A sheet job, lacquered or not, never stands. Only `solidWood`.
+With the pack: read what is in it (its own README if it has one) and choose the files; no agent
+redraws, recolours or trims a logo, and scaling a copy down for the web is all that is done.
 
-**2.9 The glass [PIOTR: "a bit more complicated"; TUNE: chat: the rule and the figures].** A
-window's glass is made to size by a glazier and cannot be ordered before the drawing says the
-sizes. It takes `GLASS_DELIVERY_WORKING_DAYS` 10.
+1. The files go under `public/brand/`, served at `/brand/...`; the folder `docs/logo-incoming/`
+   is deleted once they are there. A big file gets a smaller copy for the page (WebP if the
+   session can make one, PNG if not), and the report says what size was served.
+2. The start screen: the logo in place of the words of `<h1>Woodwork Empire</h1>`, its `alt`
+   those words; the sketch of the unit under it stays where it is, and nothing else of the
+   screen moves [TUNE: chat: Piotr was shown two variants on 04.10 and has not chosen; this is
+   the one in which nothing disappears].
+3. The menu: the logo, small, as the first thing under the cross.
+4. The page's head: a `<link rel="icon">` from the pack's mark, the title `Woodwork Empire
+   Tycoon`, and the tags a pasted link shows a picture by (`og:title`, `og:image`).
 
-- Of a timber job's material cost, `GLASS_SHARE` 0.35 is glass and ironmongery and the rest is
-  boards. The boards are ordered, delivered, unloaded onto a rack and drawn exactly as the oak
-  table's would be: `sheetsForCost` on the boards' share, never fewer than one, paid at the
-  ladder's price for the order as any order is.
-- The job carries its glass: `none` (every sheet job), `toOrder`, `ordered`, `in`, and the day
-  it arrives.
-- It can be ordered once the job's paperwork is done (`paperworkDone`). An office admin on duty
-  orders it the moment she orders the boards (`autoOrderMaterial`). Without her the owner presses
-  `Order glass` on the job card, beside `Order for this job`, a click of the same kind and no
-  minutes of his day.
-- It is paid in full when it is ordered, one ledger entry, the category the boards are booked
-  under, label `Glass for <job>`, through the overdraft as the boards are.
-- It arrives at the open of its day. No lorry, no unloading, no rack, no card: the glazier
-  carries it to the benches. The job card says `Glass ordered, here on Thu 12 March` and then
-  `Glass is in`.
-- Production starts without it. When the bar reaches `Glazing` and the glass is not in, the job
-  is stopped with `waiting for glass`, a hall stop of the same kind as 2.8's and treated the
-  same.
-- A job dropped after its glass was ordered loses that money as it loses its boards.
-- A new line on the warning strip, `glassNotOrdered`: `Glass not ordered: Sash windows`, for a
-  timber job whose paperwork is done and whose glass is still to order. Its place in
-  `WARNING_ORDER` is directly under `drawingDone` [TUNE].
-
-**2.10 A timber job's deadline [TUNE: chat].** The client knows windows take longer. The
-deadline of a timber enquiry is the deadline every enquiry is given by `deadlineDaysFrom`, the
-express factor in it, and then `TIMBER_LEAD_DAYS` 12 working days on top: the glass's ten and
-the two nights. `blockFor` holds the workshop's hands against the days without the lead. The
-hole chat knows of in a sheet job's deadline (the bespoke material's three days are not in it)
-is not touched tonight.
-
-**2.11 The pictures [PIOTR, 05.10: "put the graphics in as you have them"].** The 42 files are
-in `docs/art/incoming/t28/`, already named as the game names them (`planer.used.png`, and
-`planer.used.r.png` for the art side's 90 view). `git mv` them into `public/sprites/`, run
-`npm run sprites:manifest`, and delete the folder with its JSON once section 12 of
-`docs/art/SPRITES.md` carries the table. They are not on main's `public/sprites/` already
-because two tests pin the count of turned pictures (75; it becomes 96) and main was to stay
-green.
-
-What they are, said plainly in SPRITES.md section 12 and in the report:
-
-- Pack 1, `crossCut` and `planer`, 20 files: rendered from a model by the art side, exact to
-  the contract. Plainer than the September machines; Piotr has seen that and it stays for now.
-- Pack 2, `sander`, 10 files: as the art side delivered them.
-- Pack 2, `framePress` and `glueTable`, 12 files: the art side's files were cut wrong (half
-  size, off the anchor, with pieces of the neighbouring machine). Chat cut them again from the
-  preview board Piotr approved, scaled each to its canvas and stood it on its anchor line. They
-  are stand ins: the registration is by eye and not by geometry. `docs/art/REQUESTS-T28.md` asks
-  the art side for the twelve again.
-
-No agent alters a pixel of any of them. If one sits badly on its footprint in the Sprite check
-page, the report shows it and the request names it. SPRITES.md section 2 still says the anchor
-is at the canvas's middle; the code has had it at `8 + w x 48` since 14.09. Put the sentence
-right while section 12 is written.
+No new colour, font or token; a size rule beside `.start-panel` and one beside `.menu-pop` is
+all the stylesheet gets. Mockup first (section 9).
 
 ## 3. How to run this session
 
-One agent, serial, in the order of section 5. No worktrees, no agent teams. A0 first and alone,
-one commit, `npm run check` green on its own exit code. Then the mockups of section 9, then the
-B tasks, then the C tasks, one commit each, then the scenarios, the cross check of section 7, the
-pictures, the report, the PR. If the night runs short, the order of section 5 is the order of
-what matters: stop cleanly at the end of a task, never in the middle of one, and say in section 0
-of the report which tasks were not reached.
+**One writer.** Only the lead agent edits files under `src/` and `tests/`, changes
+STATE_VERSION or APP_VERSION, commits and pushes, and it does the tasks strictly in the order of
+section 5, one at a time. No worktrees and no parallel branches.
+
+**Sub-agents are allowed, under that one rule** [PIOTR, 05.10, as in Turn 28]. They may only do
+work that touches no file another agent is touching: read the repo and report; build the mockups
+of section 9 under docs/mockups/t29/; measure the extraction ports off the new pictures and hand
+the numbers to the lead; draft test cases for the lead to add; review each finished task's diff
+against this brief and section 7 before its commit; write docs/art/REQUESTS-T29.md and
+docs/notes-t29.md. A sub-agent never commits, and never runs `npm test`, `npm run build` or `npm
+run check` while the lead's own check is running (2.0). If a sub-agent's result disagrees with
+this brief, the brief wins.
+
+**Do not stop and do not ask.** Piotr is not watching and nobody will answer a question. Where
+this brief leaves a choice open, take the simplest reading that fits what is already in the
+repo, mark it [TUNE] in the code and list it in the report. The only reasons to stop are the
+brief's own: the first line of CLAUDE.md is not "Turn 29", or APP_VERSION on main is not 'v83'.
+A red test is not a reason to stop the session: handle it as 2.0.1 says.
+
+**Push after every task**, so that nothing is lost if the session ends early. If the session
+runs short: stop cleanly at the end of a task, never in the middle of one, and say first in
+section 0 of the report which tasks were not reached. Section 5 is in the order of what matters
+and is built so that every stopping place is a whole game.
 
 ## 4. State
 
-STATE_VERSION 41, once, in the first task that needs it. A v40 save opens with:
+STATE_VERSION 42, once, in the first task that needs it (B3). A v41 save is at the current
+version today and is loaded with no lift at all, so nothing below happens without the bump. A
+v41 save opens with:
 
-- its pelletiser, if it has one on the floor or on order, behind the wall (2.1);
-- every job with `curing` null and glass `none`;
-- no closure warned of, so that a save loaded between a warning's day and its closure gets the
-  card on the next day's open (the same promise the tax's warning keeps);
-- nothing else changed: no machine, man, price or job of a save is touched.
+- every standing contract's `assigned` cut to the four men put on it first (the list is in the
+  order they were put on), and each man taken off given back to the boss: his contract marker
+  cleared (`worker.jobId`), so that he reads as a man who needs a job and is seen by the lists
+  of free men from the first minute. The player is told once, by an event card that opens at
+  the first settle after the save is loaded, and not the next morning. It is a new kind on
+  `GameEventKind`, `contractsTrimmed`: title `Contracts take four joiners`; body `A standing
+  contract takes four joiners at the most from now on.`, then one sentence a contract, `Taken
+  off Cut sheet packs for Northgate Interiors: Ben and Pete.`, and last `They are waiting for
+  work.`; one choice, `Right`. No lift queues an event today, and the lifts work on raw JSON
+  before the state is whole: let the lift leave what it took off on the save (an optional
+  field) for the first settle to queue through `queueEvent` and clear, or let the lift push a
+  whole event on to `eventQueue` itself, whichever is the smaller. No card for a save in which
+  nobody was taken off. (Turn 26 capped the shop at three contracts with no word to a save over
+  the cap, and v65 had to mend it: this is that lesson.)
+- a glass that is `ordered` with a day later than the next working day brought forward to the
+  next working day;
+- nothing else changed: no job, man, machine, board, price or place of a save is touched. The
+  timber stores need no lift (2.11.4), the new role and the new kit have nothing in an old save.
 
-Every save that loads today loads, the fixtures among them. Say in the report what fields were
-added and where.
+Every save that loads today loads, the fixtures among them. Say in the report what the lift
+does, what fields were added and where, and list the version pins flipped.
 
 ## 5. Task queue, in order
 
-Branch turn-28-timber from main. One commit per task, npm run check green on its own exit code
-before each, two report lines per task in REPORT-T28.md.
+Branch turn-29-the-line from main. One commit per task, npm run check green on its own exit code
+before each, the branch pushed after each, two report lines per task in REPORT-T29.md.
 
-T28-A0 The suite settled on v82 (2.0.1).
-T28-A1 Housekeeping and v83: docs/turn-27-brief.md is already in docs/ (this ZIP put it there),
-this file as CLAUDE.md, the README's lines, APP_VERSION 'v83', the version pins.
-T28-A2 The mockups of section 9 into docs/mockups/t28/ with a README.
-T28-B1 2.1 the pelletiser, and STATE_VERSION 41 with section 4's lift.
-T28-B2 2.2 the closures: the rule, the five things that do not follow, the two cards, the strip
-line. The three test files chat found pinned to the old January (tests/engine/tax.test.ts,
-tests/ui/taxCards.test.ts, tests/scenarios/turn27.test.ts) are re-dated honestly, to the real
-last working day; the test of a working 30 December has lost its premise and is flipped to say
-the 30th is always closed.
-T28-C1 2.11 the pictures in, the manifest, the two counts of turned pictures (75 to 96:
-tests/engine/rotate.test.ts and tests/render/spriteClasses.test.ts), SPRITES.md section 12.
-T28-C2 2.4 the five families, with every side table, the ports and the stations (the third 75
-of spriteClasses.test.ts, `checked`, becomes 96 here).
-T28-C3 2.5 the cutter sets.
-T28-C4 2.6 and 2.10: the five products, their locks and greyed reasons, the deadline. Timber
-stays OFF the board through this task and the next three, so that a night that stops early
-never ships windows made on a table saw.
-T28-C5 2.7 the stages of a timber job.
-T28-C6 2.8 the two nights.
-T28-C7 2.9 the glass.
-T28-C8 2.3 the opening: timber comes onto the board of a company in the 800 m² hall. If the
-night ends before this task, say so first in the report: the machines are in the catalogue and
-no work for them is offered.
-T28-D1 notes (docs/notes-t28.md) and docs/art/REQUESTS-T28.md (the twelve files again; three
-cutter sets; and, for Piotr to decide, the products on the hall: a pack of timber at the gate, a
-trolley of machined parts, a rack of frames drying, a stillage of finished windows).
-T28-D2 scenarios, one line a moved figure, and two new ones. (vv): a company in the 800 m² hall
-with the five families, a spindle moulder, a booth and the sash cutters takes a sash window job
-with no admin; the
-strip says the glass is not ordered; the owner orders it; the job stands a night after pressing
-and a night after finishing, waits for the glass if it is late, is glazed, delivered and paid.
-(ww): a company played from 28 November 2025 to Mon 9 January 2026 gets the break's card on the
-first working day of December after the tax's, works to the 21st, pays its wages that day, is
-closed to the 5th with rent, rates, the draw on weekdays and the tax on the 30th booked, and
-opens on Fri 6 January with the tax's card and then the break's; and the same for August 2026,
-with no closure in August 2025.
-T28-D3 cross check. T28-D4 look and shoot: the pictures of section 7 into docs/report-t28/.
-T28-D5 report (REPORT-T28.md, section 0 first: what was not reached, what is red, section 10's
-list answered or not) and PR titled `Turn 28: the timber department, the holidays, and the
-pelletiser outside`, do not merge, end the session.
+T29-A0 The suite on v83 (2.0.1).
+T29-A1 Housekeeping and v84: docs/turn-28-brief.md is already in docs/ (this ZIP put it there),
+this file as CLAUDE.md, the README's lines, APP_VERSION 'v84', the version pins.
+T29-A2 The mockups of section 9 into docs/mockups/t29/ with a README.
+T29-B1 2.1 the glass and the timber deadline's three days.
+T29-B2 2.2 one cutter set of a kind.
+T29-B3 2.3 four joiners to a contract, with STATE_VERSION 42 and the lift of section 4 (the
+contract crews and the glass on its way).
+T29-C1 2.4 the 22 pictures in, the manifest, the count of turned pictures, SPRITES.md section
+13.
+T29-C2 2.5 and 2.6: the unit a spec names, the ladder of fewer than five classes (with the two
+tests that buy every family into the 200 m² unit, tests/engine/zones.test.ts and
+tests/engine/layout.test.ts, taught to pass over kit that unit refuses for its size), where a
+timber stage is done, who stands in for whom on the board, and the five axis CNC with every
+side table, its ports and its station.
+T29-C3 2.7 the spraying robot.
+T29-C4 2.8 the line engineer. Nobody can hire him until C5 lands the modules: at the end of this
+task his tile stands on the Workshop tab refused with `The company has no production line`,
+which is a whole game. His refusals, his lists and his words are asserted here; hiring him, his
+duty, `at the line`, his tile on Our team and the strip's line are asserted in C5.
+T29-C5 2.9 and 2.10: the five modules, their purchase and their floor, the level, what each
+covers, the factor, the boards saved, the cards, and what the line costs to own. The line is
+bought and runs at the end of this task and not before: do not land a module that can be bought
+and does nothing.
+T29-C6 2.11 the timber stores.
+T29-C7 2.12 windows and doors as standing contracts.
+T29-D1 2.13 the logo, if `docs/logo-incoming/` is there.
+T29-E1 notes (docs/notes-t29.md) and docs/art/REQUESTS-T29.md (anything that sits badly; a saw
+at module 1's infeed; the two timber stores drawn empty; the three cutter sets and the twelve
+stand in pictures of Turn 28 if still wanted; a figure for the line engineer; the products on
+the hall, for Piotr to decide).
+T29-E2 scenarios, one line a moved figure, and five new ones. (xx): a save with seven men on one
+contract opens with four on it, three waiting for work and the card; a fifth man is refused on
+both tabs in the engine's words; a man is taken off a full contract and another put on. (yy): a
+company in the 800 m² unit with the timber kit buys a five axis CNC and a robot; a window's
+Moulding moves to the CNC and its pace is the engine's own sum; with the CNC away for its
+service the Moulding is back at the moulders that day; a lacquered kitchen's Finishing is
+faster and nothing else of it has moved. (zz): the same company orders module 1, is refused
+with a rack standing on its cells, moves the rack, orders, hires an engineer; the module lands
+by itself on its day; the window's Cross cutting and Planing are on it and its pace is the
+engine's sum at level 1; all five and two engineers give level 5; one engineer let go gives
+three modules and the strip's line; none gives a line that stands still and the old machines'
+pace; module 3 is refused for sale while 4 stands. (aaa), played with a labourer on duty: a
+window's boards arrive with no timber store, are refused, and the card and the strip say so;
+with a timber rack they are unloaded onto it and the sheet racks' plates count sheets only; a
+second window's boards that the rack has not room for stand at the gate and come in whole once
+the first has drawn its own; a window dropped with its boards at the gate leaves no load and
+no board behind. (bbb): a company in the 800 m² unit is offered sash windows as a contract,
+takes it with four men, is paid for every window with nothing off the racks, and makes more of
+them a week with the line than without; a company in the 400 m² unit is never offered one and
+its seeded offer is what it was on v83.
+T29-E3 cross check. T29-E4 look and shoot: the pictures of section 7 into docs/report-t29/.
+T29-E5 report (REPORT-T29.md, section 0 first: what was not reached, what is red, whether the
+logo was done, section 10's list with what was built, and the two halls section 8 asks to be
+printed) and PR titled `Turn 29: the production line, the five axis CNC, the timber stores, and
+four to a contract`, do not merge, end the session.
+
+**Tests chat already knows will move.** This brief was checked against v83 before it was sent,
+and these are the tests that check found the turn will break. The list is a start and not the
+whole; the lines are v83's. Each is flipped to say what is true now, never kept beside a new
+one.
+
+- B1: the one literal 10 and the two literal 12 named in 2.1.
+- B3: `tests/engine/contractHall.test.ts`, lines 72 to 171: six joiners in the hall line (144;
+  144 and 180; the words `at full crew`; 162 and 144; 156 and 168). Restated with four on it.
+- C1: the three pins of 96 (2.4).
+- C2: `tests/engine/variants.test.ts` and `tests/ui/machine.test.ts` (2.5.2);
+  `tests/ui/catalogueTabs.test.ts` line 187 (the empty CNC centre); `tests/engine/ports.test.ts`
+  line 60 (37 measured classes, 40 with the `cnc5`) and line 97 (84 files, 90);
+  `tests/engine/metres.test.ts` lines 131 to 134 (every catalogue line is on one of its two
+  lists of metres: the `cnc5` here, then the robot, the modules and the stores as each lands).
+- C3: `tests/engine/dust.test.ts` lines 18 to 22 (a row in `DUST_OUTPUT_M3_PER_HOUR` for every
+  machine family: the robot here, the five modules in C5); `tests/engine/layout.test.ts` line
+  195 (`hallItems` 23, and 24 once the robot is in the catalogue).
+- C4: the pins of the set of roles and of the roles with no figure:
+  `tests/engine/boothJoiner.test.ts` line 87, `tests/ui/spriteCheck.test.ts` line 237,
+  `tests/render/capsule.test.ts` line 115, and `tests/ui/team.test.ts` for the Workshop tab.
+- C5: `tests/ui/catalogueTabs.test.ts` lines 142 to 155 (the eleven tab labels in order, and
+  the title that says eleven); `tests/engine/warnings.test.ts` lines 399 to 418 (the whole of
+  `WARNING_ORDER`, and its title) and lines 423 to 448 (every key but five named ones, in a
+  hall with no module: `lineNeedsEngineer` joins the five).
+- C6: the same two tests of `warnings.test.ts` again, for `boardsAtTheGate`;
+  `tests/ui/catalogueTabs.test.ts` lines 198 to 205 (the Storage tab's folders);
+  `tests/engine/layout.test.ts` line 195 again (25 with the timber rack, or still 24 if the
+  rack's line comes after the robot's and the 200 m² floor then has no free 4 m by 2 m: say
+  which in the report). `tests/engine/t28Timber.test.ts`: its helpers `timberHall` (lines 104
+  to 124) and `bigHall` (635 to 662) have no store, so every case that takes a window through
+  them fails on the store (151 to 190, 222 to 230, 700 to 738): give the helpers a store; line
+  143 pins the six of `TIMBER_EQUIPMENT`; lines 747 to 749 pin the tile's `Needs` line; line
+  751 reads `sheets of material`. `tests/scenarios/turn28.test.ts` lines 42 to 77:
+  `windowCompany` has no store, so neither (vv) block takes its window: give it one.
+- C7: `tests/engine/contracts.test.ts` lines 889 to 901 and
+  `tests/engine/contractPrices.test.ts` line 86 (2.12.4).
+- Every pin of STATE_VERSION 41 and of `v83`.
 
 ## 6. Do not (tonight)
 
-- No change to a sheet template, a sheet stage, its shares, or the rule a sheet job's deadline
-  is drawn by (a closure moves every due day, as a weekend does; that is 2.2 and is meant).
-- No change to the places, pace, price or power of any family the game already has. In
-  particular the spindle moulder's places stay 2, 4, 4, 6, 8 (section 8).
-- No change to the wages, the owner's base, the courier, the loan, the overdraft's rules, the
-  bank's count, the reputation, the contracts, the advertising agency's big jobs.
-- No change to the tax but the one sentence of 2.2.
-- No change to the security firm's cost, the insurance, the waste collection or the second
-  extension's card: Piotr has three questions open on them.
-- No five axis CNC, no spraying robot, no production line, no timber standing contract, no
-  timber big job.
-- No picture drawn, repainted, trimmed or scaled by an agent; no placeholder drawn for a product
-  on the hall; no sound; no new screen, modal kind, tab kind or CSS token.
-- No logo work, nothing of `public/brand/`.
+- No limit on the men of a normal job, and nothing of `addToJob`, `assignJob`, `canBuild`.
+- No change to the payment of a contract's pieces, its price formula for the three sheet
+  pieces, its bands, its term, its short week or its renewal.
+- No change to a sheet template, a sheet stage, its shares, or a sheet job's plan; the one thing
+  a sheet job may feel is the robot at the Finishing (2.7).
+- No change to the places, pace, price or power of any family the game already has. The spindle
+  moulder's places stay 2, 4, 4, 6, 8 (section 8).
+- No change to the two nights, the glass's share, its payment or its stop.
+- No change to the tax's arithmetic, the loan, the overdraft, the bank's count, the wages, the
+  owner's base, the reputation, the insurance's rate.
+- No change to the security firm's price but the one clause of 2.10, which no company without a
+  module can feel. No change to the service, breakdown or burglary of any kit but the modules
+  (the false `(service due)` label of 2.10 goes from kit that is never serviced, and nothing
+  else of it changes).
+- No second counter of stock, no stock of timber bought ahead, no timber on a contract's books.
+- No picture drawn, repainted, trimmed or scaled by an agent (a smaller copy of the logo for the
+  web is the one exception); no placeholder drawn for a product on the hall; no figure drawn
+  for the engineer; no sound; no new screen, modal kind or CSS token.
 - No storage access outside src/cloud/store.ts; no PixiJS, mobile, Steam, Electron.
 - No watch loops, nothing left running.
 
@@ -603,114 +1040,194 @@ pelletiser outside`, do not merge, end the session.
 
 - `npm run check` green on its own exit code; the count of tests and files in the report; every
   `it.skip` in the tree listed with its line of reason (the aim is none).
-- A pelletiser bought today stands behind the wall and takes no cell of the floor; a v40 save
-  with one on the floor opens with it behind the wall and the cells free; with the wall full it
-  is refused with `No room behind the hall`; a full hall floor does not refuse it or a central
-  system. Each asserted.
-- `closureOf` is `'christmas'` on days 292 to 305 (22 December 2025 to 5 January 2026) and
-  `'summer'` on 511 to 524 (1 to 14 August 2026), and `null` on 291, 306, 510, 525 and on 1 to
-  14 August 2025 (151 to 164); the winter of 2026 and the August of 2027 likewise.
-  `isWorkingDay` is false on every closed day, true on Thu 21 December 2025 (291), on Fri
-  6 January 2026 (306) and on Mon 16 August 2026 (526). Asserted.
-- A job taken on Thu 21 December 2025 (291) with a deadline of five working days is due on Thu
-  12 January 2026 (312), the fifth working day from and including the first day back, and
-  delivered that day is not late. Asserted.
-- The owner's draw is in the ledger for every weekday of a closure and for no Saturday or
-  Sunday; his house is the same tier the day before and the day after. Asserted.
-- December's wages are booked on the last working day before the 22nd. Asserted.
-- The Work Plan's columns hold no closed day, and a job's due point sits on its due day's column
-  on both sides of a closure. Asserted.
-- The break's card is raised once for each closure and never for August 2025; a save loaded on
-  10 December that never saw it sees it on the next open; `closureComing` is on the strip from
-  the card to the last working day and not after; it sits directly under `taxComing`. Asserted.
-- The first day back raises the break's card and no `Weekend` card, the tax's card before it;
-  the money on the break's card leaves the tax out. Asserted.
-- The 42 files are in `public/sprites/` and the manifest; the Sprite check page shows a file, a
-  footprint and no red port line for every class of the five families; `docs/art/incoming/` is
-  gone.
-- Each price, place count and metre of 2.4 asserted from its table; the fourteen prices of v81
-  and every other figure of every older family unchanged, asserted by the tests that already pin
-  them.
-- A company in the 200 or the 400 m² hall never sees a timber tile, live or greyed, and its
-  seeded board is what it was before this turn; one in the 800 m² hall with all the kit and the
-  cutters is offered timber; without the cutters the live tile is locked. Each reason of 2.6
-  asserted in its order. `drawBigJob` never draws one of the five. Asserted.
-- The oak dining table's plan, in the day 149 fixture and in `tests/engine/stages.test.ts`, is
-  what it was; it stands no night and carries no glass. Asserted.
-- A timber job's plan has the seven stages in the order and shares of 2.7; a sheet job's plan is
-  byte for byte what it was. Asserted.
-- A timber job stands exactly one night after pressing and one after finishing and a sheet
-  lacquer job stands none; while it stands its minutes are `hallStopped` and no `No material`
-  card is raised. Asserted.
-- A kitchen man is never drawn at one of the four new families and a window man never at an
-  edgebander or a table saw; a company with no timber job draws its men as v82 drew them.
-  Asserted.
-- Glass: cannot be ordered before the paperwork is done; is ordered by the admin with the
-  boards; costs `GLASS_SHARE` of `job.materialCost`, and the boards are `sheetsForCost` of the
-  rest; arrives ten working days on; the job
-  stops at `Glazing` without it and goes on with it; `glassNotOrdered` is on the strip while it
-  is to order and sits directly under `drawingDone`. Each asserted.
-- A timber enquiry's deadline is the old rule's plus twelve working days. Asserted.
+- Glass: ordered on a working day it is in at the next working day's open; a timber enquiry's
+  deadline is the old rule's plus three working days; a save's glass on its way is in on the
+  next working day; `TIMBER_LEAD_DAYS` is the sum of 2.1 and no literal. Asserted.
+- A second cutter set of a kind is refused in the words of 2.2, on order or owned; a first of
+  each kind is not. Asserted.
+- A fifth joiner is refused by `contractAssignCheck` in its words; a man on a full contract is
+  taken off; a refused man stays on the contract he was on; the Work Plan's popover is not
+  offered for a full contract and the false sentence is not printed; the count row reads on both
+  tabs; `contractMenNeeded` never says more than four; the hall line of an offer counts the four
+  joiners with the highest rate and reads `with four on it` for a company of six, and is to the
+  figure what it was on v83 for a company of three. Asserted.
+- A job takes a fifth, a ninth and a twentieth man as on v83; the three tests named in section 1
+  are untouched (`git diff main` shows no changed line in any of the three).
+- A v41 save with seven on a contract opens with the first four, three men with no marker, and
+  the `contractsTrimmed` card at its first settle; one with four or fewer opens with no card.
+  Asserted, on a raw save in tests/cloud/migrate.test.ts as v24's lift is.
+- The 22 files are in `public/sprites/` and the manifest; `docs/pictures-t29/` is gone; the
+  Sprite check page shows a file and a footprint for each new family and no red port line.
+- A company in the 200 or the 400 m² unit is refused a five axis CNC and every module with
+  `Needs the 800 m² unit`, and buys a robot, a timber rack and a shelter. The two tests that buy
+  the whole catalogue into the 200 m² unit pass over what it refuses for its size and nothing
+  else. Asserted.
+- The plan of a sheet job, laminate and lacquered, in a hall with a five axis CNC, a robot, a
+  whole running line and both stores is family for family what it is with none of them, and its
+  pace differs only by the robot at the Finishing. Asserted.
+- Five axis CNC: each figure of 2.6's table; a timber job's Moulding is on it while it runs and
+  at the moulders when it does not; the Moulding's speed is four times the class's pace; a
+  window is takeable with a `cnc5` and no moulder, and not without its cutters. Asserted.
+- Robot: the Finishing's speed in `stageSpeed` is twice the booth's with a robot that stands and
+  runs, and the booth's own with it broken or away; a second is refused. Asserted.
+- Engineer: hired only with a module standing or on order; a third refused; never one of the
+  men the manager carries, by `menCarried` or by `carriedBy`; never drawn; never read as idle
+  while a module stands; his tile on Our team says how much of the line runs and never `Near
+  full`. Asserted.
+- `lineNeedsEngineer` is on the strip only while modules stand that no engineer keeps, in the
+  words of 2.9.4, and sits directly under `nobodyAssigned` in `WARNING_ORDER`. Asserted.
+- Line: each price and each refusal of 2.9.2 in its order; a module on occupied cells refused
+  with the names of what stands there; a module never moved, turned or sold out of the middle;
+  five modules ordered in one morning stand on one morning; `lineModules` and `lineLevel` for
+  0, 1 and 2 engineers and for a gap in the run; each stage of 2.9.5 on its module from its
+  level and back on its old family below it; the speed of a covered stage in `stageSpeed` is
+  `LINE_FACTOR` times 1.12 at its level, and of the Moulding on module 2 `LINE_FACTOR` times 4
+  times 1.12; `LINE_FACTOR` on every stage but the Finishing; 33 men on timber work with the
+  whole line raise no `Too few` line for a module; the boards saved on a job taken with 0, 1
+  and 5 modules, the tile's count and the job's the same each time; a line that stands still
+  gives the pace of the hall without it. Each asserted.
+- What the line costs: no service is due for a module; no breakdown is rolled for one by day or
+  on the second shift, 200 days after it was bought; the hall prints no `(service due)` under
+  one, nor under a bench or a rack of that age; a burglary never takes one; the security firm's
+  price for a company with five modules is what it is for the same company without them; the
+  property premium counts them; a module is not on the Machines page and has no row in
+  `machineSavings`, and the five have one line between them on the Output sheet and on the top
+  bar's plate; an order for a module or a five axis CNC is not called off, and an order for a
+  planer is. Asserted.
+- Stores: boards are unloaded only onto a timber store and sheets only onto racks; with no store
+  the task is refused; with room for 16 a load of 19 stands at the gate and comes in whole once
+  a job has drawn three; with a labourer on duty the card of a refused load is raised at
+  arrival and on the click, the owner's row says `Nowhere to put it`, and `boardsAtTheGate` is
+  on the strip directly under `glassNotOrdered`; no board is ever in the paid store; the plates,
+  the Materials page and the Low stock card count each kind on its own; a dropped window's
+  boards are gone from the counter and its load is gone from the road or the gate with its
+  task; a store with boards on it is not sold; the outline of a shelter on order is not dragged
+  into the hall; a window is not takeable without a store, is with either, and is not while
+  its boards are more than the stores hold; a v41 save's timber job whose boards are in is
+  finished without one. Asserted.
+- Timber contracts: never drawn for a company below the 800 m² unit, whose seeded offers are
+  those of v83 (assert it on the seeds the scenarios already pin); a timber piece's minute is
+  the timber plan's pace, which is not 1 in a hall with the machines and is higher with a five
+  axis CNC than without; its men are counted against every family of the plan; nothing is
+  taken off the counter and no glass is ordered; each of the three is two a day at the
+  reference and one a day for a novice by hand; no machine tip is offered for one; a sheet
+  piece's minute, count, round and wear are what they were on v83. Asserted.
+- A contract drawn tonight for drawer boxes is called `Drawer boxes for ...`. Asserted.
 - `git diff main --stat -- src/ui/styles.css` shows no new token; every changed screen is in the
   report beside its nearest existing one.
-- The pictures: the pelletiser behind the wall; the break's card in December; the strip line;
-  the first day back; the Timber machines tab with its folders; the planer's folder open on its
-  five classes; the Sanding tab; a cutter set's card; a timber tile on the board, live, locked,
-  and greyed for each reason; a timber job's card with the glass to order, ordered and in; the Work
-  Plan with a job `glue curing`; the 800 m² hall with one of each new machine standing and men
-  at them; the Sprite check page's rows for the five families.
+- The pictures: the catalogue's CNC centre tab with the five axis CNC's three classes; the
+  Production line tab with its five folders, module 1's card locked and unlocked; the 800 m²
+  hall with the whole line standing, the five axis CNC and the robot at a booth, men at the
+  modules; the same hall with module 1 alone; a module refused for what stands on its cells;
+  the hire tile of the engineer; the strip's line with no engineer; the Output sheet with the
+  line's row; a timber rack on the floor with its plate and the shelter on the apron; the
+  Materials page with the boards' row; the lorry's card with no timber store and with the
+  stores too full; the strip with boards at the gate; a window's tile the stores cannot hold; a
+  full contract on each of the two tabs; the offer tile of a sash window contract; the card of
+  the trimmed save; the Security page's sentence for a company with the line; and, if the logo
+  was done, the start screen, the menu and the browser tab.
 
 ## 8. Parked
 
-- **A spindle moulder takes three men at most** [PIOTR, 04.10]. Today's places are 2, 4, 4, 6,
-  8 and every sheet job has a moulding stage, so the change would reach the sheet department and
-  every running save. Chat asks Piotr before anything is done.
+- **A spindle moulder takes three men at most** [PIOTR, 04.10]. Still parked from Turn 28: it
+  would reach the sheet department and every running save. Chat asks Piotr.
+- **The tax and an order that is called off.** Any order is refunded in full until the lorry,
+  so money ordered away before 30 December and called back in January is never taxed. Closed
+  tonight for the modules and the five axis CNC only (2.10); the rule for everything else is
+  Piotr's to decide.
+- Whether the line's 5 million is the whole line or each stage's own price; the split between
+  the stages; where the second engineer begins.
+- A spraying robot for each booth; the line's own lacquer hall [PIOTR, 04.10: "a separate hall
+  later"].
+- Timber bought ahead as stock on the stores, and a contract that uses the company's own timber.
+- The frames that are drying taking floor; the grade of the timber; remedial visits.
+- The products drawn on the hall; a figure for the engineer; the twelve stand in pictures and
+  the two sanders of Turn 28 that stand off their anchors.
 - The thicknesser's place in the timber department (it still has no stage).
-- The frames that are drying taking floor or racks; the grade of the timber and its waste;
-  remedial visits after fitting.
-- The products drawn on the hall (asked of the art side in REQUESTS-T28).
-- Timber standing contracts; timber big jobs from the advertising agency.
-- The five axis CNC that stands in for four moulders, the spraying robot, the line in five
-  stages [PIOTR, 04.10: era 4].
-- The bank's count of days past the limit during a closure; whether a standing contract's term
-  should be made longer by a closure.
-- The owner's forced holidays once he has a manager; accidents; the crisis.
+- The night's breakdown roll asks nothing of what kind of kit a second shift man stood at, so
+  a workbench can break down at night once 180 days have passed. Seen while this brief was
+  checked against v83; no kit but the modules is touched tonight (section 6).
+- A sheet job dropped with its delivery at the gate: the load loses its unloading task with the
+  job and stands there for ever (v83). Mended tonight for boards only (2.11.2).
+- Four men on one window in a hall of standard timber machines, two places each, are short at
+  five families at once, and the five lines between them put every man in the hall on the floor
+  of 0.25 (v83: Turn 28's places under the hall wide rule of v53). A timber contract's four men
+  will do the same. Piotr's to decide; print that hall's Output sheet in the report.
+- The booths a company with the line needs: every man on timber is counted against the booths'
+  places, as the game counts them, so thirty men on the line want several industrial booths
+  with racks. The line's own lacquer hall is Piotr's later step. Print in the report what the
+  800 m² hall with the whole line and twenty men on timber is short of.
+- The spraying robot's life, which does not run down because nobody stands at it (2.7).
+- A man walked out to the shelter on the apron (2.11.2); the stores drawn empty; the day
+  summary's word for tomorrow's boards.
+- The board after a closure (the enquiries all gone on the first day back); the bank's count
+  through a closure; a save standing in late December that never pays that month's wages.
 - Piotr's open questions after v82: the security firm at 800 m², the waste collection, the
-  second extension's card shown early. The logo.
+  second extension's card shown early.
+- The owner's forced holidays once he has a manager; accidents; the crisis.
 - From Turn 27: the account at nought and the tax; the one off licence that runs out with no
   card; the first month's wage of a man hired late.
 
-## 9. Mockups (docs/mockups/t28/)
+## 9. Mockups (docs/mockups/t29/)
 
 Before the code, each in the classes of the screen it belongs to and beside that screen as it is
-today: (1) the break's two cards in the event modal's own classes, beside the `Tax is coming`
-card for size, and the strip with the `closureComing` line; (2) the board with a timber tile
-live, the same tile locked for want of the cutters, and greyed for missing machines and for
-missing cutters; (3) a timber job's card with the glass line in its three states and the `Order
-glass`
-button beside `Order for this job`; (4) the Timber machines tab with its seven new folders and
-the two it has, the Sanding tab with one, and the planer's folder open; (5) the Work Plan's row
-of a job that is `glue curing` and of one `waiting for glass`. A README names which is which. No
-art is asked of the art side before the code; what is asked of it afterwards is in
-docs/art/REQUESTS-T28.md.
+today: (1) a running contract on the Orders board tab and on the Work Plan tab, with three of
+four and with four of four, the locked row and the reason in place of `Assign to this
+contract`, and the card a trimmed save opens with; (2) the CNC centre tab with the five axis
+CNC's folder open on three classes, and the Spraying tab with the robot's card; (3) the
+Production line tab with its five folders, module 1's card as a 200 m² company sees it, as an
+800 m² company with no five axis CNC sees it, and as one that can buy it sees it, and a module's
+refusal for what stands on its cells; (4) the engineer's hire tile on the Workshop tab, refused
+and offered, and the strip with `lineNeedsEngineer`; (5) the Storage tab with the two timber
+stores, the Materials page with the boards' row, the lorry's card with no timber store and with
+the stores too full, the strip with `boardsAtTheGate`, and a window's tile that the stores
+cannot hold, beside a big job's tile with its crew line;
+(6) the offer tile of a sash window contract beside a cut sheet pack's; (7) if
+`docs/logo-incoming/` is there, the start screen and the menu with the logo, beside both as
+they are. A README names which is which. No art is asked of the art side before the code; what
+is asked of it afterwards is in docs/art/REQUESTS-T29.md.
 
 ## 10. What chat decided and Piotr has not confirmed
 
 For the report to repeat, each with what was built:
 
-1. Christmas is 22 December to 5 January, from December 2025; summer is 1 to 14 August, from
-   2026.
-2. The whole company is closed, the owner with it; his draw is paid on the closure's weekdays.
-3. A closed day counts for no deadline.
-4. The bank's count and a contract's term run through a closure.
-5. Kit that stands outside asks for no free floor in the hall.
-6. Timber opens with the 800 m² hall and is not shown before it; one crew for both departments;
-   the oak table stays off; the cutter sets cannot be sold.
-7. Every price, place count, share and delivery day of sections 2.4 to 2.7.
-8. The cutter sets, the glass at ten working days and 0.35 of the material, the two nights (the
-   men of a job that stands are left to the player), the twelve days on a timber deadline.
-9. A cross cut saw, a planer, a spindle moulder, a sander, a frame press and a booth are needed
-   to take timber work; the glue table and the thicknesser are not.
-10. The twelve stand in pictures of the presses and the glue table.
+1. The timber deadline's twelve days become three with the glass at one day.
+2. A second cutter set of a kind is refused.
+3. A save over four on a contract is cut to the first four, with a card; the hall line of an
+   offer counts the four best men. And chat's reading of his answer on payment: every piece of
+   a contract is still paid, past the week's order too, as on v83.
+4. The five axis CNC: 300,000 for the middle class; the Moulding four times as fast in every
+   class; 12, 20 and 32 men kept busy; only in the 800 m² unit; its order cannot be called off.
+5. The robot: 120,000, one for the hall, the Finishing twice as fast, sheet jobs too.
+6. The engineer: on the Workshop tab, one for up to three modules and two for all five, hired
+   only once the line is ordered, two at the most, never drawn.
+7. The line: 5 million for the whole of it, shared 1.5, 0.75, 0.75, 1 and 1; a tab of its own
+   in the catalogue, the twelfth; only in the 800 m² unit; 30 working days for every module;
+   what each module covers (the Cross cutting and the Planing, the Moulding, the Sanding, the
+   Pressing, and no stage for the fifth), module 1 doing the Cross cutting though it is drawn
+   with no saw; a covered stage at the pace of an industrial machine; 33 places a module; who
+   stands in for whom on the board (a five axis CNC or module 2 for the spindle moulder,
+   module 1 for the cross cut saw and the planer, 3 for the sander, 4 for the press); a fixed
+   place on the cells x 5 to 34, y 14 to 16; never moved; sold only from the end; the factor
+   1.4, 1.6, 1.8, 2.1 and 2.4 on every stage but the Finishing; three per cent of the boards
+   saved a module.
+8. What the line costs to own: no service, no breakdown, no burglar, out of the security
+   firm's price, in the insurance, 60 a day of power a module, extraction of its own; an order
+   for a module cannot be called off.
+9. The timber stores: 40 and 400 boards, 1,200 and 18,000; the shelter outside on the apron;
+   boards only on a store and a window not takeable without one, nor while its boards are more
+   than the stores hold; a load of boards unloaded whole or left at the gate, and never sent
+   to the paid store; a strip line for boards at the gate; a dropped job's boards and its load
+   gone.
+10. Timber contracts: three pieces of 150, 190 and 180 minutes; the client's timber and glass,
+    no nights, no glass to order; made on the whole timber plan; only in the 800 m² unit; no
+    machine asked.
+11. The logo: in place of the title's words with the sketch kept, in the menu, as the tab's
+    icon, and the title `Woodwork Empire Tycoon`.
+12. Small things: the catalogue's first tip no longer says every family has five classes; the
+    cards of the five axis CNC, the robot and the modules each say what they do in a line of
+    their own; a load that cannot be unloaded raises its card with a labourer on duty too,
+    sheets with no rack among them; the false `(service due)` goes from benches, racks and
+    cabinets.
 
 End of brief.
