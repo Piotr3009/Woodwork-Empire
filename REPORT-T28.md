@@ -214,3 +214,15 @@ cutter set` for a door) and `needs a spray booth`; and the agency never draws on
 300 throws. A live tile shows only on the template site or better: the do it yourself website takes
 a tier off the standing, and the five weigh nought below the top tier, as the lacquered and the
 handleless kitchens do.
+
+**T28-D1 Notes and the art requests.** `docs/notes-t28.md`: the calendar of the closures, where
+the rule lives and why, every reading of the brief chat or this session made, what runs on
+calendar days through a closure, and what the work found and left (a v40 save standing on a closed
+December day, the weekly summary of a week whose Friday is closed, the ducted frame press, the
+owner on a standing job, the real-time UI test that fails under load, the sanders off the
+projection). `docs/art/REQUESTS-T28.md`, written by a sub-agent off the pictures in
+`public/sprites/`: the twelve frame press and glue table files again, with each one's canvas, anchor
+and what is wrong with the stand ins; the sanders again when there is time; the three cutter sets
+at the hand tool set's 112 by 112; and, for Piotr to decide and not to be drawn yet, a pack of
+timber at the gate, a trolley of machined parts, a rack of frames drying and a stillage of finished
+windows.
