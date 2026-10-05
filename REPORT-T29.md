@@ -257,3 +257,27 @@ Checked by hand:
 - No `.skip`, `.only`, `.todo`, `xit` or `xdescribe` anywhere in `tests/` or `src/`.
 - `git diff main --stat -- src/ui/styles.css` is empty.
 - `APP_VERSION` 'v84', `STATE_VERSION` 42, `OLDEST_SAVE_VERSION` 12.
+
+**T29-E4 Look and shoot.** Twenty three pictures in `docs/report-t29/`. Every one is drawn by
+the game's own app: it is mounted in jsdom, the state is set up by the engine or the tests'
+helpers, and the app is clicked to the screen through its own `data-do` handlers. The page is
+saved with the game's stylesheet and shot in headless Chromium. Nothing in the markup is written
+by hand. For a modal shot whole, `.modal`, `.modal-full`, `.modal-body` and `.ledger-list` were
+let out to their full height, so nothing hides behind the modal's own scroll.
+
+Three things about how they were shot:
+- The two store plates were shot at twice the pixel density so they can be read; that is the
+  game's own drawing at a finer screen, and no picture was rescaled.
+- The hall shot with module 1 alone was drawn in an app of its own. The hall walks its figures
+  from where they last stood, and with the clock stopped they would have stayed where the whole
+  line's picture had them.
+- The pages were served by a static server inside the shooting script, which stopped it before
+  it exited. The shooting scripts were throwaway files in the scratchpad and are not committed.
+
+What the pictures show that the report must say:
+- **Pace 0.68 and 0.25 in the hall shots.** These are section 8's halls: six and four men on one
+  window at standard timber machines, short at five families at once.
+- **The pallet at the gate is v83's placeholder** (`pallet.sheets`): the pallet has never been
+  painted.
+- **Both stores are drawn full whatever they hold:** the rack's plate reads 0 under a full load
+  (2.4, and on the art side's list).
