@@ -13,3 +13,12 @@ figure a test pins, no scenario is closed by the bank and no fault was found; no
 this turn's brief (first line "Turn 28"), so nothing was moved; the README names the Turn 27 brief,
 `REPORT-T28.md` and `docs/art/REQUESTS-T28.md`. `APP_VERSION` goes v82 to v83 with the two tests
 that name it flipped (`version.test.ts`, `saveCheck.test.ts`); `STATE_VERSION` is B1's.
+
+**T28-A2 The mockups.** `docs/mockups/t28/` with its README, five pages built by a sub-agent that
+touched nothing else: the game's own markup made by its own functions (`renderEvent`,
+`renderWarningStrip`, `renderBoard`, `renderCatalogue`, `renderWorkPlan`, the job card's lines),
+in its own classes, with tonight's change written in, each beside its nearest existing screen: the
+break's two cards beside `Tax is coming` and the strip with `closureComing`; the timber tile live,
+locked and greyed; the job card's glass in its three states with `Order glass`; the Timber machines
+and Sanding tabs with the planer's folder open and a cutter set's card; the Work Plan's rows
+`glue curing` and `waiting for glass`.
