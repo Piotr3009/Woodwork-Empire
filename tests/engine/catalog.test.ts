@@ -76,6 +76,9 @@ function job(partial: Partial<Job>): Job {
     dustyMinutes: 0,
     rating: null,
     overdueWarned: false,
+    curing: null,
+    glass: 'none',
+    glassDay: null,
     ...partial,
   };
 }
@@ -100,7 +103,12 @@ describe('templates', () => {
     expect(templatesForReputation(10).map((entry) => entry.id)).toContain('wardrobe');
     expect(templatesForReputation(10).map((entry) => entry.id)).toContain('oakDiningTable');
     expect(templatesForReputation(20).map((entry) => entry.id)).toContain('smallKitchen');
-    expect(templatesForReputation(20)).toHaveLength(PRODUCT_TEMPLATES.length);
+    // Everything but the timber department's windows and doors by 20; they open at 25, 30 and 35
+    // (CLAUDE.md T28 2.6), and from 35 the whole catalogue is open.
+    expect(templatesForReputation(20)).toHaveLength(PRODUCT_TEMPLATES.length - 5);
+    expect(templatesForReputation(25).map((entry) => entry.id)).toEqual(expect.arrayContaining(['casementWindows', 'frenchDoors']));
+    expect(templatesForReputation(25).map((entry) => entry.id)).not.toContain('sashWindows');
+    expect(templatesForReputation(35)).toHaveLength(PRODUCT_TEMPLATES.length);
   });
 });
 

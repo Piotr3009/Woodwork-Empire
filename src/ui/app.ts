@@ -1770,6 +1770,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'orderForJob':
       dispatch({ type: 'ORDER_FOR_JOB', jobId: id });
       return;
+    case 'orderGlass':
+      // A window's glass from the glazier: a click of the same kind, no minutes of his day
+      // (CLAUDE.md T28 2.9).
+      dispatch({ type: 'ORDER_GLASS', jobId: id });
+      return;
     case 'connectExtraction':
       dispatch({ type: 'CONNECT_EXTRACTION', equipmentId: id });
       return;

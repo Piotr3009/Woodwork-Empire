@@ -23,7 +23,6 @@ import {
   EXPRESS_PRICE_UPLIFT_MAX,
   EXPRESS_PRICE_UPLIFT_MIN,
   EXPRESS_PROBABILITY,
-  TIMBER_ON_THE_BOARD,
   UNREACHABLE_MAX,
   UNREACHABLE_MIN,
   SIZE_MULTIPLIER_MAX,
@@ -136,13 +135,16 @@ describe('enquiry generation', () => {
     expect(names.has('oakDiningTable')).toBe(false);
   });
 
-  it('offers no timber work, in the band or greyed beside it, until the timber branch (v57)', () => {
+  it('offers no timber work, in the band or greyed beside it, before the 800 m2 hall (v57, v83)', () => {
     // [PIOTR, 25.09: "while we have no timber machines, take every offer off the board that wants
     // the thicknesser or the timber machines"]. The oak table stays in the catalogue, where a
-    // timber job can still be made from; the board just never draws one.
-    expect(TIMBER_ON_THE_BOARD).toBe(false);
-    expect(offeredOnTheBoard(template('oakDiningTable'))).toBe(false);
-    expect(offeredOnTheBoard(template('bookcase'))).toBe(true);
+    // timber job can still be made from; the board just never draws one. From v83 the timber
+    // department's windows and doors come onto the board with the 800 m2 hall, and not before
+    // (CLAUDE.md T28 2.3); the oak table stays off it in every hall.
+    const small = newGame();
+    expect(offeredOnTheBoard(small, template('oakDiningTable'))).toBe(false);
+    expect(offeredOnTheBoard(small, template('sashWindows'))).toBe(false);
+    expect(offeredOnTheBoard(small, template('bookcase'))).toBe(true);
     const state = newGame();
     state.reputation = 40;
     state.enquiries = [];

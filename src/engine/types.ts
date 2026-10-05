@@ -16,6 +16,31 @@ export type Speed = 0 | 1 | 4 | 10 | 30 | 100;
 
 export type MaterialKind = 'sheet' | 'solidWood';
 
+/** The company's two holidays (PIOTR, 05.10; CLAUDE.md T28 2.2). */
+export type Closure = 'christmas' | 'summer';
+
+/** One of them, as the calendar knows it: from a day of one month to a day of the same month or
+ *  of the next, every year from its first, and told of in the month before it starts or in its
+ *  own first month (CLAUDE.md T28 2.2, 2.2.1). Months are indices into `MONTH_NAMES`. */
+export interface ClosureSpec {
+  id: Closure;
+  fromMonth: number;
+  fromDay: number;
+  toMonth: number;
+  toDay: number;
+  /** The first calendar year it runs in, by the year of its first day. */
+  firstYear: number;
+  /** The month whose first working day tells the player of it. */
+  warnMonth: number;
+}
+
+/** One closure on the game's own days: the first and the last day it holds. */
+export interface ClosureSpan {
+  closure: Closure;
+  from: number;
+  to: number;
+}
+
 export type Finish = 'laminate' | 'lacquer' | 'veneer';
 
 /** The stages a job goes through in the hall (CLAUDE.md T7 3.1): from v55 one stage a machine,
@@ -23,7 +48,31 @@ export type Finish = 'laminate' | 'lacquer' | 'veneer';
  *  the bench, a quarter each, and Finishing in the booth for a lacquered job [PIOTR, 24.09: "every
  *  machine has its own stage, split evenly"]. `cnc` is the one stage a CNC does instead of Cutting;
  *  `delivery` carries no labour at all. `machining`, the 15% of v53 and before, is gone. */
-export type StageId = 'cutting' | 'edging' | 'moulding' | 'cnc' | 'assembly' | 'finishing' | 'delivery';
+/** Where a timber job's glass is (CLAUDE.md T28 2.9). */
+export type GlassState = 'none' | 'toOrder' | 'ordered' | 'in';
+
+/** What a timber job stands for overnight (CLAUDE.md T28 2.8). */
+export type TimberStandReason = 'glue curing' | 'lacquer drying';
+
+/** A timber job standing a night: why, and the working day whose open ends it. */
+export interface TimberStand {
+  reason: TimberStandReason;
+  untilDay: number;
+}
+
+export type StageId =
+  | 'cutting'
+  | 'edging'
+  | 'moulding'
+  | 'cnc'
+  | 'assembly'
+  | 'finishing'
+  | 'delivery'
+  /** The timber department's own four (CLAUDE.md T28 2.7). */
+  | 'crossCutting'
+  | 'planing'
+  | 'pressing'
+  | 'sanding';
 
 /** One stage of the work, as the catalogue of stages holds it. */
 export interface StageSpec {
@@ -345,6 +394,9 @@ export interface ProductTemplate {
   /** Draw weight per reputation tier, index 0 is the lowest tier. */
   weightsByTier: number[];
   byHandAllowed: boolean;
+  /** The family id of the cutter set a spindle moulder needs for this product, or null: the mark
+   *  of the timber department's windows and doors (CLAUDE.md T28 2.6). */
+  cutters: string | null;
 }
 
 export interface Clock {
@@ -617,6 +669,10 @@ export interface Job {
   nightMinutes: number;
   /** The machining is done on the spindle moulder (CLAUDE.md T13 3.13). */
   needsSpindle: boolean;
+  /** True for a job of the timber department's windows and doors, the templates with `cutters`
+   *  (CLAUDE.md T28 2.7): its own plan of seven stages. Absent on every job of a save from before
+   *  them, which is false. Never true of the oak table, which is solid wood and not a window. */
+  timber?: boolean;
   /** Why the job is standing still, in plain English. Empty while nothing is in its way. */
   blockedBy: string;
   bespokeMaterial: boolean;
@@ -670,6 +726,15 @@ export interface Job {
   dustyMinutes: number;
   rating: number | null;
   overdueWarned: boolean;
+  /** The night a timber job stands after its pressing or its finishing, while the glue cures or
+   *  the lacquer dries: the reason the hall says and the day whose open ends it. Null on every
+   *  other job and between the two (CLAUDE.md T28 2.8). */
+  curing: TimberStand | null;
+  /** A window's or a door's glass: `none` on every other job, then to order, ordered and in
+   *  (CLAUDE.md T28 2.9). */
+  glass: GlassState;
+  /** The working day the glass ordered for it is in, at that day's open; null until it is ordered. */
+  glassDay: number | null;
 }
 
 /** One call from the client: when he rings, and what happened when he did. */
@@ -818,7 +883,12 @@ export type GameEventKind =
   /** The first working day of December: the taxman comes on the 30th (CLAUDE.md T27 2.3). */
   | 'taxComing'
   /** The open of 30 December took a quarter of the account (CLAUDE.md T27 2.2). */
-  | 'taxPaid';
+  | 'taxPaid'
+  /** The first working day of December, or of July from 2026: the workshop closes for its break
+   *  (CLAUDE.md T28 2.2.1). */
+  | 'closureComing'
+  /** The first day back from a closure, in place of the Weekend card (CLAUDE.md T28 2.2.2). */
+  | 'closureOver';
 
 export interface GameEventChoice {
   id: string;
@@ -1361,6 +1431,10 @@ export interface GameState {
   /** The month whose report has been put in front of the player, so it is shown once
    *  (CLAUDE.md T13 3.20). */
   monthEndShownFor: number;
+  /** The first closed day of the last closure the player was told of, or null before the first:
+   *  it is told once, and on the next open of a save that came into its window without it
+   *  (CLAUDE.md T28 2.2.1, section 4). */
+  closureWarnedFor: number | null;
   /** Every month the company has closed, in the figures its month end card was drawn from, oldest
    *  first. Accounting's Monthly reports tab is this list read back, so a month a player has not
    *  looked at is not lost with the ledger it was added up from (PIOTR, 20.09;
@@ -1421,6 +1495,8 @@ export type GameAction =
   | { type: 'BOOT_LAPTOP' }
   /** Buys a job's shortfall at the ad hoc price, for that job (CLAUDE.md T13 3.3). */
   | { type: 'ORDER_FOR_JOB'; jobId: string }
+  /** A window's glass, ordered from the glazier (CLAUDE.md T28 2.9). */
+  | { type: 'ORDER_GLASS'; jobId: string }
   /** Orders sheets onto the rack: the number the player typed, capped at the free places in it
    *  (CLAUDE.md T13 3.2, T17 2.20). */
   | { type: 'RESTOCK'; sheets?: number }

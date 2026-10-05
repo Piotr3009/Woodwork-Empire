@@ -89,15 +89,16 @@ function boxOfItem(
   return boxOf(item.specId, x, y, item.variantId, item.orientation);
 }
 
-/** True for the kit that stands outside and not on the hall floor: the two central systems and
- *  the van (`STARTING_LAYOUT`). */
+/** True for the kit that stands outside and not on the hall floor: the two central systems, the
+ *  pelletiser and the van (`STARTING_LAYOUT`). */
 export function standsOutside(specId: string): boolean {
   return STARTING_LAYOUT[specId]?.yard === true;
 }
 
-/** True for the kit that stands outside behind the rear wall: the two central systems. On the
- *  apron at the end of the hall they stood in front of the benches and hid them, and behind the
- *  wall they hide nothing (PIOTR, 03.10; v73). The van stays on the apron. */
+/** True for the kit that stands outside behind the rear wall: the two central systems, and from
+ *  v83 the pelletiser beside them. On the apron at the end of the hall they stood in front of the
+ *  benches and hid them, and behind the wall they hide nothing (PIOTR, 03.10 and 05.10; v73,
+ *  CLAUDE.md T28 2.1). The van stays on the apron. */
 export function standsBehindTheWall(specId: string): boolean {
   return STARTING_LAYOUT[specId]?.rear === true;
 }

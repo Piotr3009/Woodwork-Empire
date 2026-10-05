@@ -27,7 +27,7 @@ import {
 import {
   isFirstOfMonth,
   isLastWorkingDayOfMonth,
-  isWorkingDay,
+  isWeekday,
   monthOfDay,
   previousWorkingDay,
   weekOfDay,
@@ -590,8 +590,10 @@ export function runDayCosts(state: GameState, day: number): void {
   chargeUnavoidable(state, 'rent', 'Rent', dailyRent(state));
   chargeUnavoidable(state, 'rates', 'Business rates', dailyRates(state));
   chargeUnavoidable(state, 'power', 'Power', dailyPower(state));
-  if (isWorkingDay(day)) {
-    // What he pays himself, every working day, at the tier he chose (CLAUDE.md T13 3.18).
+  if (isWeekday(day)) {
+    // What he pays himself, every weekday, at the tier he chose (CLAUDE.md T13 3.18): on the days of
+    // a closure as on any other, because the costs run and only the people do not work (PIOTR,
+    // 05.10; CLAUDE.md T28 2.2), and a fortnight without it would take his house down a tier.
     chargeUnavoidable(state, 'ownerDraw', 'Owner\u0027s draw', ownerDrawPerDay(state));
   }
   if (isLastWorkingDayOfMonth(day)) {

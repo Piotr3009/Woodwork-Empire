@@ -161,6 +161,44 @@ export const PORTS: Record<string, Port> = {
   'cnc.standard.r.png': { px: 111, py: 79, cell: { x: 1, y: 1 } },
   'cnc.pro.r.png': { px: 136, py: 98, cell: { x: 1, y: 2 } },
   'cnc.industrial.r.png': { px: 124, py: 94, cell: { x: 0, y: 2 } },
+  // The cross cut saws (the art side's pack 1 of 05.10; v83): the mouth of the round stub on the
+  // guard, and on the used and budget saws, which have none drawn, the top of the upper blade
+  // guard. Claude's measurements off the pictures [TUNE until Piotr confirms them on the hall].
+  'crossCut.used.png': { px: 83, py: 44, cell: { x: 1, y: 0 } },
+  'crossCut.budget.png': { px: 106, py: 55, cell: { x: 1, y: 0 } },
+  'crossCut.standard.png': { px: 143, py: 61, cell: { x: 2, y: 0 } },
+  'crossCut.pro.png': { px: 161, py: 76, cell: { x: 2, y: 0 } },
+  'crossCut.industrial.png': { px: 237, py: 107, cell: { x: 3, y: 0 } },
+  'crossCut.used.r.png': { px: 78, py: 44, cell: { x: 0, y: 1 } },
+  'crossCut.budget.r.png': { px: 101, py: 56, cell: { x: 0, y: 1 } },
+  'crossCut.standard.r.png': { px: 112, py: 61, cell: { x: 0, y: 2 } },
+  'crossCut.pro.r.png': { px: 142, py: 76, cell: { x: 0, y: 2 } },
+  'crossCut.industrial.r.png': { px: 205, py: 110, cell: { x: 0, y: 3 } },
+  // The four sided planers (pack 1 of 05.10; v83): the mouth of the middle stub of the row on top
+  // of the heads, of an even row the inner one farther from the camera, as the CNC's rear stub was
+  // taken. Claude's measurements off the pictures [TUNE until Piotr confirms them on the hall].
+  'planer.used.png': { px: 91, py: 48, cell: { x: 1, y: 0 } },
+  'planer.budget.png': { px: 92, py: 48, cell: { x: 1, y: 0 } },
+  'planer.standard.png': { px: 134, py: 69, cell: { x: 2, y: 0 } },
+  'planer.pro.png': { px: 143, py: 74, cell: { x: 2, y: 0 } },
+  'planer.industrial.png': { px: 186, py: 95, cell: { x: 2, y: 0 } },
+  'planer.used.r.png': { px: 116, py: 48, cell: { x: 0, y: 1 } },
+  'planer.budget.r.png': { px: 115, py: 48, cell: { x: 0, y: 1 } },
+  'planer.standard.r.png': { px: 128, py: 65, cell: { x: 0, y: 1 } },
+  'planer.pro.r.png': { px: 166, py: 70, cell: { x: 0, y: 2 } },
+  'planer.industrial.r.png': { px: 211, py: 96, cell: { x: 0, y: 2 } },
+  // The sanders (pack 2 of 05.10, as delivered; v83): the stub on the downdraught table, the crown
+  // of the edge sander's duct, the hood of the through feed sander and the second of the line's
+  // four. These pictures are off the contract's projection, so the cells are approximate. The used
+  // sander has a vacuum of its own and no line. [TUNE until Piotr confirms them on the hall.]
+  'sander.budget.png': { px: 121, py: 32, cell: { x: 1, y: 0 } },
+  'sander.standard.png': { px: 112, py: 42, cell: { x: 1, y: 0 } },
+  'sander.pro.png': { px: 122, py: 71, cell: { x: 1, y: 1 } },
+  'sander.industrial.png': { px: 191, py: 130, cell: { x: 3, y: 1 } },
+  'sander.budget.r.png': { px: 27, py: 21, cell: { x: 0, y: 1 } },
+  'sander.standard.r.png': { px: 38, py: 42, cell: { x: 0, y: 1 } },
+  'sander.pro.r.png': { px: 127, py: 65, cell: { x: 0, y: 1 } },
+  'sander.industrial.r.png': { px: 219, py: 129, cell: { x: 1, y: 3 } },
 };
 
 /** The suffix each orientation's file carries: 0 the base picture, then a quarter turn at a time

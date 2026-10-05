@@ -2,7 +2,7 @@
 // The sprite check page is the acceptance tool for a batch of art (CLAUDE.md T3 3.6).
 
 import { describe, expect, it } from 'vitest';
-import { CNC_TOOL_CHANGER_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants';
+import { CNC_TOOL_CHANGER_SPRITE, CUTTER_SETS, EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { HALL_LAYERS, HALL_WIDE_LAYERS, PALLET_SPRITE } from '../../src/render/hall';
 import { OFFICE_LAYERS, OFFICE_LIT_LAYERS } from '../../src/render/office';
 import { standsInTheHall } from '../../src/engine/machines';
@@ -34,7 +34,9 @@ describe('the sprite check page', () => {
         for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);
         continue;
       }
-      if (standsInTheHall(spec.id)) wanted.add(spec.spriteKey);
+      // A cutter set holds no floor and is asked for all the same: a catalogue picture the art
+      // side owes (CLAUDE.md T28 2.5).
+      if (standsInTheHall(spec.id) || CUTTER_SETS.includes(spec.id)) wanted.add(spec.spriteKey);
     }
     // And the CNC with its tool changer bolted on, a picture of its own for every class of the CNC
     // (v56). The head is on no list of its own: it holds no floor, and the CNC is drawn with it.

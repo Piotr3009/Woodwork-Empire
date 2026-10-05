@@ -46,8 +46,9 @@ describe('the version in the corner', () => {
     // assign lists of free men only (PIOTR, 01.10 and 02.10). v63 is Turn 26: one kind of man on
     // the floor, and a hall that looks like a workshop (PIOTR, 02.10). v81 is Turn 27: the year,
     // the taxman, and dearer top machines (PIOTR, 03.10 and 04.10). v82 is the second extension
-    // of the unit, to 800 m2 (PIOTR, 04.10).
-    expect(APP_VERSION).toBe('v82');
+    // of the unit, to 800 m2 (PIOTR, 04.10). v83 is Turn 28: the timber department, the holidays,
+    // and the pelletiser outside (PIOTR, 04.10 and 05.10).
+    expect(APP_VERSION).toBe('v83');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -63,7 +64,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v82'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v83'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

@@ -164,7 +164,9 @@ function agencyCarrier(state: GameState): RngCarrier {
 export function drawBigJob(state: GameState, carrier: RngCarrier = agencyCarrier(state)): Enquiry | null {
   const tier = enquiryQualityTier(state);
   const candidates = templatesForReputation(effectiveReputation(state))
-    .filter(offeredOnTheBoard)
+    .filter((entry) => offeredOnTheBoard(state, entry))
+    // The agency never draws a window or a door as a big job (CLAUDE.md T28 2.3, section 8).
+    .filter((entry) => entry.cutters === null)
     .filter((entry) => lockReasonFor(state, entry) === null);
   const entry = pickWeighted(carrier, candidates, (candidate) => candidate.weightsByTier[tier] ?? 0);
   if (!entry) return null;

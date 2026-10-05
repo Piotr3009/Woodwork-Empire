@@ -42,8 +42,11 @@ import {
   COMPRESSOR,
   COMPRESSOR_AIR,
   COMPRESSOR_WITH_DRYER,
+  CUTTER_SETS,
   DRYING_RACKS,
   DRYING_RACKS_PLACES_FACTOR,
+  GLUE_TABLE,
+  GLUE_TABLE_PLACES,
   DUST_WASTE_MONTHLY,
   EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
@@ -293,6 +296,8 @@ export function floorLine(specId: string, variantId: string): string {
     // The tool changer head is bolted to the CNC's own frame; everything else that holds no floor is
     // a hand tool kept in a cabinet (v56).
     if (specId === DRYING_RACKS) return 'Stood in a spray booth, take no floor';
+    // A cutter set asks for no cabinet: it is kept where it is used (CLAUDE.md T28 2.5).
+    if (CUTTER_SETS.includes(specId)) return 'Kept at the spindle moulders';
     return specId === 'cncHead' ? 'Bolted to a CNC, takes no floor' : 'Kept in a tool cabinet';
   }
   return `Takes ${metresBy(stands)}, works in ${metresBy(zone)}`;
@@ -351,6 +356,11 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
   // they do is said in one line, off the engine's own factor (v73).
   if (spec.id === DRYING_RACKS) {
     return [line(`The booth they stand in keeps ${DRYING_RACKS_PLACES_FACTOR} times the men busy`)];
+  }
+  // The glue table is a table that makes nothing of its own: what it does is said the racks' way,
+  // off the engine's own figure (CLAUDE.md T28 2.4).
+  if (spec.id === GLUE_TABLE) {
+    return [line(`The frame press it stands by keeps ${GLUE_TABLE_PLACES} more men busy`)];
   }
   const machine = spec.category === 'machine';
   return [

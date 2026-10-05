@@ -10,6 +10,8 @@ import {
   CAPACITY_ROLES,
   CENTRAL_EXTRACTION_SPECS,
   DRYING_RACKS,
+  GLUE_TABLE,
+  GLUE_TABLE_PLACES,
   DRYING_RACKS_PLACES_FACTOR,
   DUST_BANDS,
   DUST_HIGH_THRESHOLD,
@@ -19,6 +21,7 @@ import {
   DUST_PER_SAWDUST_PILE,
   ENDURANCE_MINUTES_BY_CLASS,
   EQUIPMENT_SPECS,
+  EXTRACTION_DEMAND,
   EXTRACTOR_BAGS,
   EXTRACTOR_BREAKDOWN_CHANCE,
   EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
@@ -55,6 +58,7 @@ import {
   SERVICE_INTERVAL_MONTHS,
   SERVICE_LIFE_EXTENSION,
   TIER_WORDS,
+  TIMBER_FAMILIES,
   TOOL_CABINET,
   TOOL_CABINET_SLOTS,
   UNDER_EXTRACTION_DUST_MULTIPLIER,
@@ -426,8 +430,25 @@ export function boothsWithDryingRacks(state: GameState): Set<string> {
  *  card read this; `placesOf` is the class by itself, which is what the catalogue prints. */
 export function placesAt(state: GameState, item: Equipment): number {
   const own = placesOf(item);
+  // A glue table beside a frame press adds its places to the press's, by the same line the racks
+  // add theirs to a booth (CLAUDE.md T28 2.4).
+  if (item.specId === FRAME_PRESS && own > 0) {
+    return framePressesWithGlueTables(state).has(item.id) ? own + GLUE_TABLE_PLACES : own;
+  }
   if (item.specId !== SPRAY_BOOTH || own <= 0) return own;
   return boothsWithDryingRacks(state).has(item.id) ? own * DRYING_RACKS_PLACES_FACTOR : own;
+}
+
+/** The frame presses that have a glue table beside them: the tables the hall owns go to its
+ *  presses one a press, in the order the presses were bought, as the drying racks go to the
+ *  booths (CLAUDE.md T28 2.4). */
+export function framePressesWithGlueTables(state: GameState): Set<string> {
+  const tables = owned(state, GLUE_TABLE).filter((item) => !isSold(item)).length;
+  return new Set(
+    floorMachines(state, FRAME_PRESS)
+      .slice(0, tables)
+      .map((item) => item.id),
+  );
 }
 
 /** The machine the man at this place of the family works at, and which of its own places he
@@ -592,9 +613,11 @@ export function placeShortages(
   return found;
 }
 
-/** The plural of what the trade calls a family: `saws`, `CNCs`, `booths`. */
+/** The plural of what the trade calls a family: `saws`, `CNCs`, `booths`, and `presses`, which a
+ *  word that ends in an s takes (CLAUDE.md T28 2.4). */
 export function machinesWord(family: string): string {
-  return `${machineShortWord(family)}s`;
+  const word = machineShortWord(family);
+  return word.endsWith('s') ? `${word}es` : `${word}s`;
 }
 
 /** The line a machine's card and its hover carry while its family is short for the men whose work
@@ -713,6 +736,8 @@ export const BENCH = 'workbench';
 /** The booth family. The finishing of a lacquered job is done at it, by a joiner like every other
  *  stage (PIOTR, 02.10; CLAUDE.md T26 2.6). */
 export const SPRAY_BOOTH = 'sprayBooth';
+/** The timber department's press, which a glue table adds places to (CLAUDE.md T28 2.4). */
+export const FRAME_PRESS = 'framePress';
 
 /** The benches standing in the hall, in the order they were bought, which is the order the men
  *  fill them in. A broken one is no bench at all, the way a broken machine is no machine. */
@@ -1157,7 +1182,9 @@ function manRow(
   const machine =
     job === null && contract === null ? null : (menAtPlaces(state).find((entry) => entry.who === who)?.item ?? null);
   const doing =
-    job === null || stage === null ? '' : `${stageDoing(stage.id, job.finish === 'lacquer')} ${job.name}`;
+    job === null || stage === null
+      ? ''
+      : `${stageDoing(stage.id, job.finish === 'lacquer', job.timber === true)} ${job.name}`;
   // The job's one pace, the figure `runProductionMinute` reads before the air factor (v53); for a
   // man on a contract his piece's own, the figure `runContractMinute` reads, so the CNC he cuts
   // the packs on is his `machines` and not a remainder called hall (PIOTR, 02.10; CLAUDE.md T26
@@ -1306,6 +1333,9 @@ export function needsDucting(specId: string, variantId?: string): boolean {
   // Nothing that holds no cell of the floor is ducted: it never stood anywhere to be unplugged
   // from (CLAUDE.md T6 3.5).
   if (!standsInTheHall(specId, variantId)) return false;
+  // A timber machine that pulls on no extraction, a frame press or the sander with its own vacuum,
+  // has no pipe to run again (CLAUDE.md T28 2.4). The sheet department's kit is as it was.
+  if (TIMBER_FAMILIES.includes(specId) && (EXTRACTION_DEMAND[specId]?.[variantId ?? ''] ?? 0) <= 0) return false;
   return findSpec(specId)?.category === 'machine';
 }
 

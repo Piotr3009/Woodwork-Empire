@@ -15,7 +15,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { currentState, mount, render } from '../../src/ui/app';
 import { DAY_END_MINUTE } from '../../src/engine/constants';
-import { applyAction } from '../../src/engine/index';
+import { applyAction, formatMoney } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 
 function root(): HTMLElement {
@@ -81,7 +81,7 @@ describe('the tax on the page (CLAUDE.md T27 2.2, 2.3)', () => {
     expect(modal?.classList.contains('modal-wide')).toBe(false);
     expect(modal?.querySelector(':scope > .modal-close')).not.toBeNull();
     expect(modal?.querySelector('.event-body')?.textContent).toMatch(
-      /^On 30 December the taxman takes 25% of whatever is in the account: £[\d,]+ as it stands today\. Money spent on machines or on the workshop before then is not taxed\. Invest, or pay\.$/,
+      /^On 30 December the taxman takes 25% of whatever is in the account: £[\d,]+ as it stands today\. Money spent on machines or on the workshop before then is not taxed\. The workshop is closed from 22 December, so the last day to spend is Thu 21 December\. Invest, or pay\.$/,
     );
     expect(Array.from(modal?.querySelectorAll('.choices .btn') ?? []).map((button) => button.textContent)).toEqual(['Right']);
   });
@@ -96,23 +96,30 @@ describe('the tax on the page (CLAUDE.md T27 2.2, 2.3)', () => {
   });
 
   it('puts Tax for 2025 up after the open of 30 December, and December s report has its line', () => {
-    homeFrom(299, 48000);
+    // From Thursday 21 December, the last working day before the break, to Friday 6 January, the
+    // first day back (re-dated in v83 from Friday 29 December and Monday 2 January: CLAUDE.md T28
+    // 2.2). The break's days before the 30th have their bills, so the figures are the ledger's.
+    homeFrom(291, 48000);
     answerUntil('Tax for 2025');
     const modal = root().querySelector('[data-modal="event"]');
     expect(eventTitle()).toBe('Tax for 2025');
     expect(modal?.classList.contains('modal-wide')).toBe(false);
     expect(modal?.querySelector(':scope > .modal-close')).not.toBeNull();
+    const tax = game().ledger.find((entry) => entry.category === 'tax');
+    if (tax === undefined) throw new Error('no tax booked');
+    const before = tax.balance - tax.amount;
+    expect(before).toBeLessThan(48000);
     expect(modal?.querySelector('.event-body')?.textContent).toBe(
-      'The taxman took 25% of the £48,000 in the account: £12,000.',
+      `The taxman took 25% of the ${formatMoney(before)} in the account: ${formatMoney(-tax.amount)}.`,
     );
     answerUntil('Month 10: the report');
     const report = root().querySelector('[data-modal="event"] .month-line[data-line="tax"]');
     expect(report?.querySelector('.row-main')?.textContent).toBe('Tax');
     expect(Array.from(report?.querySelectorAll('.row-figure') ?? []).map((figure) => figure.textContent)).toEqual([
       '£0',
-      '-£12,000',
-      '-£12,000',
+      `-${formatMoney(-tax.amount)}`,
+      `-${formatMoney(-tax.amount)}`,
     ]);
-    expect(root().querySelector('.topbar .date')?.textContent).toMatch(/^Mon 2 January 2026 · /);
+    expect(root().querySelector('.topbar .date')?.textContent).toMatch(/^Fri 6 January 2026 · /);
   });
 });
