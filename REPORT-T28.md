@@ -198,3 +198,19 @@ not in, `hallStops` says `waiting for glass`, a stop of the same kind as the nig
 after its glass was ordered writes it off (`Glass written off`), its boards as before, and the drop
 card adds the two. The strip's `glassNotOrdered`, `Glass not ordered: Sash windows`, stands
 directly under `drawingDone` [TUNE]. STATE_VERSION 41's lift gives every job `glass: 'none'`.
+
+**T28-C8 The opening.** `TIMBER_ON_THE_BOARD` is gone; `timberOnTheBoard(state)` asks whether the
+second extension is open, and `offeredOnTheBoard(state, entry)` offers all the sheet work, and the
+five windows and doors once it is, never the oak table [PIOTR, 04.10: era 3; TUNE: chat: the oak
+table]. Before the 800 m2 hall the five are nowhere on the board, neither drawn into the band nor
+among what a greyed tile is drawn from, so the templates a 200 or 400 m2 company is offered are
+exactly the ones it was offered before tonight and no draw of its seeded stream moves; in the 800
+m2 hall they are templates like any other, live or greyed. Asserted: no window on the board of the
+small and the middle hall in 300 draws and 120 greyed tiles, and the offered list equal to the
+sheet templates; the big hall with its kit and its cutters is offered windows and doors, unlocked,
+never bespoke, with the lead on the deadline; without the sash cutters a live sash tile is locked
+`Needs sash window cutter set`; greyed tiles say `no cross cut saw, four sided planer` (`, door
+cutter set` for a door) and `needs a spray booth`; and the agency never draws one of the five in
+300 throws. A live tile shows only on the template site or better: the do it yourself website takes
+a tier off the standing, and the five weigh nought below the top tier, as the lacquered and the
+handleless kitchens do.

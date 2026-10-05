@@ -29,7 +29,16 @@ import {
   TIMBER_LEAD_DAYS,
 } from '../../src/engine/constants';
 import { lockReasonFor, missingEquipment, template } from '../../src/engine/catalog';
-import { blockFor, enquiryDeadlineDays, kitBlockFor } from '../../src/engine/board';
+import {
+  blockFor,
+  enquiryDeadlineDays,
+  generateEnquiry,
+  generateUnreachable,
+  kitBlockFor,
+  offeredOnTheBoard,
+  timberOnTheBoard,
+} from '../../src/engine/board';
+import { drawBigJob } from '../../src/engine/agency';
 import { deadlineDaysFrom, labourValueFor, ownerDaysFor, stagedJob } from '../../src/engine/jobs';
 import { addWorkingDays } from '../../src/engine/clock';
 import {
@@ -66,6 +75,7 @@ import type { GameState, Job } from '../../src/engine/index';
 import {
   acceptNow,
   act,
+  nextDay,
   buyStartingKit,
   clearEvents,
   fillRack,
@@ -578,5 +588,126 @@ describe('the glass (CLAUDE.md T28 2.9)', () => {
     expect(dropJob(ordered, windowJob.id)).toBe(true);
     const loss = ordered.ledger.find((entry) => entry.label === 'Glass written off: Sash windows');
     expect(loss?.amount).toBeCloseTo(-cost, 2);
+  });
+});
+
+const TIMBER_IDS = FIVE.map(([id]) => id);
+
+/** A company in the 800 m2 hall, the second extension open the morning after it was paid for, with
+ *  the day one kit, at a standing that opens all five, on the template site so the band draws from
+ *  the top tier, and the timber kit but what is named. */
+function bigHall(without: string[] = []): GameState {
+  let state = newGame({ difficulty: 'veryEasy' });
+  state.cash = 3000000;
+  state = nextDay(act(state, { type: 'EXTEND_UNIT' }));
+  state = nextDay(act(state, { type: 'EXTEND_UNIT', stage: 'second' }));
+  expect(state.unit.areaM2).toBe(800);
+  state = buyStartingKit(state);
+  state.cash = 3000000;
+  state.reputation = 40;
+  state.website.level = 3;
+  state.enquiries = [];
+  const kit: Array<[string, number, number]> = [
+    ['crossCut', 22, 12],
+    ['planer', 27, 12],
+    ['spindleMoulder', 32, 12],
+    ['sander', 22, 15],
+    ['framePress', 27, 15],
+    ['sprayBooth', 32, 15],
+    ['cuttersSash', 0, 0],
+    ['cuttersCasement', 0, 0],
+    ['cuttersDoor', 0, 0],
+  ];
+  for (const [id, x, y] of kit) {
+    if (without.includes(id)) continue;
+    placeEquipment(state, id, { variantId: 'standard', x, y, id: `kit-${id}` });
+  }
+  return state;
+}
+
+/** The templates of so many draws of the band. */
+function drawn(state: GameState, draws: number): string[] {
+  const ids: string[] = [];
+  for (let at = 0; at < draws; at += 1) {
+    const enquiry = generateEnquiry(state);
+    if (enquiry !== null) ids.push(enquiry.templateId);
+  }
+  return ids;
+}
+
+/** The templates of so many greyed tiles. */
+function greyed(state: GameState, draws: number): Array<{ templateId: string; reason: string }> {
+  const found: Array<{ templateId: string; reason: string }> = [];
+  for (let at = 0; at < draws; at += 1) {
+    state.enquiries = [];
+    const enquiry = generateUnreachable(state);
+    if (enquiry !== null) found.push({ templateId: enquiry.templateId, reason: enquiry.blockReason });
+  }
+  return found;
+}
+
+describe('timber on the board of the 800 m2 hall (CLAUDE.md T28 2.3)', () => {
+  it('offers the 200 and the 400 m2 hall exactly the templates it offered before, and no window', () => {
+    const small = timberHall();
+    const middle = nextDay(act(Object.assign(timberHall(), { cash: 3000000 }), { type: 'EXTEND_UNIT' }));
+    expect(middle.unit.areaM2).toBe(400);
+    const sheet = PRODUCT_TEMPLATES.filter((entry) => entry.material === 'sheet').map((entry) => entry.id);
+    for (const state of [small, middle]) {
+      expect(timberOnTheBoard(state)).toBe(false);
+      expect(PRODUCT_TEMPLATES.filter((entry) => offeredOnTheBoard(state, entry)).map((entry) => entry.id)).toEqual(sheet);
+      state.website.level = 3;
+      for (const id of drawn(state, 300)) expect(TIMBER_IDS, id).not.toContain(id);
+      for (const tile of greyed(state, 120)) expect(TIMBER_IDS, tile.templateId).not.toContain(tile.templateId);
+    }
+  });
+
+  it('offers windows and doors to the 800 m2 hall with the kit and the cutters, never bespoke, with the lead on', () => {
+    const state = bigHall();
+    expect(timberOnTheBoard(state)).toBe(true);
+    expect(offeredOnTheBoard(state, template('oakDiningTable'))).toBe(false);
+    const live: Array<{ templateId: string; bespoke: boolean; days: number; locked: string | null }> = [];
+    for (let at = 0; at < 400; at += 1) {
+      const enquiry = generateEnquiry(state);
+      if (enquiry === null || !TIMBER_IDS.includes(enquiry.templateId)) continue;
+      live.push({ templateId: enquiry.templateId, bespoke: enquiry.bespokeMaterial, days: enquiry.deadlineDays, locked: enquiry.lockReason });
+    }
+    expect(live.length).toBeGreaterThan(10);
+    expect(new Set(live.map((entry) => entry.templateId)).size).toBeGreaterThanOrEqual(3);
+    for (const entry of live) {
+      expect(entry.bespoke, entry.templateId).toBe(false);
+      expect(entry.locked, entry.templateId).toBeNull();
+      expect(entry.days, entry.templateId).toBeGreaterThanOrEqual(TIMBER_LEAD_DAYS + 3);
+    }
+  });
+
+  it('locks a live window without its cutters, and greys the rest for what the hall is short of', () => {
+    const noSash = bigHall(['cuttersSash']);
+    const sash: Array<string | null> = [];
+    for (let at = 0; at < 500 && sash.length < 3; at += 1) {
+      const enquiry = generateEnquiry(noSash);
+      if (enquiry?.templateId === 'sashWindows') sash.push(enquiry.lockReason);
+    }
+    expect(sash.length).toBeGreaterThan(0);
+    for (const reason of sash) expect(reason).toBe('Needs sash window cutter set');
+    // Greyed: for the machines and for the cutters, in the reasons' own words.
+    const short = greyed(bigHall(['crossCut', 'planer', 'cuttersDoor']), 200).filter((tile) => TIMBER_IDS.includes(tile.templateId));
+    expect(short.length).toBeGreaterThan(0);
+    for (const tile of short) {
+      const cutters = template(tile.templateId).cutters === 'cuttersDoor' ? ', door cutter set' : '';
+      expect(tile.reason, tile.templateId).toBe(`no cross cut saw, four sided planer${cutters}`);
+    }
+    const noBooth = greyed(bigHall(['sprayBooth']), 200).filter((tile) => TIMBER_IDS.includes(tile.templateId));
+    expect(noBooth.length).toBeGreaterThan(0);
+    for (const tile of noBooth) expect(tile.reason).toBe('needs a spray booth');
+  });
+
+  it('never has the agency draw a window or a door as a big job', () => {
+    const state = bigHall();
+    state.reputation = 90;
+    for (let seed = 0; seed < 300; seed += 1) {
+      const job = drawBigJob(state, { rng: seed * 7919 + 1 });
+      if (job === null) continue;
+      expect(TIMBER_IDS, job.templateId).not.toContain(job.templateId);
+    }
   });
 });

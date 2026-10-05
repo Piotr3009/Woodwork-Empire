@@ -27,8 +27,8 @@ import {
   SIZE_MULTIPLIER_MAX,
   SIZE_MULTIPLIER_MIN,
   SOLID_WOOD_EQUIPMENT,
+  secondExtensionOf,
   TIMBER_LEAD_DAYS,
-  TIMBER_ON_THE_BOARD,
   UNREACHABLE_MAX,
   UNREACHABLE_MIN,
   WORKING_DAYS_PER_WEEK,
@@ -79,15 +79,28 @@ export function enquiryQualityTier(state: GameState): number {
   return Math.max(0, Math.min(top, tier));
 }
 
-/** True for a template the board offers: every one but timber, until the timber branch lands
- *  [PIOTR, 25.09] (v57). */
-export function offeredOnTheBoard(entry: ProductTemplate): boolean {
-  return TIMBER_ON_THE_BOARD || entry.material !== 'solidWood';
+/** True once the board offers the timber department's windows and doors: a company in the 800 m2
+ *  hall, the second extension open [PIOTR, 04.10: era 3 is the 800 m2 hall] (CLAUDE.md T28 2.3).
+ *  The machines and the cutter sets are in the catalogue from day 1; the work for them is not. */
+export function timberOnTheBoard(state: GameState): boolean {
+  return secondExtensionOf(state.unit) === 'open';
+}
+
+/** True for a template the board offers, live or greyed: all the sheet work, and the windows and
+ *  doors once timber is on the board. The oak table, the one solid wood template the game had, stays
+ *  off it [TUNE: chat; it is not a window or a door] (v57, CLAUDE.md T28 2.3). Before the 800 m2
+ *  hall the five are nowhere on the board, so no draw of the seeded stream moves for a smaller
+ *  company. */
+export function offeredOnTheBoard(state: GameState, entry: ProductTemplate): boolean {
+  if (entry.material !== 'solidWood') return true;
+  return entry.cutters !== null && timberOnTheBoard(state);
 }
 
 function drawTemplate(state: GameState): ProductTemplate | null {
   const tier = enquiryQualityTier(state);
-  const candidates = templatesForReputation(effectiveReputation(state)).filter(offeredOnTheBoard);
+  const candidates = templatesForReputation(effectiveReputation(state)).filter((entry) =>
+    offeredOnTheBoard(state, entry),
+  );
   return pickWeighted(state, candidates, (entry) => entry.weightsByTier[tier] ?? 0);
 }
 
@@ -366,7 +379,7 @@ export function generateUnreachable(state: GameState): Enquiry | null {
   const already = new Set(
     state.enquiries.filter((other) => other.unreachable).map((other) => other.templateId),
   );
-  const left = PRODUCT_TEMPLATES.filter((entry) => offeredOnTheBoard(entry) && !already.has(entry.id));
+  const left = PRODUCT_TEMPLATES.filter((entry) => offeredOnTheBoard(state, entry) && !already.has(entry.id));
   if (left.length === 0) return null;
   const short = left.filter((entry) => kitBlockFor(state, entry) !== null);
   // Where it is short of nothing, the only reason left is the hands against the deadline, and

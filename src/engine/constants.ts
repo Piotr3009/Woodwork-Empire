@@ -4102,11 +4102,6 @@ export const EQUIPMENT_SPECS: EquipmentSpec[] = SPEC_DRAFTS.map(withVariants);
 /** Machines that must be owned before solid wood jobs can be made without the by-hand path. */
 export const SOLID_WOOD_EQUIPMENT = ['thicknesser', 'spindleMoulder'];
 
-/** The board offers no timber work until the timber branch lands [PIOTR, 25.09: "while we have no
- *  timber machines, take every offer off the board that wants the thicknesser or the timber
- *  machines"]. The timber templates stay in the catalogue, so a timber job can still be made; the
- *  board simply never draws one, neither into the band nor greyed beside it (v57). */
-export const TIMBER_ON_THE_BOARD = false;
 
 /** Fixed placement in cells, which are metres (docs/art/SPRITES.md 9.1). Free placement by the
  *  player is parked for the room blocks only: everything else he sets out himself (T2 3.10). */
