@@ -30,6 +30,7 @@ import type { ContractPieceSpec } from '../../src/engine/constants';
 import {
   acceptContract,
   assignContract,
+  closingReport,
   contractFamiliesOf,
   contractHallCapacity,
   contractMachineTip,
@@ -243,6 +244,18 @@ describe('a timber piece is made as a timber job is made (CLAUDE.md T29 2.12.3)'
     const result = contractResultFor(state, contract, worker);
     expect(result.wear).toBeGreaterThan(0);
     expect(result.machineName).toBe('the timber machines');
+    // Played for a morning, the closing report charges the minutes at the machines at the card's
+    // own rate a minute, never nought.
+    const played = runClock(connectAll(withExtraction(state)), 180);
+    const after = played.contracts.find((entry) => entry.id === contract.id);
+    if (after === undefined) throw new Error('the contract runs');
+    expect(after.machineMinutes).toBeGreaterThan(0);
+    const report = closingReport(played, after);
+    expect(report.machineWear).toBeGreaterThan(0);
+    const perMinute = result.wear / result.minutes;
+    expect(Math.abs(report.machineWear - after.machineMinutes * perMinute)).toBeLessThan(
+      (0.01 * after.machineMinutes) / result.minutes + 0.01,
+    );
     // A hall with no timber machine at all: by hand, and no wear.
     const bare = bigUnit(['crossCut', 'planer', 'spindleMoulder', 'sander', 'framePress', 'sprayBooth']);
     const none = running(bare, 'sashWindow', 'staff-w1');

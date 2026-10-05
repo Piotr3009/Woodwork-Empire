@@ -5184,7 +5184,8 @@ export const WEEK_JOBS_KEPT = 4;
  *  engineers at 15k a month, depending on the size of the line"] The line engineer's month, one
  *  grade (CLAUDE.md T29 2.8). */
 export const LINE_ENGINEER_MONTHLY_WAGE = 15000;
-/** Two engineers keep the whole line, and a third is refused (CLAUDE.md T29 2.8). */
+/** Two engineers keep the whole line, and a third is refused [PIOTR, 05.10: "one or two
+ *  engineers"; TUNE: chat: a third refused] (CLAUDE.md T29 2.8). */
 export const LINE_ENGINEERS_MAX = 2;
 /** The modules of the line its engineers on duty keep running, by how many are on duty: none with
  *  no engineer, three with one, all five with two [PIOTR: "one or two depending on the size of the

@@ -622,7 +622,8 @@ export function contractHallCapacity(state: GameState, contract: Contract): Hall
     // His minutes over a piece, rounded the way his card rounds them (`resultAtSpeed`). Points
     // that add up to less than nothing are the floor, as on the minute (`manPace`): a window's men
     // short at five families at once stand there, and until v84 the line read such a hall at full
-    // pace (CLAUDE.md T29 2.12.3, section 8). A nought is still read as the piece's own pace.
+    // pace (CLAUDE.md T29 2.12.3, section 8). A nought, a stop among the factors, is still read
+    // as 1, as before.
     const minutes = Math.max(1, Math.round(piece.minutes / manPace(rateOf(worker), speed === 0 ? 1 : speed)));
     perWeek += Math.floor(week / minutes);
   }

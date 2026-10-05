@@ -216,3 +216,44 @@ hall. Both files were written by a sub-agent from the repo and read by the lead.
 
 One scenario figure moved: (vv)'s glass waits to the next working day and not ten, restated in B1.
 (vv)'s company was given a shelter on the apron in C6, and no figure of it moved.
+
+**T29-E3 Cross check.** Four read-only auditors mapped every clause of section 7 to the test that
+asserts it. Every clause was already built; seventeen were asserted only in part or not at all.
+The rest are asserted in a new file, `tests/engine/t29CrossCheck.test.ts` (13 tests), as section
+7 words them:
+- the Sprite check page draws a file, a footprint and no red port line for all 11 new classes;
+- the five axis CNC and every module are refused in the 400 m² unit as well as the 200, and the
+  robot and both stores are sold there;
+- exactly the six big families name a unit, so the two catalogue tests pass over those six only;
+- the reputation is asked before the unit;
+- a sheet job, laminate and lacquered, keeps its plan family for family in one hall that has the
+  five axis CNC, the robot, a whole running line and both stores, against one with none of it,
+  and only the robot moves it, at the Finishing;
+- a module's requires is asked before one of each, and one of each before the cash;
+- five modules ordered in one morning stand on the morning they are due, natural days played,
+  and none the evening before;
+- the Planing's speed at every level, and the Pressing on module 4 at levels 4 and 5;
+- 33 real men on timber work with the whole line raise no `Too few` for a module, while the
+  booths are short;
+- the engineer's played week is booked at 90 per cent and more, his tile says how much of the line
+  runs, and Our team never says `Near full` or `standing most of the week` of him;
+- a load of sheets past full racks overflows to the paid store, as on v83, and never onto a
+  store with room;
+- a dropped window's load still on the road goes too;
+- a raw v41 save with a window holding its boards and no store opens and draws them all.
+
+Review fixes folded in:
+- `LINE_ENGINEERS_MAX` tagged [PIOTR] and [TUNE: chat].
+- The tile's and the taken job's boards asserted equal with 0, 1 and 5 modules (19, 18, 16).
+- A line with no engineer reads `Production line, standing still` at nought on the Output sheet,
+  in place of `0 modules` [TUNE], and has no line on the top bar's plate, like any machine at
+  nought.
+- C7's tidy-ups: the closing report's timber wear asserted against the card's rate, the
+  `pluralOf` comment pointing at the tests that check it, and the hall line guard's comment.
+
+Checked by hand:
+- `git diff main` shows no changed line in `tests/engine/assignees.test.ts`,
+  `tests/scenarios/turn19.test.ts` or `tests/ui/workPlan.test.ts`.
+- No `.skip`, `.only`, `.todo`, `xit` or `xdescribe` anywhere in `tests/` or `src/`.
+- `git diff main --stat -- src/ui/styles.css` is empty.
+- `APP_VERSION` 'v84', `STATE_VERSION` 42, `OLDEST_SAVE_VERSION` 12.

@@ -1592,8 +1592,10 @@ export function paceLines(state: GameState): PaceLine[] {
     const word = machineShortWord(family);
     lines.push({ family, label: `${word.charAt(0).toUpperCase()}${word.slice(1)}, ${best.variantId}`, percent });
   }
+  // The line as one line, and none while it stands still, as a machine that moves nothing has none.
   const line = productionLineLine(state);
-  if (line !== null) lines.push({ family: 'line', label: line.label, percent: Math.round(line.points * 100) });
+  const linePercent = line === null ? 0 : Math.round(line.points * 100);
+  if (line !== null && linePercent !== 0) lines.push({ family: 'line', label: line.label, percent: linePercent });
   return lines;
 }
 
@@ -1603,7 +1605,8 @@ export function productionLineLine(state: GameState): { label: string; points: n
   if (lineModules(state) === 0) return null;
   const level = lineLevel(state);
   return {
-    label: `Production line, ${plural(level, 'module', 'modules')}`,
+    // With no engineer on duty the line stands still, and says so in place of `0 modules` [TUNE].
+    label: level === 0 ? 'Production line, standing still' : `Production line, ${plural(level, 'module', 'modules')}`,
     points: roundPoints(lineFactor(state) - 1),
   };
 }

@@ -57,8 +57,19 @@ import { machinesInTheHall } from '../../src/ui/machinesPage';
 import { workerDoing } from '../../src/ui/personCard';
 import { formulaLine } from '../../src/ui/security';
 import { renderHall } from '../../src/render/hall';
+import { renderBoard } from '../../src/ui/board';
 import { SECURITY_LEVELS } from '../../src/engine/constants';
-import { act, buyStartingKit, newGame, nextDay, placeEquipment, testJoiner, withAir } from '../helpers';
+import {
+  act,
+  acceptNow,
+  buyStartingKit,
+  newGame,
+  nextDay,
+  placeEnquiry,
+  placeEquipment,
+  testJoiner,
+  withAir,
+} from '../helpers';
 
 const PRICES = [1500000, 750000, 750000, 1000000, 1000000];
 
@@ -332,6 +343,33 @@ describe('the boards the line saves (CLAUDE.md T29 2.9.7)', () => {
     expect(boardsForJob(withLine(bigUnit(), 5), 10, true)).toBe(1);
     expect(boardsForJob(withLine(bigUnit(), 5), cost, false)).toBe(boardsForJob(bigUnit(), cost, false));
   });
+
+  it('counts the same boards on the tile and on the job taken, with none, one and five modules', () => {
+    for (const [modules, boards] of [
+      [0, 19],
+      [1, 18],
+      [5, 16],
+    ] as const) {
+      const state = withLine(bigUnit(), modules);
+      const enquiry = placeEnquiry(state, {
+        templateId: 'sashWindows',
+        name: 'Sash windows',
+        price: 14000,
+        basePrice: 14000,
+        finish: 'lacquer',
+        materialKind: 'solidWood',
+        deadlineDays: 60,
+      });
+      const tile = document.createElement('div');
+      tile.innerHTML = renderBoard(state, '');
+      expect(tile.querySelector(`[data-enquiry="${enquiry.id}"]`)?.textContent, `${modules}`).toContain(
+        `${boards} boards of material`,
+      );
+      const taken = acceptNow(state, enquiry.id);
+      const job = taken.jobs.find((entry) => entry.templateId === 'sashWindows');
+      expect(job?.sheets, `${modules}`).toBe(boards);
+    }
+  });
 });
 
 describe('the module s card and the sheets that list machines (CLAUDE.md T29 2.9.8)', () => {
@@ -373,6 +411,15 @@ describe('the module s card and the sheets that list machines (CLAUDE.md T29 2.9
     expect(machinesInTheHall(state).some((item) => LINE_MODULES.includes(item.specId))).toBe(false);
     expect(machineSavings(state, 'week').rows.some((row) => row.id.startsWith('kit-line'))).toBe(false);
     expect(paceLines(bigUnit()).some((line) => line.family === 'line')).toBe(false);
+    // A line that stands still says so on the Output sheet at nought, and has no line on the plate.
+    const still = withLine(bigUnit(), 5);
+    expect(outputBreakdown(still).lines.find((line) => line.label.startsWith('Production line'))).toEqual({
+      label: 'Production line, standing still',
+      points: 0,
+      hall: false,
+      where: 'timber work, the Finishing excepted',
+    });
+    expect(paceLines(still).some((line) => line.family === 'line')).toBe(false);
   });
 });
 
