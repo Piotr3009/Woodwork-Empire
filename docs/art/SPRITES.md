@@ -529,3 +529,61 @@ from `budget` up; the used sander has a vacuum of its own and the presses and th
 no dust) are measured off these files, one line a file, `.r` among them, in `src/engine/ports.ts`
 [TUNE until Piotr confirms them on the hall]. The three cutter sets of 2.5 have no picture: the
 catalogue shows its empty picture box for them until the art side delivers.
+
+## 13. The five axis CNC, the spraying robot, the line and the timber stores (Turn 29, 05.10.2026)
+
+Piotr's words of 05.10: "you have it in the zip", "put everything into the next turn". The 22 files
+below came from the art side in three packs (the robot and the five axis CNC; the line's five
+modules; the two timber stores), were renamed by chat as the game names them, and went into
+`public/sprites/` as they were delivered (CLAUDE.md T29 2.4). No agent altered a pixel of any of
+them. Every file is the engine's own canvas for its class (section 2: `(w + d) × 48 + 16` by
+`(w + d) × 24 + h × 48 + 16`) with its anchor at `(8 + w × 48, H + 8)`, and the `.r` file is the
+art side's 90 degree view of the same thing, its anchor at `(8 + d × 48, H + 8)` on the same
+canvas. Metres are width, depth and height of the class in view 0. All 22 fit the canvas and the
+anchor with no table of pixels.
+
+| File in public/sprites/ (and its `.r`) | Family | Metres | File, px | Anchor, view 0 / `.r` | The art side called it |
+|---|---|---|---|---|---|
+| `cnc5.standard.png` | `cnc5` | 5 × 3 × 2.5 | 400 × 328 | 248 / 152, 320 | the same |
+| `cnc5.pro.png` | `cnc5` | 6 × 3 × 2.75 | 448 × 364 | 296 / 152, 356 | the same |
+| `cnc5.industrial.png` | `cnc5` | 8 × 4 × 3 | 592 × 448 | 392 / 200, 440 | the same |
+| `sprayRobot.standard.png` | `sprayRobot` | 2 × 1 × 2.25 | 160 × 196 | 104 / 56, 188 | the same |
+| `windowLine1.standard.png` | `windowLine1` | 6 × 3 × 2.5 | 448 × 352 | 296 / 152, 344 | `windowLine.stage1` |
+| `windowLine2.standard.png` | `windowLine2` | 6 × 3 × 2.5 | 448 × 352 | 296 / 152, 344 | `windowLine.stage2` |
+| `windowLine3.standard.png` | `windowLine3` | 6 × 3 × 2.5 | 448 × 352 | 296 / 152, 344 | `windowLine.stage3` |
+| `windowLine4.standard.png` | `windowLine4` | 6 × 3 × 2.5 | 448 × 352 | 296 / 152, 344 | `windowLine.stage4` |
+| `windowLine5.standard.png` | `windowLine5` | 6 × 3 × 2.5 | 448 × 352 | 296 / 152, 344 | `windowLine.stage5` |
+| `timberRack.standard.png` | `timberRack` | 4 × 1 × 2.5 | 256 × 256 | 200 / 56, 248 | `timberStorage.rack` |
+| `timberShelter.standard.png` | `timberShelter` | 3 × 6 × 3 | 448 × 376 | 152 / 296, 368 | `timberStorage.shelter`, its 90 view |
+
+Why the names changed. A family in this game has the five classes or one class called `standard`
+(the five axis CNC, from tonight, an unbroken run of three of them: `standard`, `pro`,
+`industrial`). Five modules at five prices and two stores of two shapes are therefore seven
+families of one class each, the way the high capacity rack is a family of its own beside the rack,
+and their files carry `.standard`. Chat renamed them and touched no pixel.
+
+The shelter's two views changed places. The art side drew it 6 m long by 3 m deep. It stands
+outside on the apron, which is 3 m wide, so the game declares it 3 wide by 6 deep: the art side's
+90 view is `timberShelter.standard.png` and its 0 view is the `.r`. Kit outside is never turned,
+so the shelter's `.r` (like the van's) is on disk for the tests and the Sprite check page and is
+never drawn on the hall.
+
+What they are:
+
+- **All 22** are rendered from models by the art side, exact to the contract, in the plainer look
+  of Turn 28's pack 1 and not in the look of the September machines; Piotr has seen that and it
+  stays for now. The industrial five axis CNC is drawn blue with a grey cabinet where the standard
+  and the pro are green.
+- **Module 1 is drawn as an infeed and a planer with no saw** (the art side's own table: feeding,
+  planing and profiling). The game gives it the Cross cutting all the same (CLAUDE.md T29 2.4,
+  [TUNE: chat]), and a saw at module 1's infeed is on `docs/art/REQUESTS-T29.md` for the art side.
+- **The two timber stores are drawn full of timber**, with no empty picture and no layer: a store
+  bought this morning shows a full load over a plate of `0 / 40`. Known and left tonight; the
+  stores drawn empty are on `docs/art/REQUESTS-T29.md`.
+- **The five modules stand short of their footprint's side corners** by about 38 px in both views
+  (about 0.8 m), so two modules butted end to end may show a narrow gap between them on the hall.
+
+The ports: only the five axis CNC wants extraction, so its six files (each class and its `.r`) have
+one line each in `src/engine/ports.ts`, measured off these pictures and written in with the family
+(T29-C2) [TUNE until Piotr confirms them on the hall]. The standard class is an open gantry with no duct stub drawn, so its line is the top
+of the head's carriage. The robot, the modules and the stores make no dust and have no port.

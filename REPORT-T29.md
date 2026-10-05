@@ -44,3 +44,9 @@ highest rate with four at the machine and reads `with four on it` for a company 
 frees the rest and queues `contractsTrimmed` for the first settle; it brings a glass on its way
 forward to the next working day. `contractHall.test.ts` restated for six joiners: 144 to 104, 144
 and 180 to 104 and 128, 162 and 144 to 128 and 104, 156 and 168 to 112 and 128.
+
+**T29-C1 The 22 pictures.** `git mv` from `docs/pictures-t29/` into `public/sprites/`, the
+manifest regenerated (280 pictures), the folder and its JSON gone, `docs/art/SPRITES.md` section 13
+written (the table, why the names changed, the shelter's two views, module 1 drawn with no saw, the
+stores drawn full). The two pins of turned files go 96 to 107; the measured class count moves as
+each family lands. No pixel touched. `tests/ui/t29Families.test.ts` holds the 22 on disk.

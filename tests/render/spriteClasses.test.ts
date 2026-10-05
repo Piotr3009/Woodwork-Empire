@@ -247,7 +247,9 @@ describe('the file on disk and the footprint in the engine', () => {
     // of the four vans and of the electric pallet truck. Seventy six from v80: the two better
     // forklifts' and the air dryer's. Seventy five from v81: the pallet truck's file is deleted.
     // Ninety six from v83: the twenty one turns of the five timber families (CLAUDE.md T28 2.11).
-    expect(turnedFiles).toHaveLength(96);
+    // One hundred and seven from v84: the eleven turns of the five axis CNCs, the robot, the
+    // line's five modules and the two timber stores (CLAUDE.md T29 2.4).
+    expect(turnedFiles).toHaveLength(107);
   });
 
   it('draws the CNC with its tool changer on the CNC s own canvas, both ways round (v56)', () => {
