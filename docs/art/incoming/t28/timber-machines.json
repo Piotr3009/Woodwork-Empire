@@ -1,0 +1,551 @@
+{
+ "note": "Metres are width, depth, height of the class in view 0. A file ending .r.png is the same machine turned a quarter (the art side's 90 folder). Canvas and anchor follow docs/art/SPRITES.md 2 and src/render/sprites.ts: nothing here is to be read into the engine, it is the proof the files fit it.",
+ "sprites": {
+  "planer.used": {
+   "metres": {
+    "w": 3,
+    "d": 1,
+    "h": 1.5
+   },
+   "canvasPx": {
+    "w": 208,
+    "h": 184
+   },
+   "source": "pack 1, rendered from a model by the art side",
+   "files": {
+    "planer.used.png": {
+     "anchorPx": {
+      "x": 152,
+      "y": 176
+     }
+    },
+    "planer.used.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 176
+     }
+    }
+   }
+  },
+  "planer.budget": {
+   "metres": {
+    "w": 3,
+    "d": 1,
+    "h": 1.5
+   },
+   "canvasPx": {
+    "w": 208,
+    "h": 184
+   },
+   "source": "pack 1, rendered from a model by the art side",
+   "files": {
+    "planer.budget.png": {
+     "anchorPx": {
+      "x": 152,
+      "y": 176
+     }
+    },
+    "planer.budget.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 176
+     }
+    }
+   }
+  },
+  "planer.standard": {
+   "metres": {
+    "w": 4,
+    "d": 1,
+    "h": 1.5
+   },
+   "canvasPx": {
+    "w": 256,
+    "h": 208
+   },
+   "source": "pack 1, rendered from a model by the art side",
+   "files": {
+    "planer.standard.png": {
+     "anchorPx": {
+      "x": 200,
+      "y": 200
+     }
+    },
+    "planer.standard.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 200
+     }
+    }
+   }
+  },
+  "planer.pro": {
+   "metres": {
+    "w": 5,
+    "d": 1,
+    "h": 1.75
+   },
+   "canvasPx": {
+    "w": 304,
+    "h": 244
+   },
+   "source": "pack 1, rendered from a model by the art side",
+   "files": {
+    "planer.pro.png": {
+     "anchorPx": {
+      "x": 248,
+      "y": 236
+     }
+    },
+    "planer.pro.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 236
+     }
+    }
+   }
+  },
+  "planer.industrial": {
+   "metres": {
+    "w": 6,
+    "d": 2,
+    "h": 2
+   },
+   "canvasPx": {
+    "w": 400,
+    "h": 304
+   },
+   "source": "pack 1, rendered from a model by the art side",
+   "files": {
+    "planer.industrial.png": {
+     "anchorPx": {
+      "x": 296,
+      "y": 296
+     }
+    },
+    "planer.industrial.r.png": {
+     "anchorPx": {
+      "x": 104,
+      "y": 296
+     }
+    }
+   }
+  },
+  "crossCut.used": {
+   "metres": {
+    "w": 2,
+    "d": 1,
+    "h": 1.25
+   },
+   "canvasPx": {
+    "w": 160,
+    "h": 148
+   },
+   "source": "pack 1, rendered from a model by the art side",
+   "files": {
+    "crossCut.used.png": {
+     "anchorPx": {
+      "x": 104,
+      "y": 140
+     }
+    },
+    "crossCut.used.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 140
+     }
+    }
+   }
+  },
+  "crossCut.budget": {
+   "metres": {
+    "w": 3,
+    "d": 1,
+    "h": 1.25
+   },
+   "canvasPx": {
+    "w": 208,
+    "h": 172
+   },
+   "source": "pack 1, rendered from a model by the art side",
+   "files": {
+    "crossCut.budget.png": {
+     "anchorPx": {
+      "x": 152,
+      "y": 164
+     }
+    },
+    "crossCut.budget.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 164
+     }
+    }
+   }
+  },
+  "crossCut.standard": {
+   "metres": {
+    "w": 4,
+    "d": 1,
+    "h": 1.5
+   },
+   "canvasPx": {
+    "w": 256,
+    "h": 208
+   },
+   "source": "pack 1, rendered from a model by the art side",
+   "files": {
+    "crossCut.standard.png": {
+     "anchorPx": {
+      "x": 200,
+      "y": 200
+     }
+    },
+    "crossCut.standard.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 200
+     }
+    }
+   }
+  },
+  "crossCut.pro": {
+   "metres": {
+    "w": 5,
+    "d": 1,
+    "h": 1.75
+   },
+   "canvasPx": {
+    "w": 304,
+    "h": 244
+   },
+   "source": "pack 1, rendered from a model by the art side",
+   "files": {
+    "crossCut.pro.png": {
+     "anchorPx": {
+      "x": 248,
+      "y": 236
+     }
+    },
+    "crossCut.pro.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 236
+     }
+    }
+   }
+  },
+  "crossCut.industrial": {
+   "metres": {
+    "w": 7,
+    "d": 2,
+    "h": 2
+   },
+   "canvasPx": {
+    "w": 448,
+    "h": 328
+   },
+   "source": "pack 1, rendered from a model by the art side",
+   "files": {
+    "crossCut.industrial.png": {
+     "anchorPx": {
+      "x": 344,
+      "y": 320
+     }
+    },
+    "crossCut.industrial.r.png": {
+     "anchorPx": {
+      "x": 104,
+      "y": 320
+     }
+    }
+   }
+  },
+  "sander.used": {
+   "metres": {
+    "w": 2,
+    "d": 1,
+    "h": 1
+   },
+   "canvasPx": {
+    "w": 160,
+    "h": 136
+   },
+   "source": "pack 2, as the art side delivered it",
+   "files": {
+    "sander.used.png": {
+     "anchorPx": {
+      "x": 104,
+      "y": 128
+     }
+    },
+    "sander.used.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 128
+     }
+    }
+   }
+  },
+  "sander.budget": {
+   "metres": {
+    "w": 2,
+    "d": 1,
+    "h": 1.25
+   },
+   "canvasPx": {
+    "w": 160,
+    "h": 148
+   },
+   "source": "pack 2, as the art side delivered it",
+   "files": {
+    "sander.budget.png": {
+     "anchorPx": {
+      "x": 104,
+      "y": 140
+     }
+    },
+    "sander.budget.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 140
+     }
+    }
+   }
+  },
+  "sander.standard": {
+   "metres": {
+    "w": 2,
+    "d": 1,
+    "h": 1.5
+   },
+   "canvasPx": {
+    "w": 160,
+    "h": 160
+   },
+   "source": "pack 2, as the art side delivered it",
+   "files": {
+    "sander.standard.png": {
+     "anchorPx": {
+      "x": 104,
+      "y": 152
+     }
+    },
+    "sander.standard.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 152
+     }
+    }
+   }
+  },
+  "sander.pro": {
+   "metres": {
+    "w": 3,
+    "d": 2,
+    "h": 1.75
+   },
+   "canvasPx": {
+    "w": 256,
+    "h": 220
+   },
+   "source": "pack 2, as the art side delivered it",
+   "files": {
+    "sander.pro.png": {
+     "anchorPx": {
+      "x": 152,
+      "y": 212
+     }
+    },
+    "sander.pro.r.png": {
+     "anchorPx": {
+      "x": 104,
+      "y": 212
+     }
+    }
+   }
+  },
+  "sander.industrial": {
+   "metres": {
+    "w": 6,
+    "d": 2,
+    "h": 2
+   },
+   "canvasPx": {
+    "w": 400,
+    "h": 304
+   },
+   "source": "pack 2, as the art side delivered it",
+   "files": {
+    "sander.industrial.png": {
+     "anchorPx": {
+      "x": 296,
+      "y": 296
+     }
+    },
+    "sander.industrial.r.png": {
+     "anchorPx": {
+      "x": 104,
+      "y": 296
+     }
+    }
+   }
+  },
+  "framePress.used": {
+   "metres": {
+    "w": 2,
+    "d": 1,
+    "h": 1
+   },
+   "canvasPx": {
+    "w": 160,
+    "h": 136
+   },
+   "source": "pack 2, cut again by chat from the approved preview board: a stand-in, registration approximate",
+   "files": {
+    "framePress.used.png": {
+     "anchorPx": {
+      "x": 104,
+      "y": 128
+     }
+    },
+    "framePress.used.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 128
+     }
+    }
+   }
+  },
+  "framePress.budget": {
+   "metres": {
+    "w": 3,
+    "d": 1,
+    "h": 1.25
+   },
+   "canvasPx": {
+    "w": 208,
+    "h": 172
+   },
+   "source": "pack 2, cut again by chat from the approved preview board: a stand-in, registration approximate",
+   "files": {
+    "framePress.budget.png": {
+     "anchorPx": {
+      "x": 152,
+      "y": 164
+     }
+    },
+    "framePress.budget.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 164
+     }
+    }
+   }
+  },
+  "framePress.standard": {
+   "metres": {
+    "w": 3,
+    "d": 1,
+    "h": 2.25
+   },
+   "canvasPx": {
+    "w": 208,
+    "h": 220
+   },
+   "source": "pack 2, cut again by chat from the approved preview board: a stand-in, registration approximate",
+   "files": {
+    "framePress.standard.png": {
+     "anchorPx": {
+      "x": 152,
+      "y": 212
+     }
+    },
+    "framePress.standard.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 212
+     }
+    }
+   }
+  },
+  "framePress.pro": {
+   "metres": {
+    "w": 4,
+    "d": 1,
+    "h": 2.5
+   },
+   "canvasPx": {
+    "w": 256,
+    "h": 256
+   },
+   "source": "pack 2, cut again by chat from the approved preview board: a stand-in, registration approximate",
+   "files": {
+    "framePress.pro.png": {
+     "anchorPx": {
+      "x": 200,
+      "y": 248
+     }
+    },
+    "framePress.pro.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 248
+     }
+    }
+   }
+  },
+  "framePress.industrial": {
+   "metres": {
+    "w": 5,
+    "d": 2,
+    "h": 2.75
+   },
+   "canvasPx": {
+    "w": 352,
+    "h": 316
+   },
+   "source": "pack 2, cut again by chat from the approved preview board: a stand-in, registration approximate",
+   "files": {
+    "framePress.industrial.png": {
+     "anchorPx": {
+      "x": 248,
+      "y": 308
+     }
+    },
+    "framePress.industrial.r.png": {
+     "anchorPx": {
+      "x": 104,
+      "y": 308
+     }
+    }
+   }
+  },
+  "glueTable.standard": {
+   "metres": {
+    "w": 3,
+    "d": 1,
+    "h": 1
+   },
+   "canvasPx": {
+    "w": 208,
+    "h": 160
+   },
+   "source": "pack 2, cut again by chat from the approved preview board: a stand-in, registration approximate",
+   "files": {
+    "glueTable.standard.png": {
+     "anchorPx": {
+      "x": 152,
+      "y": 152
+     }
+    },
+    "glueTable.standard.r.png": {
+     "anchorPx": {
+      "x": 56,
+      "y": 152
+     }
+    }
+   }
+  }
+ }
+}
