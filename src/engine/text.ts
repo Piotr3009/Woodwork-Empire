@@ -44,6 +44,13 @@ const SMALL_NUMBERS: readonly string[] = [
   'nought', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
 ];
 
+/** A catalogue name inside a sentence: `the extractor`, `the spray booth`, and `the CNC` as it is
+ *  written, because a name that opens with capitals is one. Moved here from the premises in v84,
+ *  so the canteen's refusal and the line's write a name one way (CLAUDE.md T29 2.9.2). */
+export function inASentence(name: string): string {
+  return /^[A-Z]{2}/.test(name) ? name : name.charAt(0).toLowerCase() + name.slice(1);
+}
+
 /** Names in a sentence: `Pete`, `Pete and Eddie`, `Pete, Eddie and Ben`. */
 export function andList(names: readonly string[]): string {
   if (names.length <= 1) return names.join('');

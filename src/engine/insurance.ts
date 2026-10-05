@@ -18,7 +18,7 @@ import {
 import { dayOfMonth } from './clock';
 import { canAfford, charge, formatMoney } from './economy';
 import { queueEvent } from './events';
-import { variantFor } from './machines';
+import { isLineModule, variantFor } from './machines';
 import { int } from './rng';
 import type { GameState } from './types';
 
@@ -72,6 +72,18 @@ export function insuredStockValue(state: GameState): number {
  *  stock at its value. Recomputed on every purchase and every stock change (CLAUDE.md T13 3.15). */
 export function insuredValue(state: GameState): number {
   return insuredMachinesValue(state) + insuredStockValue(state);
+}
+
+/** What the line's modules standing in the hall cost: in the insured value like everything, and
+ *  out of the security firm's price, which a company with a line would otherwise pay for five
+ *  million of kit nobody can carry off (CLAUDE.md T29 2.10). */
+export function lineValue(state: GameState): number {
+  let value = 0;
+  for (const item of state.equipment) {
+    if (item.soldOnDay !== null || !isLineModule(item.specId)) continue;
+    value += item.purchasePrice;
+  }
+  return Math.round(value);
 }
 
 /** The rate on what is insured and the vans' own figures, and twice the two of them on the

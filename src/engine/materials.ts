@@ -16,10 +16,11 @@ import {
   STOCK_LINE_NAME,
   STOCK_LINE_KINDS,
   WAITING_FOR_GLASS,
+  LINE_BOARD_SAVING,
 } from './constants';
 import { addWorkingDays } from './clock';
 import { canAfford, pay } from './economy';
-import { isSold, itemStandsInTheHall, sheetCapacityOf } from './machines';
+import { isSold, itemStandsInTheHall, lineModules, sheetCapacityOf } from './machines';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
 import { plural } from './text';
@@ -28,6 +29,19 @@ import type { Delivery, GameState, Job, MaterialKind } from './types';
 /** Sheets a job needs: one sheet is 200 of material value (PIOTR). */
 export function sheetsForCost(cost: number): number {
   return Math.max(1, Math.ceil(cost / SHEET_VALUE));
+}
+
+/** The boards, or the sheets, a job of this material cost holds: the one count the board's tile
+ *  and the job taken from it both read. A timber job's glass is not on it (CLAUDE.md T28 2.9), and
+ *  a timber job taken while the line is N modules long is counted `LINE_BOARD_SAVING` fewer boards
+ *  for each of them: the saving comes off the boards' cost to the penny before they are rounded up,
+ *  never below one board, and what is saved is the boards that are not ordered (CLAUDE.md T29
+ *  2.9.7) [TUNE: chat]. */
+export function boardsForJob(state: GameState, materialCost: number, timber: boolean): number {
+  const boards = boardsCostOf(materialCost, timber);
+  if (!timber) return sheetsForCost(boards);
+  const kept = 1 - LINE_BOARD_SAVING * lineModules(state);
+  return sheetsForCost(Math.round(boards * kept * 100) / 100);
 }
 
 /** What the shelving in the hall can hold: every rack in it, by its class. Two racks hold what

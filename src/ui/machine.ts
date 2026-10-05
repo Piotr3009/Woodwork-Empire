@@ -48,8 +48,11 @@ import {
   GLUE_TABLE,
   GLUE_TABLE_PLACES,
   CNC5_STAGE_FACTOR,
+  LINE_COVERS,
+  LINE_FACTOR,
   SPRAY_ROBOT,
   SPRAY_ROBOT_FINISH_FACTOR,
+  TIMBER_STAGES,
   DUST_WASTE_MONTHLY,
   EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
@@ -61,7 +64,8 @@ import {
   bagsToM3,
   unitCostFactor,
 } from '../engine/constants';
-import { insuranceForClass } from '../engine/machines';
+import { insuranceForClass, isLineModule, lineModuleIndex } from '../engine/machines';
+import { andList, inASentence } from '../engine/text';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import {
@@ -350,16 +354,33 @@ function figureLines(lines: Line[]): string {
     .join('');
 }
 
-/** The effects of a class, one line each: what it does to the work, what it makes, what it needs
- *  of the air, how long it lasts, and what its class alone does (a fan pulls and holds bags, a
- *  compressor gives air, a rack holds sheets, a machine with a drop can take a gate)
- *  (CLAUDE.md T13 3.1). */
+/** A module's own lines, from the constants and never in written figures: the stages it does (or,
+ *  for the fifth, what it does without one), what the line gives with it this long, and for the
+ *  first what it needs beside it (CLAUDE.md T29 2.9.8). */
+function lineModuleLines(spec: EquipmentSpec): Line[] {
+  const index = lineModuleIndex(spec.id);
+  const stages = TIMBER_STAGES.filter((stage) => LINE_COVERS[stage.id] === index).map((stage) => `the ${stage.label}`);
+  const covers =
+    stages.length === 0 ? 'Takes the finished frames off the line' : `Does ${andList(stages)} of windows and doors`;
+  const factor = `With the line this long timber work goes ${LINE_FACTOR[index] ?? 1} times as fast, the Finishing excepted`;
+  const beside = spec.requires.filter((id) => !isLineModule(id)).map((id) => `a ${inASentence(findSpec(id)?.name ?? id)}`);
+  return [
+    line(covers),
+    line(factor),
+    line(beside.length === 0 ? '' : `Needs ${andList(beside)} beside it`),
+  ];
+}
+
 /** What the five axis CNC does, said among its effects off the engine's own factor; the CNC's card
  *  says nothing of its own two, and that stays (CLAUDE.md T29 2.6). Empty for everything else. */
 function cnc5Line(spec: EquipmentSpec): string {
   return spec.id === 'cnc5' ? `The Moulding of windows and doors goes ${CNC5_STAGE_FACTOR} times as fast on it` : '';
 }
 
+/** The effects of a class, one line each: what it does to the work, what it makes, what it needs
+ *  of the air, how long it lasts, and what its class alone does (a fan pulls and holds bags, a
+ *  compressor gives air, a rack holds sheets, a machine with a drop can take a gate)
+ *  (CLAUDE.md T13 3.1). */
 function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
   // Drying racks are shelving that makes nothing of its own, no dust and no hours: the one thing
   // they do is said in one line, off the engine's own factor (v73).
@@ -371,6 +392,10 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
   if (spec.id === GLUE_TABLE) {
     return [line(`The frame press it stands by keeps ${GLUE_TABLE_PLACES} more men busy`)];
   }
+  // A module of the line says what it covers and what the line gives with it, and no Output, Dust,
+  // Life or men busy line: the line is kept by its engineers and is one thing on the sheets
+  // (CLAUDE.md T29 2.9.8).
+  if (isLineModule(spec.id)) return lineModuleLines(spec);
   const machine = spec.category === 'machine';
   return [
     line(atOnceLine(spec, variant)),

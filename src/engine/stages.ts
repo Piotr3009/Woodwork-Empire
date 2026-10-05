@@ -25,7 +25,16 @@ import {
   TIMBER_STAGES,
   WORK_EPSILON,
 } from './constants';
-import { SPRAY_BOOTH, familyRuns, hallPace, has, sprayRobotRuns } from './machines';
+import {
+  SPRAY_BOOTH,
+  familyRuns,
+  hallPace,
+  has,
+  isLineModule,
+  lineFactor,
+  lineModuleFor,
+  sprayRobotRuns,
+} from './machines';
 import type {
   Finish,
   GameState,
@@ -153,13 +162,16 @@ export function familyForStage(job: StagedJob, stage: StageId): string | null {
 
 /** The family a stage of this job is done on in this hall. A sheet job's stage is done where
  *  `familyForStage` says whatever stands in the hall. For a timber job, and for a timber job only,
- *  the answer is asked of the hall, first that applies: the five axis CNC for the Moulding while
- *  one runs, and otherwise the family the stage has always had. The stage is still the Moulding:
+ *  the answer is asked of the hall, first that applies: the line's module that covers it while the
+ *  line runs at that level (CLAUDE.md T29 2.9.5), the five axis CNC for the Moulding while one
+ *  runs, and otherwise the family the stage has always had. The stage is still the Moulding:
  *  its bar, its bag of labour, its label and its night are what they were, and only the machine
  *  under it changes (CLAUDE.md T29 2.5.3, 2.6). The one answer `stageSpeed`, `stagePlanFor` and
  *  through them the pace, the places, the men drawn and the Work Plan read. */
 export function stageFamilyIn(state: GameState, job: StagedJob, stage: StageId): string | null {
   if (job.timber !== true) return familyForStage(job, stage);
+  const module = lineModuleFor(state, stage);
+  if (module !== null) return module;
   if (stage === 'moulding' && cnc5Runs(state)) return 'cnc5';
   return familyForStage(job, stage);
 }
@@ -204,20 +216,27 @@ export function stageSpeed(
   // The CNC's own head times the hall's pace at it, like every family (CLAUDE.md T25 2.4).
   if (stage === 'cnc') return { speed: cncFactor(state) * hallPace(state, 'cnc'), byHand: false };
   const family = stageFamilyIn(state, job, stage);
-  // A timber job's Moulding on the five axis CNC goes at its four times the hall's pace at it, the
-  // class's pace on top, as the CNC's own way with the Cutting of a sheet job (CLAUDE.md T29 2.6).
-  if (family === 'cnc5') return { speed: CNC5_STAGE_FACTOR * hallPace(state, 'cnc5'), byHand: false };
-  if (family === null) return { speed: 1, byHand: false };
+  // While the line runs every stage of a timber job but the Finishing goes its factor faster, the
+  // stages it does not cover among them: the line is the department's flow, and what it feeds is
+  // fed faster (CLAUDE.md T29 2.9.6) [TUNE: chat].
+  const line = job.timber === true && stage !== 'finishing' ? lineFactor(state) : 1;
+  // A timber job's Moulding on the five axis CNC, or on the line's own CNC of module 2, goes at
+  // four times the hall's pace at it, the class's pace on top, as the CNC's own way with the
+  // Cutting of a sheet job (CLAUDE.md T29 2.6, 2.9.5).
+  if (family === 'cnc5' || (stage === 'moulding' && family !== null && isLineModule(family))) {
+    return { speed: CNC5_STAGE_FACTOR * hallPace(state, family) * line, byHand: false };
+  }
+  if (family === null) return { speed: line, byHand: false };
   // Parts come off a CNC cut and drilled, so the bench takes half the minutes (CLAUDE.md T7 3.4).
   const cnc = stage === 'assembly' && jobOnCnc(state, job, options) ? CNC_ASSEMBLY_FACTOR : 1;
   if (has(state, family) && familyRuns(state, family)) {
     // The spraying robot speeds the Finishing at a booth that runs, a lacquered sheet job's among
     // them, and does nothing with no booth that runs (CLAUDE.md T29 2.7).
     const robot = family === SPRAY_BOOTH && sprayRobotRuns(state) ? SPRAY_ROBOT_FINISH_FACTOR : 1;
-    return { speed: hallPace(state, family) * cnc * robot, byHand: false };
+    return { speed: hallPace(state, family) * cnc * robot * line, byHand: false };
   }
-  if (!BY_HAND_STAGES.includes(stage)) return { speed: cnc, byHand: false };
-  return { speed: cnc / BY_HAND_DURATION_FACTOR, byHand: true };
+  if (!BY_HAND_STAGES.includes(stage)) return { speed: cnc * line, byHand: false };
+  return { speed: (cnc * line) / BY_HAND_DURATION_FACTOR, byHand: true };
 }
 
 /** The stages of a job, in order, with the share of the labour each one carries: the four machine

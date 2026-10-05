@@ -139,7 +139,8 @@ describe('connect to extraction on the card of a machine in the hall (CLAUDE.md 
 });
 
 describe('the tabs', () => {
-  it('are the eleven Piotr named, in his order, with Owned after them', () => {
+  it('are the eleven Piotr named, in his order, the line s twelfth after CNC centre, with Owned after them', () => {
+    // Flipped in v84: a twelfth tab, Production line, after CNC centre (CLAUDE.md T29 2.9.1).
     expect(EQUIPMENT_TABS.map((tab) => tab.label)).toEqual([
       'Office',
       'Sheet machines',
@@ -150,6 +151,7 @@ describe('the tabs', () => {
       'Extraction and air',
       'CNC',
       'CNC centre',
+      'Production line',
       'Handling',
       'Storage',
     ]);

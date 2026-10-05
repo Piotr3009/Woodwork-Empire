@@ -8,7 +8,7 @@ import {
   SOLID_WOOD_EQUIPMENT,
   TIMBER_STAND_INS,
 } from './constants';
-import { findSpec, has } from './machines';
+import { findSpec, has, isLineModule, lineModuleIndex, lineModules } from './machines';
 import type { Finish, GameState, ProductTemplate } from './types';
 
 export function findTemplate(templateId: string): ProductTemplate | null {
@@ -51,10 +51,14 @@ export function wantedKit(entry: ProductTemplate): string[] {
 }
 
 /** True while something that stands in for this machine on a timber product stands in the hall
- *  (`TIMBER_STAND_INS`): the five axis CNC for the spindle moulder (CLAUDE.md T29 2.5.4). A stand
- *  in stands when the hall has one, as every kit the board asks. */
+ *  (`TIMBER_STAND_INS`): the five axis CNC for the spindle moulder, and the line's modules for the
+ *  machines whose stages they do (CLAUDE.md T29 2.5.4). The CNC stands when the hall has one, as
+ *  every kit the board asks; a module stands while it is one of the unbroken run from module 1
+ *  (`lineModules`), whatever its engineers keep today, so a day off never locks the board. */
 function stoodInFor(state: GameState, specId: string): boolean {
-  return (TIMBER_STAND_INS[specId] ?? []).some((id) => has(state, id));
+  return (TIMBER_STAND_INS[specId] ?? []).some((id) =>
+    isLineModule(id) ? lineModuleIndex(id) <= lineModules(state) : has(state, id),
+  );
 }
 
 /** The greyed out reason on the board, or null when the job can be taken as it stands. */

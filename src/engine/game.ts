@@ -45,6 +45,7 @@ import {
   WEBSITE_START_LEVEL,
   WELFARE_IN_THE_CANTEEN,
   WET_AIR_FINISH_FACTOR,
+  WINDOW_LINE_ORIGIN,
 } from './constants';
 import { arriveBigJob, setAgency } from './agency';
 import { drawnInUse } from './drawn';
@@ -80,6 +81,7 @@ import {
   lockersInWords,
   moveItem,
   outsidePlaceFor,
+  standingOn,
   standsBehindTheWall,
   standsOutside,
 } from './layout';
@@ -174,6 +176,8 @@ import {
   specOf,
   startMachineMeters,
   variantOf,
+  isLineModule,
+  lineModuleIndex,
 } from './machines';
 import {
   acceptEnquiry,
@@ -249,7 +253,7 @@ import {
   finishOnWetAir,
   underExtracted,
 } from './media';
-import { cubicMetres, metresBy, plural } from './text';
+import { andList, cubicMetres, inASentence, metresBy, plural } from './text';
 import {
   STATION_OFFICE,
   STATION_DOOR,
@@ -2600,6 +2604,12 @@ export function canBuy(
       return { ok: false, reason: 'Every frame press has its glue table' };
     }
   }
+  // One of each module of the line, owned or on order, beside the tool changer's refusal and in
+  // its shape (CLAUDE.md T29 2.9.2).
+  if (isLineModule(specId)) {
+    const counted = state.equipment.filter((item) => item.specId === specId && !isSold(item)).length + onOrderCount(state, specId);
+    if (counted > 0) return { ok: false, reason: 'The line has this module' };
+  }
   // One robot is enough for the hall, and a second would do nothing (CLAUDE.md T29 2.7).
   if (specId === SPRAY_ROBOT) {
     const counted = state.equipment.filter((item) => item.specId === specId && !isSold(item)).length + onOrderCount(state, specId);
@@ -2626,6 +2636,10 @@ export function canBuy(
     return { ok: false, reason: standsBehindTheWall(specId) ? 'No room behind the hall' : 'No room on the apron' };
   }
   if (!prepaid && !canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
+  // A module of the line stands in one place, chosen by the game: its own piece of floor must be
+  // clear, asked in place of the free floor every other machine is asked, in the canteen's shape
+  // (CLAUDE.md T29 2.9.2). Nothing holds the cells of a module not yet bought: this is the hold.
+  if (isLineModule(specId)) return lineModuleFloorCheck(state, specId);
   // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
   // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6). What
   // stands outside asks nothing of the floor: its room is behind the wall or on the apron, asked
@@ -2634,6 +2648,26 @@ export function canBuy(
     const zone = zoneOf(specId, variant.id);
     return { ok: false, reason: `No free ${metresBy(zone)} in the hall` };
   }
+  return OK;
+}
+
+/** Where module N of the line stands: six cells along x from the one before, from
+ *  `WINDOW_LINE_ORIGIN`, at orientation 0 (CLAUDE.md T29 2.9.2). */
+export function lineModuleCell(specId: string): { x: number; y: number } {
+  const width = findSpec(specId)?.width ?? 0;
+  return { x: WINDOW_LINE_ORIGIN.x + width * (lineModuleIndex(specId) - 1), y: WINDOW_LINE_ORIGIN.y };
+}
+
+/** Whether a module's own piece of floor is clear: nothing half shifted, and nothing standing on
+ *  its cells or on order for them, named in the catalogue's own words as the canteen's refusal
+ *  names them (CLAUDE.md T29 2.9.2). */
+function lineModuleFloorCheck(state: GameState, specId: string): BuyCheck {
+  if (state.movedItems.length > 0) return { ok: false, reason: 'The kit is half shifted. Finish the move first' };
+  const at = lineModuleCell(specId);
+  const spec = findSpec(specId);
+  const box = { x: at.x, y: at.y, width: spec?.width ?? 0, depth: spec?.depth ?? 0 };
+  const names = standingOn(state, box).map((id) => `the ${inASentence(findSpec(id)?.name ?? id)}`);
+  if (names.length > 0) return { ok: false, reason: `Move ${andList(names)} off the line's ${metresBy(box)}` };
   return OK;
 }
 
@@ -2660,6 +2694,9 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
 /** A new purchase lands on its default tile, or on the first free one when that is taken. The
  *  player moves it wherever he likes afterwards (CLAUDE.md T2 3.10). */
 function anchorFor(state: GameState, specId: string, variantId: string): { x: number; y: number } {
+  // A module of the line stands on its own cells, asked before the default anchor (CLAUDE.md T29
+  // 2.9.2).
+  if (isLineModule(specId)) return lineModuleCell(specId);
   const spec = findSpec(specId);
   const preferred = defaultAnchor(state, specId);
   // Outside a thing takes a place of its own, the plant behind the rear wall and the van on the
@@ -2961,6 +2998,11 @@ export function canSell(state: GameState, equipmentId: string): BuyCheck {
   if (!item) return { ok: false, reason: 'Nothing to sell' };
   if (isSold(item)) return { ok: false, reason: 'Sold, collection tomorrow' };
   if (!isSellableFamily(item.specId)) return { ok: false, reason: 'Nobody buys second hand fittings' };
+  // The line is sold only from the end: a module with a later one standing or on order is not
+  // (CLAUDE.md T29 2.9.3). The last one sells for half its price, as any machine.
+  if (isLineModule(item.specId) && laterModuleHeld(state, item.specId)) {
+    return { ok: false, reason: 'Sell the module after it first' };
+  }
   // A tool kept in a cabinet sells like anything else and frees its slot when the buyer comes;
   // it was refused here until v37 for no reason that survived a look (PIOTR, 20.09).
   if (item.broken) return { ok: false, reason: 'It is broken. Fix it first' };
@@ -2970,6 +3012,16 @@ export function canSell(state: GameState, equipmentId: string): BuyCheck {
   const storage = storageSaleBlock(state, item);
   if (storage !== '') return { ok: false, reason: storage };
   return OK;
+}
+
+/** True while a module after this one stands, not sold, or is on order (CLAUDE.md T29 2.9.3). */
+function laterModuleHeld(state: GameState, specId: string): boolean {
+  const index = lineModuleIndex(specId);
+  const later = (id: string): boolean => isLineModule(id) && lineModuleIndex(id) > index;
+  return (
+    state.equipment.some((item) => later(item.specId) && !isSold(item)) ||
+    state.onOrder.some((item) => later(item.specId))
+  );
 }
 
 /** Sells it. The buyer comes in the morning: until then it is marked sold and it does no work

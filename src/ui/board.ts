@@ -2,7 +2,7 @@
 // choose between them (CLAUDE.md T2 3.2).
 
 import {
-  boardsCostOf,
+  boardsForJob,
   canAccept,
   findSpec,
   formatReputation,
@@ -10,7 +10,6 @@ import {
   labourValueFor,
   materialCostFor,
   ownerDaysFor,
-  sheetsForCost,
   template,
   websiteReputationBonus,
 } from '../engine/index';
@@ -72,7 +71,7 @@ function tile(state: GameState, enquiry: Enquiry): string {
   // The boards the job will hold: a window's glass comes from the glazier and is no sheet on the
   // rack, so its share is not counted (CLAUDE.md T28 2.9).
   const timber = template(enquiry.templateId).cutters !== null;
-  const sheets = sheetsForCost(boardsCostOf(materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial), timber));
+  const sheets = boardsForJob(state, materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial), timber);
   // Days of his own time with the machines standing in the hall now, which is the same number
   // the deadline is worked out from (CLAUDE.md T6 3.7).
   const ownerDays =

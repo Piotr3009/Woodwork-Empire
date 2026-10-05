@@ -132,6 +132,12 @@ describe('footprints in metres', () => {
       cnc5: [5, 3, 2.5],
       // The spraying robot, the art side's metres (CLAUDE.md T29 2.4, 2.7).
       sprayRobot: [2, 1, 2.25],
+      // The line's five modules, the art side's metres (CLAUDE.md T29 2.4, 2.9.1).
+      windowLine1: [6, 3, 2.5],
+      windowLine2: [6, 3, 2.5],
+      windowLine3: [6, 3, 2.5],
+      windowLine4: [6, 3, 2.5],
+      windowLine5: [6, 3, 2.5],
     };
     // Every line of the catalogue is in one of the two lists: nothing slips in unmeasured.
     expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(

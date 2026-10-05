@@ -84,3 +84,26 @@ his tile stands refused until C5 lands the modules. Pins flipped by name: `booth
 set of roles), `spriteCheck.test.ts` (`CHARACTER_ROLES`), `capsule.test.ts` (the roles with no
 figure, and never drawn), `team.test.ts` (the Workshop tab's candidates) and `v72.test.ts` (Our
 team's tiles, not in the brief's list).
+
+**T29-C5 The production line, and what it costs to own.** Five families `windowLine1` to `5`, one
+class each, 6 by 3 by 2.5 in their own footprint, in the twelfth tab `Production line`, 1,500,000,
+750,000, 750,000, 1,000,000 and 1,000,000, thirty working days each, sixty a day of power, only in
+the 800 m² unit. `canBuy` asks the unit, what each requires (module 1 a five axis CNC and a frame
+press), one of each (`The line has this module`), the cash, then its own cells (`Move the four
+sided planer and the sheet rack off the line's 6 m by 3 m`, or the half shifted refusal), and
+`anchorFor` stands module N at x 5 + 6 (N - 1), y 14. Never moved or turned (`canPlace`, both
+branches; no Turn row; setup mode does not lift it), built in on its day, sold only from the end.
+`lineModules` (the unbroken run) and `lineLevel` (what one or two engineers on duty keep: 3 and 5);
+`stageFamilyIn` asks the line's module first, `classPaceOf` answers the industrial pace for a
+module, `stageSpeed` multiplies every timber stage but the Finishing by `LINE_FACTOR` and the
+Moulding on module 2 by four as well; 33 places a module for 1 to 4. One `boardsForJob` count for
+the tile and the job, 3 per cent fewer boards a module. The modules' cards say what they cover;
+the Output sheet and the top bar's plate carry one `Production line, N modules` line; no module on
+the Machines page or in `machineSavings`. Not serviced, never broken down by day or night, never a
+burglar's target, out of the security firm's price (the Security page says so in one clause),
+insured like everything, built to order. The engineer is hired from here (`at the line`, his week
+booked as worked, his Our team sentence `The line runs as 3 of its 5 modules.`), and the strip's
+`lineNeedsEngineer` sits directly under `nobodyAssigned`. The hall's `(service due)` asks
+`isServiced`, so a bench, a rack or a cabinet older than 180 days no longer carries it. Pins: the
+eleven tabs to twelve, `WARNING_ORDER` and its all at once list, the catalogue's metres, measured
+classes 100 to 105.

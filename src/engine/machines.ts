@@ -66,6 +66,10 @@ import {
   USED_VARIANT,
   bagsToM3,
   SPRAY_ROBOT,
+  LINE_COVERS,
+  LINE_FACTOR,
+  LINE_MODULES,
+  LINE_MODULES_KEPT,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
@@ -98,13 +102,15 @@ import { jobPace, stageDoing, stagePlanFor } from './stages';
 import { isWorkingToday, managerPaceFor, nightCrew } from './staff';
 import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
-import { andList, cubicMetres, trimmed } from './text';
+import { andList, cubicMetres, plural, trimmed } from './text';
 import type {
   Equipment,
   EquipmentSpec,
   EquipmentVariant,
   GameState,
   Orientation,
+  StageId,
+  Worker,
   WorkerTier,
 } from './types';
 
@@ -299,6 +305,70 @@ export function floorMachines(state: GameState, specId: string): Equipment[] {
   return owned(state, specId).filter((item) => itemStandsInTheHall(item) && !isSold(item));
 }
 
+/** True for a module of the production line (CLAUDE.md T29 2.9). */
+export function isLineModule(specId: string): boolean {
+  return LINE_MODULES.includes(specId);
+}
+
+/** A module's place in the line, 1 to 5, and 0 for anything that is not one. */
+export function lineModuleIndex(specId: string): number {
+  return LINE_MODULES.indexOf(specId) + 1;
+}
+
+/** How long the line is: the unbroken run from module 1 of the modules that stand, so 1, 2 and 4
+ *  standing are 2. What the engineers keep today does not shorten it (CLAUDE.md T29 2.9.4). */
+export function lineModules(state: GameState): number {
+  let run = 0;
+  for (const id of LINE_MODULES) {
+    if (floorMachines(state, id).length === 0) break;
+    run += 1;
+  }
+  return run;
+}
+
+/** The line engineers on duty today: on the books, started and not absent. It holds for the second
+ *  shift too, since the line runs at night under the engineers of the day (CLAUDE.md T29 2.8). */
+export function lineEngineersOnDuty(state: GameState): number {
+  return state.workers.filter(
+    (worker) =>
+      worker.role === 'lineEngineer' && worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0,
+  ).length;
+}
+
+/** True for a line engineer on duty in a company with a module that stands: he is at the line,
+ *  never a man standing about, and his week is a full week (CLAUDE.md T29 2.8). */
+export function engineerAtTheLine(state: GameState, worker: Worker): boolean {
+  return (
+    worker.role === 'lineEngineer' &&
+    worker.startDay <= state.clock.day &&
+    worker.absentDaysRemaining === 0 &&
+    lineModules(state) > 0
+  );
+}
+
+/** How much of the line runs today: what of its unbroken run its engineers on duty keep, nothing
+ *  with none, three modules at the most with one and all five with two. A line with none stands
+ *  still, and its stages go back to the machines that did them before (CLAUDE.md T29 2.9.4). */
+export function lineLevel(state: GameState): number {
+  const kept = LINE_MODULES_KEPT[Math.min(LINE_MODULES_KEPT.length - 1, lineEngineersOnDuty(state))] ?? 0;
+  return Math.min(lineModules(state), kept);
+}
+
+/** What the line gives every stage of a timber job but the Finishing at the level it runs at
+ *  today, 1 with no line or a line that stands still (CLAUDE.md T29 2.9.6). */
+export function lineFactor(state: GameState): number {
+  return LINE_FACTOR[lineLevel(state)] ?? 1;
+}
+
+/** The module that does this stage of a timber job while the line runs that far, or null: the
+ *  Cross cutting and the Planing on module 1, the Moulding on 2, the Sanding on 3 and the Pressing
+ *  on 4 (CLAUDE.md T29 2.9.5). */
+export function lineModuleFor(state: GameState, stage: StageId): string | null {
+  const index = LINE_COVERS[stage];
+  if (index === undefined || index > lineLevel(state)) return null;
+  return LINE_MODULES[index - 1] ?? null;
+}
+
 /** Sold, and standing until the van comes to the gate. */
 export function isSold(item: Equipment): boolean {
   return item.soldOnDay !== null;
@@ -380,6 +450,8 @@ export function placesOf(item: { specId: string; variantId: string }): number {
  *  a job goes at the by hand pace; nobody waits for it to run again (PIOTR, 24.09: "they never
  *  wait for the saw"; v53). */
 export function familyRuns(state: GameState, family: string): boolean {
+  // A module of the line runs only within the level its engineers keep (CLAUDE.md T29 2.9.4).
+  if (isLineModule(family) && lineModuleIndex(family) > lineLevel(state)) return false;
   if (bestMachineOf(state, family) === null) return false;
   if (dustOutputOf(family) > 0 && bagsFull(state)) return false;
   return familyAirBlock(state, family) === '';
@@ -671,6 +743,9 @@ export function hasGate(state: GameState, item: { id: string }): boolean {
  *  1.12 for every family a man works at, and 1 for everything else (the extraction, the air, the
  *  storage), whose class is never a speed [PIOTR, 21.09] (CLAUDE.md T25 2.4). */
 export function classPaceOf(item: { specId: string; variantId: string }): number {
+  // A module of the line is never slower than the best machine it stands in for: its one class is
+  // called standard and works at the industrial pace (CLAUDE.md T29 2.9.5) [TUNE: chat].
+  if (isLineModule(item.specId)) return MACHINE_PACE.industrial ?? 1;
   if (!PACED_FAMILIES.includes(item.specId)) return 1;
   return MACHINE_PACE[item.variantId] ?? 1;
 }
@@ -1049,6 +1124,12 @@ export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'
       where: 'the stage it does',
     });
   }
+  // The line, one line for the five modules, worth its factor less one at the level it runs at
+  // today (CLAUDE.md T29 2.9.8).
+  const line = productionLineLine(state);
+  if (line !== null) {
+    lines.push({ label: line.label, points: line.points, hall: false, where: 'timber work, the Finishing excepted' });
+  }
   return { base: 1, lines, plus: roundPoints(plus), minus: roundPoints(minus), total };
 }
 
@@ -1373,6 +1454,9 @@ export function ductingDue(state: GameState): { machines: number } {
  *  `overdueBreakdownChance` keeps that promise. A plant that is serviced and never breaks down is
  *  what the two lines say together. */
 export function isServiced(specId: string): boolean {
+  // The line's modules are kept by its engineers: never serviced, no life in hours (CLAUDE.md T29
+  // 2.10).
+  if (isLineModule(specId)) return false;
   if (specId === 'extractor' || CENTRAL_EXTRACTION_SPECS.includes(specId)) return true;
   return findSpec(specId)?.category === 'machine';
 }
@@ -1443,6 +1527,8 @@ export interface PaceLine {
 export function paceLines(state: GameState): PaceLine[] {
   const lines: PaceLine[] = [];
   for (const family of PACED_FAMILIES) {
+    // The line is one thing on the plate and never five (CLAUDE.md T29 2.9.8).
+    if (isLineModule(family)) continue;
     const best = bestMachineOf(state, family);
     if (best === null) continue;
     const percent = Math.round((paceOf(state, best) - 1) * 100);
@@ -1450,12 +1536,22 @@ export function paceLines(state: GameState): PaceLine[] {
     const word = machineShortWord(family);
     lines.push({ family, label: `${word.charAt(0).toUpperCase()}${word.slice(1)}, ${best.variantId}`, percent });
   }
+  const line = productionLineLine(state);
+  if (line !== null) lines.push({ family: 'line', label: line.label, percent: Math.round(line.points * 100) });
   return lines;
 }
 
-/** The best class of this family standing in the hall, unbroken and not away for its service, as
- *  a machine: the one that sets the hall's pace (2.4), and the one a piece's minutes and its wear
- *  are worked out on. The first bought wins a tie. Null when the hall has none it can work at. */
+/** The line as one thing on the sheets that list machines: `Production line, 3 modules` and what
+ *  it gives at the level it runs at today, or null while no module stands (CLAUDE.md T29 2.9.8). */
+export function productionLineLine(state: GameState): { label: string; points: number } | null {
+  if (lineModules(state) === 0) return null;
+  const level = lineLevel(state);
+  return {
+    label: `Production line, ${plural(level, 'module', 'modules')}`,
+    points: roundPoints(lineFactor(state) - 1),
+  };
+}
+
 /** True while the hall has a spraying robot that stands, is not broken and is not away for its
  *  service: the Finishing at the booth goes `SPRAY_ROBOT_FINISH_FACTOR` times as fast while it
  *  does (CLAUDE.md T29 2.7). */
@@ -1467,9 +1563,12 @@ export function sprayRobotRuns(state: GameState): boolean {
  *  sheet's `best in the hall` and the machine hours of `machineSavings`): the robot does not, since
  *  nobody stands at it and what it does is the booth's (CLAUDE.md T29 2.7). */
 export function onTheMachineSheets(specId: string): boolean {
-  return specId !== SPRAY_ROBOT;
+  return specId !== SPRAY_ROBOT && !isLineModule(specId);
 }
 
+/** The best class of this family standing in the hall, unbroken and not away for its service, as
+ *  a machine: the one that sets the hall's pace (2.4), and the one a piece's minutes and its wear
+ *  are worked out on. The first bought wins a tie. Null when the hall has none it can work at. */
 export function bestMachineOf(state: GameState, specId: string): Equipment | null {
   let best: Equipment | null = null;
   let pace = 0;
@@ -1562,6 +1661,9 @@ export function overdueBreakdownChance(item: Equipment, day: number): number {
   // catalogue line is "no more bags and no breakdown", and a line the player has already read is
   // not taken off him by a rule about servicing (CLAUDE.md T10 3.4, T24 2.7).
   if (CENTRAL_EXTRACTION_SPECS.includes(item.specId)) return 0;
+  // Nor does a module of the line, by day or on the second shift's roll, which asks nothing but
+  // this (CLAUDE.md T29 2.10).
+  if (isLineModule(item.specId)) return 0;
   let chance = 0;
   if (serviceIsDue(item, day)) chance += OVERDUE_BREAKDOWN_CHANCE;
   if (pastEndurance(item)) {

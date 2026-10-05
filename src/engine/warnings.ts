@@ -29,7 +29,8 @@ import {
 import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
 import { paperworkDone, takeOffOutstanding } from './jobs';
-import { bagStore } from './machines';
+import { bagStore, lineEngineersOnDuty, lineLevel, lineModules } from './machines';
+import { inWords } from './text';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine, hasOfficeAdmin } from './staff';
@@ -44,6 +45,8 @@ export type WarningKey =
    *  (PIOTR, 18.09; CLAUDE.md T21 2.1, T22 2.2). */
   | 'pastTheLimit'
   | 'nobodyAssigned'
+  /** Modules of the line stand that no engineer on duty keeps (CLAUDE.md T29 2.9.4). */
+  | 'lineNeedsEngineer'
   | 'deadlineAtRisk'
   /** The drawing is finished and the material list is the next thing to do (PIOTR, 03.10; v78). */
   | 'drawingDone'
@@ -79,6 +82,9 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   // minute, and this stops the company for good at the next look (CLAUDE.md T21 2.1).
   'pastTheLimit',
   'nobodyAssigned',
+  // Directly under it: a line that stands still or runs short is a hall of kit making nothing
+  // (CLAUDE.md T29 2.9.4) [TUNE].
+  'lineNeedsEngineer',
   'deadlineAtRisk',
   // Under the deadlines and above the standing lines: the job's calendar is running and nothing
   // can be ordered for it until the list is made, where the lines below can stand for weeks and
@@ -129,6 +135,19 @@ function pastTheLimitWarning(state: GameState): Warning | null {
     text:
       `Account ${formatMoney(state.cash)} is below the bank's ${formatMoney(limit)} limit: ` +
       `day ${day} of ${BANKRUPTCY_DAYS_BELOW_LIMIT}.`,
+  };
+}
+
+/** Said only while modules stand that no engineer on duty keeps: the line stands still with none,
+ *  and runs as three modules with one (CLAUDE.md T29 2.9.4). */
+function lineNeedsEngineerWarning(state: GameState): Warning | null {
+  const standing = lineModules(state);
+  const level = lineLevel(state);
+  if (standing === 0 || level >= standing) return null;
+  if (level === 0) return { key: 'lineNeedsEngineer', text: 'The line stands still: no engineer on duty' };
+  return {
+    key: 'lineNeedsEngineer',
+    text: `The line runs as ${inWords(level)} modules: ${inWords(lineEngineersOnDuty(state))} engineer on duty`,
   };
 }
 
@@ -305,6 +324,7 @@ const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   bagsFull: bagsFullWarning,
   pastTheLimit: pastTheLimitWarning,
   nobodyAssigned: nobodyAssignedWarning,
+  lineNeedsEngineer: lineNeedsEngineerWarning,
   deadlineAtRisk: deadlineWarning,
   drawingDone: drawingDoneWarning,
   glassNotOrdered: glassNotOrderedWarning,

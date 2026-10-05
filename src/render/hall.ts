@@ -32,6 +32,7 @@ import {
   machineIsOut,
   machinesDueService,
   machinesInService,
+  isServiced,
   sawdustPiles,
   serviceIsDue,
 } from '../engine/machines';
@@ -1767,7 +1768,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
     const bagLine = item.specId === 'extractor' && store.full ? ' (bags full)' : '';
-    const serviceLine = !item.broken && serviceIsDue(item, state.clock.day) ? ' (service due)' : '';
+    // Only kit that is serviced is ever due one: not a bench, a rack, a cabinet or a module of the
+    // line, which carried a false label once 180 days had passed (CLAUDE.md T29 2.10).
+    const serviceLine =
+      !item.broken && isServiced(item.specId) && serviceIsDue(item, state.clock.day) ? ' (service due)' : '';
     // A rack's name says what is on it and what it holds, the same share its plate is drawn with,
     // and not the whole stock over every rack's room, which read the same on every rack (v54).
     const rackLine =

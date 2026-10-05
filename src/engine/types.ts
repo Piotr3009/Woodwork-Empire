@@ -256,6 +256,9 @@ export type EquipmentTab =
   | 'computers'
   | 'cnc'
   | 'cncCentre'
+  /** The production line's five modules, a twelfth tab beside the eleven Piotr named (CLAUDE.md
+   *  T29 2.9.1) [TUNE: chat]. */
+  | 'line'
   | 'handling'
   | 'storage';
 

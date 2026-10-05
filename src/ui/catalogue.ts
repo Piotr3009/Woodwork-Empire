@@ -59,6 +59,7 @@ import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/ind
 import {
   crewAtFamily,
   hallPlaces,
+  isLineModule,
   machineShortWord,
   placeShortages,
   serviceCallCheck,
@@ -359,6 +360,8 @@ function turnAction(state: GameState, item: Equipment): string {
     return `<span class="reason">Sold, collection on ${formatCalendarDay(item.soldOnDay ?? 0)}</span>`;
   }
   if (!itemStandsInTheHall(item)) return '';
+  // A module of the line has no Turn row: it stands where it is built (CLAUDE.md T29 2.9.3).
+  if (isLineModule(item.specId)) return '';
   const spec = findSpec(item.specId);
   if (spec === undefined || spec === null) return '';
   const next = nextSpriteOrientation(spec.spriteKey, item.variantId, item.orientation);

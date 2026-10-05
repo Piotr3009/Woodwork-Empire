@@ -66,6 +66,7 @@ import {
 } from './machines';
 import {
   boardsCostOf,
+  boardsForJob,
   glassCostOf,
   materialCostFor,
   orderForJob,
@@ -74,7 +75,6 @@ import {
   releaseReservation,
   reserveSheetsFor,
   sheetsDueFor,
-  sheetsForCost,
   shortfallOf,
 } from './materials';
 import { ownerIsAvailable } from './owner';
@@ -447,7 +447,7 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     finish: enquiry.finish,
     materialKind: enquiry.materialKind,
     materialCost,
-    sheets: sheetsForCost(boardsCostOf(materialCost, timber)),
+    sheets: boardsForJob(state, materialCost, timber),
     sheetsUsed: 0,
     sheetsReserved: 0,
     kind: enquiry.kind,

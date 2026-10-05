@@ -302,6 +302,24 @@ export const STATION_TABLE: Record<string, StationRow> = {
     operator: { side: 'front', along: 0 },
     second: null,
   },
+  // The line's four modules that do a stage: the men of a timber job at the front of each, as at
+  // any machine of its plan (CLAUDE.md T29 2.9.5).
+  windowLine1: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  windowLine2: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  windowLine3: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  windowLine4: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
   edgebander: {
     // The second cell from the infeed end, which is the left, read off the footprint's width so
     // the row needs no change when the footprint grows to 4 by 1 (CLAUDE.md T16 2.1, 6).

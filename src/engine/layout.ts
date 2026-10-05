@@ -17,7 +17,7 @@ import {
   secondExtensionOf,
 } from './constants';
 import type { LayoutSlot } from './constants';
-import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
+import { findSpec, isLineModule, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
 import { standsOutsideTheHall } from './walk';
 import type { Equipment, GameState, OnOrderItem, Orientation } from './types';
@@ -278,6 +278,10 @@ export function reservationById(state: GameState, itemId: string): OnOrderItem |
 
 /** Can this item stand here? An outline held for a delivery answers exactly as the machine it is
  *  holding the floor for would (CLAUDE.md T8 3.2). */
+/** Why a module of the line, or the outline of one on order, is not moved or turned (CLAUDE.md
+ *  T29 2.9.3). */
+export const LINE_STANDS_WHERE_BUILT = 'The line stands where it is built';
+
 export function canPlace(
   state: GameState,
   itemId: string,
@@ -287,6 +291,9 @@ export function canPlace(
 ): PlaceCheck {
   const reserved = reservationById(state, itemId);
   if (reserved !== null) {
+    // The outline of a module on order is the module's own floor, as the module is (CLAUDE.md T29
+    // 2.9.3).
+    if (isLineModule(reserved.specId)) return { ok: false, reason: LINE_STANDS_WHERE_BUILT };
     return canPlaceSpec(
       state,
       reserved.specId,
@@ -307,6 +314,8 @@ export function canPlace(
     return { ok: false, reason: 'It stands in the canteen' };
   }
   if (standsOutsideTheHall(state, item)) return { ok: false, reason: 'It stands in the yard' };
+  // A module of the line is never moved and never turned (CLAUDE.md T29 2.9.3).
+  if (isLineModule(item.specId)) return { ok: false, reason: LINE_STANDS_WHERE_BUILT };
   return canPlaceSpec(
     state,
     item.specId,

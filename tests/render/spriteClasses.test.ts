@@ -209,8 +209,9 @@ describe('the file on disk and the footprint in the engine', () => {
     // desk, the chair, the laptop and the locker the catalogue shows. Ninety six from v83: the
     // twenty classes of the timber department's four ladders and the glue table (CLAUDE.md T28
     // 2.11). Ninety nine from v84: the three five axis CNCs (CLAUDE.md T29 2.4). A hundred with
-    // the spraying robot (CLAUDE.md T29 2.7).
-    expect(checked).toBe(100);
+    // the spraying robot (CLAUDE.md T29 2.7), a hundred and five with the line's five modules
+    // (CLAUDE.md T29 2.9.1).
+    expect(checked).toBe(105);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }

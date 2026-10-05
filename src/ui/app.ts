@@ -105,7 +105,7 @@ import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockS
 import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
-import { OWNER, hasCentralExtraction } from '../engine/machines';
+import { OWNER, hasCentralExtraction, isLineModule } from '../engine/machines';
 import { nextSpriteOrientation } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
@@ -2711,6 +2711,8 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   const item =
     state.equipment.find((entry) => entry.id === itemId) ?? reservationById(state, itemId);
   if (item === null || item === undefined) return false;
+  // Setup mode never lifts a module of the line: it stands where it is built (CLAUDE.md T29 2.9.3).
+  if (isLineModule(item.specId)) return false;
   const at = cellUnder(event);
   if (at === null) return false;
   // He has hold of it where he took hold of it, not by its corner.
