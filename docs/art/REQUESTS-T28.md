@@ -27,6 +27,12 @@ section says otherwise.
 
 ## 1. The frame presses and the glue table again: twelve files
 
+**Delivered 08.10.2026, in the game from v85.** The art side sent the twelve again, cut from its
+approved illustrations and fitted to the canvases and anchors of 1.3. Its own check says the
+projection is not exact (`exactProjectionVerified: false`: some long edges climb 0.39 to 0.62 px a
+px where 0.5 is owed), so what follows stays true of what a model render would still put right;
+the stand ins it describes are gone.
+
 `framePress.used`, `framePress.budget`, `framePress.standard`, `framePress.pro`,
 `framePress.industrial` and `glueTable.standard`, each with its `.r`.
 

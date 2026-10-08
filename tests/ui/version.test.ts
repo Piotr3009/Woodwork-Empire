@@ -48,8 +48,11 @@ describe('the version in the corner', () => {
     // the taxman, and dearer top machines (PIOTR, 03.10 and 04.10). v82 is the second extension
     // of the unit, to 800 m2 (PIOTR, 04.10). v83 is Turn 28: the timber department, the holidays,
     // and the pelletiser outside (PIOTR, 04.10 and 05.10). v84 is Turn 29: the production line,
-    // the five axis CNC, the timber stores, and four to a contract (PIOTR, 05.10).
-    expect(APP_VERSION).toBe('v84');
+    // the five axis CNC, the timber stores, and four to a contract (PIOTR, 05.10). v85 puts the art
+    // side's frame presses and glue table in place of chat's stand ins, and the logo on the start
+    // screen, in the menu and on the tab (PIOTR, 04.10 and 08.10). v86 takes the sketch of the unit
+    // off the start screen and stands its tick beside its words (PIOTR, 08.10).
+    expect(APP_VERSION).toBe('v86');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -65,7 +68,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v84'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v86'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

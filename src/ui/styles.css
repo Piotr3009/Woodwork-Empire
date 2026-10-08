@@ -818,6 +818,14 @@ input.num {
   z-index: 40;
 }
 
+/* The logo at the top of the menu (PIOTR, 04.10: "the logo everywhere"). */
+.menu-logo {
+  align-self: center;
+  display: block;
+  height: auto;
+  width: 180px;
+}
+
 /* --------------------------------------------------------------------------
    Views
    -------------------------------------------------------------------------- */
@@ -861,9 +869,16 @@ input.num {
   width: 520px;
 }
 
-.unit-sketch {
+/* The logo in place of the title's words on the start screen (PIOTR, 04.10). */
+.start-logo {
+  margin: 0 0 8px;
+}
+
+.start-logo img {
   display: block;
-  width: 100%;
+  height: auto;
+  margin: 0 auto;
+  width: 440px;
 }
 
 .lead {
@@ -1047,6 +1062,10 @@ input.num {
 
 .check-row input {
   margin: 0;
+  /* The box at its own size, its words beside it: .field-row's full width had stood the start
+     screen's box in the middle of the row and its words at the far end (PIOTR, 08.10). */
+  flex: none;
+  width: auto;
 }
 
 /* The Break card's tick (v70): the box and its words on one line under the card's words, in the

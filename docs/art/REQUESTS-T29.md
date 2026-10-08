@@ -170,7 +170,8 @@ on the hall; it is wanted all the same, for the tests and the Sprite check page.
 Read off `public/sprites` on branch `turn-29-the-line`: nothing of `REQUESTS-T28.md` 1 to 3 has
 landed.
 
-- **The twelve frame press and glue table files** (`REQUESTS-T28.md` 1), unchanged. The files in the
+- **The twelve frame press and glue table files** (`REQUESTS-T28.md` 1): delivered on 08.10 and in
+  the game from v85, not exact by the art side's own check; the rest of this bullet is history. The files in the
   game are still chat's stand ins of commit `ec4a07d` (T28-C1), with the flat projection, the short
   tall classes and the industrial press off its anchor that 1.1 of that page measured. From Turn 29
   they matter more: module 1 of the line requires a frame press beside it, so the stand in press

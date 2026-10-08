@@ -1,4 +1,5 @@
-// The start screen: an empty unit seen from outside, and the three decisions (CLAUDE.md 10.1).
+// The start screen: the logo and the three decisions (CLAUDE.md 10.1). The sketch of an empty unit
+// that stood under the title is off [PIOTR, 08.10: "without the sketch"].
 
 import { DIFFICULTIES } from '../engine/constants';
 import { formatCalendarDay } from '../engine/index';
@@ -23,16 +24,6 @@ export interface StartChoice {
   saved: StoredSave;
   startOverAsked: boolean;
 }
-
-const UNIT_SKETCH =
-  '<svg class="unit-sketch" viewBox="0 0 420 200" xmlns="http://www.w3.org/2000/svg" ' +
-  'role="img" aria-label="An empty rented unit">' +
-  '<polygon points="40,150 240,150 240,60 40,60" fill="var(--room)" />' +
-  '<polygon points="240,150 380,120 380,40 240,60" fill="var(--room-dark)" />' +
-  '<polygon points="40,60 140,20 380,40 240,60" fill="var(--kit-furniture)" />' +
-  '<polygon points="100,150 100,100 170,100 170,150" fill="var(--concrete)" />' +
-  '<polygon points="40,150 380,120 380,132 40,162" fill="var(--yard)" />' +
-  '</svg>';
 
 /** Sign in and Continue, and nothing at all when the build has no Supabase (CLAUDE.md T2 3.14). */
 function cloudBlock(choice: StartChoice): string {
@@ -103,8 +94,9 @@ export function renderStart(choice: StartChoice): string {
   return (
     '<div class="start">' +
     '<div class="panel start-panel">' +
-    '<h1>Woodwork Empire</h1>' +
-    UNIT_SKETCH +
+    // The logo in place of the title's words, its alt the logo's words, and no sketch of the unit
+    // under it [PIOTR, 04.10: "the logo everywhere"; 08.10: "without the sketch"].
+    '<h1 class="start-logo"><img src="/brand/logo.webp" alt="Woodwork Empire Tycoon" width="440" height="176" /></h1>' +
     '<p class="lead">You quit your job. You have some savings and the trade. Find a unit.</p>' +
     `<div class="difficulties">${options}</div>` +
     '<label class="field-row">Your name' +

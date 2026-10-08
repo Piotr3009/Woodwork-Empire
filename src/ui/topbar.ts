@@ -383,6 +383,8 @@ export function renderMenu(state: GameState, cloud: MenuCloud): string {
     // CLAUDE.md T13 3.1). The cross is the one cross, the same function every modal calls
     // (CLAUDE.md T18 2.5).
     closeButton('closeMenu') +
+    // The logo, small, the first thing under the cross [PIOTR, 04.10: "the logo everywhere"].
+    '<img class="menu-logo" src="/brand/logo.webp" alt="Woodwork Empire Tycoon" width="180" height="72" />' +
     '<button class="btn" data-do="endDay">End day</button>' +
     stayHome +
     `<button class="btn" data-do="toggleWhy">${

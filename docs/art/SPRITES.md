@@ -503,12 +503,12 @@ H + 8)` on the same canvas. Metres are width, depth and height of the class in v
 | `sander.standard.png` | 2 × 1 × 1.5 | 160 × 160 | 104 / 56, 152 | 2 |
 | `sander.pro.png` | 3 × 2 × 1.75 | 256 × 220 | 152 / 104, 212 | 2 |
 | `sander.industrial.png` | 6 × 2 × 2 | 400 × 304 | 296 / 104, 296 | 2 |
-| `framePress.used.png` | 2 × 1 × 1 | 160 × 136 | 104 / 56, 128 | 2, stand in |
-| `framePress.budget.png` | 3 × 1 × 1.25 | 208 × 172 | 152 / 56, 164 | 2, stand in |
-| `framePress.standard.png` | 3 × 1 × 2.25 | 208 × 220 | 152 / 56, 212 | 2, stand in |
-| `framePress.pro.png` | 4 × 1 × 2.5 | 256 × 256 | 200 / 56, 248 | 2, stand in |
-| `framePress.industrial.png` | 5 × 2 × 2.75 | 352 × 316 | 248 / 104, 308 | 2, stand in |
-| `glueTable.standard.png` | 3 × 1 × 1 | 208 × 160 | 152 / 56, 152 | 2, stand in |
+| `framePress.used.png` | 2 × 1 × 1 | 160 × 136 | 104 / 56, 128 | 2, redrawn 08.10 |
+| `framePress.budget.png` | 3 × 1 × 1.25 | 208 × 172 | 152 / 56, 164 | 2, redrawn 08.10 |
+| `framePress.standard.png` | 3 × 1 × 2.25 | 208 × 220 | 152 / 56, 212 | 2, redrawn 08.10 |
+| `framePress.pro.png` | 4 × 1 × 2.5 | 256 × 256 | 200 / 56, 248 | 2, redrawn 08.10 |
+| `framePress.industrial.png` | 5 × 2 × 2.75 | 352 × 316 | 248 / 104, 308 | 2, redrawn 08.10 |
+| `glueTable.standard.png` | 3 × 1 × 1 | 208 × 160 | 152 / 56, 152 | 2, redrawn 08.10 |
 
 What they are:
 
@@ -518,11 +518,16 @@ What they are:
   contract's 2 to 1 projection: their rows climb flatter than the hall's, and the industrial pair
   stands low in its canvas, so the measured ports of these files are right on the picture and
   their cells approximate.
-- **Pack 2, `framePress` and `glueTable`, 12 files:** the art side's files were cut wrong (half
-  size, off the anchor, with pieces of the neighbouring machine). Chat cut them again from the
-  preview board Piotr approved, scaled each to its canvas and stood it on its anchor line. They are
-  stand ins: the registration is by eye and not by geometry, and `docs/art/REQUESTS-T28.md` asks
-  the art side for the twelve again.
+- **Pack 2, `framePress` and `glueTable`, 12 files:** the art side's files of 05.10 were cut wrong
+  (half size, off the anchor, with pieces of the neighbouring machine), and chat's stand ins cut
+  from the preview board took their place until v85. On 08.10 the art side delivered the twelve
+  again (`docs/art/REQUESTS-T28.md` 1) and they are the files in the game from v85 (PIOTR, 08.10:
+  "code these graphics in"). They are cut from the art side's approved illustrations, scaled
+  whole and stood on each canvas and anchor, not rendered from a model: the art side's own check
+  says `exactProjectionVerified: false` and `productionReady: false`, with some long edges
+  climbing 0.39 to 0.62 px a px where the contract owes 0.5. Laid over their floor diamonds they
+  stand on them, and far better than the stand ins did (whose edges climbed 0.07 to 0.34). A model
+  render, as packs 1, 3 and 4 were made, is still the way to make them exact.
 
 The ports of the classes that want extraction (every cross cut saw, every planer, and the sanders
 from `budget` up; the used sander has a vacuum of its own and the presses and the glue table make
@@ -587,3 +592,23 @@ The ports: only the five axis CNC wants extraction, so its six files (each class
 one line each in `src/engine/ports.ts`, measured off these pictures and written in with the family
 (T29-C2) [TUNE until Piotr confirms them on the hall]. The standard class is an open gantry with no duct stub drawn, so its line is the top
 of the head's carriage. The robot, the modules and the stores make no dust and have no port.
+
+## 14. The logo (PIOTR, 04.10 and 08.10.2026)
+
+The art side's final pack, `Woodwork-Empire-Tycoon-Logo-FINAL` (08.10), is a set of bitmaps: seven
+variants of the logo on a 2560 by 1024 canvas with a transparent margin, and the WE mark as square
+icons from 32 to 1024 px. The game uses four files, in `public/brand/` and served at `/brand/`:
+
+| File | Made from | What was done to it | Where it shows |
+|---|---|---|---|
+| `logo.webp` | `png/logo-for-dark-background.png` | scaled to 880 by 352, twice its size on screen | the start screen, 440 px wide, in place of the title's words (the sketch of the unit that stood under the title is off from v86, PIOTR 08.10); the top of the menu, 180 px wide, under the cross |
+| `icon-32.png` | `icons/icon-32.png` | nothing, the pack's own file | the browser tab |
+| `icon-128.png` | `icons/icon-128.png` | nothing, the pack's own file | the tab where a bigger icon is wanted, and a phone's home screen |
+| `og.png` | `png/logo-for-light-background.png` | scaled to 1200 by 480 and laid on a 1200 by 630 card of the game's cream (`--cream`, #f3ecdc) | the picture a pasted link shows |
+
+No letter, colour or edge of the logo was retouched. The start screen and the menu sit on the dark
+panel (`--panel`, #2d3138), so the variant for a dark background is the one in the game. The
+link's picture got a background of its own because the pack's README says the background is given
+where the logo is used, and a pasted link's preview has none: some sites fill a transparent
+picture with black. The other variants, the originals and the larger icons stay in the art side's
+pack and are not in the repo. The tab's title is the logo's words, `Woodwork Empire Tycoon`.
