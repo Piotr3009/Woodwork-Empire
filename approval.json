@@ -1,0 +1,18 @@
+{
+  "status": "approved",
+  "approvedBy": "Piotr",
+  "approvalDate": "2026-10-09",
+  "instruction": "ok ale pamietaj zeby trzymac sie katow, to mega wazne ,, koduj",
+  "approvedPreviews": [
+    {
+      "file": "approved-previews/Paczka-1-frezy-podglad-3D.png",
+      "sha256": "3cc4c549c65db1b3c69fc3ea5e8e794772813828d9e94d7fbe82386d10d983ef"
+    },
+    {
+      "file": "approved-previews/Paczka-1-szlifierki-podglad-3D.png",
+      "sha256": "d143d037bb1583a9c59fbfd61b2d5368a0edeba783d5646d31146dedcc7ffb92"
+    }
+  ],
+  "pixelChangesAfterApproval": false,
+  "note": "Finalne PNG skopiowano bez ponownego renderowania, skalowania ani przycinania."
+}

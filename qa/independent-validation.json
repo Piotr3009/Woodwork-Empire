@@ -1,0 +1,2208 @@
+{
+  "scope": "order 2026-10-08 / approved package 1",
+  "briefSHA256": "6b3116c46cbdedd524a6d77aca4950e7dc4d4e2e4277d6662147c2173d2356b6",
+  "expectedAssets": 8,
+  "expectedSprites": 13,
+  "files": [
+    {
+      "file": "sprites-2x/0/sander.used.png",
+      "asset": "sander.used",
+      "view": 0,
+      "envelopeMeters": [
+        2.0,
+        1.0,
+        1.0
+      ],
+      "contractAnchorPx": [
+        104,
+        128
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "270a4aa49cd33d12e111abb299bd9c8f0d00a173fc782150aa97ee5b45f892eb",
+        "sizePx": [
+          160,
+          136
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          8,
+          21,
+          152,
+          128
+        ],
+        "marginsPx": [
+          8,
+          21,
+          8,
+          8
+        ],
+        "minimumMarginPx": 8,
+        "transparentPixelCount": 13429,
+        "passed": true,
+        "projectedBoundsDeltaPx": [
+          -0.17472000000000065,
+          -0.46399999999999864,
+          0.17471999999997934,
+          0.17472000000000776
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          2.0,
+          1.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          104.0,
+          128.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 538,
+            "slopeMinMax": [
+              0.4999999999999756,
+              0.5000000000000244
+            ],
+            "targetSlope": 0.5,
+            "maxError": 2.4424906541753444e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 850,
+            "slopeMinMax": [
+              -0.5000000000000423,
+              -0.49999999999994077
+            ],
+            "targetSlope": -0.5,
+            "maxError": 5.92303983637521e-14,
+            "passed": true
+          },
+          "2": {
+            "count": 1508,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 1.4210854715202004e-14,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            8.17472,
+            21.464
+          ],
+          [
+            151.82528000000002,
+            127.82527999999999
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 1.2874603271484375e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/90/sander.used.png",
+      "asset": "sander.used",
+      "view": 90,
+      "envelopeMeters": [
+        2.0,
+        1.0,
+        1.0
+      ],
+      "contractAnchorPx": [
+        56,
+        128
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "e5c2d99e4af395e606818399bb47307bed87277c1bc94166ea0481860ab419c5",
+        "sizePx": [
+          160,
+          136
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          8,
+          21,
+          152,
+          128
+        ],
+        "marginsPx": [
+          8,
+          21,
+          8,
+          8
+        ],
+        "minimumMarginPx": 8,
+        "transparentPixelCount": 13429,
+        "passed": true,
+        "projectedBoundsDeltaPx": [
+          -0.17472000000000065,
+          -0.46399999999999864,
+          0.17472000000000776,
+          0.17472000000000776
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          56.0,
+          128.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 538,
+            "slopeMinMax": [
+              -0.5000000000000183,
+              -0.4999999999999756
+            ],
+            "targetSlope": -0.5,
+            "maxError": 2.4424906541753444e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 850,
+            "slopeMinMax": [
+              0.49999999999994615,
+              0.5000000000000391
+            ],
+            "targetSlope": 0.5,
+            "maxError": 5.384581669432009e-14,
+            "passed": true
+          },
+          "2": {
+            "count": 1508,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 1.4210854715202004e-14,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            8.17472,
+            21.464
+          ],
+          [
+            151.82528,
+            127.82527999999999
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 1.33514404296875e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/0/sander.budget.png",
+      "asset": "sander.budget",
+      "view": 0,
+      "envelopeMeters": [
+        2.0,
+        1.0,
+        1.25
+      ],
+      "contractAnchorPx": [
+        104,
+        140
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "606e13a80aec35bfdfee23a93e320b4ccece7ff2d542d466f10992c75984f104",
+        "sizePx": [
+          160,
+          148
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          8,
+          21,
+          152,
+          140
+        ],
+        "marginsPx": [
+          8,
+          21,
+          8,
+          8
+        ],
+        "minimumMarginPx": 8,
+        "transparentPixelCount": 13582,
+        "passed": true,
+        "projectedBoundsDeltaPx": [
+          -0.17472000000000065,
+          0.08799999999999386,
+          0.17471999999997934,
+          0.17472000000000776
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          2.0,
+          1.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          104.0,
+          140.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 2294,
+            "slopeMinMax": [
+              0.499999999999926,
+              0.500000000000074
+            ],
+            "targetSlope": 0.5,
+            "maxError": 7.405187574249794e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 2098,
+            "slopeMinMax": [
+              -0.5000000000001142,
+              -0.49999999999988576
+            ],
+            "targetSlope": -0.5,
+            "maxError": 1.142419492339286e-13,
+            "passed": true
+          },
+          "2": {
+            "count": 5326,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 7.105427357601002e-15,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            8.17472,
+            20.912000000000006
+          ],
+          [
+            151.82528000000002,
+            139.82528
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 1.1622905731201172e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/90/sander.budget.png",
+      "asset": "sander.budget",
+      "view": 90,
+      "envelopeMeters": [
+        2.0,
+        1.0,
+        1.25
+      ],
+      "contractAnchorPx": [
+        56,
+        140
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "2c5738bab0ac98368ce9323c1710691e648ccb9e9285c5dd970c8e3c0017c572",
+        "sizePx": [
+          160,
+          148
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          8,
+          17,
+          152,
+          140
+        ],
+        "marginsPx": [
+          8,
+          17,
+          8,
+          8
+        ],
+        "minimumMarginPx": 8,
+        "transparentPixelCount": 13587,
+        "passed": true,
+        "projectedBoundsDeltaPx": [
+          -0.17472000000000065,
+          -0.8943584463289369,
+          0.17472000000000776,
+          0.17472000000000776
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          56.0,
+          140.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 2294,
+            "slopeMinMax": [
+              -0.500000000000037,
+              -0.499999999999963
+            ],
+            "targetSlope": -0.5,
+            "maxError": 3.702593787124897e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 2098,
+            "slopeMinMax": [
+              0.49999999999977157,
+              0.5000000000000823
+            ],
+            "targetSlope": 0.5,
+            "maxError": 2.2842838731662596e-13,
+            "passed": true
+          },
+          "2": {
+            "count": 5326,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 0.0,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            8.17472,
+            17.894358446328937
+          ],
+          [
+            151.82528,
+            139.82528
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 1.4781951904296875e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/0/sander.standard.png",
+      "asset": "sander.standard",
+      "view": 0,
+      "envelopeMeters": [
+        2.0,
+        1.0,
+        1.5
+      ],
+      "contractAnchorPx": [
+        104,
+        152
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "f29837c4a4a35b8413d488811a51f598bfc32bb15b68804ee26aa89d059210e8",
+        "sizePx": [
+          160,
+          160
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          8,
+          25,
+          152,
+          152
+        ],
+        "marginsPx": [
+          8,
+          25,
+          8,
+          8
+        ],
+        "minimumMarginPx": 8,
+        "transparentPixelCount": 15391,
+        "passed": true,
+        "projectedBoundsDeltaPx": [
+          -0.17472000000000065,
+          -0.37599999999999767,
+          0.17471999999997934,
+          0.17472000000000776
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          2.0,
+          1.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          104.0,
+          152.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 562,
+            "slopeMinMax": [
+              0.4999999999999486,
+              0.5000000000000514
+            ],
+            "targetSlope": 0.5,
+            "maxError": 5.140332604014475e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 1038,
+            "slopeMinMax": [
+              -0.5000000000000685,
+              -0.49999999999994077
+            ],
+            "targetSlope": -0.5,
+            "maxError": 6.850076061937216e-14,
+            "passed": true
+          },
+          "2": {
+            "count": 926,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 1.4210854715202004e-14,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            8.17472,
+            25.375999999999998
+          ],
+          [
+            151.82528000000002,
+            151.82528
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 1.8596649169921875e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/90/sander.standard.png",
+      "asset": "sander.standard",
+      "view": 90,
+      "envelopeMeters": [
+        2.0,
+        1.0,
+        1.5
+      ],
+      "contractAnchorPx": [
+        56,
+        152
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "f8bfeef11b61e3b188f3e9ebf2ee02698c3c790cad3749e5965dad25b33873af",
+        "sizePx": [
+          160,
+          160
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          8,
+          14,
+          152,
+          152
+        ],
+        "marginsPx": [
+          8,
+          14,
+          8,
+          8
+        ],
+        "minimumMarginPx": 8,
+        "transparentPixelCount": 15262,
+        "passed": true,
+        "projectedBoundsDeltaPx": [
+          -0.17472000000000065,
+          -0.8240640738137017,
+          0.17472000000000776,
+          0.17472000000000776
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          56.0,
+          152.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 562,
+            "slopeMinMax": [
+              -0.5000000000000514,
+              -0.4999999999999486
+            ],
+            "targetSlope": -0.5,
+            "maxError": 5.140332604014475e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 1038,
+            "slopeMinMax": [
+              0.49999999999993144,
+              0.5000000000000823
+            ],
+            "targetSlope": 0.5,
+            "maxError": 8.22675261247241e-14,
+            "passed": true
+          },
+          "2": {
+            "count": 926,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 2.842170943040401e-14,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            8.17472,
+            14.824064073813702
+          ],
+          [
+            151.82528,
+            151.82528
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 1.7642974853515625e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/0/sander.pro.png",
+      "asset": "sander.pro",
+      "view": 0,
+      "envelopeMeters": [
+        3.0,
+        2.0,
+        1.75
+      ],
+      "contractAnchorPx": [
+        152,
+        212
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "17af94c6be732942bdf3e6c77d9a40cf18e94104dd4bdeadf4d4f26ddce01da2",
+        "sizePx": [
+          256,
+          220
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          8,
+          37,
+          248,
+          212
+        ],
+        "marginsPx": [
+          8,
+          37,
+          8,
+          8
+        ],
+        "minimumMarginPx": 8,
+        "transparentPixelCount": 34139,
+        "passed": true,
+        "projectedBoundsDeltaPx": [
+          -0.17471999999999355,
+          -0.6304000000000016,
+          0.17471999999997934,
+          0.17471999999997934
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          3.0,
+          2.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          152.0,
+          212.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 1620,
+            "slopeMinMax": [
+              0.4999999999999103,
+              0.5000000000000897
+            ],
+            "targetSlope": 0.5,
+            "maxError": 8.970602038971265e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 2228,
+            "slopeMinMax": [
+              -0.5000000000001644,
+              -0.49999999999992173
+            ],
+            "targetSlope": -0.5,
+            "maxError": 1.6442402994698568e-13,
+            "passed": true
+          },
+          "2": {
+            "count": 2766,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 0.0,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            8.174719999999994,
+            37.6304
+          ],
+          [
+            247.82528000000002,
+            211.82528000000002
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 1.7881393432617188e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/90/sander.pro.png",
+      "asset": "sander.pro",
+      "view": 90,
+      "envelopeMeters": [
+        3.0,
+        2.0,
+        1.75
+      ],
+      "contractAnchorPx": [
+        104,
+        212
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "149e2fecdd77293c898d590e43e6bd0dd14e496c4cd57f32ccf8fa59117aae4e",
+        "sizePx": [
+          256,
+          220
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          8,
+          37,
+          248,
+          212
+        ],
+        "marginsPx": [
+          8,
+          37,
+          8,
+          8
+        ],
+        "minimumMarginPx": 8,
+        "transparentPixelCount": 34120,
+        "passed": true,
+        "projectedBoundsDeltaPx": [
+          -0.17472000000000065,
+          -0.6304000000000087,
+          0.17471999999997934,
+          0.17472000000000776
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          0.0,
+          2.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          104.0,
+          212.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 1620,
+            "slopeMinMax": [
+              -0.5000000000000897,
+              -0.4999999999999342
+            ],
+            "targetSlope": -0.5,
+            "maxError": 8.970602038971265e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 2228,
+            "slopeMinMax": [
+              0.4999999999999178,
+              0.5000000000000823
+            ],
+            "targetSlope": 0.5,
+            "maxError": 8.22675261247241e-14,
+            "passed": true
+          },
+          "2": {
+            "count": 2766,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 0.0,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            8.17472,
+            37.63040000000001
+          ],
+          [
+            247.82528000000002,
+            211.82528
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 1.963973045349121e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/0/sander.industrial.png",
+      "asset": "sander.industrial",
+      "view": 0,
+      "envelopeMeters": [
+        6.0,
+        2.0,
+        2.0
+      ],
+      "contractAnchorPx": [
+        296,
+        296
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "36b529b119bbd754a1b4d04f0b9513d4b674bc96cd12775bb325440548f9f115",
+        "sizePx": [
+          400,
+          304
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          8,
+          41,
+          392,
+          296
+        ],
+        "marginsPx": [
+          8,
+          41,
+          8,
+          8
+        ],
+        "minimumMarginPx": 8,
+        "transparentPixelCount": 74937,
+        "passed": true,
+        "projectedBoundsDeltaPx": [
+          -0.17471999999999355,
+          -0.47039999999999793,
+          0.17471999999997934,
+          0.17471999999997934
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          6.0,
+          2.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          296.0,
+          296.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 2278,
+            "slopeMinMax": [
+              0.49999999999990047,
+              0.5000000000000995
+            ],
+            "targetSlope": 0.5,
+            "maxError": 9.953149415764528e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 3236,
+            "slopeMinMax": [
+              -0.5000000000001762,
+              -0.499999999999765
+            ],
+            "targetSlope": -0.5,
+            "maxError": 2.349787031619144e-13,
+            "passed": true
+          },
+          "2": {
+            "count": 4202,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 0.0,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            8.174719999999994,
+            41.4704
+          ],
+          [
+            391.82528,
+            295.82528
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 3.719329833984375e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/90/sander.industrial.png",
+      "asset": "sander.industrial",
+      "view": 90,
+      "envelopeMeters": [
+        6.0,
+        2.0,
+        2.0
+      ],
+      "contractAnchorPx": [
+        104,
+        296
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "4c3f771c522b5326f537f8ffbe41f1ebd0d7d967ecf12b39c9e305e2a790ee8a",
+        "sizePx": [
+          400,
+          304
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          8,
+          41,
+          392,
+          296
+        ],
+        "marginsPx": [
+          8,
+          41,
+          8,
+          8
+        ],
+        "minimumMarginPx": 8,
+        "transparentPixelCount": 74929,
+        "passed": true,
+        "projectedBoundsDeltaPx": [
+          -0.17472000000000065,
+          -0.47040000000001214,
+          0.17471999999997934,
+          0.17471999999997934
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          0.0,
+          2.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          104.0,
+          296.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 2278,
+            "slopeMinMax": [
+              -0.5000000000000897,
+              -0.4999999999999103
+            ],
+            "targetSlope": -0.5,
+            "maxError": 8.970602038971265e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 3236,
+            "slopeMinMax": [
+              0.4999999999997533,
+              0.5000000000001644
+            ],
+            "targetSlope": 0.5,
+            "maxError": 2.466915560717098e-13,
+            "passed": true
+          },
+          "2": {
+            "count": 4202,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 0.0,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            8.17472,
+            41.47040000000001
+          ],
+          [
+            391.82528,
+            295.82528
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 3.49879264831543e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/0/cuttersSash.standard.png",
+      "asset": "cuttersSash.standard",
+      "view": 0,
+      "envelopeMeters": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "contractAnchorPx": [
+        56,
+        104
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "1523d640668205d01be59001cce83eea9292cac49708fe467b30c4423f6b2214",
+        "sizePx": [
+          112,
+          112
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          23,
+          27,
+          87,
+          87
+        ],
+        "marginsPx": [
+          23,
+          27,
+          25,
+          25
+        ],
+        "minimumMarginPx": 23,
+        "transparentPixelCount": 10237,
+        "passed": true,
+        "catalogApproximateTargetBox": [
+          23,
+          25,
+          87,
+          89
+        ],
+        "catalogBoxDeltaPx": [
+          0,
+          2,
+          0,
+          -2
+        ],
+        "catalogCenteredX": true,
+        "projectedBoundsDeltaPx": [
+          0.0,
+          -0.6035502958579855,
+          0.0,
+          0.6035502958579855
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          1.0,
+          1.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          56.0,
+          104.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 1060,
+            "slopeMinMax": [
+              0.4999999999998124,
+              0.5000000000001407
+            ],
+            "targetSlope": 0.5,
+            "maxError": 1.8762769116165146e-13,
+            "passed": true
+          },
+          "1": {
+            "count": 1266,
+            "slopeMinMax": [
+              -0.5000000000002814,
+              -0.4999999999998124
+            ],
+            "targetSlope": -0.5,
+            "maxError": 2.814415367424772e-13,
+            "passed": true
+          },
+          "2": {
+            "count": 4424,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 7.105427357601002e-15,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            23.0,
+            27.603550295857985
+          ],
+          [
+            87.0,
+            86.39644970414201
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 8.58306884765625e-06,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/0/cuttersCasement.standard.png",
+      "asset": "cuttersCasement.standard",
+      "view": 0,
+      "envelopeMeters": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "contractAnchorPx": [
+        56,
+        104
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "66d6955cd70b8875ba8c3e3fd1f5b00d25bcbc7f65f311768231b63751258158",
+        "sizePx": [
+          112,
+          112
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          23,
+          27,
+          87,
+          87
+        ],
+        "marginsPx": [
+          23,
+          27,
+          25,
+          25
+        ],
+        "minimumMarginPx": 23,
+        "transparentPixelCount": 10238,
+        "passed": true,
+        "catalogApproximateTargetBox": [
+          23,
+          25,
+          87,
+          89
+        ],
+        "catalogBoxDeltaPx": [
+          0,
+          2,
+          0,
+          -2
+        ],
+        "catalogCenteredX": true,
+        "projectedBoundsDeltaPx": [
+          0.0,
+          -0.6035502958579855,
+          0.0,
+          0.6035502958579855
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          1.0,
+          1.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          56.0,
+          104.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 932,
+            "slopeMinMax": [
+              0.49999999999993483,
+              0.5000000000000638
+            ],
+            "targetSlope": 0.5,
+            "maxError": 6.517009154549669e-14,
+            "passed": true
+          },
+          "1": {
+            "count": 1090,
+            "slopeMinMax": [
+              -0.5000000000002814,
+              -0.4999999999998124
+            ],
+            "targetSlope": -0.5,
+            "maxError": 2.814415367424772e-13,
+            "passed": true
+          },
+          "2": {
+            "count": 3880,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 7.105427357601002e-15,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            23.0,
+            27.603550295857985
+          ],
+          [
+            87.0,
+            86.39644970414201
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 1.0013580322265625e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    },
+    {
+      "file": "sprites-2x/0/cuttersDoor.standard.png",
+      "asset": "cuttersDoor.standard",
+      "view": 0,
+      "envelopeMeters": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "contractAnchorPx": [
+        56,
+        104
+      ],
+      "image": {
+        "present": true,
+        "fileSHA256": "8db90b0177668238b5d5b028ff482ee4d53e2e97b2cea8227fecc9a4f661638e",
+        "sizePx": [
+          112,
+          112
+        ],
+        "mode": "RGBA",
+        "pngBitDepth": 8,
+        "pngColorType": 6,
+        "alphaBoundsPx": [
+          23,
+          27,
+          87,
+          87
+        ],
+        "marginsPx": [
+          23,
+          27,
+          25,
+          25
+        ],
+        "minimumMarginPx": 23,
+        "transparentPixelCount": 10239,
+        "passed": true,
+        "catalogApproximateTargetBox": [
+          23,
+          25,
+          87,
+          89
+        ],
+        "catalogBoxDeltaPx": [
+          0,
+          2,
+          0,
+          -2
+        ],
+        "catalogCenteredX": true,
+        "projectedBoundsDeltaPx": [
+          0.0,
+          -0.6035502958579855,
+          0.0,
+          0.6035502958579855
+        ],
+        "rasterRegistrationVerified": true
+      },
+      "camera": {
+        "metadataPresent": true,
+        "exactProjectionVerified": true,
+        "matrixMatchesContract": true,
+        "metadataMatchesExportedMesh": true,
+        "physicalRotationVerified": true,
+        "rotationDeterminant": 1.0,
+        "anchorSourceM": [
+          1.0,
+          1.0,
+          0.0
+        ],
+        "computedAnchorPx": [
+          56.0,
+          104.0
+        ],
+        "anchorVerified": true,
+        "renderCanvasMatches": true,
+        "edgeTests": {
+          "0": {
+            "count": 841,
+            "slopeMinMax": [
+              0.4999999999998985,
+              0.5000000000000638
+            ],
+            "targetSlope": 0.5,
+            "maxError": 1.0147438445073931e-13,
+            "passed": true
+          },
+          "1": {
+            "count": 953,
+            "slopeMinMax": [
+              -0.5000000000002814,
+              -0.4999999999998124
+            ],
+            "targetSlope": -0.5,
+            "maxError": 2.814415367424772e-13,
+            "passed": true
+          },
+          "2": {
+            "count": 2984,
+            "slopeMinMax": [
+              0.0,
+              0.0
+            ],
+            "targetSlope": null,
+            "maxError": 7.105427357601002e-15,
+            "passed": true
+          }
+        },
+        "projectedVertexBoundsPx": [
+          [
+            23.0,
+            27.603550295857985
+          ],
+          [
+            87.0,
+            86.39644970414201
+          ]
+        ],
+        "gpuProbe": {
+          "method": "actual vertex shader / GPU transform feedback",
+          "sampleCount": 265,
+          "maxPixelError": 1.0013580322265625e-05,
+          "clipWMinMax": [
+            1.0,
+            1.0
+          ],
+          "passed": true
+        },
+        "lightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "keyLightScreenDirection": [
+          -336.0,
+          -288.0
+        ],
+        "keyLightFromUpperLeft": true,
+        "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+        "shaderSourceMatchesRendererFile": true
+      },
+      "passed": true
+    }
+  ],
+  "meshes": {
+    "sander.used": {
+      "path": "source/meshes/sander.used.npz",
+      "fileSHA256": "b6e100c62ab60e2eb7ddef4fb05846bbfb267b12f3cdca6e07ff25c6b810c780",
+      "trianglesSHA256": "8dafa029e0495295f71e5dd115c885ab970de01974d1d202d5dc9bf870859971",
+      "triangleCount": 4116,
+      "boundsMinM": [
+        -2.6020852139652106e-18,
+        -2.6020852139652106e-18,
+        -8.673617379884035e-19
+      ],
+      "boundsMaxM": [
+        2.0,
+        1.0,
+        1.0
+      ],
+      "insideEnvelope": true,
+      "grounded": true,
+      "heightMatchesEnvelope": true,
+      "fillsXYEnvelope": true,
+      "normalLengthMinMax": [
+        0.9999999999999998,
+        1.0000000000000002
+      ],
+      "normalsUnit": true,
+      "nonFiniteValues": 0,
+      "degenerateTriangles": 0,
+      "facesOpposedToNormals": 0,
+      "axisAlignedEdgeCounts": {
+        "0": 538,
+        "1": 850,
+        "2": 1508
+      },
+      "boxCount": 26,
+      "passed": true,
+      "fixedLightingAcrossViews": true,
+      "sameSourceMeshForBothViews": true
+    },
+    "sander.budget": {
+      "path": "source/meshes/sander.budget.npz",
+      "fileSHA256": "d5c1b3b9677bf8281251d03c05cc6029cdd9c908f13a0a79194c926bd00d7c7a",
+      "trianglesSHA256": "878b2f83e7797fa003b3c7bc8f51133b5a64703e0f69529719d2b76a6391eaa4",
+      "triangleCount": 11628,
+      "boundsMinM": [
+        -2.6020852139652106e-18,
+        -2.6020852139652106e-18,
+        -8.673617379884035e-19
+      ],
+      "boundsMaxM": [
+        2.0,
+        1.0,
+        1.25
+      ],
+      "insideEnvelope": true,
+      "grounded": true,
+      "heightMatchesEnvelope": true,
+      "fillsXYEnvelope": true,
+      "normalLengthMinMax": [
+        0.9999999999999998,
+        1.0
+      ],
+      "normalsUnit": true,
+      "nonFiniteValues": 0,
+      "degenerateTriangles": 0,
+      "facesOpposedToNormals": 0,
+      "axisAlignedEdgeCounts": {
+        "0": 2294,
+        "1": 2098,
+        "2": 5326
+      },
+      "boxCount": 31,
+      "passed": true,
+      "fixedLightingAcrossViews": true,
+      "sameSourceMeshForBothViews": true
+    },
+    "sander.standard": {
+      "path": "source/meshes/sander.standard.npz",
+      "fileSHA256": "66082fc06dc429761e4ab51c35b73a6b5da2d4dbc9519943e83900fb0e068e77",
+      "trianglesSHA256": "167e6efcd30bf6b51f7f1507c2930b41c8d123d427a1d2e6007e2e7046de5d9c",
+      "triangleCount": 4732,
+      "boundsMinM": [
+        -2.6020852139652106e-18,
+        -2.6020852139652106e-18,
+        -8.673617379884035e-19
+      ],
+      "boundsMaxM": [
+        2.0,
+        1.0,
+        1.5
+      ],
+      "insideEnvelope": true,
+      "grounded": true,
+      "heightMatchesEnvelope": true,
+      "fillsXYEnvelope": true,
+      "normalLengthMinMax": [
+        0.9999999999999997,
+        1.0000000000000002
+      ],
+      "normalsUnit": true,
+      "nonFiniteValues": 0,
+      "degenerateTriangles": 0,
+      "facesOpposedToNormals": 0,
+      "axisAlignedEdgeCounts": {
+        "0": 562,
+        "1": 1038,
+        "2": 926
+      },
+      "boxCount": 29,
+      "passed": true,
+      "fixedLightingAcrossViews": true,
+      "sameSourceMeshForBothViews": true
+    },
+    "sander.pro": {
+      "path": "source/meshes/sander.pro.npz",
+      "fileSHA256": "35eb8b29e8916fb290b9d54f42cae9b86513f5fcd5c2117bc93a04a0cabff044",
+      "trianglesSHA256": "a3b19ec0d2bf3dde9bc299705ab2a3de50e887f6323abcb4df80593c9495ce81",
+      "triangleCount": 7040,
+      "boundsMinM": [
+        -2.6020852139652106e-18,
+        -2.6020852139652106e-18,
+        -8.673617379884035e-19
+      ],
+      "boundsMaxM": [
+        3.0,
+        2.0,
+        1.75
+      ],
+      "insideEnvelope": true,
+      "grounded": true,
+      "heightMatchesEnvelope": true,
+      "fillsXYEnvelope": true,
+      "normalLengthMinMax": [
+        0.9999999999999999,
+        1.0
+      ],
+      "normalsUnit": true,
+      "nonFiniteValues": 0,
+      "degenerateTriangles": 0,
+      "facesOpposedToNormals": 0,
+      "axisAlignedEdgeCounts": {
+        "0": 1620,
+        "1": 2228,
+        "2": 2766
+      },
+      "boxCount": 94,
+      "passed": true,
+      "fixedLightingAcrossViews": true,
+      "sameSourceMeshForBothViews": true
+    },
+    "sander.industrial": {
+      "path": "source/meshes/sander.industrial.npz",
+      "fileSHA256": "97a40d90c69141bd75e4d96e0edf22b0108f3e0e47bc22bea003c8c5bbea4309",
+      "trianglesSHA256": "5d52a96d606a8324be7eff4bfbfbaf917d4acdfa28ca7bd6aa06aef128ec28b0",
+      "triangleCount": 10496,
+      "boundsMinM": [
+        -2.6020852139652106e-18,
+        -2.6020852139652106e-18,
+        -8.673617379884035e-19
+      ],
+      "boundsMaxM": [
+        6.0,
+        2.0,
+        2.0
+      ],
+      "insideEnvelope": true,
+      "grounded": true,
+      "heightMatchesEnvelope": true,
+      "fillsXYEnvelope": true,
+      "normalLengthMinMax": [
+        0.9999999999999999,
+        1.0
+      ],
+      "normalsUnit": true,
+      "nonFiniteValues": 0,
+      "degenerateTriangles": 0,
+      "facesOpposedToNormals": 0,
+      "axisAlignedEdgeCounts": {
+        "0": 2278,
+        "1": 3236,
+        "2": 4202
+      },
+      "boxCount": 131,
+      "passed": true,
+      "fixedLightingAcrossViews": true,
+      "sameSourceMeshForBothViews": true
+    },
+    "cuttersSash.standard": {
+      "path": "source/meshes/cuttersSash.standard.npz",
+      "fileSHA256": "9dc806cef2c0e2de1dc3cfe0ac2605c1ae76b09e6bdf0e2a63a8a0f9462631b2",
+      "trianglesSHA256": "3cb1d65aa98a21b27e759e05358c47d021af6bb95f18f793a35e801b602f6d81",
+      "triangleCount": 8460,
+      "boundsMinM": [
+        0.06492850098619335,
+        0.19858234714003947,
+        0.16279585798816587
+      ],
+      "boundsMaxM": [
+        0.8538831360946746,
+        0.8826060157790927,
+        0.7308431952662723
+      ],
+      "insideEnvelope": true,
+      "grounded": false,
+      "heightMatchesEnvelope": false,
+      "fillsXYEnvelope": false,
+      "normalLengthMinMax": [
+        0.9999999999999999,
+        1.0
+      ],
+      "normalsUnit": true,
+      "nonFiniteValues": 0,
+      "degenerateTriangles": 0,
+      "facesOpposedToNormals": 0,
+      "axisAlignedEdgeCounts": {
+        "0": 1060,
+        "1": 1266,
+        "2": 4424
+      },
+      "boxCount": 25,
+      "passed": true
+    },
+    "cuttersCasement.standard": {
+      "path": "source/meshes/cuttersCasement.standard.npz",
+      "fileSHA256": "c4f248a6865349a8321dbb61901f729682fcfe9df48febdabc75d3b43b1e8e32",
+      "trianglesSHA256": "5746dff274063e9fd3b4c3382b945481387dfc028512ba71835dc1c421a3d892",
+      "triangleCount": 7404,
+      "boundsMinM": [
+        0.06492850098619335,
+        0.19858234714003947,
+        0.16279585798816587
+      ],
+      "boundsMaxM": [
+        0.8538831360946746,
+        0.8826060157790927,
+        0.7308431952662723
+      ],
+      "insideEnvelope": true,
+      "grounded": false,
+      "heightMatchesEnvelope": false,
+      "fillsXYEnvelope": false,
+      "normalLengthMinMax": [
+        0.9999999999999999,
+        1.0
+      ],
+      "normalsUnit": true,
+      "nonFiniteValues": 0,
+      "degenerateTriangles": 0,
+      "facesOpposedToNormals": 0,
+      "axisAlignedEdgeCounts": {
+        "0": 932,
+        "1": 1090,
+        "2": 3880
+      },
+      "boxCount": 25,
+      "passed": true
+    },
+    "cuttersDoor.standard": {
+      "path": "source/meshes/cuttersDoor.standard.npz",
+      "fileSHA256": "40dfd8123c7022ba4a04701cae717094c4bd7515f580da960c3256119b79737a",
+      "trianglesSHA256": "3fafd620e5edb2996ed1799f8d5be692abb9086b70e36a04936e89079f7fa938",
+      "triangleCount": 5882,
+      "boundsMinM": [
+        0.06492850098619335,
+        0.19858234714003947,
+        0.16279585798816587
+      ],
+      "boundsMaxM": [
+        0.8538831360946746,
+        0.8826060157790927,
+        0.7308431952662723
+      ],
+      "insideEnvelope": true,
+      "grounded": false,
+      "heightMatchesEnvelope": false,
+      "fillsXYEnvelope": false,
+      "normalLengthMinMax": [
+        0.9999999999999999,
+        1.0
+      ],
+      "normalsUnit": true,
+      "nonFiniteValues": 0,
+      "degenerateTriangles": 0,
+      "facesOpposedToNormals": 0,
+      "axisAlignedEdgeCounts": {
+        "0": 841,
+        "1": 953,
+        "2": 2984
+      },
+      "boxCount": 25,
+      "passed": true
+    }
+  },
+  "exactProjectionVerified": true,
+  "missingFiles": [],
+  "unexpectedFiles": [],
+  "technicalChecksPassed": true,
+  "visualApproval": {
+    "status": "approved",
+    "by": "Piotr",
+    "date": "2026-10-09",
+    "evidence": "approval.json"
+  }
+}

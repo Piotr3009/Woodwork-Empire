@@ -1,0 +1,133 @@
+{
+  "views": {
+    "0": {
+      "renderer": "ModernGL EGL 5.13 / exact affine 2:1 shader",
+      "envelopeMeters": [
+        1,
+        1,
+        1
+      ],
+      "view": 0,
+      "sourceMeshSHA256": "5746dff274063e9fd3b4c3382b945481387dfc028512ba71835dc1c421a3d892",
+      "triangleCount": 7404,
+      "vertexBoundsMeters": [
+        [
+          0.06492850098619335,
+          0.19858234714003947,
+          0.16279585798816587
+        ],
+        [
+          0.8538831360946746,
+          0.8826060157790927,
+          0.7308431952662723
+        ]
+      ],
+      "normalLengthMinMax": [
+        0.9999999999999999,
+        1.0
+      ],
+      "objectTransform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "sourceToPixel": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          56.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          56.0
+        ]
+      ],
+      "worldToPixel": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          56.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          56.0
+        ]
+      ],
+      "worldToPixelMeaning": "composed SOURCE mesh coordinates to final pixels (includes objectTransform)",
+      "anchorWorldSource": [
+        1.0,
+        1.0,
+        0.0
+      ],
+      "anchorSourceM": [
+        1.0,
+        1.0,
+        0.0
+      ],
+      "anchorPx": [
+        56.0,
+        104.0
+      ],
+      "canvasPx": [
+        112,
+        112
+      ],
+      "rasterSizePx": [
+        112,
+        112
+      ],
+      "fixedLightingWorld": [
+        [
+          -2.5,
+          4.5,
+          7.0
+        ],
+        [
+          5.0,
+          -3.0,
+          4.0
+        ],
+        [
+          -3.0,
+          -4.0,
+          6.0
+        ]
+      ],
+      "shaderHash": "72ca3f2406b70d6752bcb8bd16aeff5c0991726f092af0541a9fb392c14c5230",
+      "shaderSourceFile": "/workspace/scratch/6c168f42cea6/order4-src/render3d.py",
+      "vertexShaderSource": "#version 330\nin vec3 in_pos;\nin vec3 in_normal;\nin float in_ao;\nuniform vec3 bounds;\nuniform vec2 canvas;\nuniform int view90;\nout vec3 world_pos;\nout vec3 model_pos;\nout vec3 normal;\nout float ao;\nvoid main() {\n  vec3 p=in_pos;\n  vec3 n=in_normal;\n  float W=bounds.x, D=bounds.y;\n  if(view90==1) { p=vec3(p.y,bounds.x-p.x,p.z); n=vec3(n.y,-n.x,n.z); W=bounds.y;D=bounds.x; }\n  float sx=8.0+48.0*D+48.0*(p.x-p.y);\n  float sy=8.0+48.0*bounds.z+24.0*(p.x+p.y)-48.0*p.z;\n  float depth=0.85-1.7*(p.x+p.y+p.z)/(bounds.x+bounds.y+bounds.z+0.01);\n  gl_Position=vec4(2.0*sx/canvas.x-1.0,1.0-2.0*sy/canvas.y,depth,1.0);\n  world_pos=p; model_pos=in_pos;normal=n;ao=in_ao;\n}\n",
+      "exactProjectionVerified": true,
+      "groundEdgeSlopes": [
+        0.5,
+        -0.5
+      ]
+    }
+  }
+}

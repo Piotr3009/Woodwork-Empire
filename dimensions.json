@@ -1,0 +1,464 @@
+{
+  "schemaVersion": 1,
+  "pack": "order-2026-10-08-package-1-sanders-cutters",
+  "project": "Woodwork Empire Tycoon",
+  "status": "approved",
+  "units": "m",
+  "spriteScale": "2x",
+  "alpha": "straight RGBA8",
+  "origin": "top-left of full canvas",
+  "trimSprites": false,
+  "exactProjectionVerified": true,
+  "projection": {
+    "sx": "ox + 48 * (X - Y)",
+    "sy": "oy + 24 * (X + Y) - 48 * Z",
+    "originPx": "(8 + 48 * rotatedFootprintDepthM, 8 + 48 * heightM)",
+    "nearestCorner": "(rotatedFootprintWidthM, rotatedFootprintDepthM, 0)",
+    "gridAngleDeg": 26.56505117707799,
+    "type": "orthographic dimetric 2:1",
+    "elevationDeg": 30,
+    "azimuthDeg": 45,
+    "additionalZCompressionApplied": false,
+    "zNote": "Direct contractual pixel mapping already includes the required vertical metric scale.",
+    "rotation90": {
+      "description": "Physical rotation around Z, with translation into the positive footprint.",
+      "localToWorld": "X = y; Y = originalWidthM - x; Z = z",
+      "matrix3x3": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ]
+    },
+    "lighting": "fixed screen upper-left; no ground plane; no cast shadow"
+  },
+  "sprites": [
+    {
+      "id": "sander.used",
+      "family": "sander",
+      "tier": "used",
+      "viewDeg": 0,
+      "file": "sprites-2x/0/sander.used.png",
+      "category": "floor-machine",
+      "envelopeM": {
+        "w": 2.0,
+        "d": 1.0,
+        "h": 1.0
+      },
+      "envelopeInterpretation": "physical dimensions in metres",
+      "rotatedFootprintM": {
+        "w": 2.0,
+        "d": 1.0
+      },
+      "canvasPx": {
+        "w": 160,
+        "h": 136
+      },
+      "anchorPx": {
+        "x": 104,
+        "y": 128
+      },
+      "projectionOriginPx": {
+        "x": 56.0,
+        "y": 56.0
+      },
+      "master": "masters-6x/0/sander.used.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "sander.used",
+      "family": "sander",
+      "tier": "used",
+      "viewDeg": 90,
+      "file": "sprites-2x/90/sander.used.png",
+      "category": "floor-machine",
+      "envelopeM": {
+        "w": 2.0,
+        "d": 1.0,
+        "h": 1.0
+      },
+      "envelopeInterpretation": "physical dimensions in metres",
+      "rotatedFootprintM": {
+        "w": 1.0,
+        "d": 2.0
+      },
+      "canvasPx": {
+        "w": 160,
+        "h": 136
+      },
+      "anchorPx": {
+        "x": 56,
+        "y": 128
+      },
+      "projectionOriginPx": {
+        "x": 104.0,
+        "y": 56.0
+      },
+      "master": "masters-6x/90/sander.used.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "sander.budget",
+      "family": "sander",
+      "tier": "budget",
+      "viewDeg": 0,
+      "file": "sprites-2x/0/sander.budget.png",
+      "category": "floor-machine",
+      "envelopeM": {
+        "w": 2.0,
+        "d": 1.0,
+        "h": 1.25
+      },
+      "envelopeInterpretation": "physical dimensions in metres",
+      "rotatedFootprintM": {
+        "w": 2.0,
+        "d": 1.0
+      },
+      "canvasPx": {
+        "w": 160,
+        "h": 148
+      },
+      "anchorPx": {
+        "x": 104,
+        "y": 140
+      },
+      "projectionOriginPx": {
+        "x": 56.0,
+        "y": 68.0
+      },
+      "master": "masters-6x/0/sander.budget.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "sander.budget",
+      "family": "sander",
+      "tier": "budget",
+      "viewDeg": 90,
+      "file": "sprites-2x/90/sander.budget.png",
+      "category": "floor-machine",
+      "envelopeM": {
+        "w": 2.0,
+        "d": 1.0,
+        "h": 1.25
+      },
+      "envelopeInterpretation": "physical dimensions in metres",
+      "rotatedFootprintM": {
+        "w": 1.0,
+        "d": 2.0
+      },
+      "canvasPx": {
+        "w": 160,
+        "h": 148
+      },
+      "anchorPx": {
+        "x": 56,
+        "y": 140
+      },
+      "projectionOriginPx": {
+        "x": 104.0,
+        "y": 68.0
+      },
+      "master": "masters-6x/90/sander.budget.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "sander.standard",
+      "family": "sander",
+      "tier": "standard",
+      "viewDeg": 0,
+      "file": "sprites-2x/0/sander.standard.png",
+      "category": "floor-machine",
+      "envelopeM": {
+        "w": 2.0,
+        "d": 1.0,
+        "h": 1.5
+      },
+      "envelopeInterpretation": "physical dimensions in metres",
+      "rotatedFootprintM": {
+        "w": 2.0,
+        "d": 1.0
+      },
+      "canvasPx": {
+        "w": 160,
+        "h": 160
+      },
+      "anchorPx": {
+        "x": 104,
+        "y": 152
+      },
+      "projectionOriginPx": {
+        "x": 56.0,
+        "y": 80.0
+      },
+      "master": "masters-6x/0/sander.standard.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "sander.standard",
+      "family": "sander",
+      "tier": "standard",
+      "viewDeg": 90,
+      "file": "sprites-2x/90/sander.standard.png",
+      "category": "floor-machine",
+      "envelopeM": {
+        "w": 2.0,
+        "d": 1.0,
+        "h": 1.5
+      },
+      "envelopeInterpretation": "physical dimensions in metres",
+      "rotatedFootprintM": {
+        "w": 1.0,
+        "d": 2.0
+      },
+      "canvasPx": {
+        "w": 160,
+        "h": 160
+      },
+      "anchorPx": {
+        "x": 56,
+        "y": 152
+      },
+      "projectionOriginPx": {
+        "x": 104.0,
+        "y": 80.0
+      },
+      "master": "masters-6x/90/sander.standard.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "sander.pro",
+      "family": "sander",
+      "tier": "pro",
+      "viewDeg": 0,
+      "file": "sprites-2x/0/sander.pro.png",
+      "category": "floor-machine",
+      "envelopeM": {
+        "w": 3.0,
+        "d": 2.0,
+        "h": 1.75
+      },
+      "envelopeInterpretation": "physical dimensions in metres",
+      "rotatedFootprintM": {
+        "w": 3.0,
+        "d": 2.0
+      },
+      "canvasPx": {
+        "w": 256,
+        "h": 220
+      },
+      "anchorPx": {
+        "x": 152,
+        "y": 212
+      },
+      "projectionOriginPx": {
+        "x": 104.0,
+        "y": 92.0
+      },
+      "master": "masters-6x/0/sander.pro.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "sander.pro",
+      "family": "sander",
+      "tier": "pro",
+      "viewDeg": 90,
+      "file": "sprites-2x/90/sander.pro.png",
+      "category": "floor-machine",
+      "envelopeM": {
+        "w": 3.0,
+        "d": 2.0,
+        "h": 1.75
+      },
+      "envelopeInterpretation": "physical dimensions in metres",
+      "rotatedFootprintM": {
+        "w": 2.0,
+        "d": 3.0
+      },
+      "canvasPx": {
+        "w": 256,
+        "h": 220
+      },
+      "anchorPx": {
+        "x": 104,
+        "y": 212
+      },
+      "projectionOriginPx": {
+        "x": 152.0,
+        "y": 92.0
+      },
+      "master": "masters-6x/90/sander.pro.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "sander.industrial",
+      "family": "sander",
+      "tier": "industrial",
+      "viewDeg": 0,
+      "file": "sprites-2x/0/sander.industrial.png",
+      "category": "floor-machine",
+      "envelopeM": {
+        "w": 6.0,
+        "d": 2.0,
+        "h": 2.0
+      },
+      "envelopeInterpretation": "physical dimensions in metres",
+      "rotatedFootprintM": {
+        "w": 6.0,
+        "d": 2.0
+      },
+      "canvasPx": {
+        "w": 400,
+        "h": 304
+      },
+      "anchorPx": {
+        "x": 296,
+        "y": 296
+      },
+      "projectionOriginPx": {
+        "x": 104.0,
+        "y": 104.0
+      },
+      "master": "masters-6x/0/sander.industrial.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "sander.industrial",
+      "family": "sander",
+      "tier": "industrial",
+      "viewDeg": 90,
+      "file": "sprites-2x/90/sander.industrial.png",
+      "category": "floor-machine",
+      "envelopeM": {
+        "w": 6.0,
+        "d": 2.0,
+        "h": 2.0
+      },
+      "envelopeInterpretation": "physical dimensions in metres",
+      "rotatedFootprintM": {
+        "w": 2.0,
+        "d": 6.0
+      },
+      "canvasPx": {
+        "w": 400,
+        "h": 304
+      },
+      "anchorPx": {
+        "x": 104,
+        "y": 296
+      },
+      "projectionOriginPx": {
+        "x": 296.0,
+        "y": 104.0
+      },
+      "master": "masters-6x/90/sander.industrial.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "cuttersSash.standard",
+      "family": "cuttersSash",
+      "tier": "standard",
+      "viewDeg": 0,
+      "file": "sprites-2x/0/cuttersSash.standard.png",
+      "category": "catalog",
+      "envelopeM": {
+        "w": 1.0,
+        "d": 1.0,
+        "h": 1.0
+      },
+      "envelopeInterpretation": "logical catalog framing; not a stated physical cutter-case size",
+      "rotatedFootprintM": {
+        "w": 1.0,
+        "d": 1.0
+      },
+      "canvasPx": {
+        "w": 112,
+        "h": 112
+      },
+      "anchorPx": {
+        "x": 56,
+        "y": 104
+      },
+      "projectionOriginPx": {
+        "x": 56.0,
+        "y": 56.0
+      },
+      "master": "masters-6x/0/cuttersSash.standard.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "cuttersCasement.standard",
+      "family": "cuttersCasement",
+      "tier": "standard",
+      "viewDeg": 0,
+      "file": "sprites-2x/0/cuttersCasement.standard.png",
+      "category": "catalog",
+      "envelopeM": {
+        "w": 1.0,
+        "d": 1.0,
+        "h": 1.0
+      },
+      "envelopeInterpretation": "logical catalog framing; not a stated physical cutter-case size",
+      "rotatedFootprintM": {
+        "w": 1.0,
+        "d": 1.0
+      },
+      "canvasPx": {
+        "w": 112,
+        "h": 112
+      },
+      "anchorPx": {
+        "x": 56,
+        "y": 104
+      },
+      "projectionOriginPx": {
+        "x": 56.0,
+        "y": 56.0
+      },
+      "master": "masters-6x/0/cuttersCasement.standard.png",
+      "masterScaleRelativeToSprite": 6
+    },
+    {
+      "id": "cuttersDoor.standard",
+      "family": "cuttersDoor",
+      "tier": "standard",
+      "viewDeg": 0,
+      "file": "sprites-2x/0/cuttersDoor.standard.png",
+      "category": "catalog",
+      "envelopeM": {
+        "w": 1.0,
+        "d": 1.0,
+        "h": 1.0
+      },
+      "envelopeInterpretation": "logical catalog framing; not a stated physical cutter-case size",
+      "rotatedFootprintM": {
+        "w": 1.0,
+        "d": 1.0
+      },
+      "canvasPx": {
+        "w": 112,
+        "h": 112
+      },
+      "anchorPx": {
+        "x": 56,
+        "y": 104
+      },
+      "projectionOriginPx": {
+        "x": 56.0,
+        "y": 56.0
+      },
+      "master": "masters-6x/0/cuttersDoor.standard.png",
+      "masterScaleRelativeToSprite": 6
+    }
+  ]
+}

@@ -1,0 +1,226 @@
+# Woodwork Empire Tycoon: zamówienie grafiki dla GPT, braki i rzeczy przy bramie (08.10.2026)
+
+Od: Claude (kod) i Piotr. Do: GPT (grafika).
+Robisz tylko to, co jest na tej liście, paczka po paczce. Piotr dołącza do tej instrukcji Twoje
+wcześniejsze paczki: nr 2 (szlifierki) i 3-4 ze składami (linia i składy drewna), jako wzór tego,
+co poprawiasz.
+
+## 0. O co chodzi
+
+Wszystko z Twoich paczek 1, 2, 3 i 4, składy drewna, CNC i logo są już w grze. Prasy i stół do
+klejenia z 08.10 też. Zostały braki: szlifierki w dobrej kamerze, trzy zestawy frezów, piła w
+module 1 linii i puste składy drewna. Do tego trzy nowe rzeczy przy bramie hali, które gra dziś
+pokazuje jako gołe bryły: paleta płyt, paczka drewna i gotowe wyroby czekające na transport.
+
+## 1. Zasady
+
+1. **Najpierw podglądy dla Piotra**, finalne pliki dopiero po jego zatwierdzeniu.
+2. **Paczka po paczce**, w kolejności z punktu 3.
+3. **Nie ruszasz repo ani kodu.** Oddajesz ZIP. Do gry wkłada go Claude.
+4. **Bez ludzi, bez tekstu, bez marek, bez numerów** na grafikach.
+5. **Maszyny i składy stoją puste**, bez materiału. Wyjątek: paczka 3 (palety, paczka drewna,
+   gotowe wyroby), bo tam materiał jest tematem.
+6. **Styl gry bez zmian:** realistycznie, nie kreskówka, nie pixel art. Kolory lekko stonowane,
+   krawędzie ostre, bez czarnego konturu. Ten sam wygląd co strugarki i piły z paczki 1 oraz prasy
+   z 08.10. Czysto i przyjemnie dla oka.
+7. **Każdy obiekt wypełnia swój romb podłogi** z tabeli i nie wychodzi poza obwiednię.
+
+## 2. Kamera: tym razem render z modelu 3D
+
+Prasy z 08.10 były wycięte z ilustracji. Według Twojej własnej kontroli
+(`exactProjectionVerified: false`) ich krawędzie podłogowe mają nachylenie od 0,39 do 0,62 zamiast
+0,5. W grze wyglądają dobrze, ale stoją trochę inaczej niż sąsiednie maszyny. Paczki 1, 3 i 4 były
+renderem z modelu i weszły idealnie.
+
+**Wszystko z tego zamówienia zrób renderem z prostego modelu 3D**, tą samą metodą co paczki 1, 3
+i 4. Jeśli dla któregoś pliku się nie da, napisz to Piotrowi przed oddaniem.
+
+Kontrakt bez zmian:
+
+- Rzut ortograficzny, dimetria 2:1, bez zbieżności perspektywy. Azymut 45 stopni, elewacja 30
+  stopni.
+- W pikselach pliku (skala 2x), dla współrzędnych w metrach:
+  - `sx = ox + 48 * (x - y)`
+  - `sy = oy + 24 * (x + y) - 48 * z`
+  - 1 m wzdłuż X to (+48, +24) px, wzdłuż Y to (-48, +24) px, w górę (0, -48) px.
+  - 1 m² podłogi to romb 96 × 48 px. Krawędzie leżące na podłodze mają nachylenie dokładnie 0,5
+    (26,565 stopnia).
+- Przy renderze z modelu 3D: ściśnij model w osi Z razy 0,8165 przed renderem. Nie ściskaj drugi
+  raz, jeśli liczysz wzorami powyżej.
+- Płótno: szerokość `48 * (w + d) + 16`, wysokość `24 * (w + d) + 48 * h + 16`. W tym jest 8 px
+  przezroczystego marginesu z każdej strony. Rozmiary w tabelach są już policzone.
+- Kotwica to rzut najbliższego rogu stopy na podłodze (z = 0), 8 px nad dolną krawędzią. Liczysz
+  ją z geometrii, nie z najniższego piksela. Podaj ją w `dimensions.json` jako `anchorPx`, osobno
+  dla każdego widoku.
+- Światło z lewej góry ekranu: góra najjaśniejsza, ściany zwrócone w lewo jasne, w prawo w cieniu.
+- Bez własnego cienia, bez podłogi, bez tła. Prawdziwe RGBA, 8 bitów.
+- Tam, gdzie tabela mówi „0 i 90”, oddajesz dwa widoki. Widok 90 to fizycznie obrócony obiekt przy
+  tej samej kamerze i tym samym świetle. Nigdy lustrzane odbicie, nigdy obrót bitmapy.
+- W widoku 0 długi bok biegnie wzdłuż osi X (w prawo w dół). Strona obsługi maszyny jest zwrócona
+  do kamery.
+
+## 3. Kolejność paczek
+
+| Paczka | Co | Plików |
+|---|---|---|
+| 1 | szlifierki od nowa i trzy zestawy frezów | 13 |
+| 2 | moduł 1 linii z piłą i dwa składy drewna puste | 6 |
+| 3 | przy bramie: paleta płyt, paczka drewna i gotowe wyroby | 8 |
+
+Paczka 1 jest najpilniejsza: szlifierki stoją na hali obok nowych pras i widać różnicę kamery.
+
+## 4. Paczka 1
+
+### 4.1 `sander`: szlifierki od nowa (0 i 90)
+
+Te same maszyny i te same kolory co w Twojej paczce 2. Nic nie projektuj od nowa, zmienia się tylko
+kamera. Obecne są rysowane z niższego punktu (krawędzie podłogowe od 0,27 do 0,43 zamiast 0,5),
+dwie największe stoją obok swoich kotwic, a przemysłowa jest za niska na swoim płótnie.
+
+| Plik (w `0/` i w `90/`) | Obwiednia (m) | Płótno (px) | Kotwica 0 | Kotwica 90 | Kolor |
+|---|---|---|---|---|---|
+| `sander.used.png` | 2 × 1 × 1 | 160 × 136 | 104, 128 | 56, 128 | zużyta, sprana zieleń |
+| `sander.budget.png` | 2 × 1 × 1,25 | 160 × 148 | 104, 140 | 56, 140 | jasny szary |
+| `sander.standard.png` | 2 × 1 × 1,5 | 160 × 160 | 104, 152 | 56, 152 | zieleń maszynowa |
+| `sander.pro.png` | 3 × 2 × 1,75 | 256 × 220 | 152, 212 | 104, 212 | ciemna leśna zieleń |
+| `sander.industrial.png` | 6 × 2 × 2 | 400 × 304 | 296, 296 | 104, 296 | niebieski |
+
+- **used**: ręczna szlifierka mimośrodowa z wężem do małego odkurzacza przemysłowego, na prostym
+  stoliku szlifierskim z drewnianym blatem.
+- **budget**: stół szlifierski z dolnym odciągiem (perforowany blat) i króćcem odciągu, dwie ręczne
+  szlifierki na wieszakach.
+- **standard**: szlifierka taśmowa krawędziowa z długim stołem i króćcem odciągu.
+- **pro**: szlifierka przelotowa w zamkniętej zielonej obudowie, ze stołami rolkowymi na wejściu
+  i wyjściu.
+- **industrial**: niebieska linia szlifierska do całych ram okien i drzwi, cztery sekcje, cztery
+  króćce odciągu na górze, stoły rolkowe na obu końcach, pulpit. Ma sięgać swojej wysokości 2 m,
+  tak jak strugarka przemysłowa na tym samym płótnie.
+
+### 4.2 Trzy zestawy frezów (tylko widok 0, obrazek do katalogu)
+
+Frezarka dolnowrzecionowa robi profil frezami, które dostanie, a każdy rodzaj wyrobu ma swój
+zestaw. W grze to trzy pozycje w katalogu, dziś z pustym polem zamiast obrazka. Nie stoją na hali,
+więc potrzebny jest tylko widok 0.
+
+| Plik (tylko w `0/`) | Obiekt | Płótno (px) | Kotwica |
+|---|---|---|---|
+| `cuttersSash.standard.png` | zestaw do okien skrzynkowych (sash) | 112 × 112 | 56, 104 |
+| `cuttersCasement.standard.png` | zestaw do okien rozwieranych (casement) | 112 × 112 | 56, 104 |
+| `cuttersDoor.standard.png` | zestaw do drzwi | 112 × 112 | 56, 104 |
+
+- Głowice frezowe (stalowe korpusy z nożami), pierścienie dystansowe i klucz, w otwartej walizce
+  z wyprofilowanym wnętrzem, widziane z kamery hali. Ta sama walizka dla wszystkich trzech, żeby
+  wyglądały jak jedna seria jednego producenta.
+- Walizka mieści się w środku płótna, mniej więcej od x 23 do 87 i od y 25 do 89, jak walizka
+  z ręcznymi narzędziami, która już jest w grze.
+- Bez napisów i cyfr. Zestawy rozróżnia to, co w nich leży:
+  - **sash**: najwięcej frezów i najsmuklejsze: profil i kontrprofil do szprosów, para do ślemion
+    (meeting rails).
+  - **casement**: mniej frezów, grubsze głowice ze schodkowymi nożami: profil skrzydła i
+    ościeżnicy, po parze.
+  - **drzwi**: profil ramiaka i jego kontrprofil oraz frez do płycin: szeroka tarcza z długimi
+    skośnymi nożami, największy element ze wszystkich trzech zestawów. Po nim drzwi rozpoznaje się
+    od razu.
+
+## 5. Paczka 2
+
+### 5.1 `windowLine1`: moduł 1 linii z piłą poprzeczną (0 i 90)
+
+W grze moduł 1 tnie deski na długość i je struga. Na Twoim rysunku jest wejście i strugarka, bez
+piły. Dorysuj piłę.
+
+| Plik (w `0/` i w `90/`) | Obwiednia (m) | Płótno (px) | Kotwica 0 | Kotwica 90 |
+|---|---|---|---|---|
+| `windowLine1.standard.png` | 6 × 3 × 2,5 | 448 × 352 | 296, 344 | 152, 344 |
+
+- Na końcu wejściowym, który już narysowałeś: piła poprzeczna (docking saw) nad przenośnikiem
+  wejściowym, z prowadnicą i ogranicznikami. Tu wchodzą surowe deski i są cięte na długość przed
+  strugarką.
+- Strugarka i reszta modułu jak na Twoim rysunku, te same kolory.
+- To samo płótno i te same kotwice, żeby moduł 1 dalej stykał się z modułem 2.
+
+### 5.2 Składy drewna puste (0 i 90)
+
+Dziś oba składy są narysowane pełne desek, a gra pokazuje na tabliczce, ile desek naprawdę na nich
+leży, np. `0 / 40`. Potrzebne są te same składy puste: te same konstrukcje i kolory, gołe ramiona
+regału i puste przęsła wiaty. Pełne zostają w grze, więc puste mają osobne nazwy.
+
+| Plik (w `0/` i w `90/`) | Obiekt | Obwiednia w grze (m) | Płótno (px) | Kotwica 0 | Kotwica 90 |
+|---|---|---|---|---|---|
+| `timberRackEmpty.standard.png` | regał na deski, pusty | 4 × 1 × 2,5 | 256 × 256 | 200, 248 | 56, 248 |
+| `timberShelterEmpty.standard.png` | wiata na deski, pusta | 3 × 6 × 3 | 448 × 376 | 152, 368 | 296, 368 |
+
+**Uwaga na wiatę.** Narysowałeś ją 6 m długą i 3 m głęboką. W grze stoi na wąskim placu przed
+halą, więc gra ma ją jako 3 m szeroką i 6 m głęboką: Twój widok 90 jest w grze widokiem 0, a Twój
+widok 0 jest widokiem 90. Pustą wiatę oddaj w widokach gry: do folderu `0/` widok, który w Twojej
+paczce był w `90/`, i odwrotnie.
+
+## 6. Paczka 3: przy bramie hali (nowe)
+
+Przy bramie hali gra pokazuje dziś dwie rzeczy jako gołe bryły: dostawę materiału (kwadrat 1 × 1 m)
+i gotowe zlecenia czekające na transport (żółte pudełka). Potrzebne są prawdziwe obrazki. Tu
+materiał jest tematem, więc wolno go pokazać.
+
+### 6.1 Dostawy (0 i 90)
+
+| Plik (w `0/` i w `90/`) | Obiekt | Obwiednia (m) | Płótno (px) | Kotwica 0 | Kotwica 90 |
+|---|---|---|---|---|---|
+| `palletSheets.standard.png` | paleta płyt meblowych | 2 × 1 × 1 | 160 × 136 | 104, 128 | 56, 128 |
+| `palletTimber.standard.png` | paczka drewna na okna | 2 × 1 × 1 | 160 × 136 | 104, 128 | 56, 128 |
+
+- **Paleta płyt**: stos płyt 2440 × 1220 mm na drewnianych legarach albo palecie, wierzchnia płyta
+  w jasnym dekorze, z boku widać warstwy płyt, spięte dwiema taśmami, narożniki z kartonu. Stos
+  około 0,8 m wysokości.
+- **Paczka drewna**: kantówka na okna (przekrój mniej więcej 70 × 100 mm) ułożona w pakiet
+  z przekładkami, na legarach, spięta stalowymi taśmami, na czołach widać słoje. Pakiet na całą
+  długość 2 m, około 0,8 m wysokości.
+
+### 6.2 Gotowe wyroby czekające na transport (tylko widok 0)
+
+Każdy wyrób stoi na palecie 1 × 1 m, owinięty przezroczystą folią, z kartonowymi narożnikami.
+Szyby z lekkim odblaskiem. Kolory poniżej to propozycja; Piotr może je zmienić przy podglądzie.
+
+| Plik (tylko w `0/`) | Obiekt | Obwiednia (m) | Płótno (px) | Kotwica |
+|---|---|---|---|---|
+| `finishedSash.standard.png` | gotowe okna skrzynkowe (sash) | 1 × 1 × 1,75 | 112 × 148 | 56, 140 |
+| `finishedCasement.standard.png` | gotowe okna rozwierane (casement) | 1 × 1 × 1,75 | 112 × 148 | 56, 140 |
+| `finishedDoors.standard.png` | gotowe drzwi (french, patio, bifold) | 1 × 1 × 2,25 | 112 × 172 | 56, 164 |
+| `finishedSheet.standard.png` | gotowe meble z płyty | 1 × 1 × 1,5 | 112 × 136 | 56, 128 |
+
+- **sash**: 3 do 4 białych okien skrzynkowych postawionych na sztorc jedno przy drugim, lekko
+  pochylonych, z widocznymi rogami ramy (horns) i szprosami.
+- **casement**: 3 do 4 okien rozwieranych na sztorc, w kolorze antracytu, żeby z daleka różniły się
+  od sash.
+- **drzwi**: 2 do 3 skrzydeł drzwi z dużymi szybami, na sztorc na stojaku w kształcie litery A
+  (A-frame) postawionym na palecie, białe.
+- **meble z płyty**: korpusy szafek i fronty ułożone na palecie i owinięte folią.
+
+## 7. Jak oddać
+
+Dla każdej paczki jeden ZIP, w układzie jak dotąd:
+
+- `sprites-2x/0/` i `sprites-2x/90/`: pliki pod tą samą nazwą w obu folderach, np.
+  `sprites-2x/0/sander.used.png` i `sprites-2x/90/sander.used.png`. Pliki „tylko widok 0” są tylko
+  w `0/`.
+- `dimensions.json`: obwiednie, płótna i `anchorPx` dla każdego pliku i każdego widoku.
+- `validation.json`: zmierzony rozmiar, tryb RGBA i margines każdego pliku.
+- `camera-QA.md`: dla każdego pliku nachylenie krawędzi podłogowych i `exactProjectionVerified`.
+- `approved-previews/`: podglądy, które zatwierdził Piotr.
+- `README.md` i `HANDOFF-CLAUDE.md`: co jest w paczce i co odbiega od tej instrukcji, jeśli
+  cokolwiek.
+
+## 8. Lista kontrolna przed oddaniem
+
+1. Każdy plik ma dokładnie rozmiar płótna z tabeli.
+2. Kotwica leży tam, gdzie mówi tabela, i wynika z geometrii.
+3. Krawędzie podłogowe mają nachylenie 0,5, piony są pionowe; `exactProjectionVerified: true`.
+4. Tło przezroczyste, bez cienia i bez podłogi, co najmniej 8 px marginesu.
+5. Widok 90 to prawdziwy obrót, nie odbicie.
+6. Szlifierki, moduł 1 i składy to te same obiekty i kolory co w Twoich paczkach, tylko poprawione.
+7. Nowe rzeczy postawione obok maszyn z paczki 1 i pras wyglądają jak ta sama gra.
+8. Nigdzie nie ma ludzi, tekstu, marek ani numerów.
+
+## 9. Czego w tym zamówieniu nie ma
+
+Postaci (także inżyniera linii), wózka z obrobionymi częściami, regału ze schnącymi ramami, tyłów
+maszyn (zostają dwa widoki), nowych pomieszczeń, dźwięków, logo i innych maszyn. Nie rób ich.

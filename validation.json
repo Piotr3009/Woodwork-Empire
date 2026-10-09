@@ -1,0 +1,617 @@
+{
+  "schemaVersion": 1,
+  "project": "Woodwork Empire Tycoon",
+  "package": 1,
+  "approved": true,
+  "filesExpected": 13,
+  "filesMeasured": 13,
+  "technicalChecksPassed": true,
+  "exactProjectionVerified": true,
+  "pixelsIdenticalToApprovedRenders": true,
+  "marginOrder": [
+    "left",
+    "top",
+    "right",
+    "bottom"
+  ],
+  "files": [
+    {
+      "file": "sprites-2x/0/sander.used.png",
+      "asset": "sander.used",
+      "viewDeg": 0,
+      "present": true,
+      "fileSHA256": "270a4aa49cd33d12e111abb299bd9c8f0d00a173fc782150aa97ee5b45f892eb",
+      "sizePx": [
+        160,
+        136
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        8,
+        21,
+        152,
+        128
+      ],
+      "marginsPx": [
+        8,
+        21,
+        8,
+        8
+      ],
+      "minimumMarginPx": 8,
+      "transparentPixelCount": 13429,
+      "passed": true,
+      "projectedBoundsDeltaPx": [
+        -0.17472000000000065,
+        -0.46399999999999864,
+        0.17471999999997934,
+        0.17472000000000776
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 104,
+        "y": 128
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/90/sander.used.png",
+      "asset": "sander.used",
+      "viewDeg": 90,
+      "present": true,
+      "fileSHA256": "e5c2d99e4af395e606818399bb47307bed87277c1bc94166ea0481860ab419c5",
+      "sizePx": [
+        160,
+        136
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        8,
+        21,
+        152,
+        128
+      ],
+      "marginsPx": [
+        8,
+        21,
+        8,
+        8
+      ],
+      "minimumMarginPx": 8,
+      "transparentPixelCount": 13429,
+      "passed": true,
+      "projectedBoundsDeltaPx": [
+        -0.17472000000000065,
+        -0.46399999999999864,
+        0.17472000000000776,
+        0.17472000000000776
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 56,
+        "y": 128
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/0/sander.budget.png",
+      "asset": "sander.budget",
+      "viewDeg": 0,
+      "present": true,
+      "fileSHA256": "606e13a80aec35bfdfee23a93e320b4ccece7ff2d542d466f10992c75984f104",
+      "sizePx": [
+        160,
+        148
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        8,
+        21,
+        152,
+        140
+      ],
+      "marginsPx": [
+        8,
+        21,
+        8,
+        8
+      ],
+      "minimumMarginPx": 8,
+      "transparentPixelCount": 13582,
+      "passed": true,
+      "projectedBoundsDeltaPx": [
+        -0.17472000000000065,
+        0.08799999999999386,
+        0.17471999999997934,
+        0.17472000000000776
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 104,
+        "y": 140
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/90/sander.budget.png",
+      "asset": "sander.budget",
+      "viewDeg": 90,
+      "present": true,
+      "fileSHA256": "2c5738bab0ac98368ce9323c1710691e648ccb9e9285c5dd970c8e3c0017c572",
+      "sizePx": [
+        160,
+        148
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        8,
+        17,
+        152,
+        140
+      ],
+      "marginsPx": [
+        8,
+        17,
+        8,
+        8
+      ],
+      "minimumMarginPx": 8,
+      "transparentPixelCount": 13587,
+      "passed": true,
+      "projectedBoundsDeltaPx": [
+        -0.17472000000000065,
+        -0.8943584463289369,
+        0.17472000000000776,
+        0.17472000000000776
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 56,
+        "y": 140
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/0/sander.standard.png",
+      "asset": "sander.standard",
+      "viewDeg": 0,
+      "present": true,
+      "fileSHA256": "f29837c4a4a35b8413d488811a51f598bfc32bb15b68804ee26aa89d059210e8",
+      "sizePx": [
+        160,
+        160
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        8,
+        25,
+        152,
+        152
+      ],
+      "marginsPx": [
+        8,
+        25,
+        8,
+        8
+      ],
+      "minimumMarginPx": 8,
+      "transparentPixelCount": 15391,
+      "passed": true,
+      "projectedBoundsDeltaPx": [
+        -0.17472000000000065,
+        -0.37599999999999767,
+        0.17471999999997934,
+        0.17472000000000776
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 104,
+        "y": 152
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/90/sander.standard.png",
+      "asset": "sander.standard",
+      "viewDeg": 90,
+      "present": true,
+      "fileSHA256": "f8bfeef11b61e3b188f3e9ebf2ee02698c3c790cad3749e5965dad25b33873af",
+      "sizePx": [
+        160,
+        160
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        8,
+        14,
+        152,
+        152
+      ],
+      "marginsPx": [
+        8,
+        14,
+        8,
+        8
+      ],
+      "minimumMarginPx": 8,
+      "transparentPixelCount": 15262,
+      "passed": true,
+      "projectedBoundsDeltaPx": [
+        -0.17472000000000065,
+        -0.8240640738137017,
+        0.17472000000000776,
+        0.17472000000000776
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 56,
+        "y": 152
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/0/sander.pro.png",
+      "asset": "sander.pro",
+      "viewDeg": 0,
+      "present": true,
+      "fileSHA256": "17af94c6be732942bdf3e6c77d9a40cf18e94104dd4bdeadf4d4f26ddce01da2",
+      "sizePx": [
+        256,
+        220
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        8,
+        37,
+        248,
+        212
+      ],
+      "marginsPx": [
+        8,
+        37,
+        8,
+        8
+      ],
+      "minimumMarginPx": 8,
+      "transparentPixelCount": 34139,
+      "passed": true,
+      "projectedBoundsDeltaPx": [
+        -0.17471999999999355,
+        -0.6304000000000016,
+        0.17471999999997934,
+        0.17471999999997934
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 152,
+        "y": 212
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/90/sander.pro.png",
+      "asset": "sander.pro",
+      "viewDeg": 90,
+      "present": true,
+      "fileSHA256": "149e2fecdd77293c898d590e43e6bd0dd14e496c4cd57f32ccf8fa59117aae4e",
+      "sizePx": [
+        256,
+        220
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        8,
+        37,
+        248,
+        212
+      ],
+      "marginsPx": [
+        8,
+        37,
+        8,
+        8
+      ],
+      "minimumMarginPx": 8,
+      "transparentPixelCount": 34120,
+      "passed": true,
+      "projectedBoundsDeltaPx": [
+        -0.17472000000000065,
+        -0.6304000000000087,
+        0.17471999999997934,
+        0.17472000000000776
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 104,
+        "y": 212
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/0/sander.industrial.png",
+      "asset": "sander.industrial",
+      "viewDeg": 0,
+      "present": true,
+      "fileSHA256": "36b529b119bbd754a1b4d04f0b9513d4b674bc96cd12775bb325440548f9f115",
+      "sizePx": [
+        400,
+        304
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        8,
+        41,
+        392,
+        296
+      ],
+      "marginsPx": [
+        8,
+        41,
+        8,
+        8
+      ],
+      "minimumMarginPx": 8,
+      "transparentPixelCount": 74937,
+      "passed": true,
+      "projectedBoundsDeltaPx": [
+        -0.17471999999999355,
+        -0.47039999999999793,
+        0.17471999999997934,
+        0.17471999999997934
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 296,
+        "y": 296
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/90/sander.industrial.png",
+      "asset": "sander.industrial",
+      "viewDeg": 90,
+      "present": true,
+      "fileSHA256": "4c3f771c522b5326f537f8ffbe41f1ebd0d7d967ecf12b39c9e305e2a790ee8a",
+      "sizePx": [
+        400,
+        304
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        8,
+        41,
+        392,
+        296
+      ],
+      "marginsPx": [
+        8,
+        41,
+        8,
+        8
+      ],
+      "minimumMarginPx": 8,
+      "transparentPixelCount": 74929,
+      "passed": true,
+      "projectedBoundsDeltaPx": [
+        -0.17472000000000065,
+        -0.47040000000001214,
+        0.17471999999997934,
+        0.17471999999997934
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 104,
+        "y": 296
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/0/cuttersSash.standard.png",
+      "asset": "cuttersSash.standard",
+      "viewDeg": 0,
+      "present": true,
+      "fileSHA256": "1523d640668205d01be59001cce83eea9292cac49708fe467b30c4423f6b2214",
+      "sizePx": [
+        112,
+        112
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        23,
+        27,
+        87,
+        87
+      ],
+      "marginsPx": [
+        23,
+        27,
+        25,
+        25
+      ],
+      "minimumMarginPx": 23,
+      "transparentPixelCount": 10237,
+      "passed": true,
+      "catalogApproximateTargetBox": [
+        23,
+        25,
+        87,
+        89
+      ],
+      "catalogBoxDeltaPx": [
+        0,
+        2,
+        0,
+        -2
+      ],
+      "catalogCenteredX": true,
+      "projectedBoundsDeltaPx": [
+        0.0,
+        -0.6035502958579855,
+        0.0,
+        0.6035502958579855
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 56,
+        "y": 104
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/0/cuttersCasement.standard.png",
+      "asset": "cuttersCasement.standard",
+      "viewDeg": 0,
+      "present": true,
+      "fileSHA256": "66d6955cd70b8875ba8c3e3fd1f5b00d25bcbc7f65f311768231b63751258158",
+      "sizePx": [
+        112,
+        112
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        23,
+        27,
+        87,
+        87
+      ],
+      "marginsPx": [
+        23,
+        27,
+        25,
+        25
+      ],
+      "minimumMarginPx": 23,
+      "transparentPixelCount": 10238,
+      "passed": true,
+      "catalogApproximateTargetBox": [
+        23,
+        25,
+        87,
+        89
+      ],
+      "catalogBoxDeltaPx": [
+        0,
+        2,
+        0,
+        -2
+      ],
+      "catalogCenteredX": true,
+      "projectedBoundsDeltaPx": [
+        0.0,
+        -0.6035502958579855,
+        0.0,
+        0.6035502958579855
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 56,
+        "y": 104
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    },
+    {
+      "file": "sprites-2x/0/cuttersDoor.standard.png",
+      "asset": "cuttersDoor.standard",
+      "viewDeg": 0,
+      "present": true,
+      "fileSHA256": "8db90b0177668238b5d5b028ff482ee4d53e2e97b2cea8227fecc9a4f661638e",
+      "sizePx": [
+        112,
+        112
+      ],
+      "mode": "RGBA",
+      "pngBitDepth": 8,
+      "pngColorType": 6,
+      "alphaBoundsPx": [
+        23,
+        27,
+        87,
+        87
+      ],
+      "marginsPx": [
+        23,
+        27,
+        25,
+        25
+      ],
+      "minimumMarginPx": 23,
+      "transparentPixelCount": 10239,
+      "passed": true,
+      "catalogApproximateTargetBox": [
+        23,
+        25,
+        87,
+        89
+      ],
+      "catalogBoxDeltaPx": [
+        0,
+        2,
+        0,
+        -2
+      ],
+      "catalogCenteredX": true,
+      "projectedBoundsDeltaPx": [
+        0.0,
+        -0.6035502958579855,
+        0.0,
+        0.6035502958579855
+      ],
+      "rasterRegistrationVerified": true,
+      "anchorPx": {
+        "x": 56,
+        "y": 104
+      },
+      "anchorVerified": true,
+      "exactProjectionVerified": true,
+      "approvedSpriteUnchanged": true
+    }
+  ]
+}
