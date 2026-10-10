@@ -53,8 +53,10 @@ describe('the version in the corner', () => {
     // screen, in the menu and on the tab (PIOTR, 04.10 and 08.10). v86 takes the sketch of the unit
     // off the start screen and stands its tick beside its words (PIOTR, 08.10). v87 takes the
     // stutter out of a big hall: the crew counted once, the hall's shortages reckoned once a
-    // picture, and the bags read off the extractors alone (PIOTR, 10.10).
-    expect(APP_VERSION).toBe('v87');
+    // picture, and the bags read off the extractors alone (PIOTR, 10.10). v88 keeps a big hall
+    // moving at 30x and 100x: a frame makes up for a tenth of a second at most, the page follows
+    // the clock five times a second from 30x up, and the catalogue is asked by id (PIOTR, 10.10).
+    expect(APP_VERSION).toBe('v88');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -70,7 +72,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v87'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v88'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

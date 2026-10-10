@@ -371,6 +371,20 @@ let root: HTMLElement | null = null;
 let accumulator = 0;
 let lastFrame = 0;
 
+/** The most real time one frame makes up for. A frame that took longer runs only this much of the
+ *  clock and lets the rest go, so the clock runs slower than its speed for a moment and the screen
+ *  never freezes. With a second allowed, a big hall at 100x ran a hundred minutes and drew the whole
+ *  hall in one frame, and every frame after it was as long: three frames a second (PIOTR, 10.10:
+ *  "at 100x it still stutters") [TUNE] (v88). */
+export const MAX_CATCH_UP_MS = 100;
+/** From this speed up the page follows the clock at most every `CLOCK_RENDER_GAP_MS`, where it was
+ *  written again in every frame a minute ran; the figures still walk in every frame [TUNE] (v88). */
+export const FAST_CLOCK_SPEED = 30;
+export const CLOCK_RENDER_GAP_MS = 200;
+/** The clock has moved since the page was last written for it, and when that was (v88). */
+let clockRenderOwed = false;
+let lastClockRender = 0;
+
 function freshUi(): Ui {
   return {
     screen: 'start',
@@ -2813,13 +2827,14 @@ function runPointerDown(event: MouseEvent): void {
 /** One step of the loop: whole game minutes into the engine, fractions stay in the UI
  *  (CLAUDE.md 4). The frame callback and the smoke test both come through here. Hands back the
  *  minutes that actually ran, so an event opening part way through loses none. */
-export function advanceMinutes(wholeMinutes: number): number {
+export function advanceMinutes(wholeMinutes: number, render = true): number {
   if (state === null || wholeMinutes <= 0) return 0;
   const result = runMinutes(state, wholeMinutes);
   state = result.state;
   autosave();
   autosaveWatch();
-  requestRender();
+  // The frame loop writes the page itself, at its own pace from 30x up (v88).
+  if (render) requestRender();
   return result.minutesRun;
 }
 
@@ -2857,14 +2872,15 @@ function frame(now: number): void {
 }
 
 function runFrame(now: number): void {
-  const elapsed = Math.min(1000, now - lastFrame);
+  const elapsed = Math.min(MAX_CATCH_UP_MS, now - lastFrame);
   lastFrame = now;
   // The figures walk in real time and not in game minutes, so they are moved on before anything
   // else the frame does and whatever the clock is at (CLAUDE.md T9 3.13; T16 2.2): first along
   // the floor, then on to the frame of their animation.
   if (root !== null) {
-    // The floor's pace is the game's speed this frame (PIOTR, 21.09; v44).
-    setWalkPace(game().speed);
+    // The floor's pace is the game's speed this frame (PIOTR, 21.09; v44). On the start screen
+    // there is no game to ask, and asking threw in every frame until one was started (v88).
+    if (state !== null) setWalkPace(state.speed);
     stepWalkers(root, now);
     // The doors swing on the renderer's own clock, beside the figures and for the same reason:
     // the page is written again under them and the swing is not game state (CLAUDE.md T19 2.3).
@@ -2875,14 +2891,31 @@ function runFrame(now: number): void {
   // One frame, one writing of the page, whatever the clock did inside it: ten game minutes at
   // 10x used to be ten pages (CLAUDE.md T9 3.8, 3.11).
   batched(() => {
-    if (state !== null && ui.screen === 'game' && state.gameOver === null) {
+    if (state === null || ui.screen !== 'game') return;
+    if (state.gameOver === null) {
       const perSecond = gameMinutesPerRealSecond(state.speed);
       if (perSecond > 0 && state.activeEvent === null) {
         accumulator += (elapsed / 1000) * perSecond;
         const whole = Math.floor(accumulator);
-        // Only what the engine actually ran leaves the accumulator: the rest waits for the modal.
-        if (whole > 0) accumulator -= advanceMinutes(whole);
+        if (whole > 0) {
+          const ran = advanceMinutes(whole, false);
+          if (ran > 0) clockRenderOwed = true;
+          // Only what the engine actually ran leaves the accumulator: the rest waits for the modal.
+          accumulator -= ran;
+        }
       }
+    }
+    // The page follows the clock: in every frame below 30x, and at most every 200 ms from 30x up;
+    // an event, the end of the game and a slower clock are written at once (v88).
+    const writeNow =
+      state.speed < FAST_CLOCK_SPEED ||
+      state.activeEvent !== null ||
+      state.gameOver !== null ||
+      now - lastClockRender >= CLOCK_RENDER_GAP_MS;
+    if (clockRenderOwed && writeNow) {
+      clockRenderOwed = false;
+      lastClockRender = now;
+      requestRender();
     }
   });
 }

@@ -47,6 +47,7 @@ import {
   itemFootprint,
   itemStandsInTheHall,
   itemZone,
+  menAtPlaces,
   placeShortages,
   placedMachines,
   placesLine,
@@ -1753,6 +1754,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // its family's line off this one list, where each machine asked the whole hall again and a big
   // hall stuttered (PIOTR, 10.10; v87).
   const hallShortages = placeShortages(state);
+  // Who is at which machine, read once for the picture and handed to every machine's hover, as
+  // the shortages are (v88).
+  const atPlaces = menAtPlaces(state);
   // Nothing is marked while the hall is at its dinner, a machine no more than a man (T22 2.5).
   const shortages = isBreak(state.clock.minute) ? [] : hallShortages;
   for (const short of shortages) {
@@ -1804,7 +1808,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // Pointing at the extractor reads the hall's store (CLAUDE.md T12 3.3).
     // Its places and who is in them, off the day plan the figures stand by (CLAUDE.md T25 2.5),
     // and the family too few for the crew when it is (v53).
-    const places = placesLine(state, item, 'card');
+    const places = placesLine(state, item, 'card', atPlaces);
     const short = shortageLine(state, item.specId, hallShortages);
     const tooltip =
       item.specId === 'extractor' && store.exists

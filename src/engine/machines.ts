@@ -114,14 +114,29 @@ import type {
   WorkerTier,
 } from './types';
 
+/** The catalogue by id, built on the first question: the families are asked for thousands of times
+ *  a minute in a big hall, and walking the list for each was a share of its stutter. The first
+ *  entry of an id wins, as the walk did (PIOTR, 10.10; v88). The table hangs on the function and
+ *  not on a module constant, so a module that asks while the engine's modules are still being
+ *  loaded in a circle is answered and not thrown at. */
+function specsById(): ReadonlyMap<string, EquipmentSpec> {
+  const holder = specsById as unknown as { table?: Map<string, EquipmentSpec> };
+  if (holder.table === undefined) {
+    const table = new Map<string, EquipmentSpec>();
+    for (const entry of EQUIPMENT_SPECS) if (!table.has(entry.id)) table.set(entry.id, entry);
+    holder.table = table;
+  }
+  return holder.table;
+}
+
 export function specOf(specId: string): EquipmentSpec {
-  const spec = EQUIPMENT_SPECS.find((entry) => entry.id === specId);
+  const spec = specsById().get(specId);
   if (!spec) throw new Error(`unknown equipment: ${specId}`);
   return spec;
 }
 
 export function findSpec(specId: string): EquipmentSpec | null {
-  return EQUIPMENT_SPECS.find((entry) => entry.id === specId) ?? null;
+  return specsById().get(specId) ?? null;
 }
 
 /** What a man calls this family of machine: the trade's own short word where
@@ -239,8 +254,17 @@ export function itemIsHeavy(item: { specId: string; variantId: string }): boolea
  *  tool cabinet and used at the bench (CLAUDE.md T6 3.5, T7 3.6). The one place that is asked:
  *  the floor plan, the painting, the stations and the ducting all read it. */
 export function standsInTheHall(specId: string, variantId?: string): boolean {
+  // The answer is the catalogue's and never changes, so each class is worked out once and kept on
+  // the function, as `specsById` keeps its table (v88).
+  const holder = standsInTheHall as unknown as { known?: Map<string, boolean> };
+  if (holder.known === undefined) holder.known = new Map<string, boolean>();
+  const key = `${specId}|${variantId ?? ''}`;
+  const known = holder.known.get(key);
+  if (known !== undefined) return known;
   const zone = zoneOf(specId, variantId);
-  return zone.width > 0 && zone.depth > 0;
+  const stands = zone.width > 0 && zone.depth > 0;
+  holder.known.set(key, stands);
+  return stands;
 }
 
 /** The same question of a machine that is already in the hall. */
@@ -590,8 +614,18 @@ export function machineForPlace(
   index: number,
 ): { item: Equipment; place: number } | null {
   if (index < 0) return null;
+  return placeAmong(state, placedMachines(state, family), index);
+}
+
+/** `machineForPlace` over machines already put in their order: each filled up to its places. */
+function placeAmong(
+  state: GameState,
+  machines: readonly Equipment[],
+  index: number,
+): { item: Equipment; place: number } | null {
+  if (index < 0) return null;
   let left = index;
-  for (const item of placedMachines(state, family)) {
+  for (const item of machines) {
     const places = placesAt(state, item);
     if (left < places) return { item, place: left };
     left -= places;
@@ -608,6 +642,9 @@ export function machineForPlace(
 export function menAtPlaces(state: GameState): Array<{ who: string; item: Equipment; place: number }> {
   const found: Array<{ who: string; item: Equipment; place: number }> = [];
   const given = new Map<string, number>();
+  // Each family's machines in their order, read once for the whole crew and not once a man: the
+  // same answer, without asking the hall again for every man at the same saw (v88).
+  const machinesOf = new Map<string, Equipment[]>();
   const men: Array<{ who: string; man: { working: boolean; station: string } }> = [
     { who: OWNER, man: state.owner },
     ...state.workers.map((worker) => ({ who: worker.id, man: worker })),
@@ -617,15 +654,24 @@ export function menAtPlaces(state: GameState): Array<{ who: string; item: Equipm
     const family = man.station.slice('machine:'.length);
     const index = given.get(family) ?? 0;
     given.set(family, index + 1);
-    const at = machineForPlace(state, family, index);
+    let machines = machinesOf.get(family);
+    if (machines === undefined) {
+      machines = placedMachines(state, family);
+      machinesOf.set(family, machines);
+    }
+    const at = placeAmong(state, machines, index);
     if (at !== null) found.push({ who, item: at.item, place: at.place });
   }
   return found;
 }
 
 /** Who is at this machine this minute, in the order of its places (CLAUDE.md T25 2.5). */
-export function menAtMachine(state: GameState, item: { id: string }): string[] {
-  return menAtPlaces(state)
+export function menAtMachine(
+  state: GameState,
+  item: { id: string },
+  atPlaces: ReadonlyArray<{ who: string; item: Equipment; place: number }> = menAtPlaces(state),
+): string[] {
+  return atPlaces
     .filter((entry) => entry.item.id === item.id)
     .sort((a, b) => a.place - b.place)
     .map((entry) => entry.who);
@@ -636,11 +682,17 @@ export function menAtMachine(state: GameState, item: { id: string }): string[] {
  *  and Eddie`, on the Owned tab's tile the short form `2 of 2 in use`, and `Free` on both while
  *  nobody is at it. Empty for a thing nobody works at, and for a machine that has no places this
  *  minute because it is broken, away for its service or sold: its card says which. */
-export function placesLine(state: GameState, item: Equipment, form: 'card' | 'tile'): string {
+export function placesLine(
+  state: GameState,
+  item: Equipment,
+  form: 'card' | 'tile',
+  atPlaces?: ReadonlyArray<{ who: string; item: Equipment; place: number }>,
+): string {
   const places = placesAt(state, item);
   if (places <= 0) return '';
   if (!placedMachines(state, item.specId).some((entry) => entry.id === item.id)) return '';
-  const men = menAtMachine(state, item);
+  // A caller that writes many machines reads the men at their places once and hands them in (v88).
+  const men = menAtMachine(state, item, atPlaces ?? menAtPlaces(state));
   if (men.length === 0) return 'Free';
   const count = `${men.length} of ${places} in use`;
   if (form === 'tile') return count;
