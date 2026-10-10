@@ -1749,11 +1749,15 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // The one machine of each family too few for the crew that wears the mark: the first of it with
   // places, in the order they are filled (PIOTR, 24.09: "an exclamation at the saw"; v53).
   const markedMachines = new Map<string, string>();
+  // The hall's shortages, reckoned once for the whole picture: every machine's hover below reads
+  // its family's line off this one list, where each machine asked the whole hall again and a big
+  // hall stuttered (PIOTR, 10.10; v87).
+  const hallShortages = placeShortages(state);
   // Nothing is marked while the hall is at its dinner, a machine no more than a man (T22 2.5).
-  const shortages = isBreak(state.clock.minute) ? [] : placeShortages(state);
+  const shortages = isBreak(state.clock.minute) ? [] : hallShortages;
   for (const short of shortages) {
     const first = placedMachines(state, short.family)[0];
-    if (first !== undefined) markedMachines.set(first.id, shortageLine(state, short.family));
+    if (first !== undefined) markedMachines.set(first.id, shortageLine(state, short.family, hallShortages));
   }
   // Everything the player has bought, except the office furniture, which lives in the office
   // view, and the hand edgebander, which lives in a tool cabinet (CLAUDE.md T6 3.5). A CNC with a
@@ -1801,7 +1805,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // Its places and who is in them, off the day plan the figures stand by (CLAUDE.md T25 2.5),
     // and the family too few for the crew when it is (v53).
     const places = placesLine(state, item, 'card');
-    const short = shortageLine(state, item.specId);
+    const short = shortageLine(state, item.specId, hallShortages);
     const tooltip =
       item.specId === 'extractor' && store.exists
         ? `${name}. ${bagStoreLine(store)}. ${spec.effect}`

@@ -676,6 +676,15 @@ export function fullCrew(state: GameState): number {
  *  and never a labourer or the office (`CAPACITY_ROLES`; PIOTR, 25.09; v57); by night
  *  the second shift, which is joiners. */
 export function crewAtFamily(state: GameState, family: string, shift: 'day' | 'night' = 'day'): number {
+  return crewByFamily(state, shift).get(family) ?? 0;
+}
+
+/** The men of `crewAtFamily`, counted against every family at once: one pass over the crew, each
+ *  job's plan read once however many men are on it and however many families are asked, where
+ *  every family used to read every plan again. The rules of the count are the ones above, and
+ *  nothing else. A hall of a hundred things and twenty six men read the plans thousands of times
+ *  a picture and stuttered [PIOTR, 10.10: "with lots of things bought the game stutters"] (v87). */
+export function crewByFamily(state: GameState, shift: 'day' | 'night' = 'day'): Map<string, number> {
   const men: Array<{ id: string; working: boolean }> =
     shift === 'night'
       ? nightCrew(state).map((worker) => ({ id: worker.id, working: true }))
@@ -683,22 +692,50 @@ export function crewAtFamily(state: GameState, family: string, shift: 'day' | 'n
           { id: OWNER, working: state.owner.working },
           ...state.workers.filter((worker) => CAPACITY_ROLES.includes(worker.role)),
         ];
-  let count = 0;
+  const counts = new Map<string, number>();
+  const plans = new Map<string, Set<string>>();
+  const countOn = (families: ReadonlySet<string>): void => {
+    for (const family of families) counts.set(family, (counts.get(family) ?? 0) + 1);
+  };
   for (const man of men) {
     if (!man.working) continue;
     const job = jobHeldBy(state, man.id);
     if (job !== null) {
       // A job made by hand wants no machine at all (CLAUDE.md 9.5).
-      if (!job.byHand && stagePlanFor(state, job).some((stage) => stage.family === family)) count += 1;
+      if (job.byHand) continue;
+      let families = plans.get(job.id);
+      if (families === undefined) {
+        families = familiesIn(stagePlanFor(state, job).map((stage) => stage.family));
+        plans.set(job.id, families);
+      }
+      countOn(families);
       continue;
     }
     const contract = man.id === OWNER ? null : contractOfWorker(state, man.id);
     if (contract === null) continue;
     // A sheet piece's one family, or every family of a window's or a door's plan, as a timber
     // job's men are counted (CLAUDE.md T29 2.12.3).
-    if (contractFamiliesOf(state, contractPiece(contract)).includes(family)) count += 1;
+    countOn(familiesIn(contractFamiliesOf(state, contractPiece(contract))));
   }
-  return count;
+  return counts;
+}
+
+/** The families of a plan, each once: a man is one man at a family however many of his stages
+ *  are done on it. */
+function familiesIn(families: ReadonlyArray<string | null>): Set<string> {
+  const found = new Set<string>();
+  for (const family of families) if (family !== null) found.add(family);
+  return found;
+}
+
+/** The count `placeShortages` asks of each family by default: the whole crew read once, on the
+ *  first family that has places, and every other family read off that one count (v87). */
+function crewCounter(state: GameState, shift: 'day' | 'night'): (family: string) => number {
+  let crew: Map<string, number> | null = null;
+  return (family) => {
+    if (crew === null) crew = crewByFamily(state, shift);
+    return crew.get(family) ?? 0;
+  };
 }
 
 /** One family the hall has too few machines of for the men whose work goes through it. */
@@ -725,7 +762,7 @@ export interface PlaceShortage {
 export function placeShortages(
   state: GameState,
   shift: 'day' | 'night' = 'day',
-  count: (family: string) => number = (family) => crewAtFamily(state, family, shift),
+  count: (family: string) => number = crewCounter(state, shift),
 ): PlaceShortage[] {
   const found: PlaceShortage[] = [];
   for (const family of CAPACITY_FAMILIES) {
@@ -752,9 +789,14 @@ export function machinesWord(family: string): string {
 /** The line a machine's card and its hover carry while its family is short for the men whose work
  *  goes through it, and the words of the mark drawn over it in the hall: `Too few saws for the
  *  crew: 4 men, capacity 3, 1 works at 67%` (PIOTR, 24.09; v53, v55). Empty while the family
- *  keeps up. */
-export function shortageLine(state: GameState, family: string): string {
-  const short = placeShortages(state).find((entry) => entry.family === family);
+ *  keeps up. A caller that draws many machines reckons the hall's shortages once and hands them in,
+ *  so the hall is not asked again for every machine (v87). */
+export function shortageLine(
+  state: GameState,
+  family: string,
+  shortages: readonly PlaceShortage[] = placeShortages(state),
+): string {
+  const short = shortages.find((entry) => entry.family === family);
   if (short === undefined) return '';
   const pace = Math.round(100 / BY_HAND_DURATION_FACTOR);
   const who = short.over === 1 ? '1 works' : `${short.over} work`;
@@ -1842,8 +1884,12 @@ export function bagStore(state: GameState): BagStore {
   const exists = bagsExist(state);
   let bags = 0;
   for (const item of state.equipment) {
-    if (isSold(item) || !itemStandsInTheHall(item)) continue;
-    bags += bagsOf(item);
+    // Only an extractor has bags, and that is asked first: the store is read many times a minute,
+    // and looking up where each of a hundred other things stands was most of a big hall's
+    // stutter once the shortages were reckoned once (PIOTR, 10.10; v87).
+    const itemBags = bagsOf(item);
+    if (itemBags <= 0 || isSold(item) || !itemStandsInTheHall(item)) continue;
+    bags += itemBags;
   }
   const capacityM3 = bagsToM3(bags);
   const fillM3 = state.bagFillM3;

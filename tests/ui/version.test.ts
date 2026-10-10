@@ -51,8 +51,10 @@ describe('the version in the corner', () => {
     // the five axis CNC, the timber stores, and four to a contract (PIOTR, 05.10). v85 puts the art
     // side's frame presses and glue table in place of chat's stand ins, and the logo on the start
     // screen, in the menu and on the tab (PIOTR, 04.10 and 08.10). v86 takes the sketch of the unit
-    // off the start screen and stands its tick beside its words (PIOTR, 08.10).
-    expect(APP_VERSION).toBe('v86');
+    // off the start screen and stands its tick beside its words (PIOTR, 08.10). v87 takes the
+    // stutter out of a big hall: the crew counted once, the hall's shortages reckoned once a
+    // picture, and the bags read off the extractors alone (PIOTR, 10.10).
+    expect(APP_VERSION).toBe('v87');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -68,7 +70,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v86'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v87'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });
