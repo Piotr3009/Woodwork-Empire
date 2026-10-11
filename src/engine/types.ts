@@ -495,9 +495,10 @@ export type UnitExtension = 'none' | 'building' | 'open';
  *  or one being built that opens the next working morning (CLAUDE.md T31 2.7). */
 export type LongExtension = 'none' | 'building';
 
-/** The two times a unit can be extended, in the order they are built: the second 200 m2 along the
- *  rear wall, and then 400 m2 along the front of that (v67, v82). */
-export type ExtensionStage = 'first' | 'second';
+/** The times a unit can be extended, in the order they are built: the second 200 m2 along the
+ *  rear wall, then 400 m2 along the front of that (v67, v82), and then 200 m2 more along the rear
+ *  wall as many times as the player wants, one at a time (`'long'`, CLAUDE.md T31 2.7). */
+export type ExtensionStage = 'first' | 'second' | 'long';
 
 export interface UnitState {
   areaM2: number;

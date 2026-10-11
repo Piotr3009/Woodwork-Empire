@@ -2554,8 +2554,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       setAgency(next, action.on);
       break;
     case 'EXTEND_UNIT':
-      // The second 200 m2, or the 400 m2 along the front of them: paid for at the click, there in
-      // the morning (PIOTR, 03.10 and 04.10; v67, v82).
+      // The second 200 m2, the 400 m2 along the front of them, or 200 m2 more along the rear wall
+      // again and again: paid for at the click, there in the morning (PIOTR, 03.10, 04.10 and
+      // 11.10; v67, v82; CLAUDE.md T31 2.7).
       extendUnit(next, action.stage ?? 'first');
       break;
     case 'ENLARGE_CANTEEN':

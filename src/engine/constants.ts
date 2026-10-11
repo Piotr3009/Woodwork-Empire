@@ -483,6 +483,18 @@ export const UNIT_SECOND_EXTENSION_PRICE = 1000000;
  *  times two: insurance, security, power"] (v82). The rent, the rates, the standing power and a
  *  security firm's month are doubled by the area itself, as they were by the first extension. */
 export const UNIT_SECOND_EXTENSION_COST_FACTOR = 2;
+/** The hall that grows [PIOTR, 11.10: "adding 200 m² at a time, each time 20 per cent dearer than
+ *  the present price for 200"; "from 600"; "as many as the player wants"]. Once the second
+ *  extension is open the hall can be made longer again and again, one at a time: each adds this
+ *  many metres along the rear wall, which is 200 m2 of a hall twenty metres deep, and the n-th of
+ *  them (n from 0) costs the first price times the growth to the n, rounded to the pound
+ *  (CLAUDE.md T31 2.7). The landlord's deposit on the bigger rent is on top of it. */
+export const UNIT_LONG_EXTENSION_CELLS = 10;
+/** The floor of the unit the second extension makes, forty metres by twenty: what the long
+ *  extensions are reckoned past (CLAUDE.md T31 2.7). */
+export const UNIT_SECOND_EXTENSION_M2 = 800;
+export const UNIT_LONG_EXTENSION_PRICE = 600000;
+export const UNIT_LONG_EXTENSION_GROWTH = 1.2;
 
 /** Where the second extension of a unit stands. No save from before v82 carries the field, and
  *  that is a unit that has not had one (v82). */
@@ -490,10 +502,13 @@ export function secondExtensionOf(unit: { secondExtension?: UnitExtension }): Un
   return unit.secondExtension ?? 'none';
 }
 
-/** What the insurer and a flat security level multiply their figure by for this unit: two once
- *  the second extension is open, and one until then (v82). */
-export function unitCostFactor(unit: { secondExtension?: UnitExtension }): number {
-  return secondExtensionOf(unit) === 'open' ? UNIT_SECOND_EXTENSION_COST_FACTOR : 1;
+/** What the insurer and a flat security level multiply their figure by for this unit: one until
+ *  the second extension is open, and from then the area over 400 m2, which is two in the 800 m2
+ *  unit as it always was and goes up with every long extension: 2.5 at 1,000 m2 (v82; CLAUDE.md
+ *  T31 2.7) [TUNE: chat]. */
+export function unitCostFactor(unit: { secondExtension?: UnitExtension; areaM2: number }): number {
+  if (secondExtensionOf(unit) !== 'open') return 1;
+  return (UNIT_SECOND_EXTENSION_COST_FACTOR * unit.areaM2) / UNIT_SECOND_EXTENSION_M2;
 }
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
@@ -4874,6 +4889,9 @@ export const CANTEEN_LOCKERS_WIDE = CANTEEN_PLATES_WIDE.length;
  *  that unit takes [PIOTR, 04.10: "thirty two workers"] (v82). Its picture has the sixteen doors
  *  it was painted with, so the room shows the thirty two sixteen at a time. */
 export const CANTEEN_LOCKERS_DEEP = CANTEEN_LOCKERS_WIDE * 2;
+/** And this many more in an enlarged canteen for every 200 m2 the hall has grown past 800, so the
+ *  lockers keep up with the joiners the longer hall takes (CLAUDE.md T31 2.7) [TUNE: chat]. */
+export const CANTEEN_LOCKERS_PER_LONG_EXTENSION = 8;
 
 /** The counter over the banks, where the room says how many of the eight are in use [PIOTR]. */
 export const CANTEEN_COUNTER: RoomRect = { x: 95, y: 35, w: 450, h: 65 };

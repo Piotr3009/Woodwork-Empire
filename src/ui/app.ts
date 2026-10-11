@@ -1724,8 +1724,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'extendUnit':
       // The Premises page's buttons (PIOTR, 03.10 and 04.10; v67, v82): the first extension, and
-      // the second on the button that names it.
-      dispatch({ type: 'EXTEND_UNIT', stage: element.dataset.stage === 'second' ? 'second' : 'first' });
+      // the second and the long one (CLAUDE.md T31 2.7) on the buttons that name them.
+      dispatch({
+        type: 'EXTEND_UNIT',
+        stage: element.dataset.stage === 'second' || element.dataset.stage === 'long' ? element.dataset.stage : 'first',
+      });
       return;
     case 'enlargeCanteen':
       dispatch({ type: 'ENLARGE_CANTEEN' });

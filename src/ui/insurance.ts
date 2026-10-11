@@ -40,7 +40,7 @@ function figureRow(label: string, value: number): string {
 function unitLine(state: GameState): string {
   const factor = unitCostFactor(state.unit);
   if (factor === 1) return '';
-  return ` A unit of ${state.unit.areaM2} m² is charged ${factor} times that.`;
+  return ` A unit of ${state.unit.areaM2.toLocaleString('en-GB')} m² is charged ${factor} times that.`;
 }
 
 /** What the cover is written on, in words the player can check against the hall. */

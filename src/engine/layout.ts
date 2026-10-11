@@ -4,6 +4,7 @@
 import {
   CANTEEN_LOCKERS,
   CANTEEN_LOCKERS_DEEP,
+  CANTEEN_LOCKERS_PER_LONG_EXTENSION,
   CANTEEN_LOCKERS_WIDE,
   FORKLIFT_LANE_CELLS,
   GATE_LANE,
@@ -16,6 +17,8 @@ import {
   WELFARE_IN_THE_CANTEEN,
   REAR_YARD_GAP_CELLS,
   STARTING_LAYOUT,
+  UNIT_AREA_M2,
+  UNIT_SECOND_EXTENSION_M2,
   WINDOW_LINE_ORIGIN,
   YARD_WIDTH_CELLS,
   roomsOf,
@@ -598,7 +601,10 @@ export function crewLimit(state: GameState): number {
  *  count by (PIOTR, 20.09, 03.10 and 04.10; CLAUDE.md T23 2.10; v67, v82). */
 export function canteenLockers(state: GameState): number {
   if (!state.unit.canteenWide) return CANTEEN_LOCKERS;
-  return secondExtensionOf(state.unit) === 'open' ? CANTEEN_LOCKERS_DEEP : CANTEEN_LOCKERS_WIDE;
+  if (secondExtensionOf(state.unit) !== 'open') return CANTEEN_LOCKERS_WIDE;
+  // Eight more for every 200 m2 past 800, for the joiners a longer hall takes (CLAUDE.md T31 2.7).
+  const past = Math.max(0, Math.floor((state.unit.areaM2 - UNIT_SECOND_EXTENSION_M2) / UNIT_AREA_M2));
+  return CANTEEN_LOCKERS_DEEP + CANTEEN_LOCKERS_PER_LONG_EXTENSION * past;
 }
 
 /** The figures a canteen can hold, in a word each. */

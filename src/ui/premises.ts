@@ -2,12 +2,14 @@
 // and the things that can be done to it, each a card in the skin the advertising agency's card
 // wears. Extend the unit: the builder's price and the landlord's deposit, what it adds and what
 // every running cost becomes, and the one button. Once that extension is open, a second card of
-// the same kind under it for the 400 m2 along the front (PIOTR, 04.10; v82). Enlarge the canteen:
+// the same kind under it for the 400 m2 along the front (PIOTR, 04.10; v82), and once that one is
+// open a third, the hall 200 m2 longer again and again (CLAUDE.md T31 2.7). Enlarge the canteen:
 // no charge, what it is and what it becomes, and the button greyed with the reason beside it
 // until the extension is open and the floor beside the canteen is clear.
 //
 // Every figure on the page is the engine's (`src/engine/premises.ts`): the page holds none.
 
+import { secondExtensionOf } from '../engine/constants';
 import { crewLimit } from '../engine/layout';
 import {
   type ExtensionTerms,
@@ -16,6 +18,7 @@ import {
   extendUnitCheck,
   extensionStatus,
   extensionTerms,
+  secondExtensionAreaM2,
 } from '../engine/premises';
 import type { ExtensionStage, GameState } from '../engine/index';
 import { button, escapeHtml, lockedButton, money, reasonLabel } from './modal';
@@ -23,6 +26,11 @@ import { button, escapeHtml, lockedButton, money, reasonLabel } from './modal';
 /** A floor by its two sides, the way the page writes one: `40 × 10 m`. */
 function bySides(width: number, depth: number): string {
   return `${width} × ${depth} m`;
+}
+
+/** A floor's area in square metres, grouped by thousands once the hall is past 999: `1,000 m²`. */
+function squareMetres(area: number): string {
+  return `${area.toLocaleString('en-GB')} m²`;
 }
 
 /** One card: its name, the price line with what follows the price, the line under it in the dim
@@ -93,20 +101,45 @@ function secondOffer(terms: ExtensionTerms): string {
   );
 }
 
+/** The card of a long extension, offered: the hall ten metres longer along the rear wall, and
+ *  every figure that goes up with the floor, as the second's card says them (CLAUDE.md T31 2.7). */
+function longOffer(terms: ExtensionTerms): string {
+  return (
+    `Adds ${terms.addsM2} m² along the rear wall: ` +
+    `${bySides(terms.widthCells, terms.depthCells)}, ready the next morning. Room for ` +
+    `${terms.joiners} joiners and ${terms.benches} benches, and ${terms.lockers} lockers in ` +
+    `the enlarged canteen. Rent ${money(terms.rentNow)} → ${money(terms.rentThen)} a month, ` +
+    `rates ${money(terms.ratesNow)} → ${money(terms.ratesThen)}, standing power ` +
+    `${money(terms.powerNow)} → ${money(terms.powerThen)} a day.` +
+    moved('Insurance', terms.insuranceNow, terms.insuranceThen) +
+    moved('Security', terms.securityNow, terms.securityThen)
+  );
+}
+
+const EXTEND_CARD_IDS: Record<ExtensionStage, string> = { first: 'extend', second: 'extendSecond', long: 'extendLong' };
+
 /** One extension's card: offered with its price, being built, or done. The second names the unit
- *  it makes, so the two cards are told apart at a glance. */
+ *  it makes, so the cards are told apart at a glance. The long one is never done: once one is
+ *  open the next is offered at its own price, as many as the player wants (CLAUDE.md T31 2.7). */
 function extendCard(state: GameState, stage: ExtensionStage): string {
   const unit = state.unit;
   const status = extensionStatus(unit, stage);
-  const id = stage === 'first' ? 'extend' : 'extendSecond';
-  // An open stage has no terms: the unit is what it is.
-  const area = status === 'open' ? unit.areaM2 : extensionTerms(state, stage).areaM2;
-  const title = stage === 'first' ? 'Extend the unit' : `Extend the unit to ${area} m²`;
+  const id = EXTEND_CARD_IDS[stage];
+  // An open stage has no terms: the unit is what it is, and the second is named by the 800 m2 it
+  // made whatever the hall has grown to since.
+  const area = status === 'open' ? secondExtensionAreaM2(unit) : extensionTerms(state, stage).areaM2;
+  const title =
+    stage === 'first'
+      ? 'Extend the unit'
+      : stage === 'long'
+        ? `Extend the hall: ${squareMetres(extensionTerms(state, stage).addsM2)} more`
+        : `Extend the unit to ${squareMetres(area)}`;
   if (status === 'open') {
-    // The unit as it stands is said once, on the card of the last extension it has had.
+    // The unit as it stands is said once, on the card of the last extension it has had; the long
+    // card is never done, so a hall grown longer says it on the second's.
     const last = stage === 'second' || extensionStatus(unit, 'second') !== 'open';
     const text = last
-      ? `${unit.areaM2} m², ${unitRoomLine(state)}.`
+      ? `${squareMetres(unit.areaM2)}, ${unitRoomLine(state)}.`
       : 'The first extension, to the right of the hall.';
     return card(id, title, 'Extended', '', text, DONE);
   }
@@ -117,7 +150,7 @@ function extendCard(state: GameState, stage: ExtensionStage): string {
       title,
       'Being built',
       ' · paid for. It opens the next working morning.',
-      `${terms.areaM2} m², ${bySides(terms.widthCells, terms.depthCells)}, room for ` +
+      `${squareMetres(terms.areaM2)}, ${bySides(terms.widthCells, terms.depthCells)}, room for ` +
         `${terms.joiners} joiners and ${terms.benches} benches.`,
       '<span class="badge badge-held">Paid</span>',
     );
@@ -129,9 +162,9 @@ function extendCard(state: GameState, stage: ExtensionStage): string {
     title,
     money(terms.price),
     ` · ${deposit}Needs ${money(terms.total)} in the account.`,
-    stage === 'first' ? firstOffer(terms) : secondOffer(terms),
+    stage === 'first' ? firstOffer(terms) : stage === 'second' ? secondOffer(terms) : longOffer(terms),
     check.ok
-      ? button('extendUnit', 'Extend', stage === 'second' ? 'data-stage="second"' : '')
+      ? button('extendUnit', 'Extend', stage === 'first' ? '' : `data-stage="${stage}"`)
       : greyed('Extend', check.reason),
   );
 }
@@ -165,13 +198,15 @@ function canteenCard(state: GameState): string {
 export function renderPremises(state: GameState): string {
   const unit = state.unit;
   return (
-    `<p class="hint">The unit you rent: ${unit.areaM2} m², ` +
+    `<p class="hint">The unit you rent: ${squareMetres(unit.areaM2)}, ` +
     `${escapeHtml(bySides(unit.widthCells, unit.depthCells))}. Rent ${money(unit.rentMonthly)} a ` +
     `month, rates ${money(unit.ratesMonthly)} a month.</p>` +
     '<h3>Unit</h3>' +
     extendCard(state, 'first') +
     // The second is along the front of an extended unit, so it is offered once the first is open.
     (unit.extension === 'open' ? extendCard(state, 'second') : '') +
+    // The hall grows longer once it is twenty metres deep (CLAUDE.md T31 2.7).
+    (secondExtensionOf(unit) === 'open' ? extendCard(state, 'long') : '') +
     '<h3>Canteen</h3>' +
     canteenCard(state)
   );

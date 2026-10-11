@@ -45,7 +45,7 @@ export function formulaLine(state: GameState, spec: SecurityLevelSpec): string {
   const line = lineValue(state) > 0 ? ', the production line is not in it' : '';
   return (
     `The firm charges ${money(parts.base)} a month for a hall of ${SECURITY_SCALE_AREA_M2} m² ` +
-    `with nothing in it, times the hall's area over that (${parts.areaM2} m², so ` +
+    `with nothing in it, times the hall's area over that (${parts.areaM2.toLocaleString('en-GB')} m², so ` +
     `× ${trimmed(parts.areaFactor, 2)}), times one plus the insured value over ` +
     `${money(SECURITY_SCALE_VALUE)} (${money(parts.insured)} insured${line}, so × ${trimmed(parts.valueFactor, 2)}): ` +
     `${money(parts.monthly)} a month.`

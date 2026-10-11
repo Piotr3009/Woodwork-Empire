@@ -76,3 +76,16 @@ so no scenario moved (2.9's "choose its seed") [TUNE]. A lost contract's ended b
 alone, and `renewContract` lets it go and refuses its renewal in words. An offer already on the board
 when a client leaves stays takeable through the quiet days, since the day's offer is drawn before the
 week closes (the order of the day's open is unchanged).
+
+**T31-C3 The hall that grows.** Once the second extension is open the Premises page has a third card,
+`Extend the hall: 200 m² more` (`data-premises="extendLong"`, `data-stage="long"`), in the extension
+cards' shape: 10 m more along the rear wall at a time, one at a time, the next working morning, the
+apron and everything at or past the old kerb moved out (`moveTheApron`), the plant behind the wall
+left; priced `UNIT_LONG_EXTENSION_PRICE` 600,000 times 1.2 to the n with the deposit on the bigger
+rent, no limit. The rent, rates, benches, power, joiners and a firm by the area as before;
+`unitCostFactor` is now the area over 400 past the 800 m² unit [TUNE: chat] and an enlarged
+canteen's lockers 32 and 8 more per 200 m² [TUNE: chat]. The picture: `scripts/hall-long.py` cuts
+three pieces from `hallBackgroundDeep.png`, nothing painted or scaled (SPRITES.md 9.9, with why the
+cut is x 28 to 39 and why a flat ground piece is laid under all of it); the frame, the camera and the
+fit read the hall's own length. A second reader's finding put right before the commit: the end now
+comes in over the last piece's last metre, so the join at the end never shows the ground through.

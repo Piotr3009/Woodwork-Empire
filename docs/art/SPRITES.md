@@ -323,6 +323,50 @@ unchanged. Floor corners on it: (0,20) = 120, 768; (40,0) = 3000, 1248; (40,20) 
 the art side repaints any of the three layers of 9.3, run `scripts/hall-wide.py`, then this
 script, and then `npm run sprites:manifest`.
 
+### 9.9 The hall that grows (Turn 31, PIOTR 11.10.2026: "adding 200 m² at a time")
+
+From its second extension the hall can be made 10 m longer along the rear wall as many times as
+the player wants (CLAUDE.md T31 2.7): 50 × 20 m, 60 × 20 m and on. Nothing is painted for it. Three
+pieces are cut out of `hallBackgroundDeep.png` by `scripts/hall-long.py`, pixel for pixel, none of
+them scaled:
+
+| File in `public/sprites/` | Format | Contents | Cut from 9.8's canvas at |
+|---|---|---|---|
+| `hallBackgroundLong.png` | RGBA, 1490 × 914 | ten metres of the hall, x 28 to 39 at every depth: the floor, the rear wall and its top, the front kerb, the first metre (28 to 29) coming in from nothing | x 1462, y 790 |
+| `hallBackgroundEnd.png` | RGBA, 1060 × 700 | the end of the hall, everything of it from x 39 on: the kerb under the end, the end of the rear wall and of its top, the corner of the front kerb, coming in over the metre before it (38 to 39) | x 1942, y 1030 |
+| `hallBackgroundGround.png` | RGB, 480 × 240 | the flat ground the picture is painted on outside the hall (34, 36, 40), one step of the hall's growth, from its top right corner | x 2640, y 0 |
+
+On the wall and above it a piece is cut along the screen's upright, where the wall at x stands; on
+the floor and below it along the floor's own x. The two cuts meet on the foot of the rear wall,
+which a step of ten metres along the hall lays on itself. The sky over the wall and the ground in
+front of the kerb are the picture's flat ground, and that is left out of the long piece and the end
+(transparent): the ground piece under them is the same colour, and a feathered metre over flat
+ground drew a line one level darker than the ground on either side of it.
+
+**The cut the picture asked for.** The brief's piece was the hall from x 30 to 40, feathered over
+its first metre. The painted floor stops at x 39.06, where the kerb under the end of the hall
+begins, and the wall's corner shade is at 39.7 to 40. A piece cut to 40 would leave a kerb and a
+shade across the floor every ten metres. So the piece is cut ten metres long from 29 to 39, with
+its feathered metre 28 to 29. Laid ten metres further along than the one before, its feather comes
+in over floor that is there, and its first whole metre covers the kerb under the end of the one
+before it. The end comes in over the metre 38 to 39, which is the last piece's last metre and the
+same metre of the picture, so the last piece and the end meet as they were drawn: cut hard at the
+same x, the two edges, each drawn and scaled on its own, let the ground show through the join.
+
+**The ground.** The longer scene is a bigger rectangle, and at its top right and its bottom left it
+shows more ground and sky than any number of pieces laid along the hall can cover: those corners
+grow with every piece. So a third piece, the picture's own flat ground, is laid edge to edge under
+all of it (an SVG pattern of the file at its own size, nothing stretched). Whatever the long pieces
+and the end leave is the picture's own ground.
+
+**How the game lays them.** For a hall of `40 + 10n` m the scene is 9.8's picture, then the ground
+under it all, then `n` long pieces, the k-th (from 0) laid 480 × 240 px (2x) further along than the
+cut's own place for each of `k + 1` steps, then the end, laid `n` steps along. The office and the
+canteen layers sit on top unchanged. The frame of the scene, which the camera's bounds and the zoom
+that fits the hall read, is 9.8's canvas and 480 × 240 px more for each piece: `-540 -144 2040 1164`
+at 1x for 60 m, `-540 -144 3000 1644` for 100 m. If `hallBackgroundDeep.png` is made again, run
+`scripts/hall-long.py` after `scripts/hall-deep.py`, then `npm run sprites:manifest`.
+
 ---
 
 ## 10. Characters (accepted by Piotr, 13.09.2026): frame sheets from the 3D model
