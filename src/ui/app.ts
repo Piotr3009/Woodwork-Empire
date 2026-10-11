@@ -42,6 +42,7 @@ interface Drag {
   y: number;
 }
 import { WHY, boxOf, canPlace, reservationById, summaryOfDay } from '../engine/index';
+import { lineBox, lineModuleCell } from '../engine/layout';
 import {
   type Frame,
   type HallCamera,
@@ -63,6 +64,7 @@ import {
 import {
   APP_VERSION,
   HOUSE_CARD_SECONDS,
+  LINE_MODULES,
   type RoomId,
   TOOL_CABINET,
   roomById,
@@ -599,8 +601,22 @@ function ghostFor(current: GameState): Ghost | null {
   if (drag === null) return null;
   const kit = kitOf(current, drag.itemId);
   if (kit === null) return null;
-  const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId, ui.rotate);
   const check = canPlace(current, drag.itemId, drag.x, drag.y, ui.rotate);
+  // The line is taken by any of its modules and the six go together: its ghost is the whole 36 m
+  // by 3 m, each module's 6 m by 3 m drawn in it (CLAUDE.md T30 2.4).
+  if (isLineModule(kit.specId)) {
+    const offset = lineModuleCell({ x: 0, y: 0 }, kit.specId);
+    const first = { x: drag.x - offset.x, y: drag.y - offset.y };
+    const whole = lineBox(first);
+    return {
+      ...whole,
+      ok: check.ok,
+      reason: check.reason,
+      orientation: ui.rotate,
+      parts: LINE_MODULES.map((id) => ({ ...boxOf(id, lineModuleCell(first, id).x, first.y) })),
+    };
+  }
+  const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId, ui.rotate);
   return {
     x: box.x,
     y: box.y,
@@ -2725,8 +2741,6 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   const item =
     state.equipment.find((entry) => entry.id === itemId) ?? reservationById(state, itemId);
   if (item === null || item === undefined) return false;
-  // Setup mode never lifts a module of the line: it stands where it is built (CLAUDE.md T29 2.9.3).
-  if (isLineModule(item.specId)) return false;
   const at = cellUnder(event);
   if (at === null) return false;
   // He has hold of it where he took hold of it, not by its corner.

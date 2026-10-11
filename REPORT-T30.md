@@ -47,3 +47,12 @@ so the two new kinds of file needed no teaching in `src/`, and the two counts th
 `state.windowLine` whole with its defaults, and `takeTheLineBack` (gated `version < 43`) refunds
 Turn 29's modules on one `Production line refunded: it is sold whole now` line and queues the
 `lineRefunded` card; a module sold and waiting is left for its van, which pays its own half.
+
+**T30-C2 The line moved as one.** In setup mode any module, or the outline of one on order, takes
+the whole line: `canPlace` asks the 36 by 3 at the new place clear of everything but the line
+(`canPlaceLine`, through `canPlaceBox`) and refuses with `The line needs a clear 36 m by 3 m`, or
+`The line is never turned` for a turn; `moveItem` moves the six or none, a man at a module with it;
+`MOVE_ITEM` records the six, so Done reads `Moving 6 machines takes 6 h` (a module heavy for that
+question alone, its delivery still built in) and Put them back puts the six back. The ghost is the
+36 by 3 with each module drawn in it (`Ghost.parts`); the app's guard and `LINE_STANDS_WHERE_BUILT`
+are gone. New: `tests/engine/t30Move.test.ts` and the drag in `tests/ui/t30Line.test.ts`.

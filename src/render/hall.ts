@@ -1589,6 +1589,9 @@ export interface Ghost {
   reason: string;
   /** Which way the next drop will stand it (T10 3.8; CLAUDE.md T22 2.11). */
   orientation?: Orientation;
+  /** The pieces of a thing that is dragged whole: the line's six modules, each drawn in the ghost
+   *  of the 36 m by 3 m (CLAUDE.md T30 2.4). */
+  parts?: ReadonlyArray<{ x: number; y: number; width: number; depth: number }>;
 }
 
 /** A view that is expensive to build. The shell carries the pictures, which are megabytes: a
@@ -2136,6 +2139,13 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       `<g data-ghost="1">` +
         `<polygon points="${points(footprintPolygon(ghost.x, ghost.y, ghost.width, ghost.depth))}" ` +
         `fill="none" stroke="${colour}" stroke-width="3" />` +
+        (ghost.parts ?? [])
+          .map(
+            (part) =>
+              `<polygon data-ghost-part="1" points="${points(footprintPolygon(part.x, part.y, part.width, part.depth))}" ` +
+              `fill="none" stroke="${colour}" stroke-width="1" />`,
+          )
+          .join('') +
         `<text x="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).x)}" ` +
         `y="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).y)}" ` +
         `text-anchor="middle" class="iso-label ghost-label" fill="${colour}">` +

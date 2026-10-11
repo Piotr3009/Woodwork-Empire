@@ -84,6 +84,7 @@ import {
   lockersInWords,
   moveItem,
   lineBox,
+  lineGroup,
   lineModuleCell,
   lineSite,
   outsidePlaceFor,
@@ -1365,9 +1366,11 @@ function endSetup(state: GameState, speed: Speed): void {
   if (movePending(state) !== null) return;
   // The question is already in front of him: asking it twice would book the move twice.
   if (moveConfirmPending(state)) return;
+  // A module of the line counts as heavy here and nowhere else: moving it is an hour of somebody's
+  // time, while its delivery is still built in, with no unloading (CLAUDE.md T30 2.4) [TUNE: chat].
   const heavy = state.movedItems.filter((moved) => {
     const item = state.equipment.find((kit) => kit.id === moved.itemId);
-    return item !== undefined && itemIsHeavy(item);
+    return item !== undefined && (itemIsHeavy(item) || isLineModule(item.specId));
   });
   state.movedItems = heavy;
   if (heavy.length === 0) return;
@@ -2393,11 +2396,16 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'MOVE_ITEM': {
       const item = next.equipment.find((entry) => entry.id === action.itemId);
-      const stood = item
-        ? { x: item.anchorX, y: item.anchorY, orientation: item.orientation }
-        : null;
+      // A module of the line moves the whole line, so the move is recorded for all six of it
+      // (CLAUDE.md T30 2.4).
+      const group = item !== undefined && isLineModule(item.specId) ? new Set(lineGroup(next, false)) : null;
+      const moving = item === undefined ? [] : group === null ? [item] : next.equipment.filter((entry) => group.has(entry.id));
+      const stood = moving.map((entry) => ({ x: entry.anchorX, y: entry.anchorY, orientation: entry.orientation }));
       moveItem(next, action.itemId, action.x, action.y, action.orientation);
-      if (item && stood) recordMove(next, item, stood);
+      moving.forEach((entry, index) => {
+        const was = stood[index];
+        if (was !== undefined) recordMove(next, entry, was);
+      });
       break;
     }
     case 'ORDER_TRANSPORT': {

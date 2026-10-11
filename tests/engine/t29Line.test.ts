@@ -244,7 +244,7 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     expect(orders.map((item) => [item.anchorX, item.anchorY])).toEqual(LINE_MODULES.map((_, index) => [at.x + 6 * index, at.y]));
   });
 
-  it('is ordered whole in one click, the cash down once, stands on its cells on one morning, and is never moved or turned', () => {
+  it('is ordered whole in one click, the cash down once, stands on its cells on one morning, moved only as one and never turned', () => {
     const state = bigUnit();
     const cash = state.cash;
     const ledger = state.ledger.length;
@@ -270,8 +270,10 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     for (const order of orders) {
       expect(cancelOrder(state, order.id)).toEqual({ ok: false, reason: 'Built to order: it cannot be called off' });
     }
-    // The outline of one on order is not dragged or turned.
-    expect(canPlace(state, first.id, 3, 14)).toEqual({ ok: false, reason: 'The line stands where it is built' });
+    // The outline of one on order is dragged only as the whole line, and never turned (CLAUDE.md
+    // T30 2.4; tests/engine/t30Move.test.ts).
+    expect(canPlace(state, first.id, 3, 14)).toEqual({ ok: true, reason: '' });
+    expect(canPlace(state, first.id, 2, 14, 1)).toEqual({ ok: false, reason: 'The line is never turned' });
     // On its day it stands, built in, with nobody to unload it.
     for (const order of orders) order.dueDay = state.clock.day + 1;
     let next = state;
@@ -281,8 +283,8 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     const module = next.equipment.find((item) => item.specId === 'windowLine3');
     expect(module).toMatchObject({ anchorX: 14, anchorY: 14, orientation: 0, purchasePrice: 1250000 });
     if (module === undefined) throw new Error('module 3 stands');
-    expect(canPlace(next, module.id, 15, 14)).toEqual({ ok: false, reason: 'The line stands where it is built' });
-    expect(canPlace(next, module.id, 14, 14, 1)).toEqual({ ok: false, reason: 'The line stands where it is built' });
+    expect(canPlace(next, module.id, 15, 14)).toEqual({ ok: true, reason: '' });
+    expect(canPlace(next, module.id, 14, 14, 1)).toEqual({ ok: false, reason: 'The line is never turned' });
   });
 
   it('stands the six at once for the same price when bought on the spot', () => {

@@ -17,6 +17,8 @@ import { LINE_MODULES } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { placeEquipmentOrder } from '../../src/engine/game';
 import { catalogueTabFrom, renderCatalogue } from '../../src/ui/catalogue';
+import { currentState, mount, render } from '../../src/ui/app';
+import { tileToScreen } from '../../src/render/iso';
 import { act, buyStartingKit, newGame, nextDay, placeEquipment, withAir } from '../helpers';
 
 /** A company in the 800 m² unit with the day one kit, air enough for a CNC, and the money for the
@@ -67,5 +69,60 @@ describe('the line on the Owned tab (CLAUDE.md T30 2.3.3, 2.3.5)', () => {
       expect(tile.textContent).toContain('Built to order: it cannot be called off');
       expect(tile.querySelector('[data-do="cancelOrder"]')).toBeNull();
     }
+  });
+});
+
+describe('the line dragged in setup mode (CLAUDE.md T30 2.4)', () => {
+  function required<T>(value: T | null | undefined): T {
+    if (value === null || value === undefined) throw new Error('Missing test fixture');
+    return value;
+  }
+
+  it('draws the six at the drag together in the ghost, and drops them all', () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = required(document.querySelector<HTMLElement>('#app'));
+    mount(root);
+    required(root.querySelector<HTMLButtonElement>('[data-do="startGame"]')).click();
+    required(root.querySelector<HTMLButtonElement>('[data-do="setSpeed"][data-speed="1"]')).click();
+    const state = required(currentState());
+    const big = bigUnit();
+    LINE_MODULES.forEach((id, index) => placeEquipment(big, id, { x: 2 + 6 * index, y: 14, id: `kit-line-${index + 1}` }));
+    big.speed = 1;
+    Object.assign(state, big);
+    render();
+    Object.defineProperty(SVGSVGElement.prototype, 'getScreenCTM', {
+      configurable: true,
+      value: () => ({ inverse: () => ({ a: 0.5, d: 0.5, e: -150, f: -60 }) }),
+    });
+    Object.defineProperty(SVGSVGElement.prototype, 'createSVGPoint', {
+      configurable: true,
+      value: () => ({
+        x: 0,
+        y: 0,
+        matrixTransform(matrix: { a: number; d: number; e: number; f: number }) {
+          return { x: this.x * matrix.a + matrix.e, y: this.y * matrix.d + matrix.f };
+        },
+      }),
+    });
+    const mouse = (type: string, x: number, y: number): MouseEvent => {
+      const point = tileToScreen(x + 0.25, y + 0.25);
+      return new MouseEvent(type, { bubbles: true, clientX: point.x * 2 + 300, clientY: point.y * 2 + 120 });
+    };
+    required(root.querySelector<HTMLButtonElement>('[data-do="startSetup"]')).click();
+    required(root.querySelector('[data-kit="kit-line-3"]')).dispatchEvent(mouse('mousedown', 14, 14));
+    window.dispatchEvent(mouse('mousemove', 14, 17));
+    const ghost = required(root.querySelector('[data-ghost]'));
+    expect(ghost.querySelectorAll('[data-ghost-part]')).toHaveLength(6);
+    expect(ghost.textContent).toBe('Drop it here');
+    window.dispatchEvent(mouse('mouseup', 14, 17));
+    // The six went by the same cells, wherever the mouse put module 3.
+    const moved = required(currentState()).equipment.filter((item) => LINE_MODULES.includes(item.specId));
+    const first = required(moved[0]);
+    expect(first.anchorY).not.toBe(14);
+    expect(moved.map((item) => [item.anchorX, item.anchorY])).toEqual(
+      LINE_MODULES.map((_, index) => [first.anchorX + 6 * index, first.anchorY]),
+    );
+    delete (SVGSVGElement.prototype as unknown as Record<string, unknown>).getScreenCTM;
+    delete (SVGSVGElement.prototype as unknown as Record<string, unknown>).createSVGPoint;
   });
 });

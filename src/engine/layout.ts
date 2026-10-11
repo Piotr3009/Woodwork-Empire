@@ -21,6 +21,7 @@ import {
 import type { LayoutSlot } from './constants';
 import { findSpec, isLineModule, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
+import { metresBy } from './text';
 import { standsOutsideTheHall } from './walk';
 import type { Equipment, GameState, OnOrderItem, Orientation } from './types';
 
@@ -322,12 +323,42 @@ export function reservationById(state: GameState, itemId: string): OnOrderItem |
   return reservedItems(state).find((entry) => entry.id === itemId) ?? null;
 }
 
-/** Can this item stand here? An outline held for a delivery answers exactly as the machine it is
- *  holding the floor for would (CLAUDE.md T8 3.2). */
-/** Why a module of the line, or the outline of one on order, is not moved or turned (CLAUDE.md
- *  T29 2.9.3). */
-export const LINE_STANDS_WHERE_BUILT = 'The line stands where it is built';
+/** The line's two refusals in setup mode [TUNE: chat]: it is never turned, its conveyor running one
+ *  way and its turned pictures being the other turn, and it goes only where the whole of it has a
+ *  clear 36 m by 3 m (CLAUDE.md T30 2.4). */
+export const LINE_NEVER_TURNED = 'The line is never turned';
+export function lineNeedsRoom(): string {
+  return `The line needs a clear ${metresBy(lineBox({ x: 0, y: 0 }))}`;
+}
 
+/** The ids of the whole line as it stands this minute: its modules on the floor, or its outlines on
+ *  order. They move together and never stand in one another's way (CLAUDE.md T30 2.4). */
+export function lineGroup(state: GameState, onOrder: boolean): string[] {
+  const items = onOrder ? reservedItems(state) : hallItems(state);
+  return items.filter((item) => isLineModule(item.specId)).map((item) => item.id);
+}
+
+/** Can the whole line stand with this module at this cell: never turned, and a clear 36 m by 3 m
+ *  for the six, clear of everything but the line itself, asked as `canPlaceBox` asks one machine
+ *  (CLAUDE.md T30 2.4). */
+function canPlaceLine(
+  state: GameState,
+  specId: string,
+  x: number,
+  y: number,
+  orientation: Orientation | undefined,
+  onOrder: boolean,
+): PlaceCheck {
+  if (orientation !== undefined && orientation !== 0) return { ok: false, reason: LINE_NEVER_TURNED };
+  const offset = lineModuleCell({ x: 0, y: 0 }, specId);
+  const box = lineBox({ x: x - offset.x, y: y - offset.y });
+  if (!canPlaceBox(state, box, new Set(lineGroup(state, onOrder))).ok) return { ok: false, reason: lineNeedsRoom() };
+  return OK;
+}
+
+/** Can this item stand here? An outline held for a delivery answers exactly as the machine it is
+ *  holding the floor for would (CLAUDE.md T8 3.2). A module of the line, or the outline of one on
+ *  order, answers for the whole line, which moves as one (CLAUDE.md T30 2.4). */
 export function canPlace(
   state: GameState,
   itemId: string,
@@ -337,9 +368,8 @@ export function canPlace(
 ): PlaceCheck {
   const reserved = reservationById(state, itemId);
   if (reserved !== null) {
-    // The outline of a module on order is the module's own floor, as the module is (CLAUDE.md T29
-    // 2.9.3).
-    if (isLineModule(reserved.specId)) return { ok: false, reason: LINE_STANDS_WHERE_BUILT };
+    // The outline of the line on order moves as the line does (CLAUDE.md T30 2.4).
+    if (isLineModule(reserved.specId)) return canPlaceLine(state, reserved.specId, x, y, orientation, true);
     // And the outline of kit on order that stands outside is refused as the kit itself is: a
     // shelter or a van on order is never dragged into the hall (CLAUDE.md T29 2.11.1).
     if (standsOutsideTheHall(state, reserved)) return { ok: false, reason: 'It stands in the yard' };
@@ -363,8 +393,8 @@ export function canPlace(
     return { ok: false, reason: 'It stands in the canteen' };
   }
   if (standsOutsideTheHall(state, item)) return { ok: false, reason: 'It stands in the yard' };
-  // A module of the line is never moved and never turned (CLAUDE.md T29 2.9.3).
-  if (isLineModule(item.specId)) return { ok: false, reason: LINE_STANDS_WHERE_BUILT };
+  // A module of the line answers for the whole line: moved as one, never turned (CLAUDE.md T30 2.4).
+  if (isLineModule(item.specId)) return canPlaceLine(state, item.specId, x, y, orientation, false);
   return canPlaceSpec(
     state,
     item.specId,
@@ -387,6 +417,13 @@ export function moveItem(
   const check = canPlace(state, itemId, x, y, orientation);
   if (!check.ok) return check;
   const reserved = reservationById(state, itemId);
+  const taken = reserved ?? state.equipment.find((entry) => entry.id === itemId) ?? null;
+  // The line goes as one: every module, or every outline of one on order, by the same cells
+  // (CLAUDE.md T30 2.4).
+  if (taken !== null && isLineModule(taken.specId)) {
+    moveLine(state, reserved !== null, x - taken.anchorX, y - taken.anchorY);
+    return OK;
+  }
   if (reserved !== null) {
     // Nothing is carried and nothing is unplugged: the floor held for it is held somewhere else.
     reserved.anchorX = x;
@@ -408,6 +445,27 @@ export function moveItem(
     }
   }
   return OK;
+}
+
+/** The whole line moved by these cells, its six modules or its six outlines, and a man at a module
+ *  with it, as a man goes with his bench (CLAUDE.md T30 2.4). */
+function moveLine(state: GameState, onOrder: boolean, dx: number, dy: number): void {
+  const ids = new Set(lineGroup(state, onOrder));
+  const items = onOrder ? state.onOrder : state.equipment;
+  const stood = new Set<string>();
+  for (const item of items) {
+    if (!ids.has(item.id)) continue;
+    stood.add(`${item.anchorX},${item.anchorY}`);
+    item.anchorX += dx;
+    item.anchorY += dy;
+  }
+  if (onOrder) return;
+  // Each man once, off the cells the modules stood on before any of them moved.
+  for (const worker of state.workers) {
+    if (!stood.has(`${worker.anchorX},${worker.anchorY}`)) continue;
+    worker.anchorX += dx;
+    worker.anchorY += dy;
+  }
 }
 
 /** The floor nothing stands on: the hall's area less every room, the gate lane and the working
