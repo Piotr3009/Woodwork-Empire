@@ -26,3 +26,10 @@ boards held on the timber stores (`boardsHeld`, `reservedSheets`), the glass at 
 their refusals; the office admin orders at two days left (and the minute a contract is taken); a
 line short of either stands, said by `lineNeedsMaterial` and the `Standing still` row; written off
 at the sale. The lift `liftToVersion44` writes every new field, and a running line gets one batch.
+
+**T31-B2 The line's books.** The line's own day book in `windowLine` (`today`, `days` kept 400 days,
+`since`): a window booked as it is made, each working minute of its contract as possible or lost by
+cause, and a calendar day's engineers, power and property cover at its open (beside the ledger's
+`runDayCosts`, weekends among them, while the line stands). The fifth tab of the Accounting page,
+`Production line`, once the line has stood: four columns in the Summary's classes, the month's pace,
+a year at it, paid back, and what the month lost; selectors in `src/engine/lineBooks.ts`.

@@ -227,6 +227,7 @@ import {
   emptyLineUpgrades,
   emptyWindowLine,
   endLineContract,
+  openLineDay,
   orderLineGlass,
   orderLineTimber,
   runLineDay,
@@ -615,6 +616,8 @@ function startDay(state: GameState): void {
   // The month's paper before the day's: the loan, the covers and the security run with the
   // monthly items, and the report is put in front of the player before the board (T13 3.20).
   runDayCosts(state, state.clock.day);
+  // And the line's own day book opens the day beside them (CLAUDE.md T31 2.5).
+  openLineDay(state);
   accrueOverdraftInterest(state);
   raiseMonthEnd(state);
   // December's warning after the month's report: the taxman comes on the 30th (CLAUDE.md T27 2.3).
@@ -1149,6 +1152,7 @@ function advanceToNextDay(state: GameState): void {
     state.clock.day = weekendDay;
     const before = state.cash;
     runDayCosts(state, weekendDay);
+    openLineDay(state);
     accrueOverdraftInterest(state);
     weekendCosts += before - state.cash;
     // What left the account that day and nothing that came in, the tax apart: the day's own books,

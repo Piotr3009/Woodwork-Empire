@@ -5334,6 +5334,9 @@ export const LINE_GLASS_WINDOWS_MAX = 40;
 /** [PIOTR, 11.10: "yes"] One order of the line's timber or glass is for this many windows: 40
  *  boards, or glass for 20 windows (CLAUDE.md T31 2.2). */
 export const LINE_ORDER_WINDOWS = 20;
+/** The calendar days the line's own day book keeps behind the day in hand: more than a year of
+ *  the game's, so the tab's year is always whole (CLAUDE.md T31 2.5). */
+export const LINE_DAYS_KEPT = 400;
 /** [PIOTR, 11.10: "the office admin orders by himself when two days are left"] The office orders
  *  the line's timber or glass when what it holds and what is on its way are fewer than this many
  *  working days of windows at the line's pace (CLAUDE.md T31 2.3). */

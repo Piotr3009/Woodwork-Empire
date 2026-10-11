@@ -23,14 +23,18 @@
 // which the client takes at the open of the next working day (2.8).
 
 import {
+  DAYS_PER_MONTH,
   DAYS_PER_WEEK,
+  DAYS_PER_YEAR,
   GLASS_DELIVERY_WORKING_DAYS,
   LINE_BOARDS_PER_WINDOW,
   LINE_CONTRACT_NAME,
+  LINE_DAYS_KEPT,
   LINE_ENGINEERS_MAX,
   LINE_GLASS_PER_WINDOW,
   LINE_GLASS_WINDOWS_MAX,
   LINE_MATERIAL_SHARE,
+  LINE_MODULE_POWER_PER_DAY,
   LINE_MODULES,
   LINE_ORDER_WINDOWS,
   LINE_PALLET_WINDOWS,
@@ -42,19 +46,22 @@ import {
   LINE_WINDOW_MINUTES_MIN,
   LINE_WINDOW_PRICE,
   MINUTES_PER_WORKING_DAY,
+  PROPERTY_INSURANCE_RATE_YEARLY,
   SHEET_VALUE,
   WORKING_DAYS_PER_WEEK,
+  unitCostFactor,
 } from './constants';
 import { addWorkingDays, formatCalendarDay, isBreak, isWorkingDay, weekOfDay } from './clock';
 import { canAfford, charge, formatMoney, noteLoss, pay, refund } from './economy';
 import { queueEvent } from './events';
+import { lineValue } from './insurance';
 import { MATERIAL_ORDER_ROLES } from './jobs';
 import { boardRoom, freeBoardRoom, lineLevel, lineStandsWhole } from './machines';
 import { createDelivery, isBoards, lineLoadInWords } from './materials';
 import { crewHasGoneHome, lineEngineers } from './staff';
 import { firstOnDutyOf, movingMachines } from './tasks';
 import { inWords, plural } from './text';
-import type { GameState, LineContract, LineDay, LineSince, WindowLineState } from './types';
+import type { GameState, LineContract, LineDay, LineLostMinutes, LineSince, WindowLineState } from './types';
 
 /** A day of the line's day book with nothing in it yet (CLAUDE.md T31 2.5). */
 export function emptyLineDay(day: number): LineDay {
@@ -70,6 +77,86 @@ export function emptyLineDay(day: number): LineDay {
     possibleWindows: 0,
     lost: { engineer: 0, timber: 0, glass: 0, timberAndGlass: 0, move: 0 },
   };
+}
+
+/** The day's share of the line engineers on the books that day: each one's month over the days of
+ *  a month (CLAUDE.md T31 2.5). */
+export function lineEngineersPerDay(state: GameState, day: number): number {
+  return lineEngineers(state)
+    .filter((worker) => worker.startDay <= day && (worker.leavesOnDay === null || worker.leavesOnDay >= day))
+    .reduce((total, worker) => total + worker.monthlyWage / DAYS_PER_MONTH, 0);
+}
+
+/** The day's power of the six modules (CLAUDE.md T31 2.5). */
+export function linePowerPerDay(): number {
+  return LINE_MODULES.length * LINE_MODULE_POWER_PER_DAY;
+}
+
+/** The day's share of the property cover on the line, while the cover is held: its value at the
+ *  cover's rate and the unit's factor, over the days of a year (CLAUDE.md T31 2.5). */
+export function lineCoverPerDay(state: GameState): number {
+  if (!state.insurance.property) return 0;
+  return (lineValue(state) * PROPERTY_INSURANCE_RATE_YEARLY * unitCostFactor(state.unit)) / DAYS_PER_YEAR;
+}
+
+/** True for a day of the book that holds anything: a cost, a window, or a working minute. */
+function holdsAnything(record: LineDay): boolean {
+  return record.power > 0 || record.windows > 0 || record.possibleMinutes > 0;
+}
+
+/** The day in hand, closed into the book when the clock has left it and a new one started: the
+ *  one road a day of the book is written by (CLAUDE.md T31 2.5). */
+function lineToday(state: GameState): LineDay {
+  const line = state.windowLine;
+  const day = state.clock.day;
+  if (line.today.day !== day) {
+    if (line.today.day >= 1 && holdsAnything(line.today)) line.days.push(line.today);
+    line.days = line.days.filter((record) => record.day > day - LINE_DAYS_KEPT);
+    line.today = emptyLineDay(day);
+  }
+  return line.today;
+}
+
+/** The open of a calendar day, beside the ledger's own day costs, weekends among them: the day
+ *  before is closed into the book, and while the line stands the day takes its share of the
+ *  engineers, the power and the property cover, taken at its open as the ledger's are, contract or
+ *  not (CLAUDE.md T31 2.5) [TUNE: chat]. The first day it stands is the day it first stood. */
+export function openLineDay(state: GameState): void {
+  const today = lineToday(state);
+  if (!lineStandsWhole(state) || today.power > 0) return;
+  const since = state.windowLine.since;
+  today.engineers = lineEngineersPerDay(state, today.day);
+  today.power = linePowerPerDay();
+  today.cover = lineCoverPerDay(state);
+  if (since.firstDay === null) since.firstDay = today.day;
+  since.engineers += today.engineers;
+  since.power += today.power;
+  since.cover += today.cover;
+}
+
+/** Why the line cannot use a working minute of its contract, or null when it can: no two engineers
+ *  on duty, the line being moved, or the timber, the glass or both short (CLAUDE.md T31 2.5). */
+function lineLostTo(state: GameState): keyof LineLostMinutes | null {
+  if (lineLevel(state) < LINE_MODULES.length) return 'engineer';
+  if (movingMachines(state) !== null) return 'move';
+  const short = lineShortOf(state);
+  if (short === 'timber') return 'timber';
+  if (short === 'glass') return 'glass';
+  if (short === 'timber or glass') return 'timberAndGlass';
+  return null;
+}
+
+/** A working minute of the contract in the day book: possible while the contract runs on a working
+ *  day, outside the dinner hour and before five, worth the window's share of it at today's pace,
+ *  and lost by why when the line cannot use it (CLAUDE.md T31 2.5). */
+function bookLineMinute(state: GameState): void {
+  if (runningLineContract(state) === null) return;
+  if (!isWorkingDay(state.clock.day) || isBreak(state.clock.minute) || crewHasGoneHome(state)) return;
+  const today = lineToday(state);
+  today.possibleMinutes += 1;
+  today.possibleWindows += 1 / lineWindowMinutes(state);
+  const lost = lineLostTo(state);
+  if (lost !== null) today.lost[lost] += 1;
 }
 
 /** The line's totals of a company whose line has never stood (CLAUDE.md T31 2.5). */
@@ -490,6 +577,7 @@ export function lineMakesWindows(state: GameState): boolean {
  *  labourer do not touch it, and no minute of any man or machine is booked for it (CLAUDE.md T30
  *  2.7) [TUNE]. */
 export function runLineMinute(state: GameState): void {
+  bookLineMinute(state);
   if (!lineMakesWindows(state)) return;
   const line = state.windowLine;
   line.minutes += 1;
@@ -519,6 +607,14 @@ function makeWindow(state: GameState): void {
   contract.revenue += LINE_WINDOW_PRICE;
   // The material the windows used, not what was bought (CLAUDE.md T31 2.5).
   contract.materialCost += material;
+  // And in the line's own day book, the day in hand and since it first stood (CLAUDE.md T31 2.5).
+  const today = lineToday(state);
+  today.windows += 1;
+  today.turnover += LINE_WINDOW_PRICE;
+  today.material += material;
+  line.since.windows += 1;
+  line.since.turnover += LINE_WINDOW_PRICE;
+  line.since.material += material;
   line.onPallet += 1;
   if (line.onPallet >= LINE_PALLET_WINDOWS) {
     line.onPallet = 0;
