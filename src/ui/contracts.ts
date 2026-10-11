@@ -51,9 +51,25 @@ import {
   weekPace,
 } from '../engine/contracts';
 import { OWNER, lineEngineersOnDuty, lineLevel } from '../engine/machines';
-import { LINE_CONTRACT_NAME, LINE_MODULES, LINE_PALLET_WINDOWS, LINE_WINDOW_PRICE } from '../engine/constants';
 import {
+  LINE_BOARDS_PER_WINDOW,
+  LINE_CONTRACT_NAME,
+  LINE_MODULES,
+  LINE_ORDER_WINDOWS,
+  LINE_PALLET_WINDOWS,
+  LINE_WINDOW_PRICE,
+} from '../engine/constants';
+import {
+  lineBoardsOnTheWay,
+  lineGlassCheck,
+  lineGlassOnTheWay,
+  lineGlassOrderCost,
+  lineGlassWindows,
   lineMaterialPerWindow,
+  lineOrderBoards,
+  lineShortOf,
+  lineTimberCheck,
+  lineTimberOrderCost,
   lineWindowEvery,
   lineWindowMinutes,
   lineWindowsAWeek,
@@ -279,23 +295,62 @@ function lineContractBlock(state: GameState): string {
   const minutesEach = lineWindowMinutes(state);
   const level = lineLevel(state);
   const onDuty = lineEngineersOnDuty(state);
-  // Short of the two that keep it whole there is one engineer on duty, or none.
+  // Short of the two that keep it whole there is one engineer on duty, or none; with both on duty it
+  // stands for want of its timber or its glass (CLAUDE.md T31 2.4).
+  const short = lineShortOf(state);
   const still =
-    level >= LINE_MODULES.length
-      ? ''
-      : countRow('Standing still', `${onDuty === 0 ? 'no' : inWords(onDuty)} engineer on duty`, 'bad');
+    level < LINE_MODULES.length
+      ? countRow('Standing still', `${onDuty === 0 ? 'no' : inWords(onDuty)} engineer on duty`, 'bad')
+      : short === null
+        ? ''
+        : countRow('Standing still', short, 'bad');
   return (
     '<div class="contract-active" data-line-contract="1">' +
     `<div class="row"><span class="row-main"><h3>${escapeHtml(LINE_CONTRACT_NAME)}</h3></span>` +
     `<span class="row-action">${button('endLineContract', 'End it')}</span></div>` +
     `<p class="figures"><strong class="contract-count">This week: ${plural(contract.windowsThisWeek, 'window', 'windows')}. ` +
     `In all: ${contract.windowsMade}</strong> · ${money(LINE_WINDOW_PRICE)} a window; the timber and the glass ` +
-    `${money(lineMaterialPerWindow())} a window</p>` +
+    `${money(lineMaterialPerWindow())} a window, ordered ahead</p>` +
     `<p class="hint">One window every ${escapeHtml(lineWindowEvery(minutesEach))}: about ${lineWindowsAWeek(state)} a week</p>` +
     countRow('On the pallet', `${line.onPallet} of ${LINE_PALLET_WINDOWS}`) +
     (line.palletsAtGate > 0 ? countRow('At the gate for collection', plural(line.palletsAtGate, 'pallet', 'pallets')) : '') +
     still +
+    lineMaterialRows(state) +
     '</div>'
+  );
+}
+
+/** The line's timber and glass under the block's rows of Turn 30, and the row of the two orders in
+ *  the ended block's button row, each locked with its reason under the row as the board's and the
+ *  catalogue's are (CLAUDE.md T31 2.2, 2.4). */
+function lineMaterialRows(state: GameState): string {
+  const line = state.windowLine;
+  const boardsComing = lineBoardsOnTheWay(state);
+  const glassComing = lineGlassOnTheWay(state);
+  const timber =
+    `${plural(line.boards, 'board', 'boards')}, for ${plural(Math.floor(line.boards / LINE_BOARDS_PER_WINDOW), 'window', 'windows')}` +
+    (boardsComing > 0 ? `, ${boardsComing} more on the way` : '');
+  const glass =
+    `for ${plural(lineGlassWindows(state), 'window', 'windows')}` +
+    (glassComing > 0 ? `, ${glassComing} more on the way` : '');
+  const timberCheck = lineTimberCheck(state);
+  const glassCheck = lineGlassCheck(state);
+  const timberText = `Order timber: ${plural(lineOrderBoards(), 'board', 'boards')}, ${money(lineTimberOrderCost())}`;
+  const glassText = `Order glass: ${plural(LINE_ORDER_WINDOWS, 'window', 'windows')}, ${money(lineGlassOrderCost())}`;
+  // One reason a locked button, in the buttons' order, and a reason the two share said once
+  // [TUNE].
+  const reasons = [timberCheck, glassCheck]
+    .filter((check) => !check.ok)
+    .map((check) => check.reason)
+    .filter((reason, index, all) => all.indexOf(reason) === index);
+  return (
+    countRow('Timber on the stores', timber) +
+    countRow('Glass at module 6', glass) +
+    '<div class="row"><span class="row-main"></span><span class="row-action">' +
+    (timberCheck.ok ? button('orderLineTimber', timberText) : lockedButton(timberText, timberCheck.reason)) +
+    (glassCheck.ok ? button('orderLineGlass', glassText) : lockedButton(glassText, glassCheck.reason)) +
+    '</span></div>' +
+    reasons.map((reason) => `<p class="lock">${escapeHtml(reason)}</p>`).join('')
   );
 }
 

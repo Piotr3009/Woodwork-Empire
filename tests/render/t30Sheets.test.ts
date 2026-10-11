@@ -30,7 +30,8 @@ vi.mock('../../src/engine/drawn', async (importOriginal) => {
 });
 
 /** A company in the 800 m² unit with the whole line standing, two engineers, and the line's
- *  contract running at nine in the morning of a working day, the clock at 1x. */
+ *  contract running at nine in the morning of a working day, the clock at 1x, with a batch of its
+ *  timber and glass in hand, which it makes windows only with from Turn 31 (CLAUDE.md T31 2.1). */
 function working(): GameState {
   let state = newGame({ difficulty: 'veryEasy' });
   state.cash = 9000000;
@@ -50,6 +51,9 @@ function working(): GameState {
     revenue: 0,
     materialCost: 0,
   };
+  state.windowLine.boards = 40;
+  state.stock.sheets += 40;
+  state.windowLine.glass = 20;
   state.clock.minute = 60;
   state.speed = 1;
   state.activeEvent = null;

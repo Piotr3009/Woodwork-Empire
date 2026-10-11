@@ -396,7 +396,7 @@ describe('the line that counts the days below the bank s limit (CLAUDE.md T22 2.
 });
 
 describe('the order of urgency', () => {
-  it('is bags, past the limit, nobody assigned, the line with no engineer, overdue, drawing done, glass not ordered, boards at the gate, no insurance, below zero, spending over earning, tax coming, closure coming, crew full, first steps', () => {
+  it('is bags, past the limit, nobody assigned, the line with no engineer, the line with no material, overdue, drawing done, glass not ordered, boards at the gate, no insurance, below zero, spending over earning, tax coming, closure coming, crew full, first steps', () => {
     expect(WARNING_ORDER).toEqual([
       'bagsFull',
       // Turn 21: above everything but the bags. The bags stop every machine in the hall this
@@ -405,6 +405,9 @@ describe('the order of urgency', () => {
       'nobodyAssigned',
       // Turn 29: a line no engineer keeps, directly under it (CLAUDE.md T29 2.9.4).
       'lineNeedsEngineer',
+      // Turn 31: the line whole and manned and short of its timber or glass, directly under it
+      // (CLAUDE.md T31 2.4).
+      'lineNeedsMaterial',
       'deadlineAtRisk',
       // v78 (PIOTR, 03.10): the drawing is done and the material list is next.
       'drawingDone',
@@ -431,7 +434,8 @@ describe('the order of urgency', () => {
     // Nor the drawing line of v78: no job of this hall is waiting for its material list. Nor the
     // tax of Turn 27: this is not December, and an account under nought has no tax to take. Nor the
     // closure of Turn 28: this is neither December nor July. Nor a window's glass: there is no
-    // window in this hall. Nor the line of Turn 29: no module stands in it, nor a load of boards.
+    // window in this hall. Nor the line of Turn 29: no module stands in it, nor a load of boards;
+    // nor, so, the line's material of Turn 31.
     let state = tradedWeek(0, 500);
     state = withStartedJobNobodyOn(state);
     state = withDeadlineAtRisk(state);
@@ -451,6 +455,7 @@ describe('the order of urgency', () => {
           key !== 'taxComing' &&
           key !== 'closureComing' &&
           key !== 'lineNeedsEngineer' &&
+          key !== 'lineNeedsMaterial' &&
           key !== 'boardsAtTheGate',
       ),
     );

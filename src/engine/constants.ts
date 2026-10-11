@@ -193,8 +193,13 @@ import type {
  *  state gains its one field for the line (its contract, its windows, its pallets and its
  *  upgrades), and Turn 29's modules bought one by one are taken back, their money given back on one
  *  line of the books and the player told by a card at the first settle (CLAUDE.md T30 section 4).
- *  Every v12 to v42 save loads. */
-export const STATE_VERSION = 43;
+ *  Every v12 to v42 save loads.
+ *
+ *  Version 44 is v91, Turn 31 (PIOTR, 11.10). The line keeps its own timber and glass and its own
+ *  day book, the hall can grow by 200 m2 at a time, and a standing contract can go quiet: every
+ *  new field is written once, with its default, and a line whose contract runs is given its first
+ *  batch of timber and glass (CLAUDE.md T31 section 4). Every v12 to v43 save loads. */
+export const STATE_VERSION = 44;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -5298,9 +5303,10 @@ export const LINE_NAME = 'Window production line';
 /** [PIOTR, 10.10: "about 1,500 pounds a window on average, a standing order"] What the window
  *  company pays for every window the line makes on its contract (CLAUDE.md T30 2.6). */
 export const LINE_WINDOW_PRICE = 1500;
-/** [PIOTR, 10.10: "material 40"] The share of a window's price its timber and glass cost, booked as
- *  money for each window made; the labour, twenty per cent, is the two engineers' wages, which the
- *  month already pays (CLAUDE.md T30 2.6). */
+/** [PIOTR, 10.10: "material 40"] The share of a window's price its timber and glass cost: paid at
+ *  their order from Turn 31, two boards and a window's glass ordered ahead (CLAUDE.md T31 2.1); the
+ *  labour, twenty per cent, is the two engineers' wages, which the month already pays (CLAUDE.md
+ *  T30 2.6). */
 export const LINE_MATERIAL_SHARE = 0.4;
 /** [PIOTR, 10.10: "one window every two hours"] The minutes a window takes on the line's contract
  *  (CLAUDE.md T30 2.7). */
@@ -5314,6 +5320,24 @@ export const LINE_PALLET_WINDOWS = 10;
 export const LINE_PALLET_LAYOUT = { x: 0, y: 10, width: 2, depth: 1, height: 1.75 };
 /** The line's contract's name: the client has no name (CLAUDE.md T30 2.6) [TUNE: chat]. */
 export const LINE_CONTRACT_NAME = 'Windows off the line';
+/** [PIOTR, 11.10: "yes" to chat's proposal] The boards a window of the line takes off the timber
+ *  stores. They are a window's material at `SHEET_VALUE` each, and its glass is the rest of the
+ *  window's £600 (CLAUDE.md T31 2.1) [TUNE: chat: the split]. */
+export const LINE_BOARDS_PER_WINDOW = 2;
+/** [PIOTR, 11.10: "yes"] The glass a window takes: one window's (CLAUDE.md T31 2.1). */
+export const LINE_GLASS_PER_WINDOW = 1;
+/** [PIOTR, 11.10: "yes"] The windows' glass module 6 holds, what is on its way among it (CLAUDE.md
+ *  T31 2.1, 2.2). */
+export const LINE_GLASS_WINDOWS_MAX = 40;
+/** [PIOTR, 11.10: "yes"] The windows one order of the line's timber, or of its glass, is for
+ *  (CLAUDE.md T31 2.2). */
+export const LINE_ORDER_WINDOWS = 20;
+/** [PIOTR, 11.10: "yes": "when two days are left"] The working days of windows the office admin
+ *  keeps the line's timber and glass above, at the minutes a window takes today (CLAUDE.md T31
+ *  2.3). */
+export const LINE_REORDER_DAYS = 2;
+/** The calendar days of the line's day book kept, a little over a year (CLAUDE.md T31 2.5). */
+export const LINE_DAYS_KEPT = 400;
 
 /** [PIOTR, 11.10: "later add ons can be bought, better new knives, better software, so that it
  *  later speeds up to one window an hour"; TUNE: chat: the fifteen minutes] What each upgrade of the

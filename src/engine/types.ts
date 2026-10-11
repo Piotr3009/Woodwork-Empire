@@ -514,6 +514,10 @@ export interface UnitState {
   /** True once the canteen has been enlarged from two by four metres to four by four, which is
    *  what takes its lockers from eight to sixteen (PIOTR, 03.10; v67). */
   canteenWide: boolean;
+  /** The long extensions open, ten metres more along the rear wall each, and whether the builders
+   *  are in on the next one (CLAUDE.md T31 2.7) [TUNE: the names]. */
+  longExtensions: number;
+  longExtension: 'none' | 'building';
 }
 
 export interface Worker {
@@ -789,9 +793,54 @@ export interface LineUpgrade {
   fittedOnDay: number;
 }
 
+/** One order of glass for the line on its way from the glazier: the windows it is for and the
+ *  working day it is at module 6 (CLAUDE.md T31 2.1, 2.2). */
+export interface LineGlassLoad {
+  windows: number;
+  day: number;
+}
+
+/** The minutes a working day of the line's contract lost, by what stopped it: too few engineers on
+ *  duty, the line being moved, no timber, no glass (CLAUDE.md T31 2.5) [TUNE: the causes]. */
+export interface LineLostMinutes {
+  engineer: number;
+  moving: number;
+  timber: number;
+  glass: number;
+}
+
+/** The line's day in hand (CLAUDE.md T31 2.5): the windows made, their turnover and the material
+ *  they used, the working minutes its contract ran and the windows it could have made in them,
+ *  the minutes lost by cause, and the engineers', power's and cover's shares of the calendar day. */
+export interface LineDay {
+  day: number;
+  windows: number;
+  turnover: number;
+  material: number;
+  engineers: number;
+  power: number;
+  cover: number;
+  possibleMinutes: number;
+  possibleWindows: number;
+  lost: LineLostMinutes;
+}
+
+/** The line's totals since it first stood, for the paid back line (CLAUDE.md T31 2.5). `firstDay`
+ *  is null until the line has stood. */
+export interface LineSince {
+  firstDay: number | null;
+  windows: number;
+  turnover: number;
+  material: number;
+  engineers: number;
+  power: number;
+  cover: number;
+}
+
 /** The line's own state, everything of it that is not kit on the floor (CLAUDE.md T30 section 4):
  *  its contract, the day it may be offered again, the minutes into the window in hand, the windows
- *  on module 6's pallet, the full pallets waiting at the gate, and the upgrades. */
+ *  on module 6's pallet, the full pallets waiting at the gate, and the upgrades. From Turn 31 its
+ *  timber and glass too, and its own day book (CLAUDE.md T31 2.1, 2.5, section 4). */
 export interface WindowLineState {
   contract: LineContract | null;
   /** Null until the first offer; a week on whenever an offer is turned down or a contract ends. */
@@ -800,6 +849,17 @@ export interface WindowLineState {
   onPallet: number;
   palletsAtGate: number;
   upgrades: LineUpgrade[];
+  /** The boards the line holds on the timber stores: on the one counter (`stock.sheets`) like
+   *  every board, and held, never free (CLAUDE.md T31 2.1). */
+  boards: number;
+  /** The windows' glass standing at module 6, on no store, and the glass on its way. */
+  glass: number;
+  glassOnTheWay: LineGlassLoad[];
+  /** The day in hand, one record a calendar day kept for a little over a year, and the totals
+   *  since the line first stood (CLAUDE.md T31 2.5). */
+  today: LineDay;
+  days: LineDay[];
+  since: LineSince;
 }
 
 /** One item the player has dragged, and the tile it stood on before he started. An item put back
@@ -831,6 +891,9 @@ export interface Delivery {
    *  and never on a sheet rack. A delivery without the mark is read from its job, so a save's
    *  deliveries need no lift (CLAUDE.md T29 2.11.2). */
   boards?: true;
+  /** A load of boards for the production line, with no job: never stock, unloaded onto the timber
+   *  stores and held for the line (CLAUDE.md T31 2.2). No save carries it before v91. */
+  line?: true;
 }
 
 export type TaskKind =
@@ -1513,6 +1576,9 @@ export interface GameState {
   /** The day a shop last rang with a contract, declined or not, or null before the first: a name
    *  of twenty is owed a ring every week (PIOTR, 22.09; v51). */
   lastContractOfferDay: number | null;
+  /** No standing contract is offered before this day: the quiet weeks after a client went
+   *  elsewhere, or null (CLAUDE.md T31 2.9). */
+  contractQuietUntilDay: number | null;
   ledger: LedgerEntry[];
   eventQueue: GameEvent[];
   activeEvent: GameEvent | null;
@@ -1552,6 +1618,9 @@ export type GameAction =
   | { type: 'END_LINE_CONTRACT' }
   /** An upgrade of the line bought, fitted ten working days on (CLAUDE.md T30 2.10). */
   | { type: 'BUY_LINE_UPGRADE'; upgradeId: string }
+  /** A batch of the line's timber, or of its glass, from the Contracts tab (CLAUDE.md T31 2.2). */
+  | { type: 'ORDER_LINE_TIMBER' }
+  | { type: 'ORDER_LINE_GLASS' }
   /** Run the clock at 4x until the task the owner is out on is over (CLAUDE.md T8 3.3). */
   | { type: 'SKIP_AHEAD' }
   | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }

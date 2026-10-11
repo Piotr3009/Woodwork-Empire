@@ -126,7 +126,9 @@ export function canUnload(state: GameState, delivery?: Delivery): boolean {
  *  holds what it still has to cut; the contracts are read here rather than through contracts.ts,
  *  which asks this file for the free stock. */
 export function reservedSheets(state: GameState): number {
-  let reserved = 0;
+  // The line's boards are held for it as a timber job's are, so no sheet job ever takes one
+  // (CLAUDE.md T31 2.1).
+  let reserved = state.windowLine.boards;
   for (const job of state.jobs) {
     if (job.stage === 'completed') continue;
     reserved += job.sheetsReserved;
@@ -230,11 +232,12 @@ export function boardsLine(state: GameState): { held: number; room: number } {
 
 /** Sheets bought for stock and not yet on the rack. A second Restock before the first lorry has
  *  landed would buy the same sheets twice, so they count as if they were here: one click is one
- *  order (CLAUDE.md T13 3.2). */
+ *  order (CLAUDE.md T13 3.2). A load of the line's timber has no job and is never stock (CLAUDE.md
+ *  T31 2.2). */
 export function pendingStockSheets(state: GameState): number {
   let pending = 0;
   for (const delivery of state.deliveries) {
-    if (delivery.jobId === null && !delivery.unloaded) pending += delivery.sheets;
+    if (delivery.jobId === null && delivery.line !== true && !delivery.unloaded) pending += delivery.sheets;
   }
   return pending;
 }
@@ -372,6 +375,7 @@ export function createDelivery(
   bespoke: boolean,
   pricePaid = 0,
   boards = false,
+  line = false,
 ): Delivery {
   const delivery: Delivery = {
     id: makeId(state, 'del'),
@@ -384,8 +388,10 @@ export function createDelivery(
     unloaded: false,
     bespoke,
     overflowSheets: 0,
-    // A load of boards for a timber job says so (CLAUDE.md T29 2.11.2).
+    // A load of boards for a timber job says so (CLAUDE.md T29 2.11.2), and a load of the line's
+    // timber says that too (CLAUDE.md T31 2.2).
     ...(boards ? { boards: true as const } : {}),
+    ...(line ? { line: true as const } : {}),
   };
   state.deliveries.push(delivery);
   return delivery;
@@ -483,7 +489,7 @@ export function arriveDeliveries(state: GameState): Delivery[] {
     delivery.arrived = true;
     createTask(state, {
       kind: 'unload',
-      label: `Unload ${loadWords(state, delivery)}`,
+      label: unloadWords(state, delivery),
       // By the size of the load: the first hundred sheets and every hundred past them (v75).
       minutes: unloadMinutes(state, delivery.sheets),
       deliveryId: delivery.id,
@@ -494,9 +500,30 @@ export function arriveDeliveries(state: GameState): Delivery[] {
 }
 
 /** A load in the words the player reads it in: `19 boards` for a timber job's, `12 sheets` for the
- *  rest (CLAUDE.md T29 2.11.2). */
+ *  rest (CLAUDE.md T29 2.11.2), and `Timber for the line: 40 boards` for the line's own (CLAUDE.md
+ *  T31 2.2). */
 export function loadWords(state: GameState, delivery: Delivery): string {
+  if (delivery.line === true) return lineLoadWords(delivery.sheets);
   return isBoards(state, delivery) ? plural(delivery.sheets, 'board', 'boards') : plural(delivery.sheets, 'sheet', 'sheets');
+}
+
+/** The words of a load of the line's timber, on its pallet and the Orders list (CLAUDE.md T31 2.2). */
+export function lineLoadWords(boards: number): string {
+  return `Timber for the line: ${plural(boards, 'board', 'boards')}`;
+}
+
+/** A load in the words a ledger line reads after a colon: the line's timber as `timber for the
+ *  line, 40 boards`, every other load as it is read anywhere (CLAUDE.md T31 2.2) [TUNE]. */
+export function cancelledLoadWords(state: GameState, delivery: Delivery): string {
+  if (delivery.line === true) return `timber for the line, ${plural(delivery.sheets, 'board', 'boards')}`;
+  return loadWords(state, delivery);
+}
+
+/** The unloading task's words for a load: `Unload 19 boards`, and the line's `Unload timber for the
+ *  line: 40 boards` (CLAUDE.md T31 2.2) [TUNE: the words]. */
+export function unloadWords(state: GameState, delivery: Delivery): string {
+  if (delivery.line === true) return `Unload timber for the line: ${plural(delivery.sheets, 'board', 'boards')}`;
+  return `Unload ${loadWords(state, delivery)}`;
 }
 
 /** Room left on the sheet rack, counted without the boards (CLAUDE.md T29 2.11.2). */
@@ -518,6 +545,14 @@ export function buyStock(state: GameState, sheets: number): boolean {
  *  A load for one job is held for that job first; whatever else lands is free for every job with
  *  a shortfall, in the order they were accepted (CLAUDE.md T13 3.3). */
 export function unloadIntoStock(state: GameState, delivery: Delivery): void {
+  if (delivery.line === true) {
+    // The line's timber comes off the lorry whole onto the timber stores, as a timber job's boards
+    // do, and is the line's from the unloading: on the counter and held (CLAUDE.md T31 2.2).
+    state.windowLine.boards += delivery.sheets;
+    state.stock.sheets += delivery.sheets;
+    delivery.overflowSheets = 0;
+    return;
+  }
   const timberJob = isBoards(state, delivery)
     ? state.jobs.find((entry) => entry.id === delivery.jobId) ?? null
     : null;

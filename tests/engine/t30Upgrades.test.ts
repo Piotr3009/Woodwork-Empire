@@ -112,6 +112,10 @@ describe('the minutes a window (CLAUDE.md T30 2.7, 2.10)', () => {
     const state = nextDay(allFitted(withLine(bigUnit())), seen);
     // The offer is taken off its card by nextDay's first answer.
     expect(seen.some((event) => event.kind === 'lineContractOffered')).toBe(true);
+    // Eight windows want sixteen boards and eight glass in hand from Turn 31 (CLAUDE.md T31 2.1).
+    state.windowLine.boards += 40;
+    state.stock.sheets += 40;
+    state.windowLine.glass += 20;
     const morning = state.clock.day;
     const day = play(state, DAY_END_MINUTE + 60, (event) => (event.kind === 'goingHome' ? 'home' : event.choices[0]?.id ?? 'ok'));
     // The day's own windows, on its one growing line: past five the play runs into the next morning.

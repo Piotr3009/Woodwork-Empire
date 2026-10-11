@@ -292,7 +292,8 @@ export function boardCapacityOf(item: { specId: string; variantId: string }): nu
  *  and everything else on it is sheets (CLAUDE.md T29 2.11.2). Written here and not in
  *  `materials.ts`, which reads this module, as `sheetsStrandedBySale` is. */
 export function boardsHeld(state: GameState): number {
-  let held = 0;
+  // The production line's boards are its own as a timber job's are its job's (CLAUDE.md T31 2.1).
+  let held = state.windowLine.boards;
   for (const job of state.jobs) {
     if (job.timber !== true || job.stage === 'completed') continue;
     held += job.sheetsReserved;

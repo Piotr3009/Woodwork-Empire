@@ -223,7 +223,14 @@ export function shoppingList(state: GameState): OrderLine[] {
       // `19 boards` for a timber job's load (CLAUDE.md T29 2.11.2).
       name: loadWords(state, delivery),
       // For stock, or for the job it was ordered for by name (CLAUDE.md T13 3.2, 3.3).
-      detail: delivery.jobId === null ? 'for stock' : `for ${jobNameFor(state, delivery.jobId)}`,
+      // The line's own timber says so in its name, and is for no job and never for stock (CLAUDE.md
+      // T31 2.2).
+      detail:
+        delivery.line === true
+          ? ''
+          : delivery.jobId === null
+            ? 'for stock'
+            : `for ${jobNameFor(state, delivery.jobId)}`,
       pricePaid: delivery.pricePaid,
       orderedDay: delivery.orderedDay,
       dueDay: delivery.arriveDay,
