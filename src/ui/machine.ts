@@ -49,7 +49,17 @@ import {
   GLUE_TABLE_PLACES,
   CNC5_STAGE_FACTOR,
   LINE_COVERS,
+  LINE_DESCRIPTION,
   LINE_FACTOR,
+  LINE_MODULES,
+  LINE_MODULES_KEPT,
+  LINE_NAME,
+  LINE_PRICE,
+  LINE_ROW_TAIL,
+  LINE_UPGRADE_DAYS,
+  LINE_UPGRADE_MINUTES,
+  LINE_UPGRADES,
+  SALE_FRACTION,
   SPRAY_ROBOT,
   SPRAY_ROBOT_FINISH_FACTOR,
   TIMBER_STAGES,
@@ -64,8 +74,11 @@ import {
   bagsToM3,
   unitCostFactor,
 } from '../engine/constants';
-import { boardCapacityOf, insuranceForClass, isLineModule, lineModuleIndex } from '../engine/machines';
-import { andList, inASentence } from '../engine/text';
+import type { LineUpgradeSpec } from '../engine/constants';
+import { boardCapacityOf, findVariant, insuranceForClass, isLineModule } from '../engine/machines';
+import { lineBox } from '../engine/layout';
+import { lineUpgradeCheck, lineWindowEvery, lineWindowMinutes } from '../engine/lineContract';
+import { andList, inWords } from '../engine/text';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import {
@@ -170,7 +183,7 @@ function atOnceLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
 /** What this class adds to the property premium a year, off the one rate the cover is written at
  *  (CLAUDE.md T13 3.1, 3.15), and twice it on the 800 m2 unit, where the insurer charges twice
  *  the premium (v82). */
-function insuranceLine(state: GameState, variant: EquipmentVariant): string {
+function insuranceLine(state: GameState, variant: { price: number; insuranceYearly?: number }): string {
   const yearly = insuranceForClass(variant) * unitCostFactor(state.unit);
   return `Insurance ${money(yearly)} a year`;
 }
@@ -357,20 +370,43 @@ function figureLines(lines: Line[]): string {
     .join('');
 }
 
-/** A module's own lines, from the constants and never in written figures: the stages it does (or,
- *  for the fifth, what it does without one), what the line gives with it this long, and for the
- *  first what it needs beside it (CLAUDE.md T29 2.9.8). */
-function lineModuleLines(spec: EquipmentSpec): Line[] {
-  const index = lineModuleIndex(spec.id);
-  const stages = TIMBER_STAGES.filter((stage) => LINE_COVERS[stage.id] === index).map((stage) => `the ${stage.label}`);
-  const covers =
-    stages.length === 0 ? 'Takes the finished frames off the line' : `Does ${andList(stages)} of windows and doors`;
-  const factor = `With the line this long timber work goes ${LINE_FACTOR[index] ?? 1} times as fast, the Finishing excepted`;
-  const beside = spec.requires.filter((id) => !isLineModule(id)).map((id) => `a ${inASentence(findSpec(id)?.name ?? id)}`);
+/** The line's own lines on its card, from the constants and never in written figures: a row a
+ *  module with the stages it does (`LINE_COVERS`), what the line gives the window jobs with its two
+ *  engineers, and how it is sold (CLAUDE.md T30 2.3.3). */
+function lineLines(state: GameState): Line[] {
+  const rows = LINE_MODULES.map((_, index) => {
+    const place = index + 1;
+    const stages = TIMBER_STAGES.filter((stage) => LINE_COVERS[stage.id] === place);
+    const words = stages.map((stage) => {
+      const tail = LINE_ROW_TAIL[stage.id];
+      return tail === undefined ? stage.label.toLowerCase() : `the ${stage.label}, ${tail}`;
+    });
+    return line(`Module ${place}: ${andList(words)}`);
+  });
+  // The engineers that keep all six: the last entry of the table, two.
+  const engineers = LINE_MODULES_KEPT.length - 1;
+  const factor = LINE_FACTOR[LINE_MODULES.length] ?? 1;
   return [
-    line(covers),
-    line(factor),
-    line(beside.length === 0 ? '' : `Needs ${andList(beside)} beside it`),
+    ...rows,
+    line(`With ${inWords(engineers)} engineers, timber work goes ${factor} times as fast`),
+    line(`It can make windows on a contract of its own: one every ${lineWindowEvery(lineWindowMinutes(state))}`),
+    line(
+      `Sold whole, for ${SALE_FRACTION === 0.5 ? 'half' : `${Math.round(SALE_FRACTION * 100)} per cent of`} its ` +
+        'price; the upgrades go with it',
+    ),
+  ];
+}
+
+/** What every card prints of its costs, for the line whole: the wait, the power of the six, the
+ *  insurance of the whole and the floor of the six end to end (CLAUDE.md T30 2.3.3). */
+function lineCostLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
+  const power = LINE_MODULES.reduce((total, id) => total + (findVariant(id, variant.id)?.powerPerDay ?? 0), 0);
+  const floor = lineBox({ x: 0, y: 0 });
+  return [
+    line(deliveryLine(spec, variant)),
+    line(`Power ${money(power)} a day`),
+    line(insuranceLine(state, { price: LINE_PRICE })),
+    line(`Takes ${metresBy(floor)}, works in ${metresBy(floor)}`),
   ];
 }
 
@@ -395,10 +431,6 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
   if (spec.id === GLUE_TABLE) {
     return [line(`The frame press it stands by keeps ${GLUE_TABLE_PLACES} more men busy`)];
   }
-  // A module of the line says what it covers and what the line gives with it, and no Output, Dust,
-  // Life or men busy line: the line is kept by its engineers and is one thing on the sheets
-  // (CLAUDE.md T29 2.9.8).
-  if (isLineModule(spec.id)) return lineModuleLines(spec);
   const machine = spec.category === 'machine';
   return [
     line(atOnceLine(spec, variant)),
@@ -496,9 +528,76 @@ export function recommendedVariant(state: GameState, spec: EquipmentSpec): strin
   return '';
 }
 
+/** The line's one card, in the class card's classes and in its layout, in place of module 1's
+ *  class card: the line is bought whole and one Buy orders the six (CLAUDE.md T30 2.3.3). */
+function lineCard(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): string {
+  const check = orderEquipmentCheck(state, spec.id, variant.id);
+  const onTheList = state.onOrder.find((order) => isLineModule(order.specId) && !order.arrived);
+  const owned = state.equipment.some((item) => isLineModule(item.specId))
+    ? '<span class="badge badge-owned">Owned</span>'
+    : '';
+  const buy = onTheList
+    ? `<span class="tile-waiting">On order, due ${formatCalendarDay(onTheList.dueDay)}</span>`
+    : check.ok
+      ? primaryButton('buyEquipment', 'Buy', `data-id="${spec.id}" data-variant="${variant.id}"`)
+      : lockedButton('Buy', check.reason);
+  return (
+    `<div class="tile${check.ok || onTheList ? '' : ' is-locked'}${owned === '' ? '' : ' is-owned'}` +
+    `${onTheList ? ' is-ordered' : ''}" data-variant="${variant.id}" data-line="1">` +
+    `<h3 class="tile-name">${escapeHtml(LINE_NAME)} ${owned}</h3>` +
+    pictureSlot(pictureKeyOf(spec), variant.id) +
+    `<div class="card-effects">${figureLines(lineLines(state))}</div>` +
+    `<div class="card-costs"><p class="tile-price">${money(LINE_PRICE)}</p>` +
+    `${figureLines(lineCostLines(state, spec, variant))}</div>` +
+    `<p class="tile-text card-description">${escapeHtml(LINE_DESCRIPTION)}</p>` +
+    (check.ok || onTheList ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
+    `<div class="tile-action">${buy}</div>` +
+    '</div>'
+  );
+}
+
+/** One upgrade's card, in the class card's classes, under the line's: its name, its price, its
+ *  sentence, what it takes off a window and when it is fitted, every figure from the constants, and
+ *  Buy, or the locked Buy with its reason under it as for kit (CLAUDE.md T30 2.10). No picture: the
+ *  upgrades are not drawn. */
+function upgradeCard(state: GameState, upgrade: LineUpgradeSpec): string {
+  const check = lineUpgradeCheck(state, upgrade.id);
+  const buy = check.ok
+    ? button('buyLineUpgrade', 'Buy', `data-id="${escapeHtml(upgrade.id)}"`)
+    : lockedButton('Buy', check.reason);
+  const effects = [
+    line(`Takes ${LINE_UPGRADE_MINUTES} minutes off each window of the line's contract`),
+    line(`Fitted ${LINE_UPGRADE_DAYS} working days after the order`),
+  ];
+  return (
+    `<div class="tile${check.ok ? '' : ' is-locked'}" data-upgrade="${escapeHtml(upgrade.id)}">` +
+    `<h3 class="tile-name">${escapeHtml(upgrade.name)}</h3>` +
+    `<div class="card-effects">${figureLines(effects)}</div>` +
+    `<div class="card-costs"><p class="tile-price">${money(upgrade.price)}</p></div>` +
+    `<p class="tile-text card-description">${escapeHtml(upgrade.sentence)}</p>` +
+    (check.ok ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
+    `<div class="tile-action">${buy}</div>` +
+    '</div>'
+  );
+}
+
+/** The inside of the line's folder: the line's one card, and the four upgrades under it (CLAUDE.md
+ *  T30 2.3.3, 2.10). Every module's family opens on it, though only module 1's has a folder. */
+function renderLine(state: GameState, filter: string): string {
+  const spec = findSpec(LINE_MODULES[0] ?? '');
+  const variant = spec?.variants[0];
+  if (!spec || !variant) return '<p class="empty">Not in the catalogue.</p>';
+  const head = `<p class="hint">${escapeHtml(spec.effect)}</p>`;
+  const needle = filter.trim().toLowerCase();
+  if (needle !== '' && !LINE_NAME.toLowerCase().includes(needle)) return `${head}<p class="empty">Nothing matches that.</p>`;
+  const upgrades = LINE_UPGRADES.map((upgrade) => upgradeCard(state, upgrade)).join('');
+  return `${head}<div class="tile-grid">${lineCard(state, spec, variant)}${upgrades}</div>`;
+}
+
 /** The inside of a folder: one card per class of the family, filtered by whatever is in the
  *  filter field (CLAUDE.md T7 3.7). */
 export function renderMachine(state: GameState, specId: string, filter = ''): string {
+  if (isLineModule(specId)) return renderLine(state, filter);
   const spec = findSpec(specId);
   if (!spec) return '<p class="empty">Not in the catalogue.</p>';
   const owned = countOf(state, specId);

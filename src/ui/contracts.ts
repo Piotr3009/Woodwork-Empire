@@ -50,7 +50,16 @@ import {
   sheetsForPieces,
   weekPace,
 } from '../engine/contracts';
-import { OWNER } from '../engine/machines';
+import { OWNER, lineEngineersOnDuty, lineLevel } from '../engine/machines';
+import { LINE_CONTRACT_NAME, LINE_MODULES, LINE_PALLET_WINDOWS, LINE_WINDOW_PRICE } from '../engine/constants';
+import {
+  lineMaterialPerWindow,
+  lineWindowEvery,
+  lineWindowMinutes,
+  lineWindowsAWeek,
+  runningLineContract,
+} from '../engine/lineContract';
+import { inWords } from '../engine/text';
 import { ROLE_WORDS } from './team';
 import type { Contract, GameState, Worker } from '../engine/index';
 import {
@@ -258,6 +267,38 @@ function endedBlock(state: GameState, contract: Contract): string {
   );
 }
 
+/** The line's own contract while it runs, first on the tab, in the classes a running contract's
+ *  block has and through the rows the tab already writes: what a window brings and costs, the
+ *  line's pace, the week's windows and all of them, the pallet, the gate, and why it stands still
+ *  when it does; `End it` at one click (CLAUDE.md T30 2.9). Nobody is put on it, so the Work Plan's
+ *  Contracts tab does not show it. */
+function lineContractBlock(state: GameState): string {
+  const contract = runningLineContract(state);
+  if (contract === null) return '';
+  const line = state.windowLine;
+  const minutesEach = lineWindowMinutes(state);
+  const level = lineLevel(state);
+  const onDuty = lineEngineersOnDuty(state);
+  // Short of the two that keep it whole there is one engineer on duty, or none.
+  const still =
+    level >= LINE_MODULES.length
+      ? ''
+      : countRow('Standing still', `${onDuty === 0 ? 'no' : inWords(onDuty)} engineer on duty`, 'bad');
+  return (
+    '<div class="contract-active" data-line-contract="1">' +
+    `<div class="row"><span class="row-main"><h3>${escapeHtml(LINE_CONTRACT_NAME)}</h3></span>` +
+    `<span class="row-action">${button('endLineContract', 'End it')}</span></div>` +
+    `<p class="figures"><strong class="contract-count">This week: ${plural(contract.windowsThisWeek, 'window', 'windows')}. ` +
+    `In all: ${contract.windowsMade}</strong> · ${money(LINE_WINDOW_PRICE)} a window; the timber and the glass ` +
+    `${money(lineMaterialPerWindow())} a window</p>` +
+    `<p class="hint">One window every ${escapeHtml(lineWindowEvery(minutesEach))}: about ${lineWindowsAWeek(state)} a week</p>` +
+    countRow('On the pallet', `${line.onPallet} of ${LINE_PALLET_WINDOWS}`) +
+    (line.palletsAtGate > 0 ? countRow('At the gate for collection', plural(line.palletsAtGate, 'pallet', 'pallets')) : '') +
+    still +
+    '</div>'
+  );
+}
+
 export function renderContracts(state: GameState): string {
   const head =
     '<p class="hint">Repeat work: so many pieces a week for a term, at a price a piece. What a ' +
@@ -266,14 +307,18 @@ export function renderContracts(state: GameState): string {
   const offer = offeredContract(state);
   const active = activeContracts(state);
   const ended = endedContracts(state);
+  // The line's own contract stands first while it runs, whatever else is on the tab (CLAUDE.md T30
+  // 2.9).
+  const line = lineContractBlock(state);
   if (!offer && active.length === 0 && ended.length === 0) {
     const why = contractsAllowed(state)
       ? `No contract on offer. A shop rings now and then, and an offer stands for ${plural(CONTRACT_OFFER_DAYS, 'day', 'days')}.`
       : 'No contracts yet. They come with reputation, from the second tier up.';
-    return head + emptyLine(why);
+    return head + line + (line === '' ? emptyLine(why) : '');
   }
   return (
     head +
+    line +
     ended.map((contract) => endedBlock(state, contract)).join('') +
     (offer ? `<h3>On offer</h3><div class="tile-grid">${offerTile(state, offer)}</div>` : '') +
     active.map((contract) => activeBlock(state, contract)).join('')

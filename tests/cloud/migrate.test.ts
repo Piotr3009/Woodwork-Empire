@@ -8,7 +8,7 @@ import { openSavedRow } from '../../src/cloud/saves';
 import { peekSave } from '../../src/cloud/store';
 import type { SaveStore } from '../../src/cloud/store';
 import { OLDEST_SAVE_VERSION, canOpenVersion, migrateState } from '../../src/engine/migrate';
-import { STATE_VERSION, bagStore, tick } from '../../src/engine/index';
+import { STATE_VERSION, applyAction, bagStore, tick } from '../../src/engine/index';
 import { currentStage, stagePlanFor } from '../../src/engine/stages';
 import {
   CABINET_SLOT_LAYOUT,
@@ -21,6 +21,7 @@ import { orientationsFor } from '../../src/engine/ports';
 import { spriteFiles } from '../../src/render/sprites';
 import { acceptNow, buyStartingKit, newGame, placeEnquiry, placeEquipment, twoMenOnSheetWork } from '../helpers';
 import { canPlace, firstFreeCell } from '../../src/engine/layout';
+import { nextWorkingDay } from '../../src/engine/clock';
 
 /** A game saved by v18 on the morning of day 2, with a full bag on the saw, the question about
  *  it open and the bag change on the list: everything the bump took away, in the shape it had.
@@ -148,8 +149,9 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    // 42 from v84: four joiners to a contract, and the glass a day (CLAUDE.md T29 section 4).
-    expect(STATE_VERSION).toBe(42);
+    // 42 from v84: four joiners to a contract, and the glass a day (CLAUDE.md T29 section 4). 43
+    // from v89: the line bought whole, and its own field (CLAUDE.md T30 section 4).
+    expect(STATE_VERSION).toBe(43);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -294,7 +296,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(42);
+    expect(lifted.version).toBe(43);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -426,7 +428,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(42);
+    expect(lifted.version).toBe(43);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
     // told the player he cost (CLAUDE.md T21 2.10). From v38 that holds until the v22 lift, which
@@ -645,7 +647,7 @@ describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
     // There is one track for money from tonight: a cost the player did not choose is paid out of
     // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
     // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
-    expect(lifted.version).toBe(42);
+    expect(lifted.version).toBe(43);
     expect(lifted.cash).toBe(-4998 - 2780);
   });
 
@@ -737,7 +739,7 @@ describe('a v35 save in this build (CLAUDE.md T23 section 4)', () => {
     // A played company starts its list at its next month end: the card the player was shown that
     // evening is the report, and one worked out again tonight would not be that card
     // (CLAUDE.md T23 2.14).
-    expect(lifted.version).toBe(42);
+    expect(lifted.version).toBe(43);
     expect(lifted.monthlyReports).toEqual([]);
   });
 
@@ -833,7 +835,7 @@ describe('a v23 save made under the split day (PIOTR, 21.09; v42)', () => {
   if (lifted === null) throw new Error('the lift refused a version 23 state');
 
   it('comes up at this build s version', () => {
-    expect(lifted.version).toBe(42);
+    expect(lifted.version).toBe(43);
   });
 
   it('takes every man on a running contract off the jobs he was standing on', () => {
@@ -860,7 +862,7 @@ describe('a v24 save in this build (v44)', () => {
   it('comes in with no evening take-over in hand', () => {
     const lifted = migrateState({ version: 24, owner: { wentHome: false } }, 24);
     if (lifted === null) throw new Error('the lift refused a version 24 state');
-    expect(lifted.version).toBe(42);
+    expect(lifted.version).toBe(43);
     expect(lifted.owner.tookOverJobId).toBe(null);
   });
 });
@@ -872,7 +874,7 @@ describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
       25,
     );
     if (lifted === null) throw new Error('the lift refused a version 25 state');
-    expect(lifted.version).toBe(42);
+    expect(lifted.version).toBe(43);
     expect(lifted.dayStats.byMan).toEqual({});
     // The figure the sheet prints above the block is the save's own and is not guessed at.
     expect(lifted.dayStats.workMinutes).toBe(12);
@@ -886,7 +888,7 @@ describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
       };
       const lifted = migrateState(raw.state, raw.state.version);
       if (lifted === null) throw new Error(`${path} did not open`);
-      expect(lifted.version).toBe(42);
+      expect(lifted.version).toBe(43);
       expect(lifted.dayStats.byMan).toEqual({});
     }
   });
@@ -905,7 +907,7 @@ describe('a v25 save in this build (PIOTR, 22.09; v51)', () => {
   if (lifted === null) throw new Error('the lift refused a version 25 state');
 
   it('comes up at this build s version, through v26 on the way', () => {
-    expect(lifted.version).toBe(42);
+    expect(lifted.version).toBe(43);
     expect(lifted.version).toBe(STATE_VERSION);
     expect(lifted.dayStats.byMan).toEqual({});
   });
@@ -936,7 +938,7 @@ describe('a v25 save in this build (PIOTR, 22.09; v51)', () => {
       26,
     );
     if (fromT24 === null) throw new Error('the lift refused a version 26 state');
-    expect(fromT24.version).toBe(42);
+    expect(fromT24.version).toBe(43);
     expect(fromT24.equipment[0]?.servicedDay).toBe(40);
   });
 });
@@ -994,7 +996,7 @@ describe('a v27 save in this build (CLAUDE.md T25 section 4)', () => {
 
   it('clears every claim on a machine and never writes one again', () => {
     const lifted = lifted27();
-    expect(lifted.version).toBe(42);
+    expect(lifted.version).toBe(43);
     for (const item of lifted.equipment) expect(item.takenBy, item.id).toBeNull();
   });
 
@@ -1106,7 +1108,7 @@ describe('a v28 save in this build (PIOTR, 24.09; v53)', () => {
 
   it('comes up at this build s version with no job waiting on the CNC', () => {
     const { after } = lifted28();
-    expect(after.version).toBe(42);
+    expect(after.version).toBe(43);
     for (const job of after.jobs) expect('sawFallback' in job, job.id).toBe(false);
   });
 
@@ -1155,7 +1157,7 @@ describe('a v29 save in this build (PIOTR, 24.09; v54)', () => {
 
   it('makes the pallet truck and the better forklift classes of the one family', () => {
     const after = lifted29();
-    expect(after.version).toBe(42);
+    expect(after.version).toBe(43);
     const byId = new Map(after.equipment.map((item) => [item.id, item]));
     expect([byId.get('kit-pt')?.specId, byId.get('kit-pt')?.variantId]).toEqual(['forklift', 'used']);
     expect([byId.get('kit-fb')?.specId, byId.get('kit-fb')?.variantId]).toEqual(['forklift', 'pro']);
@@ -1194,7 +1196,7 @@ describe('a v30 save in this build (PIOTR, 24.09; v55)', () => {
 
   it('empties the bags of the stages that are gone and loses nothing of the job', () => {
     const { after } = lifted30();
-    expect(after.version).toBe(42);
+    expect(after.version).toBe(43);
     const job = after.jobs[0];
     if (job === undefined) throw new Error('the job went missing in the lift');
     expect(job.stageLabour).toEqual({ cutting: job.labourValue * 0.25 });
@@ -1245,7 +1247,7 @@ describe('a v55 save with its spray booths at their old size (PIOTR, 25.09; v56)
     const { raw, used } = hallOfV55();
     const after = migrateState(raw, 31);
     if (after === null) throw new Error('the lift refused a v31 state');
-    expect(after.version).toBe(42);
+    expect(after.version).toBe(43);
     const booth = (id: string) => {
       const item = after.equipment.find((entry) => entry.id === id);
       if (item === undefined) throw new Error(`${id} went missing in the lift`);
@@ -1276,7 +1278,7 @@ describe('a v56 save with timber offers on its board (PIOTR, 25.09; v57)', () =>
     raw.version = 32;
     const after = migrateState(raw, 32);
     if (after === null) throw new Error('the lift refused a v32 state');
-    expect(after.version).toBe(42);
+    expect(after.version).toBe(43);
     const ids = after.enquiries.map((enquiry) => enquiry.id);
     expect(ids).toContain(shelves.id);
     expect(ids).not.toContain(oak.id);
@@ -1403,7 +1405,7 @@ describe('a v41 save in this build (CLAUDE.md T29 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 41 state');
 
   it('comes up at this build s version', () => {
-    expect(lifted.version).toBe(42);
+    expect(lifted.version).toBe(43);
   });
 
   it('keeps the four put on a contract first and gives the three taken off back to the boss', () => {
@@ -1476,5 +1478,161 @@ describe('a v41 save in this build (CLAUDE.md T29 section 4)', () => {
     expect(next.activeEvent?.kind).toBe('contractsTrimmed');
     expect(next.activeEvent?.body).toContain('Taken off Cut sheet packs for a shop: Ben.');
     expect(next.clock.day).toBe(opened.clock.day);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v42 to v43 (v89, Turn 30): the line bought whole, Turn 29's modules taken back and their money
+// given back (PIOTR, 11.10; CLAUDE.md T30 section 4)
+// ---------------------------------------------------------------------------
+
+/** A whole v42 save of an 800 m² company, as Piotr's own: written raw from a game of today, its
+ *  version set back, its line field taken off (a v42 save has none) and the day set to 999. */
+function v42BigSave(): Record<string, unknown> & {
+  onOrder: Array<Record<string, unknown>>;
+  equipment: Array<Record<string, unknown>>;
+  workers: Array<Record<string, unknown>>;
+  clock: Record<string, unknown>;
+  cash: number;
+} {
+  let state = newGame({ difficulty: 'veryEasy' });
+  state.cash = 9000000;
+  state = lift(state, { type: 'EXTEND_UNIT' });
+  state = lift(state, { type: 'EXTEND_UNIT', stage: 'second' });
+  state = buyStartingKit(state);
+  state.cash = 40000;
+  const raw = JSON.parse(JSON.stringify(state)) as ReturnType<typeof v42BigSave>;
+  raw.version = 42;
+  delete raw.windowLine;
+  raw.clock.day = 999;
+  // Saved with no card open and none waiting, so the first card the lift queues is the one seen.
+  raw.activeEvent = null;
+  raw.eventQueue = [];
+  return raw;
+}
+
+/** The unit extended through the engine, to the next morning. */
+function lift(state: GameState, action: Parameters<typeof applyAction>[1]): GameState {
+  let next = applyAction(state, action);
+  const day = next.clock.day;
+  let guard = 0;
+  while (next.clock.day === day && guard < 2000) {
+    guard += 1;
+    next = tick(next, 30);
+    if (next.activeEvent !== null) next = applyAction(next, { type: 'RESOLVE_EVENT', choiceId: next.activeEvent.choices[0]?.id ?? 'ok' });
+  }
+  return next;
+}
+
+/** Turn 29's module on order, as v88 booked it: at its old cells, for its old price. */
+function moduleOrder(n: number, pricePaid: number): Record<string, unknown> {
+  return {
+    id: `order-line-${n}`,
+    specId: `windowLine${n}`,
+    variantId: 'standard',
+    pricePaid,
+    orderedDay: 990,
+    dueDay: 1020,
+    anchorX: 5 + 6 * (n - 1),
+    anchorY: 14,
+    arrived: false,
+    orientation: 0,
+  };
+}
+
+/** Turn 29's module standing, as v88 stood it. */
+function moduleStanding(raw: ReturnType<typeof v42BigSave>, n: number, purchasePrice: number, soldOnDay: number | null = null): Record<string, unknown> {
+  const like = raw.equipment[0] ?? {};
+  return {
+    ...(JSON.parse(JSON.stringify(like)) as Record<string, unknown>),
+    id: `kit-line-${n}`,
+    specId: `windowLine${n}`,
+    variantId: 'standard',
+    spriteKey: `windowLine${n}`,
+    anchorX: 5 + 6 * (n - 1),
+    anchorY: 14,
+    purchasePrice,
+    soldOnDay,
+    orientation: 0,
+  };
+}
+
+describe('a v42 save in this build (CLAUDE.md T30 section 4)', () => {
+  it('opens Piotr s save, module 1 on order on day 999, with 1,500,000 back on one line, no module and the card', () => {
+    const raw = v42BigSave();
+    raw.onOrder.push(moduleOrder(1, 1500000));
+    raw.workers.push({ ...(JSON.parse(JSON.stringify(raw.workers[0] ?? {})) as Record<string, unknown>), id: 'eng-1', name: 'Kev', role: 'lineEngineer', tier: null });
+    const cash = raw.cash;
+    const opened = migrateState(raw, 42);
+    if (opened === null) throw new Error('the lift refused a whole version 42 state');
+    expect(opened.version).toBe(43);
+    expect(opened.cash).toBe(cash + 1500000);
+    expect(opened.onOrder.some((item) => item.specId.startsWith('windowLine'))).toBe(false);
+    expect(opened.equipment.some((item) => item.specId.startsWith('windowLine'))).toBe(false);
+    const refunds = opened.ledger.filter((entry) => entry.label === 'Production line refunded: it is sold whole now');
+    expect(refunds.map((entry) => [entry.category, entry.amount])).toEqual([['equipment', 1500000]]);
+    // The line's own field, every part at its default.
+    expect(opened.windowLine).toEqual({ contract: null, nextOfferDay: null, minutes: 0, onPallet: 0, palletsAtGate: 0, upgrades: [] });
+    // The engineers stay.
+    expect(opened.workers.some((worker) => worker.id === 'eng-1')).toBe(true);
+    // The card, queued for the first settle.
+    expect(opened.activeEvent).toBeNull();
+    const card = opened.eventQueue.find((event) => event.kind === 'lineRefunded');
+    expect(card?.title).toBe('The production line is sold whole');
+    expect(card?.body).toBe(
+      'The line is bought as one now: six modules for £10,000,000. ' +
+        'Your order for Window line, module 1 is cancelled and £1,500,000 is back in the bank. ' +
+        'Your line engineers stay on the books.',
+    );
+    expect(card?.choices).toEqual([{ id: 'ok', label: 'Right' }]);
+    const next = tick(opened, 1);
+    expect(next.activeEvent?.kind).toBe('lineRefunded');
+  });
+
+  it('takes a standing module back for what it cost and leaves one sold and waiting for its van', () => {
+    const raw = v42BigSave();
+    raw.equipment.push(moduleStanding(raw, 1, 1500000), moduleStanding(raw, 2, 750000, 1000));
+    raw.onOrder.push(moduleOrder(3, 750000));
+    raw.cash = 100000;
+    const opened = migrateState(raw, 42);
+    if (opened === null) throw new Error('the lift refused a whole version 42 state');
+    expect(opened.cash).toBe(100000 + 1500000 + 750000);
+    expect(opened.equipment.filter((item) => item.specId.startsWith('windowLine')).map((item) => item.id)).toEqual(['kit-line-2']);
+    expect(opened.onOrder.some((item) => item.specId.startsWith('windowLine'))).toBe(false);
+    const card = opened.eventQueue.find((event) => event.kind === 'lineRefunded');
+    expect(card?.body).toBe(
+      'The line is bought as one now: six modules for £10,000,000. ' +
+        'Window line, module 1 is taken back and £1,500,000 is back in the bank. ' +
+        'Your order for Window line, module 3 is cancelled and £750,000 is back in the bank.',
+    );
+  });
+
+  it('pays a module left sold and waiting its own half on its morning, as any machine', () => {
+    const raw = v42BigSave();
+    const morning = nextWorkingDay(999);
+    raw.equipment.push(moduleStanding(raw, 2, 750000, morning));
+    const opened = migrateState(raw, 42);
+    if (opened === null) throw new Error('the lift refused a whole version 42 state');
+    expect(opened.eventQueue.some((event) => event.kind === 'lineRefunded')).toBe(false);
+    let state = opened;
+    let guard = 0;
+    while (state.clock.day < morning && guard < 4000) {
+      guard += 1;
+      state = tick(state, 30);
+      if (state.activeEvent !== null) {
+        state = applyAction(state, { type: 'RESOLVE_EVENT', choiceId: state.activeEvent.choices[0]?.id ?? 'ok' });
+      }
+    }
+    const sold = state.ledger.filter((entry) => entry.label.startsWith('Sold: '));
+    expect(sold.map((entry) => [entry.label, entry.amount])).toEqual([['Sold: Window line, module 2', 375000]]);
+  });
+
+  it('raises no card and books nothing for a save with no module', () => {
+    const raw = v42BigSave();
+    const cash = raw.cash;
+    const quiet = migrateState(raw, 42);
+    expect(quiet?.eventQueue.some((event) => event.kind === 'lineRefunded')).toBe(false);
+    expect(quiet?.cash).toBe(cash);
+    expect(quiet?.windowLine.upgrades).toEqual([]);
   });
 });

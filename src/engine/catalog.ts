@@ -9,7 +9,7 @@ import {
   TIMBER_STAND_INS,
   TIMBER_STORE_WANTED,
 } from './constants';
-import { findSpec, has, isLineModule, lineModuleIndex, lineModules } from './machines';
+import { findSpec, has, isLineModule, lineContractRuns, lineStandsWhole } from './machines';
 import type { Finish, GameState, ProductTemplate } from './types';
 
 export function findTemplate(templateId: string): ProductTemplate | null {
@@ -65,11 +65,12 @@ export function wantedName(specId: string): string {
 /** True while something that stands in for this machine on a timber product stands in the hall
  *  (`TIMBER_STAND_INS`): the five axis CNC for the spindle moulder, and the line's modules for the
  *  machines whose stages they do (CLAUDE.md T29 2.5.4). The CNC stands when the hall has one, as
- *  every kit the board asks; a module stands while it is one of the unbroken run from module 1
- *  (`lineModules`), whatever its engineers keep today, so a day off never locks the board. */
+ *  every kit the board asks; a module stands while the whole line stands, whatever its engineers
+ *  keep today, so a day off never locks the board, and not while the line works its own contract,
+ *  when a window wants the company's own machines (CLAUDE.md T30 2.5, 2.6). */
 function stoodInFor(state: GameState, specId: string): boolean {
   return (TIMBER_STAND_INS[specId] ?? []).some((id) =>
-    isLineModule(id) ? lineModuleIndex(id) <= lineModules(state) : has(state, id),
+    isLineModule(id) ? lineStandsWhole(state) && !lineContractRuns(state) : has(state, id),
   );
 }
 

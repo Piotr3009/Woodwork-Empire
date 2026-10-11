@@ -42,6 +42,7 @@ interface Drag {
   y: number;
 }
 import { WHY, boxOf, canPlace, reservationById, summaryOfDay } from '../engine/index';
+import { lineBox, lineModuleCell } from '../engine/layout';
 import {
   type Frame,
   type HallCamera,
@@ -63,6 +64,7 @@ import {
 import {
   APP_VERSION,
   HOUSE_CARD_SECONDS,
+  LINE_MODULES,
   type RoomId,
   TOOL_CABINET,
   roomById,
@@ -106,7 +108,7 @@ import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
 import { OWNER, hasCentralExtraction, isLineModule } from '../engine/machines';
-import { nextSpriteOrientation } from '../render/sprites';
+import { nextSpriteOrientation, playSheets } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
@@ -599,8 +601,22 @@ function ghostFor(current: GameState): Ghost | null {
   if (drag === null) return null;
   const kit = kitOf(current, drag.itemId);
   if (kit === null) return null;
-  const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId, ui.rotate);
   const check = canPlace(current, drag.itemId, drag.x, drag.y, ui.rotate);
+  // The line is taken by any of its modules and the six go together: its ghost is the whole 36 m
+  // by 3 m, each module's 6 m by 3 m drawn in it (CLAUDE.md T30 2.4).
+  if (isLineModule(kit.specId)) {
+    const offset = lineModuleCell({ x: 0, y: 0 }, kit.specId);
+    const first = { x: drag.x - offset.x, y: drag.y - offset.y };
+    const whole = lineBox(first);
+    return {
+      ...whole,
+      ok: check.ok,
+      reason: check.reason,
+      orientation: ui.rotate,
+      parts: LINE_MODULES.map((id) => ({ ...boxOf(id, lineModuleCell(first, id).x, first.y) })),
+    };
+  }
+  const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId, ui.rotate);
   return {
     x: box.x,
     y: box.y,
@@ -1250,6 +1266,9 @@ export function render(): void {
   // And the doors, which the fresh markup has just written back to the state the hall computed
   // for this frame: the swing is the renderer's, like the walk (CLAUDE.md T19 2.3).
   syncDoors(parts.page, nowMs());
+  // And the machines' sheets, which the fresh markup has just put back to frame 0: on the frame real
+  // time asks for, so a page written mid loop never shakes them (CLAUDE.md T30 2.11).
+  playSheets(parts.page, nowMs(), clockRuns());
   restoreFocus(memory);
 }
 
@@ -1756,6 +1775,15 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'endContract':
       dispatch({ type: 'END_CONTRACT', contractId: id });
+      return;
+    case 'endLineContract':
+      // The line's own contract, one click and nothing asked (CLAUDE.md T30 2.6).
+      dispatch({ type: 'END_LINE_CONTRACT' });
+      return;
+    case 'buyLineUpgrade':
+      // An upgrade of the line, paid at the click and fitted ten working days on (CLAUDE.md T30
+      // 2.10).
+      dispatch({ type: 'BUY_LINE_UPGRADE', upgradeId: id });
       return;
     case 'setSecondShift':
       dispatch({ type: 'SET_SECOND_SHIFT', on: element.dataset.on === '1' });
@@ -2725,8 +2753,6 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   const item =
     state.equipment.find((entry) => entry.id === itemId) ?? reservationById(state, itemId);
   if (item === null || item === undefined) return false;
-  // Setup mode never lifts a module of the line: it stands where it is built (CLAUDE.md T29 2.9.3).
-  if (isLineModule(item.specId)) return false;
   const at = cellUnder(event);
   if (at === null) return false;
   // He has hold of it where he took hold of it, not by its corner.
@@ -2842,6 +2868,13 @@ export function advanceMinutes(wholeMinutes: number, render = true): number {
  *  The loops are set to exactly what the hall is running; the one shots are offered every frame
  *  and the engine thins them to one a second each, so x10 and x30 do not rattle. Nothing plays
  *  before the first click, because nothing is unlocked before it. */
+/** True while the workshop's clock runs: a speed, no card open, the game not over. A stopped clock
+ *  is a stopped workshop, and the one test the sound and the machines' sheets read (CLAUDE.md T19
+ *  2.10, T30 2.11). */
+function clockRuns(): boolean {
+  return state !== null && ui.screen === 'game' && state.speed > 0 && state.activeEvent === null && state.gameOver === null;
+}
+
 function driveSound(now: number): void {
   if (state === null || ui.screen !== 'game') {
     stopAllSounds();
@@ -2849,7 +2882,7 @@ function driveSound(now: number): void {
   }
   applySoundSettings(state.settings.sound);
   // A stopped clock is a stopped workshop: nothing is being cut while the player reads a modal.
-  const running = state.speed > 0 && state.activeEvent === null && state.gameOver === null;
+  const running = clockRuns();
   if (!running) {
     stopAllSounds();
     return;
@@ -2886,6 +2919,8 @@ function runFrame(now: number): void {
     // the page is written again under them and the swing is not game state (CLAUDE.md T19 2.3).
     stepDoors(root, now);
     playCharacters(root, now);
+    // The machines' sheets beside the figures, on the same real time (CLAUDE.md T30 2.11).
+    playSheets(root, now, clockRuns());
     driveSound(now);
   }
   // One frame, one writing of the page, whatever the clock did inside it: ten game minutes at

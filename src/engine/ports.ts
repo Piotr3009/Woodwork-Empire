@@ -187,18 +187,20 @@ export const PORTS: Record<string, Port> = {
   'planer.standard.r.png': { px: 128, py: 65, cell: { x: 0, y: 1 } },
   'planer.pro.r.png': { px: 166, py: 70, cell: { x: 0, y: 2 } },
   'planer.industrial.r.png': { px: 211, py: 96, cell: { x: 0, y: 2 } },
-  // The sanders (pack 2 of 05.10, as delivered; v83): the stub on the downdraught table, the crown
-  // of the edge sander's duct, the hood of the through feed sander and the second of the line's
-  // four. These pictures are off the contract's projection, so the cells are approximate. The used
-  // sander has a vacuum of its own and no line. [TUNE until Piotr confirms them on the hall.]
-  'sander.budget.png': { px: 121, py: 32, cell: { x: 1, y: 0 } },
-  'sander.standard.png': { px: 112, py: 42, cell: { x: 1, y: 0 } },
-  'sander.pro.png': { px: 122, py: 71, cell: { x: 1, y: 1 } },
-  'sander.industrial.png': { px: 191, py: 130, cell: { x: 3, y: 1 } },
-  'sander.budget.r.png': { px: 27, py: 21, cell: { x: 0, y: 1 } },
-  'sander.standard.r.png': { px: 38, py: 42, cell: { x: 0, y: 1 } },
-  'sander.pro.r.png': { px: 127, py: 65, cell: { x: 0, y: 1 } },
-  'sander.industrial.r.png': { px: 219, py: 129, cell: { x: 1, y: 3 } },
+  // The sanders (the art side's pack 1 of 09.10; v89): the top centre of the mouth of the round
+  // stub, on the downdraught table, on the end of the edge sander's belt housing, on the roof of the
+  // through feed sander, and the second of the line's four. Each is the stub's centre in the art
+  // side's mesh projected by the pack's own matrix, checked by eye on each picture (CLAUDE.md T30
+  // 2.1). The used sander has a vacuum of its own and no line. [TUNE until Piotr confirms them on
+  // the hall.]
+  'sander.budget.png': { px: 125, py: 53, cell: { x: 1, y: 0 } },
+  'sander.standard.png': { px: 131, py: 56, cell: { x: 1, y: 0 } },
+  'sander.pro.png': { px: 143, py: 61, cell: { x: 1, y: 0 } },
+  'sander.industrial.png': { px: 188, py: 83, cell: { x: 2, y: 0 } },
+  'sander.budget.r.png': { px: 98, py: 22, cell: { x: 0, y: 0 } },
+  'sander.standard.r.png': { px: 104, py: 18, cell: { x: 0, y: 0 } },
+  'sander.pro.r.png': { px: 113, py: 61, cell: { x: 0, y: 1 } },
+  'sander.industrial.r.png': { px: 158, py: 110, cell: { x: 0, y: 3 } },
   // The five axis CNCs (the art side's pack 3 of 05.10; v84): the mouth of the round duct stub on
   // the cabin's roof, and of the industrial cell's two stubs the one farther from the camera, as
   // the CNC's rear stub was taken. The standard class is an open gantry with no stub drawn: its

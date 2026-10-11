@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>The production line is sold whole: the card a lifted save opens with (CLAUDE.md T30 section 4)</title>
+<link rel="stylesheet" href="../../../src/ui/styles.css">
+<style>
+/* The mockup's own page layout only: the game's shells standing in the page flow instead of
+   floating over a hall. Nothing here is a game style. */
+body { margin: 0; padding: 20px; background: var(--page); color: var(--text); font-family: var(--font-ui); }
+.mock-lead { max-width: 1280px; color: var(--text-dim); font-size: var(--fs-body); margin: 0 0 16px; }
+.mock-title { font-size: var(--fs-lead); margin: 0 0 6px; }
+.mock-cap { font-size: var(--fs-body); margin: 18px 0 8px; max-width: 1280px; }
+.mock-bar { width: 1280px; }
+.mock-row { display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap; }
+.mock-modal { position: relative !important; inset: auto !important; left: auto !important; top: auto !important;
+  transform: none !important; margin: 14px 14px 0 0; }
+/* A list modal shown whole, its body unscrolled, so the picture holds all of it. */
+.mock-open { height: auto !important; max-height: none !important; }
+.mock-open .modal-body { max-height: none !important; overflow: visible !important; }
+.mock-narrow { width: 640px !important; }
+.mock-mid { width: 980px !important; }
+.mock-wide { width: 1380px !important; }
+</style></head><body>
+<p class="mock-title">The production line is sold whole: the card a lifted save opens with (CLAUDE.md T30 section 4)</p>
+<p class="mock-lead">The event modal, its small folder, as the game draws it: the shell through syncModals with the spec app.ts writes for an event (one choice, so the cross; Escape and a click outside close it as for every card of one choice), the body through renderEvent and the choice through renderEventFooter. Turn 29's card is the engine's own: a whole v41 save with six joiners on one running contract, lifted by migrateState and settled one minute, opens with Contracts take four joiners. Turn 30's card is an event of the new kind, lineRefunded, queued by the lift of a v42 save that holds any of Turn 29's line modules unsold or on order, made here in the generating process with the brief's title and one choice and a body built from the save itself: one sentence for each module removed, an order's price paid or a standing module's purchase price, and the engineers' sentence because the save has a line engineer on the books. The money goes back on one line of the books, Production line refunded: it is sold whole now. A save with no module of the line opens with no card. Every sentence below was checked word for word against the brief's.</p>
+<p class="mock-cap">Section 4: the card a lifted save opens with, at its first settle. Today (v88) a v42 save of Piotr's shape opens with no card, Window line, module 1 still on order at £1,500,000; Turn 29's card stands beside the new one for size and words.</p><div class="mock-row"><div><p class="mock-cap">Today (v88): Turn 29's card, off the lift of a v41 save</p><div class="modal modal-folder modal-centred mock-modal" data-modal="event"><header class="modal-head" data-drag="1"><h2>Contracts take four joiners</h2></header><div class="modal-body"><p class="event-body">A standing contract takes four joiners at the most from now on. Taken off Cut sheet packs for Northgate Interiors: Ben and Pete. They are waiting for work.</p></div><footer class="modal-foot"><div class="choices"><button class="btn btn-primary" data-do="resolveEvent" data-id="ok">Right</button></div></footer><button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">×</button></div></div><div><p class="mock-cap">After: Piotr's save, Fri 9 December 2027 (day 999), module 1 on order</p><div class="modal modal-folder modal-centred mock-modal" data-modal="event"><header class="modal-head" data-drag="1"><h2>The production line is sold whole</h2></header><div class="modal-body"><p class="event-body">The line is bought as one now: six modules for £10,000,000. Your order for Window line, module 1 is cancelled and £1,500,000 is back in the bank. Your line engineers stay on the books.</p></div><footer class="modal-foot"><div class="choices"><button class="btn btn-primary" data-do="resolveEvent" data-id="ok">Right</button></div></footer><button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">×</button></div></div></div>
+<div class="mock-row"><div><p class="mock-cap">After: module 1 standing, module 2 on order [TUNE: the modules in turn]</p><div class="modal modal-folder modal-centred mock-modal" data-modal="event"><header class="modal-head" data-drag="1"><h2>The production line is sold whole</h2></header><div class="modal-body"><p class="event-body">The line is bought as one now: six modules for £10,000,000. Window line, module 1 is taken back and £1,500,000 is back in the bank. Your order for Window line, module 2 is cancelled and £750,000 is back in the bank. Your line engineers stay on the books.</p></div><footer class="modal-foot"><div class="choices"><button class="btn btn-primary" data-do="resolveEvent" data-id="ok">Right</button></div></footer><button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">×</button></div></div></div>
+</body></html>

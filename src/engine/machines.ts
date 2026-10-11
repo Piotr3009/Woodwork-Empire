@@ -376,7 +376,7 @@ export function isLineModule(specId: string): boolean {
   return LINE_MODULES.includes(specId);
 }
 
-/** A module's place in the line, 1 to 5, and 0 for anything that is not one. */
+/** A module's place in the line, 1 to 6, and 0 for anything that is not one. */
 export function lineModuleIndex(specId: string): number {
   return LINE_MODULES.indexOf(specId) + 1;
 }
@@ -413,26 +413,59 @@ export function engineerAtTheLine(state: GameState, worker: Worker): boolean {
 }
 
 /** How much of the line runs today: what of its unbroken run its engineers on duty keep, nothing
- *  with none, three modules at the most with one and all five with two. A line with none stands
- *  still, and its stages go back to the machines that did them before (CLAUDE.md T29 2.9.4). */
+ *  with none, three modules at the most with one and all six with two. A line with none stands
+ *  still, and its stages go back to the machines that did them before (CLAUDE.md T29 2.9.4, T30
+ *  2.3.6). What the engineers' tile, the strip, `familyRuns` and the line's contract read. */
 export function lineLevel(state: GameState): number {
   const kept = LINE_MODULES_KEPT[Math.min(LINE_MODULES_KEPT.length - 1, lineEngineersOnDuty(state))] ?? 0;
   return Math.min(lineModules(state), kept);
 }
 
-/** What the line gives every stage of a timber job but the Finishing at the level it runs at
- *  today, 1 with no line or a line that stands still (CLAUDE.md T29 2.9.6). */
-export function lineFactor(state: GameState): number {
-  return LINE_FACTOR[lineLevel(state)] ?? 1;
+/** True while the line works its own contract, from the minute it is taken to the minute it ends:
+ *  it then makes only its windows (PIOTR, 11.10: "1: yes"; CLAUDE.md T30 2.6). */
+export function lineContractRuns(state: GameState): boolean {
+  return state.windowLine.contract?.status === 'active';
 }
 
-/** The module that does this stage of a timber job while the line runs that far, or null: the
- *  Cross cutting and the Planing on module 1, the Moulding on 2, the Sanding on 3 and the Pressing
- *  on 4 (CLAUDE.md T29 2.9.5). */
+/** What of the line the jobs get: nothing while its contract runs, and the level it runs at
+ *  otherwise. The one answer `lineModuleFor` and `lineFactor` read (CLAUDE.md T30 2.5). */
+export function lineLevelForJobs(state: GameState): number {
+  return lineContractRuns(state) ? 0 : lineLevel(state);
+}
+
+/** What the line gives every stage of a timber job at the level the jobs get today, 1 with no
+ *  line, a line that stands still or a line on its contract (CLAUDE.md T29 2.9.6, T30 2.5). */
+export function lineFactor(state: GameState): number {
+  return LINE_FACTOR[lineLevelForJobs(state)] ?? 1;
+}
+
+/** The module that does this stage of a timber job while the line runs that far for the jobs, or
+ *  null: the Cross cutting and the Planing on module 1, the Moulding on 2, the Sanding on 3, the
+ *  Pressing on 4, the Finishing on 5 and the Glazing on 6 (CLAUDE.md T29 2.9.5, T30 2.5). */
 export function lineModuleFor(state: GameState, stage: StageId): string | null {
   const index = LINE_COVERS[stage];
-  if (index === undefined || index > lineLevel(state)) return null;
+  if (index === undefined || index > lineLevelForJobs(state)) return null;
   return LINE_MODULES[index - 1] ?? null;
+}
+
+/** True while the whole line of six stands, not sold: what the board's stand ins and the boards it
+ *  saves ask, whatever the engineers keep today (CLAUDE.md T30 2.5). */
+export function lineStandsWhole(state: GameState): boolean {
+  return lineModules(state) === LINE_MODULES.length;
+}
+
+/** The modules of the line the company holds, standing or sold and waiting for the van, in their
+ *  order along it (CLAUDE.md T30 2.3.5). */
+export function lineItems(state: GameState): Equipment[] {
+  return LINE_MODULES.flatMap((id) => state.equipment.filter((item) => item.specId === id));
+}
+
+/** What the buyer pays for the whole line: half of what its six cost, each module's half summed
+ *  (CLAUDE.md T30 2.3.5). */
+export function lineSalePrice(state: GameState): number {
+  return lineItems(state)
+    .filter((item) => !isSold(item))
+    .reduce((total, item) => total + salePriceFor(item), 0);
 }
 
 /** Sold, and standing until the van comes to the gate. */
@@ -1274,11 +1307,11 @@ export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'
       where: 'the stage it does',
     });
   }
-  // The line, one line for the five modules, worth its factor less one at the level it runs at
+  // The line, one line for the six modules, worth its factor less one at the level it runs at
   // today (CLAUDE.md T29 2.9.8).
   const line = productionLineLine(state);
   if (line !== null) {
-    lines.push({ label: line.label, points: line.points, hall: false, where: 'timber work, the Finishing excepted' });
+    lines.push({ label: line.label, points: line.points, hall: false, where: productionLineWhere(state) });
   }
   return { base: 1, lines, plus: roundPoints(plus), minus: roundPoints(minus), total };
 }
@@ -1677,7 +1710,7 @@ export interface PaceLine {
 export function paceLines(state: GameState): PaceLine[] {
   const lines: PaceLine[] = [];
   for (const family of PACED_FAMILIES) {
-    // The line is one thing on the plate and never five (CLAUDE.md T29 2.9.8).
+    // The line is one thing on the plate and never six (CLAUDE.md T29 2.9.8, T30 2.5).
     if (isLineModule(family)) continue;
     const best = bestMachineOf(state, family);
     if (best === null) continue;
@@ -1693,16 +1726,29 @@ export function paceLines(state: GameState): PaceLine[] {
   return lines;
 }
 
-/** The line as one thing on the sheets that list machines: `Production line, 3 modules` and what
- *  it gives at the level it runs at today, or null while no module stands (CLAUDE.md T29 2.9.8). */
+/** The line as one thing on the sheets that list machines: `Production line, 6 modules` and what
+ *  it gives the jobs at the level it runs at today, or null while no module stands (CLAUDE.md T29
+ *  2.9.8, T30 2.5). */
 export function productionLineLine(state: GameState): { label: string; points: number } | null {
   if (lineModules(state) === 0) return null;
   const level = lineLevel(state);
   return {
-    // With no engineer on duty the line stands still, and says so in place of `0 modules` [TUNE].
-    label: level === 0 ? 'Production line, standing still' : `Production line, ${plural(level, 'module', 'modules')}`,
+    // With no engineer on duty the line stands still, and says so in place of `0 modules` [TUNE];
+    // on its contract it says that, and gives the jobs nothing [TUNE] (CLAUDE.md T30 2.5).
+    label: lineContractRuns(state)
+      ? 'Production line, on its contract'
+      : level === 0
+        ? 'Production line, standing still'
+        : `Production line, ${plural(level, 'module', 'modules')}`,
     points: roundPoints(lineFactor(state) - 1),
   };
+}
+
+/** What the line's line on the Output sheet acts on: every stage of a timber job, and below the
+ *  level module 5 sprays from, every stage but the Finishing (CLAUDE.md T29 2.9.8, T30 2.5). */
+export function productionLineWhere(state: GameState): string {
+  const finishing = LINE_COVERS.finishing ?? LINE_MODULES.length;
+  return lineLevelForJobs(state) >= finishing ? 'timber work' : 'timber work, the Finishing excepted';
 }
 
 /** True while the hall has a spraying robot that stands, is not broken and is not away for its

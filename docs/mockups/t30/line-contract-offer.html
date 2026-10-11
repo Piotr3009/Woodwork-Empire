@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Windows off the line: the line contract's offer card (CLAUDE.md T30 2.6)</title>
+<link rel="stylesheet" href="../../../src/ui/styles.css">
+<style>
+/* The mockup's own page layout only: the game's shells standing in the page flow instead of
+   floating over a hall. Nothing here is a game style. */
+body { margin: 0; padding: 20px; background: var(--page); color: var(--text); font-family: var(--font-ui); }
+.mock-lead { max-width: 1280px; color: var(--text-dim); font-size: var(--fs-body); margin: 0 0 16px; }
+.mock-title { font-size: var(--fs-lead); margin: 0 0 6px; }
+.mock-cap { font-size: var(--fs-body); margin: 18px 0 8px; max-width: 1280px; }
+.mock-bar { width: 1280px; }
+.mock-row { display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap; }
+.mock-modal { position: relative !important; inset: auto !important; left: auto !important; top: auto !important;
+  transform: none !important; margin: 14px 14px 0 0; }
+/* A list modal shown whole, its body unscrolled, so the picture holds all of it. */
+.mock-open { height: auto !important; max-height: none !important; }
+.mock-open .modal-body { max-height: none !important; overflow: visible !important; }
+.mock-narrow { width: 640px !important; }
+.mock-mid { width: 980px !important; }
+.mock-wide { width: 1380px !important; }
+</style></head><body>
+<p class="mock-title">Windows off the line: the line contract's offer card (CLAUDE.md T30 2.6)</p>
+<p class="mock-lead">The event modal, its small folder, as the game draws it: the shell through syncModals with the spec app.ts writes for an event (no cross while a card has two choices, closable only with one), the body through renderEvent and the choices through renderEventFooter. Today's card is the engine's own End of day, raised by askAboutGoingHome at 17:00 on a new company's first day. The new card is an event of the new kind, lineContractOffered, made in the generating process with the brief's title, body and two choices, and drawn by the same two renderers: like End of day it has no cross, Escape does not close it, and the first choice is the primary button. It comes at the open of a working day, once the six modules stand and two line engineers are on the books.</p>
+<p class="mock-cap">2.6, the offer of the line's contract, beside the card of two choices the game has</p><div class="mock-row"><div><p class="mock-cap">Today (v88): End of day, Mon 1 March 2025, 17:00, two choices and no cross</p><div class="modal modal-folder modal-centred mock-modal" data-modal="event"><header class="modal-head" data-drag="1"><h2>End of day</h2></header><div class="modal-body"><p class="event-body">Five o'clock and the day's work is behind you. The hall is yours until seven if you want it, and any overtime at all costs 10% of tomorrow, on top of whatever the week has already cost you.</p></div><footer class="modal-foot"><div class="choices"><button class="btn btn-primary" data-do="resolveEvent" data-id="home">Go home</button><button class="btn" data-do="resolveEvent" data-id="overtime">Stay for overtime</button></div></footer></div></div><div><p class="mock-cap">After 2.6: Windows off the line, Mon 5 October 2026, 08:00, two choices and no cross</p><div class="modal modal-folder modal-centred mock-modal" data-modal="event"><header class="modal-head" data-drag="1"><h2>Windows off the line</h2></header><div class="modal-body"><p class="event-body">A window company will take every window your line makes, at £1,500 a window. The timber and the glass for each one are bought as it is made, £600 a window. The line makes one every 2 hours, about 20 a week, and the client collects each pallet of ten the next working day. It runs until you end it.</p></div><footer class="modal-foot"><div class="choices"><button class="btn btn-primary" data-do="resolveEvent" data-id="take">Take it</button><button class="btn" data-do="resolveEvent" data-id="decline">Not now</button></div></footer></div></div></div>
+<div class="mock-row"><div><p class="mock-cap">After 2.6 and 2.10: offered again a week after it was ended, Mon 26 October 2026, 08:00, with one upgrade fitted (the minutes off lineWindowMinutes, 105) [TUNE: the mock's reading of the card's figures]</p><div class="modal modal-folder modal-centred mock-modal" data-modal="event"><header class="modal-head" data-drag="1"><h2>Windows off the line</h2></header><div class="modal-body"><p class="event-body">A window company will take every window your line makes, at £1,500 a window. The timber and the glass for each one are bought as it is made, £600 a window. The line makes one every 1 h 45 min, about 22 a week, and the client collects each pallet of ten the next working day. It runs until you end it.</p></div><footer class="modal-foot"><div class="choices"><button class="btn btn-primary" data-do="resolveEvent" data-id="take">Take it</button><button class="btn" data-do="resolveEvent" data-id="decline">Not now</button></div></footer></div></div></div>
+</body></html>

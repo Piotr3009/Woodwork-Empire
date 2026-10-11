@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   EQUIPMENT_SPECS,
   EQUIPMENT_TABS,
+  LINE_MODULES,
   GATE_OUTPUT_BONUS,
   GATE_PRICE,
   SERVICE_INTERVAL_DAYS,
@@ -226,12 +227,17 @@ describe('the tabs', () => {
     ]);
     expect(folders('sanding')).toEqual(['sander']);
     // Every line of the catalogue is in exactly one folder of exactly one tab, except the shared
-    // spindle moulder, which is in both machine tabs (CLAUDE.md T13 3.13).
+    // spindle moulder, which is in both machine tabs (CLAUDE.md T13 3.13), and the line's modules 2
+    // to 6, which come with the line and have no folder: its one folder is module 1's (flipped in
+    // v89, CLAUDE.md T30 2.3.3).
     const all = EQUIPMENT_TABS.flatMap((tab) => folders(tab.id));
     expect(all.filter((id) => id === 'spindleMoulder')).toHaveLength(2);
     const once = all.filter((id) => id !== 'spindleMoulder');
     expect(new Set(once).size).toBe(once.length);
-    expect(new Set(all)).toEqual(new Set(EQUIPMENT_SPECS.map((spec) => spec.id)));
+    expect(folders('line')).toEqual([LINE_MODULES[0]]);
+    expect(new Set(all)).toEqual(
+      new Set(EQUIPMENT_SPECS.map((spec) => spec.id).filter((id) => !LINE_MODULES.slice(1).includes(id))),
+    );
   });
 
   it('opens a folder on the classes of that family, with the way back out', () => {

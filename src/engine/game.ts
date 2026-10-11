@@ -45,7 +45,10 @@ import {
   WEBSITE_START_LEVEL,
   WELFARE_IN_THE_CANTEEN,
   WET_AIR_FINISH_FACTOR,
-  WINDOW_LINE_ORIGIN,
+  LINE_MODULES,
+  LINE_NAME,
+  LINE_PRICE,
+  STANDARD_VARIANT,
 } from './constants';
 import { arriveBigJob, setAgency } from './agency';
 import { drawnInUse } from './drawn';
@@ -80,8 +83,11 @@ import {
   lockerSlots,
   lockersInWords,
   moveItem,
+  lineBox,
+  lineGroup,
+  lineModuleCell,
+  lineSite,
   outsidePlaceFor,
-  standingOn,
   standsBehindTheWall,
   standsOutside,
 } from './layout';
@@ -177,7 +183,9 @@ import {
   startMachineMeters,
   variantOf,
   isLineModule,
-  lineModuleIndex,
+  lineItems,
+  findVariant,
+  menAtPlaces,
   boardRoom,
   freeBoardRoom,
   sheetsOnCounter,
@@ -212,6 +220,15 @@ import {
   takeOverJob,
   transportLabel,
 } from './jobs';
+import {
+  answerLineOffer,
+  buyLineUpgrade,
+  emptyLineUpgrades,
+  emptyWindowLine,
+  endLineContract,
+  runLineDay,
+  runLineMinute,
+} from './lineContract';
 import {
   arriveDeliveries,
   arriveGlass,
@@ -258,7 +275,7 @@ import {
   finishOnWetAir,
   underExtracted,
 } from './media';
-import { andList, cubicMetres, inASentence, metresBy, plural } from './text';
+import { cubicMetres, metresBy, plural } from './text';
 import {
   STATION_OFFICE,
   STATION_DOOR,
@@ -512,6 +529,7 @@ export function createGame(options: NewGameOptions): GameState {
     speedBeforeSkip: null,
     summaryCadence: 'daily',
     gameOver: null,
+    windowLine: emptyWindowLine(),
   };
   startDay(state);
   settle(state);
@@ -641,6 +659,10 @@ function startDay(state: GameState): void {
   delegateTasks(state);
   queueDeliveryEvents(state, arriving);
   queueKitDeliveryEvents(state, kit);
+  // The line's own step, last, after the day's kit has landed and its cards are queued: so a line
+  // that lands with two engineers already hired is offered its contract that morning (CLAUDE.md
+  // T30 2.6, 2.8).
+  runLineDay(state);
 }
 
 /** The first working day of the month, before the board: the month's report, once per month
@@ -714,23 +736,27 @@ function collectSoldMachines(state: GameState): void {
   const going = state.equipment.filter(
     (item) => item.soldOnDay !== null && item.soldOnDay <= state.clock.day,
   );
-  for (const item of going) {
+  // The line goes on one van: its six halves on one line of the books and one card (CLAUDE.md T30
+  // 2.3.5). A module of Turn 29 a lifted save left sold and waiting goes as any machine does, for
+  // its own half (CLAUDE.md T30 section 4).
+  const line = going.filter((item) => isLineModule(item.specId));
+  const whole = line.length === LINE_MODULES.length;
+  if (whole) {
+    const price = line.reduce((total, item) => total + salePriceFor(item), 0);
+    for (const item of line) takeAway(state, item);
+    receive(state, 'equipment', `Sold: ${LINE_NAME}`, price);
+    queueEvent(state, {
+      kind: 'machineCollected',
+      title: `${LINE_NAME} collected`,
+      body: `The buyer took it away this morning. ${formatMoney(price)} in.`,
+      choices: [{ id: 'ok', label: 'Gone' }],
+      data: { specId: LINE_MODULES[0] ?? '', price },
+    });
+  }
+  for (const item of going.filter((entry) => !whole || !isLineModule(entry.specId))) {
     const name = findSpec(item.specId)?.name ?? item.specId;
     const price = salePriceFor(item);
-    state.equipment = state.equipment.filter((entry) => entry.id !== item.id);
-    // Nobody services or repairs a machine that is on the back of somebody else's lorry.
-    const orphaned = new Set(
-      state.tasks
-        .filter((task) => task.equipmentId === item.id && !task.done)
-        .map((task) => task.id),
-    );
-    state.tasks = state.tasks.filter((task) => !orphaned.has(task.id));
-    if (state.owner.currentTaskId !== null && orphaned.has(state.owner.currentTaskId)) {
-      state.owner.currentTaskId = null;
-    }
-    for (const worker of state.workers) {
-      if (worker.taskId !== null && orphaned.has(worker.taskId)) worker.taskId = null;
-    }
+    takeAway(state, item);
     receive(state, 'equipment', `Sold: ${name}`, price);
     queueEvent(state, {
       kind: 'machineCollected',
@@ -739,6 +765,25 @@ function collectSoldMachines(state: GameState): void {
       choices: [{ id: 'ok', label: 'Gone' }],
       data: { specId: item.specId, price },
     });
+  }
+}
+
+/** A sold thing off the floor and onto the buyer's van: off the list of kit, and every task for it
+ *  with it. */
+function takeAway(state: GameState, item: Equipment): void {
+  state.equipment = state.equipment.filter((entry) => entry.id !== item.id);
+  // Nobody services or repairs a machine that is on the back of somebody else's lorry.
+  const orphaned = new Set(
+    state.tasks
+      .filter((task) => task.equipmentId === item.id && !task.done)
+      .map((task) => task.id),
+  );
+  state.tasks = state.tasks.filter((task) => !orphaned.has(task.id));
+  if (state.owner.currentTaskId !== null && orphaned.has(state.owner.currentTaskId)) {
+    state.owner.currentTaskId = null;
+  }
+  for (const worker of state.workers) {
+    if (worker.taskId !== null && orphaned.has(worker.taskId)) worker.taskId = null;
   }
 }
 
@@ -1333,9 +1378,11 @@ function endSetup(state: GameState, speed: Speed): void {
   if (movePending(state) !== null) return;
   // The question is already in front of him: asking it twice would book the move twice.
   if (moveConfirmPending(state)) return;
+  // A module of the line counts as heavy here and nowhere else: moving it is an hour of somebody's
+  // time, while its delivery is still built in, with no unloading (CLAUDE.md T30 2.4) [TUNE: chat].
   const heavy = state.movedItems.filter((moved) => {
     const item = state.equipment.find((kit) => kit.id === moved.itemId);
-    return item !== undefined && itemIsHeavy(item);
+    return item !== undefined && (itemIsHeavy(item) || isLineModule(item.specId));
   });
   state.movedItems = heavy;
   if (heavy.length === 0) return;
@@ -2078,6 +2125,9 @@ function advanceMinute(state: GameState): boolean {
   const onTask = state.owner.currentTaskId !== null;
   runMinute(state);
   runProductionMinute(state, onTask);
+  // The line's own minute, beside the men's and outside it, so a minute nobody works still runs the
+  // line (CLAUDE.md T30 2.7).
+  runLineMinute(state);
   state.clock.minute += 1;
   refreshBoardAtMidday(state);
   if (shouldFinishDay(state)) finishDay(state);
@@ -2136,6 +2186,10 @@ function resolveEvent(state: GameState, choiceId: string, remember = false): voi
     case 'moveConfirm':
       if (choiceId === 'do') startTheMove(state);
       else putThemBack(state);
+      break;
+    case 'lineContractOffered':
+      // Taken, it runs from this minute; Not now, it comes back a week on (CLAUDE.md T30 2.6).
+      answerLineOffer(state, choiceId);
       break;
     case 'deliveryArrived':
       if (choiceId === 'unload') {
@@ -2361,11 +2415,16 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'MOVE_ITEM': {
       const item = next.equipment.find((entry) => entry.id === action.itemId);
-      const stood = item
-        ? { x: item.anchorX, y: item.anchorY, orientation: item.orientation }
-        : null;
+      // A module of the line moves the whole line, so the move is recorded for all six of it
+      // (CLAUDE.md T30 2.4).
+      const group = item !== undefined && isLineModule(item.specId) ? new Set(lineGroup(next, false)) : null;
+      const moving = item === undefined ? [] : group === null ? [item] : next.equipment.filter((entry) => group.has(entry.id));
+      const stood = moving.map((entry) => ({ x: entry.anchorX, y: entry.anchorY, orientation: entry.orientation }));
       moveItem(next, action.itemId, action.x, action.y, action.orientation);
-      if (item && stood) recordMove(next, item, stood);
+      moving.forEach((entry, index) => {
+        const was = stood[index];
+        if (was !== undefined) recordMove(next, entry, was);
+      });
       break;
     }
     case 'ORDER_TRANSPORT': {
@@ -2409,6 +2468,14 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       // After the first month he may walk away, and it costs him nothing but the work
       // (CLAUDE.md T17 2.22).
       endContractNow(next, action.contractId);
+      break;
+    case 'END_LINE_CONTRACT':
+      // The line's own contract ends at one click, asking nothing, at any time (CLAUDE.md T30 2.6).
+      endLineContract(next);
+      break;
+    case 'BUY_LINE_UPGRADE':
+      // The cash leaves at the click; the upgrade is fitted ten working days on (CLAUDE.md T30 2.10).
+      buyLineUpgrade(next, action.upgradeId);
       break;
     case 'SET_SECOND_SHIFT':
       // No manager, no second shift (CLAUDE.md T13 3.9).
@@ -2572,6 +2639,8 @@ export function canBuy(
   if (!spec) return { ok: false, reason: 'Not in the catalogue' };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   if (spec.locked) return { ok: false, reason: spec.lockReason };
+  // Modules 2 to 6 come with the line and are never bought alone (CLAUDE.md T30 2.3.4).
+  if (isLineModule(specId) && specId !== LINE_MODULES[0]) return { ok: false, reason: 'It comes with the line' };
   if (state.reputation < spec.minReputation) {
     return { ok: false, reason: `Needs reputation ${spec.minReputation}` };
   }
@@ -2580,6 +2649,9 @@ export function canBuy(
   if (spec.minUnitM2 !== undefined && state.unit.areaM2 < spec.minUnitM2) {
     return { ok: false, reason: `Needs the ${spec.minUnitM2} m² unit` };
   }
+  // The line is bought whole, through module 1's family, and asked its own questions from here
+  // (CLAUDE.md T30 2.3.4).
+  if (isLineModule(specId)) return lineBuyCheck(state, prepaid);
   // A class may want something the family does not: a floor edgebander wants extraction where a
   // hand one wants a tool cabinet (CLAUDE.md T7 3.6).
   for (const required of requiresFor(spec, variant)) {
@@ -2624,12 +2696,6 @@ export function canBuy(
       return { ok: false, reason: 'Every frame press has its glue table' };
     }
   }
-  // One of each module of the line, owned or on order, beside the tool changer's refusal and in
-  // its shape (CLAUDE.md T29 2.9.2).
-  if (isLineModule(specId)) {
-    const counted = state.equipment.filter((item) => item.specId === specId && !isSold(item)).length + onOrderCount(state, specId);
-    if (counted > 0) return { ok: false, reason: 'The line has this module' };
-  }
   // One robot is enough for the hall, and a second would do nothing (CLAUDE.md T29 2.7).
   if (specId === SPRAY_ROBOT) {
     const counted = state.equipment.filter((item) => item.specId === specId && !isSold(item)).length + onOrderCount(state, specId);
@@ -2656,10 +2722,6 @@ export function canBuy(
     return { ok: false, reason: standsBehindTheWall(specId) ? 'No room behind the hall' : 'No room on the apron' };
   }
   if (!prepaid && !canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
-  // A module of the line stands in one place, chosen by the game: its own piece of floor must be
-  // clear, asked in place of the free floor every other machine is asked, in the canteen's shape
-  // (CLAUDE.md T29 2.9.2). Nothing holds the cells of a module not yet bought: this is the hold.
-  if (isLineModule(specId)) return lineModuleFloorCheck(state, specId);
   // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
   // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6). What
   // stands outside asks nothing of the floor: its room is behind the wall or on the apron, asked
@@ -2671,23 +2733,18 @@ export function canBuy(
   return OK;
 }
 
-/** Where module N of the line stands: six cells along x from the one before, from
- *  `WINDOW_LINE_ORIGIN`, at orientation 0 (CLAUDE.md T29 2.9.2). */
-export function lineModuleCell(specId: string): { x: number; y: number } {
-  const width = findSpec(specId)?.width ?? 0;
-  return { x: WINDOW_LINE_ORIGIN.x + width * (lineModuleIndex(specId) - 1), y: WINDOW_LINE_ORIGIN.y };
-}
-
-/** Whether a module's own piece of floor is clear: nothing half shifted, and nothing standing on
- *  its cells or on order for them, named in the catalogue's own words as the canteen's refusal
- *  names them (CLAUDE.md T29 2.9.2). */
-function lineModuleFloorCheck(state: GameState, specId: string): BuyCheck {
+/** The line's own questions, asked of module 1's family, which stands for it in the catalogue;
+ *  modules 2 to 6 come with it and are never bought alone. In order, after the reputation's and the
+ *  unit's: one line to a company, owned or on order; the cash for the whole of it; nothing half
+ *  shifted; and a clear 36 m by 3 m (CLAUDE.md T30 2.3.4) [TUNE: chat]. */
+function lineBuyCheck(state: GameState, prepaid: boolean): BuyCheck {
+  const held =
+    state.equipment.some((item) => isLineModule(item.specId) && !isSold(item)) ||
+    state.onOrder.some((item) => isLineModule(item.specId));
+  if (held) return { ok: false, reason: 'The company has its production line' };
+  if (!prepaid && !canAfford(state, LINE_PRICE)) return { ok: false, reason: 'Not enough cash' };
   if (state.movedItems.length > 0) return { ok: false, reason: 'The kit is half shifted. Finish the move first' };
-  const at = lineModuleCell(specId);
-  const spec = findSpec(specId);
-  const box = { x: at.x, y: at.y, width: spec?.width ?? 0, depth: spec?.depth ?? 0 };
-  const names = standingOn(state, box).map((id) => `the ${inASentence(findSpec(id)?.name ?? id)}`);
-  if (names.length > 0) return { ok: false, reason: `Move ${andList(names)} off the line's ${metresBy(box)}` };
+  if (lineSite(state) === null) return { ok: false, reason: `No free ${metresBy(lineBox({ x: 0, y: 0 }))} in the hall` };
   return OK;
 }
 
@@ -2714,9 +2771,6 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
 /** A new purchase lands on its default tile, or on the first free one when that is taken. The
  *  player moves it wherever he likes afterwards (CLAUDE.md T2 3.10). */
 function anchorFor(state: GameState, specId: string, variantId: string): { x: number; y: number } {
-  // A module of the line stands on its own cells, asked before the default anchor (CLAUDE.md T29
-  // 2.9.2).
-  if (isLineModule(specId)) return lineModuleCell(specId);
   const spec = findSpec(specId);
   const preferred = defaultAnchor(state, specId);
   // Outside a thing takes a place of its own, the plant behind the rear wall and the van on the
@@ -2786,6 +2840,15 @@ export function buyEquipment(
 ): BuyCheck {
   const check = canBuy(state, specId, variantId, prepaid);
   if (!check.ok) return check;
+  // The line stands whole at once, in the place its order would take, for the same price, paid
+  // once (CLAUDE.md T30 2.3.4).
+  if (isLineModule(specId)) {
+    const site = lineSite(state);
+    if (site === null) return { ok: false, reason: `No free ${metresBy(lineBox({ x: 0, y: 0 }))} in the hall` };
+    if (!prepaid) pay(state, 'equipment', LINE_NAME, LINE_PRICE);
+    for (const id of LINE_MODULES) standItem(state, id, STANDARD_VARIANT, lineModuleCell(site, id), true);
+    return OK;
+  }
   const spec = specOf(specId);
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   standItem(state, specId, variant.id, anchorFor(state, specId, variant.id), prepaid);
@@ -2923,6 +2986,7 @@ export function placeEquipmentOrder(
   // An order starts the clock if it was stopped: nothing happens in stopped time, and the player
   // asked for the clock to run rather than for a refusal (PIOTR, 13.09).
   if (timeIsPaused(state)) state.speed = 1;
+  if (isLineModule(specId)) return placeLineOrder(state);
   const spec = specOf(specId);
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   pay(state, 'equipment', variant.name, variant.price);
@@ -2934,6 +2998,22 @@ export function placeEquipmentOrder(
     anchorX: at.x,
     anchorY: at.y,
   });
+  return OK;
+}
+
+/** The line is ordered whole in one click: the cash leaves once, on one line of the books, and its
+ *  six modules go on order on one due day, each at its cell of the first clear 36 m by 3 m and each
+ *  with its share as the price paid, for the insurance, the books and the sale. Built to order, so
+ *  no module's order is called off (CLAUDE.md T30 2.3.4) [TUNE: chat: the words]. */
+function placeLineOrder(state: GameState): BuyCheck {
+  const site = lineSite(state);
+  if (site === null) return { ok: false, reason: `No free ${metresBy(lineBox({ x: 0, y: 0 }))} in the hall` };
+  pay(state, 'equipment', `${LINE_NAME} ordered`, LINE_PRICE);
+  for (const id of LINE_MODULES) {
+    const at = lineModuleCell(site, id);
+    const share = findVariant(id, STANDARD_VARIANT)?.price ?? 0;
+    createOnOrder(state, { specId: id, variantId: STANDARD_VARIANT, pricePaid: share, anchorX: at.x, anchorY: at.y });
+  }
   return OK;
 }
 
@@ -3018,10 +3098,12 @@ export function canSell(state: GameState, equipmentId: string): BuyCheck {
   if (!item) return { ok: false, reason: 'Nothing to sell' };
   if (isSold(item)) return { ok: false, reason: 'Sold, collection tomorrow' };
   if (!isSellableFamily(item.specId)) return { ok: false, reason: 'Nobody buys second hand fittings' };
-  // The line is sold only from the end: a module with a later one standing or on order is not
-  // (CLAUDE.md T29 2.9.3). The last one sells for half its price, as any machine.
-  if (isLineModule(item.specId) && laterModuleHeld(state, item.specId)) {
-    return { ok: false, reason: 'Sell the module after it first' };
+  // The line is sold whole, from any module's tile, so the six are asked: nobody may stand at any
+  // of them (CLAUDE.md T30 2.3.5) [TUNE: chat].
+  if (isLineModule(item.specId)) {
+    const atPlaces = menAtPlaces(state);
+    const manned = lineItems(state).some((module) => menAtMachine(state, module, atPlaces).length > 0);
+    if (manned) return { ok: false, reason: 'Somebody is standing at it' };
   }
   // A tool kept in a cabinet sells like anything else and frees its slot when the buyer comes;
   // it was refused here until v37 for no reason that survived a look (PIOTR, 20.09).
@@ -3034,16 +3116,6 @@ export function canSell(state: GameState, equipmentId: string): BuyCheck {
   return OK;
 }
 
-/** True while a module after this one stands, not sold, or is on order (CLAUDE.md T29 2.9.3). */
-function laterModuleHeld(state: GameState, specId: string): boolean {
-  const index = lineModuleIndex(specId);
-  const later = (id: string): boolean => isLineModule(id) && lineModuleIndex(id) > index;
-  return (
-    state.equipment.some((item) => later(item.specId) && !isSold(item)) ||
-    state.onOrder.some((item) => later(item.specId))
-  );
-}
-
 /** Sells it. The buyer comes in the morning: until then it is marked sold and it does no work
  *  (CLAUDE.md T8 3.5). */
 export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
@@ -3052,9 +3124,20 @@ export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
   const item = state.equipment.find((entry) => entry.id === equipmentId);
   if (!item) return check;
   if (timeIsPaused(state)) state.speed = 1;
-  item.soldOnDay = nextWorkingDay(state.clock.day);
-  // Off the extraction the day it is sold; the buyer's van takes the machine, not the pipe.
-  disconnectExtraction(state, item.id);
+  // The line goes whole: a sale of any module marks all six, for the next working day (CLAUDE.md
+  // T30 2.3.5).
+  const going = isLineModule(item.specId) ? lineItems(state).filter((module) => !isSold(module)) : [item];
+  for (const sold of going) {
+    sold.soldOnDay = nextWorkingDay(state.clock.day);
+    // Off the extraction the day it is sold; the buyer's van takes the machine, not the pipe.
+    disconnectExtraction(state, sold.id);
+  }
+  // A running line contract ends the day the line is sold, and its upgrades go with it for nothing
+  // (CLAUDE.md T30 2.3.5, 2.6, 2.10).
+  if (isLineModule(item.specId)) {
+    endLineContract(state);
+    emptyLineUpgrades(state);
+  }
   return OK;
 }
 

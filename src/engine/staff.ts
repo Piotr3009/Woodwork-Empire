@@ -748,10 +748,10 @@ export function lineEngineers(state: GameState): Worker[] {
   return state.workers.filter((worker) => worker.role === 'lineEngineer');
 }
 
-/** True while a module of the production line stands or is on order: the line an engineer can be
- *  hired for. Modules are ordered in sequence and sold only from the end, so the first is asked
- *  (CLAUDE.md T29 2.8, 2.9.2). An order counts, since the interview is checked again against the
- *  hall as it stands when it is over. */
+/** True while the production line stands or is on order: the line an engineer can be hired for.
+ *  The line is bought and sold whole, so module 1 is asked for all six (CLAUDE.md T29 2.8, T30
+ *  2.3). An order counts, since the interview is checked again against the hall as it stands when
+ *  it is over. */
 export function hasALine(state: GameState): boolean {
   const first = LINE_MODULES[0] ?? '';
   return state.equipment.some((item) => item.specId === first && !isSold(item)) || onOrderCount(state, first) > 0;
