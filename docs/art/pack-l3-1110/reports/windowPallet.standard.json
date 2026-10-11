@@ -1,0 +1,445 @@
+{
+  "asset": "windowPallet.standard",
+  "views": [
+    {
+      "file": "sprites-2x/0/windowPallet.standard.png",
+      "imageSHA256": "e8511494cd3ed43c0d0d7b24270db1ec661c973e67c60a3a5cbcde800183e6f2",
+      "camera": {
+        "renderer": "L3 adapter / unchanged L2 materials and fragment shader / ModernGL EGL",
+        "sourceMeshSHA256": "73f291d9f84948468e013d2d05572db675217591f9445ce90fd705142f955725",
+        "triangleCount": 3406,
+        "sourceToPixel": [
+          [
+            48.0,
+            -48.0,
+            0.0,
+            56.0
+          ],
+          [
+            24.0,
+            24.0,
+            -48.0,
+            92.0
+          ]
+        ],
+        "worldToPixel": [
+          [
+            48.0,
+            -48.0,
+            0.0,
+            56.0
+          ],
+          [
+            24.0,
+            24.0,
+            -48.0,
+            92.0
+          ]
+        ],
+        "objectTransform": [
+          [
+            1.0,
+            -0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "worldToPixelMeaning": "composed source coordinates to final canvas pixels",
+        "anchorSourceM": [
+          2.0,
+          1.0,
+          0.0
+        ],
+        "anchorPx": [
+          104.0,
+          164.0
+        ],
+        "canvasPx": [
+          160,
+          172
+        ],
+        "rasterSizePx": [
+          160,
+          172
+        ],
+        "vertexBoundsMeters": [
+          [
+            0.27500000000000036,
+            0.0,
+            0.0
+          ],
+          [
+            1.7249999999999996,
+            1.0,
+            1.668
+          ]
+        ],
+        "normalLengthMinMax": [
+          0.9999999999999999,
+          1.0
+        ],
+        "fixedLightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "uniforms": {
+          "canvas": [
+            160,
+            172
+          ],
+          "origin": [
+            56.0,
+            92.0
+          ],
+          "model_transform": [
+            [
+              1.0,
+              -0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "depth_range": [
+            -0.7020000219345093,
+            5.105999946594238
+          ]
+        },
+        "rotationDegrees": 0.0,
+        "direction": null,
+        "phase": 0.0,
+        "shaderSourceFile": "/workspace/scratch/6c168f42cea6/l3-src/render_l3.py",
+        "vertexShaderSource": "#version 330\nin vec3 in_pos;\nin vec3 in_normal;\nin float in_ao;\nuniform vec2 canvas;\nuniform vec2 origin;\nuniform mat4 model_transform;\nuniform vec2 depth_range;\nout vec3 world_pos;\nout vec3 model_pos;\nout vec3 normal;\nout float ao;\nvoid main() {\n  vec3 p=(model_transform*vec4(in_pos,1.0)).xyz;\n  vec3 n=mat3(model_transform)*in_normal;\n  float sx=origin.x+48.0*(p.x-p.y);\n  float sy=origin.y+24.0*(p.x+p.y)-48.0*p.z;\n  float depth=0.8-1.6*(p.x+p.y+p.z-depth_range.x)/(depth_range.y-depth_range.x);\n  gl_Position=vec4(2.0*sx/canvas.x-1.0,1.0-2.0*sy/canvas.y,depth,1.0);\n  world_pos=p; model_pos=in_pos; normal=n; ao=in_ao;\n}\n",
+        "fragmentShaderSource": "#version 330\nin vec3 world_pos;\nin vec3 model_pos;\nin vec3 normal;\nin float ao;\nuniform vec3 basecolor;\nuniform float roughness;\nuniform float metallic;\nuniform int texture_kind;\nuniform float specular;\nuniform float opacity;\nout vec4 fragColor;\nfloat hash(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }\nvoid main() {\n vec3 N=normalize(normal);\n vec3 V=normalize(vec3(1.,1.,1.));\n if(opacity<.999 && dot(N,V)<0.) N=-N;\n vec3 L=normalize(vec3(-2.5,4.5,7.0));\n vec3 F=normalize(vec3(5.,-3.,4.));\n vec3 R=normalize(vec3(-3.,-4.,6.));\n vec3 col=basecolor;\n if(texture_kind==1) {\n   float grain=sin(model_pos.y*135.+sin(model_pos.x*3.2+model_pos.z*24.)*3.0);\n   float fine=sin(model_pos.y*380.+model_pos.x*10.);\n   float noise=hash(floor(model_pos*vec3(22.,290.,135.)));\n   col*=.94+.055*grain+.026*fine+.045*noise;\n }\n if(texture_kind==2) {\n   float noise=hash(floor(model_pos*730.)); col*=.977+.046*noise;\n }\n if(texture_kind==3) {\n   float noise=hash(floor(model_pos*950.)); col*=.85+.30*noise;\n }\n if(texture_kind==4) {\n   float noise=hash(floor(model_pos*470.));\n   col*=.955+.055*noise+.022*sin(model_pos.x*8.+model_pos.z*12.);\n   float scratch=sin(model_pos.x*273.+model_pos.y*142.);\n   if(abs(sin(model_pos.z*197.+model_pos.y*44.))>.993 && scratch>.94) col*=1.17;\n }\n if(texture_kind==5) {\n   float rings=sin(length(model_pos.yz-vec2(.18,.3))*230.);\n   col*=.94+.075*rings;\n }\n float diffuse=max(dot(N,L),0.);\n float fill=max(dot(N,F),0.);\n float rim=max(dot(N,R),0.);\n float hemi=.38+.13*max(N.z,0.)-.045*max(-N.z,0.);\n vec3 lit=col*(hemi+.65*diffuse+.16*fill+.08*rim)*(1.-.29*ao);\n vec3 H=normalize(L+V);\n float exponent=mix(180.,12.,roughness);\n float spec=pow(max(dot(N,H),0.),exponent)*(.09+.55*metallic+.25*specular)*(1.-roughness*.45);\n float strip=pow(max(dot(N,normalize(vec3(-.3,1.8,3.5))+V*.13),0.),25.);\n float fresnel=pow(1.-max(dot(N,V),0.),4.);\n vec3 specCol=mix(vec3(1.),col,.42*metallic);\n lit+=specCol*(spec+strip*.055*metallic+fresnel*.055*(1.-roughness));\n // Materials are authored in display colour; gentle highlight compression.\n lit=clamp(lit,0.,1.);\n // Real pane alpha. Opaque monitor/tinted inserts retain opacity=1.\n float alpha=opacity<.999 ? min(.24,opacity+.025*fresnel) : 1.;\n fragColor=vec4(lit,alpha);\n}\n",
+        "shaderHash": "65c8d049b901ae141d3683876ee7b9d376929157e9bb005955ce0c0ee6487f50",
+        "fragmentShaderSHA256": "c5c881053f594f30bb52e653b4eafcc1b713f3b81204b7f42da3283f0479b5e2",
+        "sameFragmentShaderAsL2": true,
+        "usesPhysicalRotation": true,
+        "noAdditionalZSquash": true,
+        "groundEdgeSlopeMagnitude": 0.5,
+        "exactProjectionVerified": true,
+        "envelopeMeters": [
+          2,
+          1,
+          1.75
+        ],
+        "view": 0
+      },
+      "image": {
+        "canvasPx": [
+          160,
+          172
+        ],
+        "mode": "RGBA",
+        "bitDepth": 8,
+        "alphaBoundsPx": [
+          22,
+          24,
+          138,
+          157
+        ],
+        "marginsPx": [
+          22,
+          24,
+          22,
+          15
+        ],
+        "pixelSHA256": "b97edf516daa2047f8d2700ac6e8f5f6f93169e141c6671cd43022ac8fc8d7ee"
+      },
+      "exactProjectionVerified": true
+    },
+    {
+      "file": "sprites-2x/90/windowPallet.standard.png",
+      "imageSHA256": "5e7d95d3702c6e239f4c15d80a79740c6463a10d252b130be9a319618b7c057a",
+      "camera": {
+        "renderer": "L3 adapter / unchanged L2 materials and fragment shader / ModernGL EGL",
+        "sourceMeshSHA256": "73f291d9f84948468e013d2d05572db675217591f9445ce90fd705142f955725",
+        "triangleCount": 3406,
+        "sourceToPixel": [
+          [
+            48.0,
+            48.0,
+            0.0,
+            8.0
+          ],
+          [
+            -24.0,
+            24.0,
+            -48.0,
+            140.0
+          ]
+        ],
+        "worldToPixel": [
+          [
+            48.0,
+            48.0,
+            0.0,
+            8.0
+          ],
+          [
+            -24.0,
+            24.0,
+            -48.0,
+            140.0
+          ]
+        ],
+        "objectTransform": [
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            -1.0,
+            0.0,
+            0.0,
+            2.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "worldToPixelMeaning": "composed source coordinates to final canvas pixels",
+        "anchorSourceM": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "anchorPx": [
+          56.0,
+          164.0
+        ],
+        "canvasPx": [
+          160,
+          172
+        ],
+        "rasterSizePx": [
+          160,
+          172
+        ],
+        "vertexBoundsMeters": [
+          [
+            0.27500000000000036,
+            0.0,
+            0.0
+          ],
+          [
+            1.7249999999999996,
+            1.0,
+            1.668
+          ]
+        ],
+        "normalLengthMinMax": [
+          0.9999999999999999,
+          1.0
+        ],
+        "fixedLightingWorld": [
+          [
+            -2.5,
+            4.5,
+            7.0
+          ],
+          [
+            5.0,
+            -3.0,
+            4.0
+          ],
+          [
+            -3.0,
+            -4.0,
+            6.0
+          ]
+        ],
+        "uniforms": {
+          "canvas": [
+            160,
+            172
+          ],
+          "origin": [
+            104.0,
+            92.0
+          ],
+          "model_transform": [
+            [
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              -1.0,
+              0.0,
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "depth_range": [
+            -0.7020000219345093,
+            5.105999946594238
+          ]
+        },
+        "rotationDegrees": -90.0,
+        "direction": null,
+        "phase": 0.0,
+        "shaderSourceFile": "/workspace/scratch/6c168f42cea6/l3-src/render_l3.py",
+        "vertexShaderSource": "#version 330\nin vec3 in_pos;\nin vec3 in_normal;\nin float in_ao;\nuniform vec2 canvas;\nuniform vec2 origin;\nuniform mat4 model_transform;\nuniform vec2 depth_range;\nout vec3 world_pos;\nout vec3 model_pos;\nout vec3 normal;\nout float ao;\nvoid main() {\n  vec3 p=(model_transform*vec4(in_pos,1.0)).xyz;\n  vec3 n=mat3(model_transform)*in_normal;\n  float sx=origin.x+48.0*(p.x-p.y);\n  float sy=origin.y+24.0*(p.x+p.y)-48.0*p.z;\n  float depth=0.8-1.6*(p.x+p.y+p.z-depth_range.x)/(depth_range.y-depth_range.x);\n  gl_Position=vec4(2.0*sx/canvas.x-1.0,1.0-2.0*sy/canvas.y,depth,1.0);\n  world_pos=p; model_pos=in_pos; normal=n; ao=in_ao;\n}\n",
+        "fragmentShaderSource": "#version 330\nin vec3 world_pos;\nin vec3 model_pos;\nin vec3 normal;\nin float ao;\nuniform vec3 basecolor;\nuniform float roughness;\nuniform float metallic;\nuniform int texture_kind;\nuniform float specular;\nuniform float opacity;\nout vec4 fragColor;\nfloat hash(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }\nvoid main() {\n vec3 N=normalize(normal);\n vec3 V=normalize(vec3(1.,1.,1.));\n if(opacity<.999 && dot(N,V)<0.) N=-N;\n vec3 L=normalize(vec3(-2.5,4.5,7.0));\n vec3 F=normalize(vec3(5.,-3.,4.));\n vec3 R=normalize(vec3(-3.,-4.,6.));\n vec3 col=basecolor;\n if(texture_kind==1) {\n   float grain=sin(model_pos.y*135.+sin(model_pos.x*3.2+model_pos.z*24.)*3.0);\n   float fine=sin(model_pos.y*380.+model_pos.x*10.);\n   float noise=hash(floor(model_pos*vec3(22.,290.,135.)));\n   col*=.94+.055*grain+.026*fine+.045*noise;\n }\n if(texture_kind==2) {\n   float noise=hash(floor(model_pos*730.)); col*=.977+.046*noise;\n }\n if(texture_kind==3) {\n   float noise=hash(floor(model_pos*950.)); col*=.85+.30*noise;\n }\n if(texture_kind==4) {\n   float noise=hash(floor(model_pos*470.));\n   col*=.955+.055*noise+.022*sin(model_pos.x*8.+model_pos.z*12.);\n   float scratch=sin(model_pos.x*273.+model_pos.y*142.);\n   if(abs(sin(model_pos.z*197.+model_pos.y*44.))>.993 && scratch>.94) col*=1.17;\n }\n if(texture_kind==5) {\n   float rings=sin(length(model_pos.yz-vec2(.18,.3))*230.);\n   col*=.94+.075*rings;\n }\n float diffuse=max(dot(N,L),0.);\n float fill=max(dot(N,F),0.);\n float rim=max(dot(N,R),0.);\n float hemi=.38+.13*max(N.z,0.)-.045*max(-N.z,0.);\n vec3 lit=col*(hemi+.65*diffuse+.16*fill+.08*rim)*(1.-.29*ao);\n vec3 H=normalize(L+V);\n float exponent=mix(180.,12.,roughness);\n float spec=pow(max(dot(N,H),0.),exponent)*(.09+.55*metallic+.25*specular)*(1.-roughness*.45);\n float strip=pow(max(dot(N,normalize(vec3(-.3,1.8,3.5))+V*.13),0.),25.);\n float fresnel=pow(1.-max(dot(N,V),0.),4.);\n vec3 specCol=mix(vec3(1.),col,.42*metallic);\n lit+=specCol*(spec+strip*.055*metallic+fresnel*.055*(1.-roughness));\n // Materials are authored in display colour; gentle highlight compression.\n lit=clamp(lit,0.,1.);\n // Real pane alpha. Opaque monitor/tinted inserts retain opacity=1.\n float alpha=opacity<.999 ? min(.24,opacity+.025*fresnel) : 1.;\n fragColor=vec4(lit,alpha);\n}\n",
+        "shaderHash": "65c8d049b901ae141d3683876ee7b9d376929157e9bb005955ce0c0ee6487f50",
+        "fragmentShaderSHA256": "c5c881053f594f30bb52e653b4eafcc1b713f3b81204b7f42da3283f0479b5e2",
+        "sameFragmentShaderAsL2": true,
+        "usesPhysicalRotation": true,
+        "noAdditionalZSquash": true,
+        "groundEdgeSlopeMagnitude": 0.5,
+        "exactProjectionVerified": true,
+        "envelopeMeters": [
+          2,
+          1,
+          1.75
+        ],
+        "view": 90
+      },
+      "image": {
+        "canvasPx": [
+          160,
+          172
+        ],
+        "mode": "RGBA",
+        "bitDepth": 8,
+        "alphaBoundsPx": [
+          22,
+          24,
+          138,
+          157
+        ],
+        "marginsPx": [
+          22,
+          24,
+          22,
+          15
+        ],
+        "pixelSHA256": "e816b7a8fd5df5402b801eed1d353411b03217f2e193f72e9a9c54e8d8393477"
+      },
+      "exactProjectionVerified": true
+    }
+  ],
+  "windowReference": {
+    "referenceAsset": "windowLine6.standard.stack10",
+    "translationMeters": [
+      -4.225,
+      -1.9,
+      0.0
+    ],
+    "windowCount": 10,
+    "normalComparison": "bitwise",
+    "materialComparison": "exact_tuple_equality",
+    "geometryToleranceMeters": 1e-09,
+    "components": {
+      "windows": {
+        "triangleCount": 1780,
+        "referenceTriangleCount": 1780,
+        "geometryEqualAfterTranslation": true,
+        "normalArraysExactlyEqual": true,
+        "materialsExactlyEqual": true,
+        "maxAbsCoordinateDifferenceMeters": 0.0,
+        "sourceCanonicalSHA256": "4b75b5d33be26cba28f642449bc32b00d3c168a55be090f57ca343ca5e8c7cc4",
+        "translatedCanonicalSHA256": "4b75b5d33be26cba28f642449bc32b00d3c168a55be090f57ca343ca5e8c7cc4",
+        "canonicalHashesMatch": true
+      },
+      "wrap": {
+        "triangleCount": 366,
+        "referenceTriangleCount": 366,
+        "geometryEqualAfterTranslation": true,
+        "normalArraysExactlyEqual": true,
+        "materialsExactlyEqual": true,
+        "maxAbsCoordinateDifferenceMeters": 0.0,
+        "sourceCanonicalSHA256": "932fb204329340339c4b30cbb4b178b203caf1cdebfb962746975b924983d952",
+        "translatedCanonicalSHA256": "932fb204329340339c4b30cbb4b178b203caf1cdebfb962746975b924983d952",
+        "canonicalHashesMatch": true
+      }
+    },
+    "actualBoundsMeters": [
+      [
+        0.27500000000000036,
+        0.0,
+        0.0
+      ],
+      [
+        1.7249999999999996,
+        1.0,
+        1.668
+      ]
+    ],
+    "withinEnvelope": true,
+    "passed": true
+  }
+}

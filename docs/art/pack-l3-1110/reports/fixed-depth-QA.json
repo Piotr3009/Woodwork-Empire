@@ -1,0 +1,40 @@
+{
+  "sw": {
+    "frames": [
+      0,
+      3
+    ],
+    "staticChangedPixels": 0,
+    "visibleStaticPixelsTested": 16811,
+    "depthRanges": [
+      [
+        -3.193654775619507,
+        5.052999973297119
+      ],
+      [
+        -3.193654775619507,
+        5.052999973297119
+      ]
+    ],
+    "equalDepthRanges": true
+  },
+  "se": {
+    "frames": [
+      0,
+      3
+    ],
+    "staticChangedPixels": 0,
+    "visibleStaticPixelsTested": 16976,
+    "depthRanges": [
+      [
+        -3.193603038787842,
+        5.011000156402588
+      ],
+      [
+        -3.193603038787842,
+        5.011000156402588
+      ]
+    ],
+    "equalDepthRanges": true
+  }
+}

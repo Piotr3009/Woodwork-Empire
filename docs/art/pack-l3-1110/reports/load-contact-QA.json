@@ -1,0 +1,63 @@
+{
+  "passed": true,
+  "model": "forklift.build_forklift(phase=0,loaded=True)",
+  "visualViewsInspected": [
+    "sw",
+    "se",
+    "nw",
+    "ne"
+  ],
+  "loadTransformTranslationM": [
+    0.225,
+    -0.5,
+    0.18
+  ],
+  "loadedAssemblyBoundsM": [
+    [
+      0.5,
+      -0.5,
+      0.18
+    ],
+    [
+      1.95,
+      0.5,
+      1.848
+    ]
+  ],
+  "forkTopZM": 0.33,
+  "upperCrossmemberUndersideZM": 0.33,
+  "verticalContactGapM": 0,
+  "lowerPocketClearanceM": 0.055,
+  "sidePocketClearanceMinMaxM": [
+    0.0825,
+    0.1025
+  ],
+  "forkCentersYM": [
+    -0.2,
+    0.2
+  ],
+  "forkWidthM": 0.105,
+  "forkTipXM": 1.94,
+  "woodenPalletFrontXM": 1.95,
+  "tipInsetFromPalletFrontM": 0.01,
+  "loadCenterXM": 1.225,
+  "forksReachBeyondLoadCenter": true,
+  "carriageFrontXM": 0.495,
+  "woodenPalletBackXM": 0.5,
+  "carriageToWoodGapM": 0.005,
+  "forkWoodPositiveAABBOverlaps": 0,
+  "overlapTest": "Actual fork triangle AABBs against individual original wooden cuboid bounds; positive overlap in all three axes above 1e-8 m. Intended common-Z contact excluded.",
+  "wholeAssemblyBoundsM": [
+    [
+      -1.95,
+      -0.6805,
+      0.00015578919836950478
+    ],
+    [
+      1.95,
+      0.6805,
+      2.225
+    ]
+  ],
+  "visualFindings": "Pallet visibly supported by the inserted forks; load clears mast, carriage, wheels and driver in all four renders. No source change needed."
+}

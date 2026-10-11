@@ -1,13 +1,15 @@
-# Turn 31: the line's timber and glass, its books, the forklift's lane, the hall that grows, the shelter behind the wall, and contracts that can be lost
+# Turn 31: the line's timber and glass, its books, the forklift's lane and its forklift, the hall that grows, the shelter behind the wall, and contracts that can be lost
 
 Woodwork Empire. Autonomous session brief for Claude Code (cloud, one writer, serial, effort
 high). Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), written 11.10.2026 from
 Piotr's words of that afternoon, against main at v90, and checked against v90 by a second reader
-before it was sent.
+before it was sent; brought to v91 that evening (v91 changes only how the line's sheets are
+played), and given the art side's L3 that evening: the line's forklift and its pallet (2.10).
 
 Read this whole file (first line must say "Turn 31"; if the root CLAUDE.md does not, stop and
 report), then REPORT-T30.md section 0, then docs/notes-t30.md, then docs/ui-style.md, then
-docs/art/SPRITES.md sections 9.7, 9.8, 13 and 15, then the archived briefs in docs/
+docs/art/SPRITES.md sections 9.7, 9.8, 10, 13 and 15, then docs/art/REQUESTS-T30.md sections 1
+and 2 (what L3 was asked to be), then the archived briefs in docs/
 (docs/turn-30-brief.md is the last, and this ZIP put it there). Where files disagree, this one
 wins. All standing rules apply (no em or en dashes anywhere, scope 1:1, one code path, constants
 never in the UI, [TUNE] for every figure you choose and [PIOTR] for his, kill background
@@ -23,14 +25,17 @@ Before a line is written: clone, read what is there, and build with it. Every sc
 tab, row and strip line this turn needs already has its kind in the repo (the Contracts tab's
 running and ended blocks and their buttons, the Accounting page's tabs and the Summary tab's four
 columns, the Premises page's extension cards, the event card, the warning strip, the Materials
-page's rows, the gate lane's rule that nothing stands on it). Nothing here asks for a second
+page's rows, the gate lane's rule that nothing stands on it, the figures' sheets and the walkers
+that move them, the finished goods drawn at the gate with their label). Nothing here asks for a second
 version of any of them, and none is to be written [PIOTR, 18.09: one game, one look].
 
-Precondition. main carries v90: APP_VERSION 'v90', STATE_VERSION 43. This ZIP carries v90's five
-files as well (the line's motion four times slower), so main has it once the ZIP is pushed. If
-APP_VERSION is not 'v90', stop and report. Turn 30 ended green (2,847 tests in 297 files); v90 was
-checked with the type check, the lint and the tests it touched. Task A0 runs the whole suite on
-v90 before anything is touched.
+Precondition. main carries v91: APP_VERSION 'v91', STATE_VERSION 43. This ZIP carries v91's seven
+files as well (the line's motion at the speed it was drawn, one loop a game hour a module), so main
+has it once the ZIP is pushed. If APP_VERSION is not 'v91', stop and report. Turn 30 ended green
+(2,847 tests in 297 files); v90 and v91 were each checked with the type check, the lint and the
+tests they touched. Task A0 runs the whole suite on v91 before anything is touched. This ZIP also
+brings the art side's L3: three pictures in `docs/pictures-l3/` and the rest of its pack in
+`docs/art/pack-l3-1110/` (2.10).
 
 The four rules of 18.09 bind every agent: one game, one look; nothing visual without a mockup;
 no sound without a recorded file; every modal, popover and list has the cross, Escape and click
@@ -60,8 +65,9 @@ by the year."
 **The forklift's lane.** "Then a road will be needed: two yellow lines from the end of the
 production line to the door, for the forklift that will drive with the pallet." Yes to chat's
 route along the front wall and up the left wall to the gate, two metres wide, nothing standing on
-it, "and the forklift driving". The art side has been asked for the forklift and the pallet (L3);
-they are not here tonight.
+it, "and the forklift driving". That evening the art side delivered the forklift and the pallet
+standing alone (L3); Piotr approved them ("akceptacja jest") and asked: "won't we add it to this
+turn?" (2.10).
 
 **The hall.** "Add the expansion of the space in the factory: adding 200 m² at a time, each time
 20 per cent dearer than the present price for 200, and of course everything goes up
@@ -83,27 +89,31 @@ asks for less.
 What this turn is not: any change to a normal job, a sheet job's plan, a wage, the tax, the loan,
 the bank, the timber contracts of Turn 29, the line's contract's price, minutes, pallet and offer,
 or the frame loop; no picture drawn by an agent (the hall's longer background is made of the 800 m²
-picture by a script, as 9.7 and 9.8 were); not the forklift, the pallet standing alone or the sheet
-store.
+picture by a script, as 9.7 and 9.8 were); not the sheet store.
 
 ## 1. Rules restated (short)
 
-Everything from Turns 1 to 30 and the chat fixes to v90. Tonight in addition:
+Everything from Turns 1 to 30 and the chat fixes to v91. Tonight in addition:
 
-- APP_VERSION = 'v91'. STATE_VERSION 44, once (section 4); every save that loads today loads.
+- APP_VERSION = 'v92'. STATE_VERSION 44, once (section 4); every save that loads today loads.
 - **A job takes as many men as the boss puts on it.** Nothing of `addToJob`, `assignJob` or
   `canBuild` is touched.
 - **The sheet department's jobs are not touched**; its standing contracts are, by 2.9 only.
 - **The art side's pictures go in as they are.** No agent draws, repaints, trims or scales a
-  picture. The shelter's two files change places (2.8), and the hall's longer background is cut
-  from the 800 m² picture by a script and painted by nobody (2.7).
+  picture. The shelter's two files change places (2.8), the hall's longer background is cut from
+  the 800 m² picture by a script and painted by nobody (2.7), and L3's three pictures go in under
+  their own names (2.10).
 
 ## 2. Changes to the design (the contract)
 
-### 2.0 What v90 left (for A0's reasons)
+### 2.0 What v90 and v91 left (for A0's reasons)
 
-- The full suite was last run green at the end of Turn 30; v90 changed one constant and its
-  tests.
+- The full suite was last run green at the end of Turn 30. v90 and v91 changed only how the line's
+  sheets are played, and their tests: from v91 each module plays one loop of its sheet, at the 6
+  frames a second it was drawn at, each time the game's clock reaches its minute of the hour
+  (`everyMinutes` and `atMinute` in `MACHINE_WORK_SHEETS`, read by `playSheets`), and stands on its
+  picture between two loops [PIOTR, 11.10: "at the speed it was drawn, but started now and then and
+  not all the time"].
 - `tests/ui/app.test.ts` plays the game in real time: no sub-agent runs `npm test`, `npm run build`
   or `npm run check` while the lead's check is running.
 - The line exists only in the 800 m² unit; its contract is `state.windowLine.contract`
@@ -275,8 +285,8 @@ door"; "yes" to chat's route].** Two metres wide, from the line to the gate:
   forklift's lane: the sheet rack and a workbench` (the catalogue's names, as `standingOn` gives
   them, kit on order among them), until it is moved. A line of Turn 30 that stands where its lane
   cannot be (y 15 to 17) keeps its place, no lane is drawn, and the same line reads `The line
-  stands too near the front wall for its lane: move it back` [TUNE]. Nothing else depends on the
-  lane tonight: the pallets go to the gate as in Turn 30 until the forklift comes.
+  stands too near the front wall for its lane: move it back` [TUNE]. The forklift of 2.10 drives on
+  the lane; a line with no lane has none, and its pallets go to the gate as in Turn 30.
 - **Drawn** as two yellow lines on the floor along the lane's outer edges, the corners joined,
   under every piece of kit and every man. The hall's painted shell is cached and drawn again only
   when its key changes, so the lane is drawn at the head of the hall's live drawing, where it
@@ -374,6 +384,114 @@ on a contract, never the line's contract.
   the scenario moves: re-pin it with one line of reason, as the relaxed rule says, or choose its seed
   so that it shows what it always showed, and say which in the report.
 
+### E. The line's forklift and the pallet standing alone (L3)
+
+**2.10 The forklift [PIOTR, 10.10: "when the pallet of windows is stacked, ten of them, the
+forklift takes it to the door"; 11.10: "two yellow lines from the end of the production line to the
+door, for the forklift that will drive with the pallet", "and the forklift driving"; that evening,
+having approved the art side's L3 ("akceptacja jest"): "won't we add it to this turn?"].**
+
+*The pictures.* In `docs/pictures-l3/`, put there by this ZIP, checked by chat:
+
+| File | What it is |
+|---|---|
+| `windowPallet.standard.png` | the pallet of ten wrapped windows standing alone, view 0: 160 by 172, anchor 104, 164, 2 x 1 x 1.75 m |
+| `vehicle.forklift.drive.sheet.png` | the line's forklift and its driver, forks empty: 1,632 by 1,024, four rows of six cells of 272 by 256 |
+| `vehicle.forklift.driveLoaded.sheet.png` | the same with the pallet of ten windows on its forks |
+
+The rest of the art side's pack is already in `docs/art/pack-l3-1110/`: its notes, figures and
+reports, the previews Piotr approved, its source, the two sheets' JSONs, and the pallet's 90 degree
+view, which nothing turns and which is not served; `EDITED.md` there says what chat left out and the
+dashes it replaced. The two JSONs say the same: `{"cellWidth": 272, "cellHeight": 256, "anchorX":
+136, "anchorY": 192, "frames": 6, "fps": 8, "rows": {"sw": 0, "se": 1, "nw": 2, "ne": 3}, "loop":
+true}`.
+
+What chat checked: the pallet's canvas and anchor are the contract's for 2 x 1 x 1.75 m, and its
+windows and its pallet are module 6's (`stack10` and the pallet drawn in module 6's picture); the
+rows are the figures' four directions in the game's own sense (`sw` along +y, `se` +x, `nw` -x,
+`ne` -y, as `facingTowards` gives them), and in every row the forks point the way it drives; every
+cell of a row has the same bounds, so the forklift drives on the spot and the game moves it; the
+anchor is one point of the floor under the forklift with its load, the same in both sheets, so the
+empty forklift is not centred on it and is not to be centred again. The forklift is drawn at true
+size, where the forklift family's own pictures are a 1 by 1 by 1 m frame (REQUESTS-T30 2.1): those
+are not touched tonight (E1).
+
+*To do, in task C4.*
+
+- `git add docs/pictures-l3` if they are not tracked yet, then `git mv` the three pictures into
+  `public/sprites/` under their own names, run `npm run sprites:manifest`, and `docs/pictures-l3/`
+  is gone.
+- **Two more kinds of file**, as Turn 30 2.2 taught the work sheets and the overlays: a vehicle's
+  sheet of four rows (`vehicle.<name>.<variant>.sheet.png`) and the picture of a thing that is no
+  family's class (`windowPallet.standard.png`). Every place that lists, counts or picks files learns
+  them: no count of class pictures or of turned pictures counts either, the Sprite check page lists
+  them, and the report says where they were taught.
+- Their figures written once as a constant (`FORKLIFT_SHEETS`, empty and loaded [TUNE: the name]),
+  from the JSONs, as `MACHINE_WORK_SHEETS` was.
+- SPRITES.md section 16, `The line's forklift and its pallet (L3, Turn 31, 11.10.2026)`: the table,
+  the rows and their directions, the anchor, the true size, and how the game uses them.
+
+*Whose it is, and who drives* [TUNE: chat: REQUESTS-T30 2.4's simplest]. The forklift is the line's
+own: it comes with the line and goes with it, costs nothing, and is not a piece of kit (no spec, no
+place, no power, no insurance, no catalogue card). It is not the company's forklift family, which
+stays as it is and goes on unloading the lorries. Its driver is part of the picture and takes no
+man's time.
+
+*Where it waits.* On the lane's front strip (2.6) in front of module 6's pallet, empty and facing
+`nw`, along the strip towards the left wall, standing still on frame 0 of its empty sheet's `nw`
+row [TUNE: chat: the cell]. It is drawn while the six modules stand and the line has its lane: a line
+with no lane (2.6) has no forklift, and its pallets go to the gate as in Turn 30.
+
+*The trip.* Whenever a pallet leaves module 6 for the gate (the tenth window, or a part pallet at the
+contract's end), the forklift takes it there along the lane and comes back:
+
+1. Loaded, from where it waits: along the front strip (`nw`) to the lane's corner, then up the left
+   strip (`ne`) until the pallet on its forks is over `LINE_PALLET_LAYOUT`. There the pallet is set
+   down: the forklift's sheet becomes the empty one and the pallet standing alone is drawn at its
+   place.
+2. Empty: down the left strip (`sw`) and along the front strip (`se`) to where it waits, and it faces
+   `nw` again.
+
+The pallet comes off module 6 onto the forks at once: the engine already draws module 6's pallet
+empty the moment the tenth window is made. Nothing is drawn of the forks lifting or setting down,
+and a corner is a turn on the spot [TUNE: chat].
+
+*The engine does not change* [TUNE: chat]. In the engine the pallet is at the gate the moment it
+leaves module 6, as in Turn 30, so the Contracts tab, the client's collection at the next working
+day's open and every engine test stay as they are. The forklift is the renderer's, as the walkers and
+the doors are: a small module of its own in their shape (`src/render/forklift.ts` [TUNE: the
+name]), with no game state, no lift and no minute booked. Its step runs in every frame with the
+state, whatever page is open, so a trip goes on while the player reads another page and he finds the
+forklift where it has got to; it sees a pallet leave when `palletsAtGate` goes up between two of its
+steps on the same day. It is set again after every page written (as `syncFigures` and `syncDoors`
+are), so a page written mid trip never puts it back where it waits; and it is forgotten, back where
+it waits, wherever a view is built from nothing (the load, the new game and the new morning that call
+`resetWalkers` and `resetDoors`), when the line is moved or sold, and when the clock goes to
+`WALK_SKIPPED_FROM_SPEED` or over. While its loaded leg runs, the newest pallet at the gate is not
+drawn: it is on the forks. A pallet sent while it is out is drawn at the gate at once [TUNE].
+
+*Its pace.* `FORKLIFT_CELLS_PER_SECOND` 3 [TUNE: chat: twice a man's walk], in real time, at every
+speed of the clock below `WALK_SKIPPED_FROM_SPEED`, and on while the clock is paused, as the men
+walk on. From `WALK_SKIPPED_FROM_SPEED` no trip is drawn: the pallet is at the gate at once and the
+forklift waits where it waits, as a man is put where he is going (v71). At 1x, with the line at
+(2, 14) in the 800 m² hall, a trip there and back is about 30 seconds.
+
+*How it is drawn.* From its sheet as a figure is (`characterArt`, `cellBox`: an `<svg>` clipped to
+one cell by its view box over the whole sheet), marked `data-forklift` with its leg: its row the way
+it is going, its six frames at the sheet's 8 a second while it moves and frame 0 while it stands; its
+anchor on the middle line of the strip it is on; in the hall's live drawing with the figures, by depth
+as a figure is, by the cell its anchor is on, so that it passes in front of and behind men and kit as
+they stand. It is longer than a man is wide: if it is drawn under or over something it should not
+be, the report shows it.
+
+*The pallet at the gate.* Drawn from `windowPallet.standard.png` at `LINE_PALLET_LAYOUT` (2 by 1,
+view 0, on the box's nearest corner as every picture is) in place of Turn 30's two boxes, with the
+label as it is; a second pallet, the most that is drawn, beside it along x, at x 2 to 3, y 10 [TUNE:
+chat]. Each keeps `data-line-pallet`. A part pallet is drawn as the full one, and the label counts
+pallets (REQUESTS-T30 1.4's simplest) [TUNE].
+
+*What the player reads.* Nothing new: no text, card, strip line or button.
+
 ## 3. How to run this session
 
 **One writer.** Only the lead agent edits files under `src/` and `tests/`, changes STATE_VERSION
@@ -391,7 +509,7 @@ is running. If a sub-agent's result disagrees with this brief, the brief wins.
 **Do not stop and do not ask.** Piotr is not watching and nobody will answer a question. Where this
 brief leaves a choice open, take the simplest reading that fits what is already in the repo, mark it
 [TUNE] in the code and list it in the report. The only reasons to stop are the brief's own: the
-first line of CLAUDE.md is not "Turn 31", or APP_VERSION on main is not 'v90'. A red test is not a
+first line of CLAUDE.md is not "Turn 31", or APP_VERSION on main is not 'v91'. A red test is not a
 reason to stop the session: handle it as 2.0.1 says.
 
 **Push after every task**, so that nothing is lost if the session ends early. If the session runs
@@ -418,6 +536,7 @@ version moves once. A v43 save opens with:
   with the plant's own step (`standThePlantBehindTheWall(state, 'timberShelter')`), gated
   `version < 44` and outside the chain of `else if` the plant's other moves are in, its footprint
   the new 6 by 3; one that finds no room stays where it is and the report says so.
+- The forklift of 2.10 is the renderer's: no field and no lift for it.
 - Nothing else changed.
 
 Every save that loads today loads, the fixtures among them. Assert the lift on raw saves in
@@ -430,9 +549,9 @@ what the lift does and list the version pins flipped.
 Branch turn-31-line-books from main. One commit per task, npm run check green on its own exit code
 before each, the branch pushed after each, two report lines per task in REPORT-T31.md.
 
-T31-A0 The suite on v90 (2.0.1).
-T31-A1 Housekeeping and v91: docs/turn-30-brief.md is already in docs/ (this ZIP put it there),
-this file as CLAUDE.md, the README's lines (the brief, REPORT-T31.md), APP_VERSION 'v91' and its
+T31-A0 The suite on v91 (2.0.1).
+T31-A1 Housekeeping and v92: docs/turn-30-brief.md is already in docs/ (this ZIP put it there),
+this file as CLAUDE.md, the README's lines (the brief, REPORT-T31.md), APP_VERSION 'v92' and its
 pins (the pins of STATE_VERSION go with B1).
 T31-A2 The mockups of section 9 into docs/mockups/t31/ with a README.
 T31-B1 2.1 to 2.4: the line's timber and glass, its orders, the office's orders, what the player
@@ -440,13 +559,17 @@ reads, with STATE_VERSION 44 and the lift of section 4 but the shelter's.
 T31-B2 2.5: the line's books, the Production line tab.
 T31-C1 2.8: the timber shelter behind the rear wall, with its lift.
 T31-C2 2.6: the forklift's lane.
+T31-C4 2.10: the line's forklift and the pallet standing alone (L3), straight after C2, whose lane it
+drives on.
 T31-D1 2.9: contracts that can be lost.
 T31-C3 2.7: the hall that grows, with its card, its scaling and its longer picture. One task: a
 longer hall without its picture is not a whole game.
 T31-E1 notes (docs/notes-t31.md), and docs/art/REQUESTS-T31.md: nothing new is asked of the art
-side tonight; it names what chat's order of 11.10 asked (the pallet standing alone and the driving
-forklift, the outside sheet store of 1,000 sheets, and, if Piotr wants it, the line's motion in 48
-frames) so the next turn can take them in, and anything of tonight that sits badly.
+side tonight; it names what chat's order of 11.10 asked and is still to come (the outside sheet
+store of 1,000 sheets, S1) so the next turn can take it in; the forklift family's own pictures, a 1
+by 1 by 1 m frame beside L3's forklift at true size, for Piotr to say whether they are drawn again;
+and anything of tonight that sits badly (the forklift's depth against kit, the pallet's turn as it is
+set down, if either shows).
 T31-E2 scenarios, one line a moved figure, and five new ones. (hhh): a company with the line's
 contract running and no admin orders timber and glass, is refused a third glass batch over 40, sees
 the timber come on the next working day's lorry and go onto the stores, makes windows that take 2
@@ -464,21 +587,23 @@ scenario pins today.
 T31-E3 cross check. T31-E4 look and shoot: the pictures of section 7 into docs/report-t31/.
 T31-E5 report (REPORT-T31.md, section 0 first: what was not reached, what is red, section 10's list
 with what was built) and PR titled `Turn 31: the line's timber and glass, its books, the forklift's
-lane, the hall that grows, the shelter behind the wall, and contracts that can be lost`, do not
-merge, end the session.
+lane and its forklift, the hall that grows, the shelter behind the wall, and contracts that can be
+lost`, do not merge, end the session.
 
-**Tests chat already knows will move.** Checked against v90; a start and not the whole; the lines
-are v90's. Each is flipped to say what is true now, never kept beside a new one.
+**Tests chat already knows will move.** Checked against v90, and against v91 for the files v91
+changed; a start and not the whole; the lines are v91's. Each is flipped to say what is true now,
+never kept beside a new one.
 
-- A1: `tests/ui/saveCheck.test.ts` 140, `tests/ui/version.test.ts` 62 and 78 (every pin of 'v90').
-- B1: the pins of STATE_VERSION 43: `tests/ui/saveCheck.test.ts` 141, `tests/engine/v67.test.ts`
+- A1: `tests/ui/saveCheck.test.ts` 141, `tests/ui/version.test.ts` 63 and 79 (every pin of 'v91').
+- B1: the pins of STATE_VERSION 43: `tests/ui/saveCheck.test.ts` 142, `tests/engine/v67.test.ts`
   100, `tests/engine/types.test.ts` 54, and in `tests/cloud/migrate.test.ts` 154 and the lifted
   versions at 299, 431, 650, 742, 838, 865, 877, 891, 910, 941, 999, 1111, 1160, 1199, 1250, 1281,
   1408 and 1568 (`contracts.test.ts` 609 and `migrate.test.ts` 1443 pin a 43 that is not the
   version: leave them). And `tests/engine/t30Contract.test.ts` (a window books £600 of material
   as it is made; the offer card's sentence at 99), `tests/engine/t30Upgrades.test.ts` 110 to 119
-  (eight windows a day want their material), `tests/render/t30Sheets.test.ts` 67 (the sheets play
-  only while the line makes windows, which now wants material), `tests/ui/t30Line.test.ts` 163 to
+  (eight windows a day want their material), `tests/render/t30Sheets.test.ts` 36 (`working()`: the
+  sheets play only while the line makes windows, which now wants material, and every test of the
+  file builds on it), `tests/ui/t30Line.test.ts` 163 to
   196 (the `Standing still` row), `tests/engine/warnings.test.ts` 400 to 455 (`WARNING_ORDER`
   whole) and `tests/scenarios/turn30.test.ts`.
 - C1: `tests/engine/t29Stores.test.ts` and `tests/ui/t29Families.test.ts` (the shelter on the
@@ -488,6 +613,11 @@ are v90's. Each is flipped to say what is true now, never kept beside a new one.
   (20, 18) is on the new lane), `tests/engine/warnings.test.ts` again (`laneBlocked`).
 - D1: the scenarios whose seeded sheet contracts meet a loss or a cut (2.9's last paragraph):
   `tests/scenarios/autopilot.ts` and the turn13, turn17, turn20 and turn29 scenarios may.
+- C4: `tests/ui/t30Line.test.ts` 204 to 218 (the boxes at the gate become the pallet's picture,
+  `data-line-pallet` kept, two drawn at the most), and any test that lists every file of
+  `public/sprites/` or the Sprite check page's rows. The counts of class pictures and of turns
+  (`tests/render/spriteClasses.test.ts` 218 and 260, `tests/engine/rotate.test.ts` 255) must not
+  move: if one does, a new kind of file was not taught.
 - C3: `tests/engine/v67.test.ts` 184 and 433 and `tests/ui/v67.test.ts` 292 to 326 (the 800 m²
   unit as the last), and the locker count of 32 as the most.
 
@@ -506,7 +636,10 @@ are v90's. Each is flipped to say what is true now, never kept beside a new one.
   headers.
 - No picture drawn, repainted, trimmed or scaled by an agent (the longer hall is cut from the 800 m²
   picture by a script, and the shelter's two files only change places); no placeholder drawn for a
-  forklift or a sheet store; no sound; no new screen; no new CSS token but `--lane-yellow`.
+  sheet store, and no forklift but L3's; no sound; no new screen; no new CSS token but
+  `--lane-yellow`.
+- No change to the engine for the forklift (2.10): no state, no lift, no minute, no money; in the
+  engine the pallet is at the gate the moment it leaves module 6, as in Turn 30.
 - No storage access outside src/cloud/store.ts; no PixiJS, mobile, Steam, Electron.
 - No watch loops, nothing left running.
 
@@ -543,6 +676,14 @@ are v90's. Each is flipped to say what is true now, never kept beside a new one.
   every offer but the line's, and never a renewal; a renewal cut is 5 to 15 per cent under the price a
   piece it had; no timber piece and no line contract is ever touched; where none of the three
   happens, the seeded offers pinned today are unchanged. Asserted.
+- Forklift: drawn waiting where 2.10 says only while the six stand and the line has its lane, and
+  none with no lane; a pallet that leaves module 6 makes one trip, loaded `nw` then `ne`, empty `sw`
+  then `se`, at 3 cells a second of real time, its row and frames as it goes and frame 0 standing;
+  the newest pallet at the gate not drawn while it is on the forks and drawn once it is set down; a
+  page written mid trip leaves it where it is; no trip from 30x, and a trip ended at a move, a sale, a
+  load and a new morning; nothing of the engine changed; the pallet at the gate drawn from its
+  picture, two at the most, with its label; the three files in `public/sprites/` byte for byte the
+  art side's, and no count of class pictures or turns moved. Asserted.
 - `git diff main --stat -- src/ui/styles.css` shows `--lane-yellow` and no other new token; every
   changed screen is in the report beside its nearest existing one.
 - The pictures: the running block with the material rows and the two buttons (offered, locked); the
@@ -550,14 +691,16 @@ are v90's. Each is flipped to say what is true now, never kept beside a new one.
   the line and its lane; `laneBlocked`; the Premises page's long extension card; a 60 m and a 100 m
   hall, and a join at the closest zoom; the shelter behind the rear wall with its plate over the
   wall, and the apron with the van alone; the lost contract's card and its ended block; a renewal
-  card with the cut.
+  card with the cut; the forklift waiting at the line's end, loaded on the front strip, setting the
+  pallet down at the gate, and the pallet standing at the gate with its label; and a strip of the
+  forklift's frames on a trip, if the session can make one.
 
 ## 8. Parked
 
-- **The driving forklift and the pallet standing alone** (L3) and **the outside sheet store** of
-  1,000 sheets at about 100,000 [PIOTR]: ordered from the art side on 11.10, for the turn after
-  their delivery.
-- **The line's motion in 48 frames** (L2b): ordered as an option, if Piotr wants it.
+- **The outside sheet store** of 1,000 sheets at about 100,000 [PIOTR]: ordered from the art side
+  on 11.10 (S1), for the turn after its delivery.
+- **The forklift family's own pictures**, a 1 by 1 by 1 m frame beside L3's forklift at true size,
+  and the forks lifting and setting a pallet down: not drawn; Piotr's to say.
 - **The renewal's own rise**: `renegotiatedPriceFor` raises a contract 1 per cent for every full
   week, so a six month term renewed twice in full is about 60 per cent dearer than it began. That
   is one reason the contracts pay so well after a while. Not touched tonight: chat asks Piotr
@@ -576,7 +719,9 @@ page with the long extension card beside the second extension's; (6) a longer ha
 hall with the ten metres more drawn as an outline on it, the real picture coming with C3 into the
 report; (7) the shelter behind the rear wall with its plate over the wall, beside the shelter on
 the apron; (8) the lost contract's card and its ended block, and a renewal card with the cut,
-beside an ended contract's card and block. A README names which is which.
+beside an ended contract's card and block; (9) the hall with the forklift waiting at the line's
+end, the forklift loaded on the front strip, and the pallet standing at the gate with its label,
+beside Turn 30's boxes at the gate. A README names which is which.
 
 ## 10. What chat decided and Piotr has not confirmed
 
@@ -604,5 +749,11 @@ For the report to repeat, each with what was built:
    but the line's and the renewals; the renewal cut at a chance of one in four, under the price a
    piece it had.
 9. The lift: a running line given one batch of timber and glass free.
+10. The forklift: the line's own, its driver part of the picture; waiting on the front strip in front
+    of module 6, facing `nw`; no lifting drawn, a corner a turn on the spot.
+11. The trip drawn by the renderer alone: the engine's pallet at the gate at once, as in Turn 30, the
+    newest pallet at the gate not drawn while it is on the forks; 3 cells a second of real time, on
+    while the clock is paused, none from 30x.
+12. The pallet at the gate: the second beside the first along x, a part pallet drawn as a full one.
 
 End of brief.

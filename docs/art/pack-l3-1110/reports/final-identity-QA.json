@@ -1,0 +1,673 @@
+{
+  "passed": true,
+  "graphicsModelsSourceUnchanged": true,
+  "comparedFiles": 111,
+  "files": [
+    {
+      "previewFile": "frames/drive/ne/00.png",
+      "finalFile": "frames/drive/ne/00.png",
+      "sha256": "17405716270e0877ba45e2f0b46d7c470109f3313eca0bb3b6ccadc608dcbcf0",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/ne/01.png",
+      "finalFile": "frames/drive/ne/01.png",
+      "sha256": "ed5620db16d90321bce04a957747ddae527cd8ead44322f01de8df9435c123fc",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/ne/02.png",
+      "finalFile": "frames/drive/ne/02.png",
+      "sha256": "b085abf502bed0d965736dfec26946cadd1251ac90998e91ec50a947870ca1d7",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/ne/03.png",
+      "finalFile": "frames/drive/ne/03.png",
+      "sha256": "9251cacbf7a2da81666fe314934389f7a807eac0c961719e24481cdca84581ab",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/ne/04.png",
+      "finalFile": "frames/drive/ne/04.png",
+      "sha256": "820f7ccc53d3a50a732bc72c066e6e10587aa25c8e4d7a91eeb3de2752b4d25c",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/ne/05.png",
+      "finalFile": "frames/drive/ne/05.png",
+      "sha256": "05efc04045cecfadae4692cb6bd9828ca914ab87655cb2d9d13bacf95682e359",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/nw/00.png",
+      "finalFile": "frames/drive/nw/00.png",
+      "sha256": "bfe958764561b62a749aa7a5ae05c35e375d3d82e8bd64dafeb324b90a504de6",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/nw/01.png",
+      "finalFile": "frames/drive/nw/01.png",
+      "sha256": "dbeb21ddd301df9554d581900440e764679dc64fd032d299be6a99612e1c172c",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/nw/02.png",
+      "finalFile": "frames/drive/nw/02.png",
+      "sha256": "42b79cabf4c1f5ad951b63956f1b5af58652c88cde7ebc0525a210197981854e",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/nw/03.png",
+      "finalFile": "frames/drive/nw/03.png",
+      "sha256": "9b6288fa319afb1b0df17cba572df86605ec41a549c860ea4b40dcc9e5f79c9b",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/nw/04.png",
+      "finalFile": "frames/drive/nw/04.png",
+      "sha256": "ab30a3e564a15a05291d8fa5853e6518e9c67bcd08e4ef17d4b4105514e6a164",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/nw/05.png",
+      "finalFile": "frames/drive/nw/05.png",
+      "sha256": "f32ee3994520d751d4decbad6405b3df079a2fb845a4883156454913f01613ef",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/se/00.png",
+      "finalFile": "frames/drive/se/00.png",
+      "sha256": "175f335f4949db11c16f7853f7e91f3e759142e051575bcfbe1e69a92cabfd70",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/se/01.png",
+      "finalFile": "frames/drive/se/01.png",
+      "sha256": "d0dffb7db45fe949512d11b02ae455041aa9a53294b3b2f60e33f959cc241193",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/se/02.png",
+      "finalFile": "frames/drive/se/02.png",
+      "sha256": "2318d184b7df0d52dbeb74e0f8b438c42f04a9854d552936ce1ea85cbd54b2c1",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/se/03.png",
+      "finalFile": "frames/drive/se/03.png",
+      "sha256": "d5d937d3ba0a9d3728348f82c47f3af806b6d2ef40be3b502a81ada67996af45",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/se/04.png",
+      "finalFile": "frames/drive/se/04.png",
+      "sha256": "3d3ea00fa4d8c84239d033511030d5586b42e68fe8952653d346f6882d99b592",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/se/05.png",
+      "finalFile": "frames/drive/se/05.png",
+      "sha256": "8e216f131a6707d33fb20c4fb2cd2b9d744806b3fcc7c3d0b111e5fe1ef24fed",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/sw/00.png",
+      "finalFile": "frames/drive/sw/00.png",
+      "sha256": "af75f6a58280b3be2badb10d02f26238fa1375bcb50559eb263d0db24130640a",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/sw/01.png",
+      "finalFile": "frames/drive/sw/01.png",
+      "sha256": "c54155217a4f4a079b96f850983a5ce8e1b4810a8ba1ca9c59bdaa61e81b9e07",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/sw/02.png",
+      "finalFile": "frames/drive/sw/02.png",
+      "sha256": "239cc72c8972cf875a3685e18bcff4d1adf9b887c81337f2821e5cbbf82d249a",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/sw/03.png",
+      "finalFile": "frames/drive/sw/03.png",
+      "sha256": "21daee768ee42d90c1e206c6b5e34f117f44146e6569cfc4196a437b5848d40f",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/sw/04.png",
+      "finalFile": "frames/drive/sw/04.png",
+      "sha256": "42c3b9a182fa2748bc03d1db612d74abcf60fa4cd12a8a968511e6964f91cf92",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/drive/sw/05.png",
+      "finalFile": "frames/drive/sw/05.png",
+      "sha256": "17333c6937e08ac5f4196421e68d200fbf6dd96e03e3f50cdd13beb08b9c624e",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/ne/00.png",
+      "finalFile": "frames/driveLoaded/ne/00.png",
+      "sha256": "c59f1115d8e17a8dab38aa8e563ce3b890b080101928514da985d4dcbbafca33",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/ne/01.png",
+      "finalFile": "frames/driveLoaded/ne/01.png",
+      "sha256": "aaf02c49cbe088fc6bdf62c03e2191667480737672fe6568cd039fcf81dd30c8",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/ne/02.png",
+      "finalFile": "frames/driveLoaded/ne/02.png",
+      "sha256": "1e5786bc7fe507be144d16740fa4f0d1c46d3af2c1df224bc37c3eca06b8cdbe",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/ne/03.png",
+      "finalFile": "frames/driveLoaded/ne/03.png",
+      "sha256": "9e5995e72112fdfb550ea54f4e380feb394994f2d86eb387677825a4470f775a",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/ne/04.png",
+      "finalFile": "frames/driveLoaded/ne/04.png",
+      "sha256": "434211e4eea021ba0ca187e9fd6e9b03f96c1dc0eb684287ebebd82c5d1c53a8",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/ne/05.png",
+      "finalFile": "frames/driveLoaded/ne/05.png",
+      "sha256": "bc904510abc7ffb558bc5b7d8b3bc34cb14d2b99b06d0f00503dcfb32a6eeef5",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/nw/00.png",
+      "finalFile": "frames/driveLoaded/nw/00.png",
+      "sha256": "5f72374f07a6c0221fb54728319af50044853a1afa9c29239abd6cbe1b2609db",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/nw/01.png",
+      "finalFile": "frames/driveLoaded/nw/01.png",
+      "sha256": "c11a5e8fc1d9fc177ef8942e6c15069b4937e3da4c66e57e5dff694e72380d65",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/nw/02.png",
+      "finalFile": "frames/driveLoaded/nw/02.png",
+      "sha256": "77fd4abd6e907c8ea6d3198072af4616bf91a540530f42297e211ab270dfd490",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/nw/03.png",
+      "finalFile": "frames/driveLoaded/nw/03.png",
+      "sha256": "351708a9721e69bc9f509016eba43b9f822f5fd2ed20d39785da87c563f7360a",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/nw/04.png",
+      "finalFile": "frames/driveLoaded/nw/04.png",
+      "sha256": "7d127d61d4c0afb7f68109cb714c7b30fcf649467feeba4e4be6ad5e6ce7e7f6",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/nw/05.png",
+      "finalFile": "frames/driveLoaded/nw/05.png",
+      "sha256": "b0e42b5171652fd6b70959ff013e341647dd1b4a715616d9897f3469f332a3dd",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/se/00.png",
+      "finalFile": "frames/driveLoaded/se/00.png",
+      "sha256": "c86faa2de48568111e9f9d10cb38ff9df3cf7b1e321b4175ca620bd8f7eda99a",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/se/01.png",
+      "finalFile": "frames/driveLoaded/se/01.png",
+      "sha256": "55eafbafd435cc187bb2d46c14ce6d5a9161fa78723facbf9692f3b46099c491",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/se/02.png",
+      "finalFile": "frames/driveLoaded/se/02.png",
+      "sha256": "fff451054617629ea703b51ebcabd9ace423d81f9b1d11f64dd139317714bb1b",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/se/03.png",
+      "finalFile": "frames/driveLoaded/se/03.png",
+      "sha256": "7a9b5abd7bd3c4f4bec0c91c8522f96f92f784e25a61cf2d90287e7f08df5ae3",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/se/04.png",
+      "finalFile": "frames/driveLoaded/se/04.png",
+      "sha256": "a65ce2693e2c79fcb488f1b9e404bf7539b3a24de26568d51e1b33af7c30ea74",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/se/05.png",
+      "finalFile": "frames/driveLoaded/se/05.png",
+      "sha256": "74497cae64636818457f182746dd6a9bdca4f561651175f5ac5e2a775c4e087c",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/sw/00.png",
+      "finalFile": "frames/driveLoaded/sw/00.png",
+      "sha256": "6e311c16c7dedd14325677bd793bfb9a48b203e9d128751feff1de88520e869d",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/sw/01.png",
+      "finalFile": "frames/driveLoaded/sw/01.png",
+      "sha256": "a16ca7c508c67a7d9f5820e18f7b560f1a3eb1dd741e39cf4df0f0d9a80aa7b6",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/sw/02.png",
+      "finalFile": "frames/driveLoaded/sw/02.png",
+      "sha256": "089cd0ed47db91017e74e40f00d52548a13fe70d5a0e9936263ddb1c20d44674",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/sw/03.png",
+      "finalFile": "frames/driveLoaded/sw/03.png",
+      "sha256": "a29f0110ec4326a96987e865d956f554be87a95ae97cc656a30086a72cbb21c4",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/sw/04.png",
+      "finalFile": "frames/driveLoaded/sw/04.png",
+      "sha256": "047c6f275338c8c4042352c2f75a378591939cbb71af6dfc2aef1ff49e191ad3",
+      "identical": true
+    },
+    {
+      "previewFile": "frames/driveLoaded/sw/05.png",
+      "finalFile": "frames/driveLoaded/sw/05.png",
+      "sha256": "2a87d68dbf9caed4405c60d1e1b80c860541fe05f42491418bc020045530f81c",
+      "identical": true
+    },
+    {
+      "previewFile": "masters/0/windowPallet.standard.png",
+      "finalFile": "masters/0/windowPallet.standard.png",
+      "sha256": "7a87d4fa6001e247e21d3f0426add8db985defefd211911f76918aaf4cfed663",
+      "identical": true
+    },
+    {
+      "previewFile": "masters/90/windowPallet.standard.png",
+      "finalFile": "masters/90/windowPallet.standard.png",
+      "sha256": "9729267788b97a432bf68307e580d20d0415f980becadb61cf84c773ceb674c7",
+      "identical": true
+    },
+    {
+      "previewFile": "masters/drive/ne.png",
+      "finalFile": "masters/drive/ne.png",
+      "sha256": "fd4d7931abd1a5e3691d775ecf1fbc8432f0f9664423e77c0536e31f885d3180",
+      "identical": true
+    },
+    {
+      "previewFile": "masters/drive/nw.png",
+      "finalFile": "masters/drive/nw.png",
+      "sha256": "68dce2fff975c1c4cff16c026d39ccee54b3480cba47bcd28d26d2277b066f75",
+      "identical": true
+    },
+    {
+      "previewFile": "masters/drive/se.png",
+      "finalFile": "masters/drive/se.png",
+      "sha256": "c07eaf70d63ebb24da18ad0e3fbe1e91949bdd38c870c97ce37f33107d392ff2",
+      "identical": true
+    },
+    {
+      "previewFile": "masters/drive/sw.png",
+      "finalFile": "masters/drive/sw.png",
+      "sha256": "7313459b3d61988be806ac617a8bdbca8baf9ef3008574c59ba47f44ba8272de",
+      "identical": true
+    },
+    {
+      "previewFile": "masters/driveLoaded/ne.png",
+      "finalFile": "masters/driveLoaded/ne.png",
+      "sha256": "50ee0e12c1a679db5392220a879a52065e39ffb82133f81ed319c887582db172",
+      "identical": true
+    },
+    {
+      "previewFile": "masters/driveLoaded/nw.png",
+      "finalFile": "masters/driveLoaded/nw.png",
+      "sha256": "ed459661235ce5fa46f10deb13d4394dfb06984ea1553c80bc3b4c744c2bb046",
+      "identical": true
+    },
+    {
+      "previewFile": "masters/driveLoaded/se.png",
+      "finalFile": "masters/driveLoaded/se.png",
+      "sha256": "86dff4658d2dab2086bca42a884b70533596a656251d10da2efa845b73d9ae2e",
+      "identical": true
+    },
+    {
+      "previewFile": "masters/driveLoaded/sw.png",
+      "finalFile": "masters/driveLoaded/sw.png",
+      "sha256": "b9aefe5fc8f2fdb7e4412ac44f388edd9b4144f37a1252796856d99641c0fadd",
+      "identical": true
+    },
+    {
+      "previewFile": "models/drive/00.npz",
+      "finalFile": "models/drive/00.npz",
+      "sha256": "bfa12437a0d2e891cbf88bd1dec3423a952e886da3181ad7b9932b5e5055550b",
+      "identical": true
+    },
+    {
+      "previewFile": "models/drive/01.npz",
+      "finalFile": "models/drive/01.npz",
+      "sha256": "1b1486bd9b85144ae7a7b5833441ad4844851c1d8dea8dbfba1bc77d8e0c4102",
+      "identical": true
+    },
+    {
+      "previewFile": "models/drive/02.npz",
+      "finalFile": "models/drive/02.npz",
+      "sha256": "66c98b323f4cc7523f9165b28bdd69925eea99cdf515de3ddb2b80b8006a2af1",
+      "identical": true
+    },
+    {
+      "previewFile": "models/drive/03.npz",
+      "finalFile": "models/drive/03.npz",
+      "sha256": "be4dff09171edc801cd0785d612beba4fb298593971f432a945fef008033076f",
+      "identical": true
+    },
+    {
+      "previewFile": "models/drive/04.npz",
+      "finalFile": "models/drive/04.npz",
+      "sha256": "372ba82728512cc2ac1146c83fb277dfa154a4b6fccae39ffade584e58ec813f",
+      "identical": true
+    },
+    {
+      "previewFile": "models/drive/05.npz",
+      "finalFile": "models/drive/05.npz",
+      "sha256": "f068b1f959f6cd5c14fe37b5e16ff73314e9b24c3077b89465ddd2c40f4eefd0",
+      "identical": true
+    },
+    {
+      "previewFile": "models/driveLoaded/00.npz",
+      "finalFile": "models/driveLoaded/00.npz",
+      "sha256": "11bd97f669a99a34e9f40ffb26ad3d2b4149cc0d969a9a342d1e8f5082c7bb7a",
+      "identical": true
+    },
+    {
+      "previewFile": "models/driveLoaded/01.npz",
+      "finalFile": "models/driveLoaded/01.npz",
+      "sha256": "408e7c9ce1349d1565627510e71d079f18d56317d73ce57145281f7c3ca06f4f",
+      "identical": true
+    },
+    {
+      "previewFile": "models/driveLoaded/02.npz",
+      "finalFile": "models/driveLoaded/02.npz",
+      "sha256": "8847c39e3fa4c152c35e402f51862bf6dfb20283b8b3c813632609075affea4c",
+      "identical": true
+    },
+    {
+      "previewFile": "models/driveLoaded/03.npz",
+      "finalFile": "models/driveLoaded/03.npz",
+      "sha256": "998d741ad6784ed1125dabefdb46389f3e3dbbe15f6a8ea4a69eee35cf560073",
+      "identical": true
+    },
+    {
+      "previewFile": "models/driveLoaded/04.npz",
+      "finalFile": "models/driveLoaded/04.npz",
+      "sha256": "e1ed8ce71d8940ef52b02682a2655192a522ede34ab616fd42500f1158836401",
+      "identical": true
+    },
+    {
+      "previewFile": "models/driveLoaded/05.npz",
+      "finalFile": "models/driveLoaded/05.npz",
+      "sha256": "aa41735ea2b22aab48fb6095e52edaf9cd85bbbed8ab47caf0d4fa21fe390f98",
+      "identical": true
+    },
+    {
+      "previewFile": "models/windowPallet.standard.npz",
+      "finalFile": "models/windowPallet.standard.npz",
+      "sha256": "e0672140480a5aa174e9a63f4ab1a25d2fcc0d0f4d14cd1e5342871b8f952355",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-podglad-statyczny.png",
+      "finalFile": "approved-previews/L3-podglad-statyczny.png",
+      "sha256": "8d439faa07b85b1397317e55b8f88407d9cdcbdc34b88552d5bfecb3a844b571",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-wozek-pusty-4-kierunki.gif",
+      "finalFile": "approved-previews/L3-wozek-pusty-4-kierunki.gif",
+      "sha256": "5b80282bc4ba3051306b8895246dee924468f3dff57b6e61b6ba9f82a2ea240c",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-wozek-pusty-ne.gif",
+      "finalFile": "approved-previews/L3-wozek-pusty-ne.gif",
+      "sha256": "af3ac227ecbaa4e2b1100835ebbfed83d1bbe8289222fa31749d6213dcb3f7f9",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-wozek-pusty-nw.gif",
+      "finalFile": "approved-previews/L3-wozek-pusty-nw.gif",
+      "sha256": "d76e549d6e83ac7bd7a36268d8e141cbd890b30a3f09cc0de82fd05200351d99",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-wozek-pusty-se.gif",
+      "finalFile": "approved-previews/L3-wozek-pusty-se.gif",
+      "sha256": "3d333a98ffd1e9784103c8cb36b5cdba212d895c11154d7c2aa5cc73812a30c6",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-wozek-pusty-sw.gif",
+      "finalFile": "approved-previews/L3-wozek-pusty-sw.gif",
+      "sha256": "5068e17af51aabf39913582849516b5be78b857a065945b11dd392f5b24c4beb",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-wozek-z-paleta-4-kierunki.gif",
+      "finalFile": "approved-previews/L3-wozek-z-paleta-4-kierunki.gif",
+      "sha256": "6e8dcad604a8fb51ace6bece034c09f85c0bb1b4aad4ecba04fdcf39dfb6c52e",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-wozek-z-paleta-ne.gif",
+      "finalFile": "approved-previews/L3-wozek-z-paleta-ne.gif",
+      "sha256": "2898b0af1f4d1015244ce5ec0f721f7334efcdb8002a24abc3fabdc954ed6bca",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-wozek-z-paleta-nw.gif",
+      "finalFile": "approved-previews/L3-wozek-z-paleta-nw.gif",
+      "sha256": "060d5685a4ad1385f7b0d6d068dca6da457d76687817155f9f71d895cfdd8b83",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-wozek-z-paleta-se.gif",
+      "finalFile": "approved-previews/L3-wozek-z-paleta-se.gif",
+      "sha256": "38df0d7515755e9db42e0cf315bfc4ffd5cbd2f23b0b5b5bee62fd37dde1a4c1",
+      "identical": true
+    },
+    {
+      "previewFile": "previews/L3-wozek-z-paleta-sw.gif",
+      "finalFile": "approved-previews/L3-wozek-z-paleta-sw.gif",
+      "sha256": "0039aa215678e50210f061baa93c7be59d046cdde5d488ec1c2c7f1f04130c2f",
+      "identical": true
+    },
+    {
+      "previewFile": "reference/brief-1110/l3-trasa-wozka.png",
+      "finalFile": "reference/brief-1110/l3-trasa-wozka.png",
+      "sha256": "6afc0b6d5405ad4b2e9eb713e563c2ee1e703ae5099ed9eb1cbb22217ee8cba4",
+      "identical": true
+    },
+    {
+      "previewFile": "reference/brief-1110/linia-1-kamera.png",
+      "finalFile": "reference/brief-1110/linia-1-kamera.png",
+      "sha256": "1d5ffea269f46e53b68f269c48afbc37e14f59ccfb7f3e7b5118b92fb82eee19",
+      "identical": true
+    },
+    {
+      "previewFile": "reference/brief-1110/linia-ruch-wozek.gif",
+      "finalFile": "reference/brief-1110/linia-ruch-wozek.gif",
+      "sha256": "2f317ae5cc17e8153f94733dfc1efe4e7c55b94904854d5792bfcae4dc174d1d",
+      "identical": true
+    },
+    {
+      "previewFile": "reference/brief-1110/s1-magazyn-plyt.png",
+      "finalFile": "reference/brief-1110/s1-magazyn-plyt.png",
+      "sha256": "7d0f4d0fb6b90d1e5152b8d0fc5770937d8072ee9f71db04786907899bdf1adf",
+      "identical": true
+    },
+    {
+      "previewFile": "reference/forklift-standard-appearance.png",
+      "finalFile": "reference/forklift-standard-appearance.png",
+      "sha256": "40365b4d2c6d08ab64c8c99468ee3d542aa331302105e494f6fadefbe2af87cd",
+      "identical": true
+    },
+    {
+      "previewFile": "reference/l2-source/common.py",
+      "finalFile": "reference/l2-source/common.py",
+      "sha256": "a483ae3a6b31b21d3f21eabcab6d0a29af83a6817068b77664e26c32f9b736ba",
+      "identical": true
+    },
+    {
+      "previewFile": "reference/l2-source/legacy/build_assets.py",
+      "finalFile": "reference/l2-source/legacy/build_assets.py",
+      "sha256": "ed2f22a41ef234e9d5a08b36a7b4a1a08e534bd5d1383d4ea6124231553fe8ee",
+      "identical": true
+    },
+    {
+      "previewFile": "reference/l2-source/legacy/renderer.py",
+      "finalFile": "reference/l2-source/legacy/renderer.py",
+      "sha256": "e6d14d5d7e10ec1d569d986de3dcb4142b1c6949c68c7afc46f249e2bbf8387a",
+      "identical": true
+    },
+    {
+      "previewFile": "reference/l2-source/modules56.py",
+      "finalFile": "reference/l2-source/modules56.py",
+      "sha256": "3390807b68e103ba69885226d2480aa269deba3be1b3df9d8a475e20e08d6068",
+      "identical": true
+    },
+    {
+      "previewFile": "reference/l2-source/motion56.py",
+      "finalFile": "reference/l2-source/motion56.py",
+      "sha256": "a456281a300ec734876a561fddd4bc08d7f615a16f9f6c325059f482e174865e",
+      "identical": true
+    },
+    {
+      "previewFile": "sheets/vehicle.forklift.drive.sheet.png",
+      "finalFile": "sheets/vehicle.forklift.drive.sheet.png",
+      "sha256": "1cde699fa3c650c545bb3fc938238a448d288aa4cc5b980929be22c478106e09",
+      "identical": true
+    },
+    {
+      "previewFile": "sheets/vehicle.forklift.driveLoaded.sheet.png",
+      "finalFile": "sheets/vehicle.forklift.driveLoaded.sheet.png",
+      "sha256": "cb29979c14b42015968337882cd94c9a55f9a089e1348684845d7f39a66876d5",
+      "identical": true
+    },
+    {
+      "previewFile": "source/build_l3.py",
+      "finalFile": "source/build_l3.py",
+      "sha256": "c1b49739a111d2dc5debd0d22a37a6f7e77aada7d11fc6118b9cb079b6bdd484",
+      "identical": true
+    },
+    {
+      "previewFile": "source/common.py",
+      "finalFile": "source/common.py",
+      "sha256": "a483ae3a6b31b21d3f21eabcab6d0a29af83a6817068b77664e26c32f9b736ba",
+      "identical": true
+    },
+    {
+      "previewFile": "source/driver.py",
+      "finalFile": "source/driver.py",
+      "sha256": "3617f76513d38d817325dea5ede1a3d334c5d1293f8980b2fb8d448b8a3f8d96",
+      "identical": true
+    },
+    {
+      "previewFile": "source/fonts/DejaVuSans-Bold.ttf",
+      "finalFile": "source/fonts/DejaVuSans-Bold.ttf",
+      "sha256": "5c1247acef7f2b8522a31742c76d6adcb5569bacc0be7ceaa4dc39dd252ce895",
+      "identical": true
+    },
+    {
+      "previewFile": "source/fonts/DejaVuSans.ttf",
+      "finalFile": "source/fonts/DejaVuSans.ttf",
+      "sha256": "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280",
+      "identical": true
+    },
+    {
+      "previewFile": "source/forklift.py",
+      "finalFile": "source/forklift.py",
+      "sha256": "64856326d9231c14a942ac9c1f44f13620e69af16ce2b2091a27068f194f2c7d",
+      "identical": true
+    },
+    {
+      "previewFile": "source/legacy/build_assets.py",
+      "finalFile": "source/legacy/build_assets.py",
+      "sha256": "ed2f22a41ef234e9d5a08b36a7b4a1a08e534bd5d1383d4ea6124231553fe8ee",
+      "identical": true
+    },
+    {
+      "previewFile": "source/legacy/renderer.py",
+      "finalFile": "source/legacy/renderer.py",
+      "sha256": "e6d14d5d7e10ec1d569d986de3dcb4142b1c6949c68c7afc46f249e2bbf8387a",
+      "identical": true
+    },
+    {
+      "previewFile": "source/make_previews_l3.py",
+      "finalFile": "source/make_previews_l3.py",
+      "sha256": "884466f25e1ef1ea2419fabbf624a210b70a85ecac04999022e65e3421acd1b4",
+      "identical": true
+    },
+    {
+      "previewFile": "source/modules56.py",
+      "finalFile": "source/modules56.py",
+      "sha256": "3390807b68e103ba69885226d2480aa269deba3be1b3df9d8a475e20e08d6068",
+      "identical": true
+    },
+    {
+      "previewFile": "source/motion56.py",
+      "finalFile": "source/motion56.py",
+      "sha256": "a456281a300ec734876a561fddd4bc08d7f615a16f9f6c325059f482e174865e",
+      "identical": true
+    },
+    {
+      "previewFile": "source/pallet.py",
+      "finalFile": "source/pallet.py",
+      "sha256": "13f2ea4b417ce3f520b53d9eb4ad1a6e6463d8125581344fe3bed8f106e6b174",
+      "identical": true
+    },
+    {
+      "previewFile": "source/render3d.py",
+      "finalFile": "source/render3d.py",
+      "sha256": "be74e204fafe8695af9f6e65c38989fe7b49f11096bbadd2cf1cf5bbcf219a29",
+      "identical": true
+    },
+    {
+      "previewFile": "source/render_l3.py",
+      "finalFile": "source/render_l3.py",
+      "sha256": "ab9f096364b871997dcfdcb0e308217f300b3ef5836013e8631e3918dd0a02f9",
+      "identical": true
+    },
+    {
+      "previewFile": "source/validate_l3.py",
+      "finalFile": "source/validate_l3.py",
+      "sha256": "83cbf5a401a40de8fa574009ce18009d3d86633b961225e236c6f9d8311fc58b",
+      "identical": true
+    },
+    {
+      "previewFile": "sprites-2x/0/windowPallet.standard.png",
+      "finalFile": "sprites-2x/0/windowPallet.standard.png",
+      "sha256": "e8511494cd3ed43c0d0d7b24270db1ec661c973e67c60a3a5cbcde800183e6f2",
+      "identical": true
+    },
+    {
+      "previewFile": "sprites-2x/90/windowPallet.standard.png",
+      "finalFile": "sprites-2x/90/windowPallet.standard.png",
+      "sha256": "5e7d95d3702c6e239f4c15d80a79740c6463a10d252b130be9a319618b7c057a",
+      "identical": true
+    }
+  ]
+}

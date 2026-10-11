@@ -1,0 +1,99 @@
+{
+  "package": "L3",
+  "status": "approved_final",
+  "projection": "sx=ox+48*(x-y); sy=oy+24*(x+y)-48*z",
+  "assets": [
+    {
+      "file": "sprites-2x/0/windowPallet.standard.png",
+      "canvasPx": [
+        160,
+        172
+      ],
+      "envelopeMeters": [
+        2,
+        1,
+        1.75
+      ],
+      "anchorPx": [
+        104.0,
+        164.0
+      ],
+      "exactProjectionVerified": true,
+      "mode": "RGBA",
+      "bitDepth": 8
+    },
+    {
+      "file": "sprites-2x/90/windowPallet.standard.png",
+      "canvasPx": [
+        160,
+        172
+      ],
+      "envelopeMeters": [
+        2,
+        1,
+        1.75
+      ],
+      "anchorPx": [
+        56.0,
+        164.0
+      ],
+      "exactProjectionVerified": true,
+      "mode": "RGBA",
+      "bitDepth": 8
+    },
+    {
+      "file": "sheets/vehicle.forklift.drive.sheet.png",
+      "canvasPx": [
+        1632,
+        1024
+      ],
+      "cellWidth": 272,
+      "cellHeight": 256,
+      "anchorX": 136,
+      "anchorY": 192,
+      "frames": 6,
+      "fps": 8,
+      "rows": {
+        "sw": 0,
+        "se": 1,
+        "nw": 2,
+        "ne": 3
+      },
+      "loop": true,
+      "exactProjectionVerified": true,
+      "mode": "RGBA",
+      "bitDepth": 8
+    },
+    {
+      "file": "sheets/vehicle.forklift.driveLoaded.sheet.png",
+      "canvasPx": [
+        1632,
+        1024
+      ],
+      "cellWidth": 272,
+      "cellHeight": 256,
+      "anchorX": 136,
+      "anchorY": 192,
+      "frames": 6,
+      "fps": 8,
+      "rows": {
+        "sw": 0,
+        "se": 1,
+        "nw": 2,
+        "ne": 3
+      },
+      "loop": true,
+      "exactProjectionVerified": true,
+      "mode": "RGBA",
+      "bitDepth": 8
+    }
+  ],
+  "approval": {
+    "status": "approved",
+    "approvedBy": "Piotr",
+    "date": "2026-10-11",
+    "userMessage": "akceptajca jest",
+    "approvedPreviewArchive": "Woodwork-Empire-L3-PODGLAD-2026-10-11.zip",
+    "approvedPreviewSHA256": "8133a409311873a1cebe0f25d86bcb227280475b71b9948bd9cb1e50f931d419"
+  }
+}

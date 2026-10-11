@@ -24,6 +24,7 @@ import {
   timeIsPaused,
 } from '../engine/index';
 import type {
+  Clock,
   Difficulty,
   GameAction,
   GameState,
@@ -1266,9 +1267,9 @@ export function render(): void {
   // And the doors, which the fresh markup has just written back to the state the hall computed
   // for this frame: the swing is the renderer's, like the walk (CLAUDE.md T19 2.3).
   syncDoors(parts.page, nowMs());
-  // And the machines' sheets, which the fresh markup has just put back to frame 0: on the frame real
-  // time asks for, so a page written mid loop never shakes them (CLAUDE.md T30 2.11).
-  playSheets(parts.page, nowMs(), clockRuns());
+  // And the machines' sheets, which the fresh markup has just put back to frame 0: on the frame
+  // their loop is at, so a page written mid loop never shakes them (CLAUDE.md T30 2.11; v91).
+  playSheets(parts.page, nowMs(), runningClock());
   restoreFocus(memory);
 }
 
@@ -2875,6 +2876,12 @@ function clockRuns(): boolean {
   return state !== null && ui.screen === 'game' && state.speed > 0 && state.activeEvent === null && state.gameOver === null;
 }
 
+/** The game's clock while it runs, which the machines' sheets start their loops by, or null while
+ *  it stands and they hold where they are (CLAUDE.md T30 2.11; v91). */
+function runningClock(): Clock | null {
+  return state !== null && clockRuns() ? state.clock : null;
+}
+
 function driveSound(now: number): void {
   if (state === null || ui.screen !== 'game') {
     stopAllSounds();
@@ -2920,7 +2927,7 @@ function runFrame(now: number): void {
     stepDoors(root, now);
     playCharacters(root, now);
     // The machines' sheets beside the figures, on the same real time (CLAUDE.md T30 2.11).
-    playSheets(root, now, clockRuns());
+    playSheets(root, now, runningClock());
     driveSound(now);
   }
   // One frame, one writing of the page, whatever the clock did inside it: ten game minutes at

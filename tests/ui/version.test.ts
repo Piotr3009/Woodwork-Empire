@@ -57,9 +57,10 @@ describe('the version in the corner', () => {
     // moving at 30x and 100x: a frame makes up for a tenth of a second at most, the page follows
     // the clock five times a second from 30x up, and the catalogue is asked by id (PIOTR, 10.10).
     // v89 is Turn 30: the line bought whole, its windows contract, its upgrades and its moving
-    // pictures (PIOTR, 10.10 and 11.10). v90 plays the line's motion four times slower (PIOTR,
-    // 11.10).
-    expect(APP_VERSION).toBe('v90');
+    // pictures (PIOTR, 10.10 and 11.10). v90 played the line's motion four times slower (PIOTR,
+    // 11.10). v91 plays it at the speed it was drawn, one loop a game hour a module, one module
+    // after another (PIOTR, 11.10).
+    expect(APP_VERSION).toBe('v91');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -75,7 +76,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v90'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v91'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

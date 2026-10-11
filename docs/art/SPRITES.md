@@ -697,12 +697,17 @@ How the game uses them (CLAUDE.md T30 2.11, 2.12). A module that works is drawn 
 place of its picture: the same box, the same anchor, the same shadow and name, an `<svg>` clipped to
 one cell by its view box over an `<image>` of the whole sheet, as a man's figure is drawn. It works
 only while the clock runs, and then, while the line's contract runs, all six in the minutes the line
-makes windows, and without the contract a module a man is drawn at this minute. The frame comes from
-real time, the same for all six, so the line plays in step, whatever the speed of the clock. The
-art side drew it at 6 frames a second, a loop of two seconds; from v90 the game plays it four times
-slower, 1.5 frames a second and a loop of eight seconds (`LINE_SHEET_SLOWDOWN`) [PIOTR, 11.10: "too
-fast", "four times slower at the least"]; the moment the clock stops every sheet holds, and the next page written
-draws the six from their pictures. Module 6 with one to nine windows on its pallet is drawn with
+makes windows, and without the contract a module a man is drawn at this minute. A working module
+plays its sheet at the speed the art side drew it, 6 frames a second in real time whatever the
+speed of the clock, a loop of two seconds, but not all the time: one loop each time the game's
+clock reaches the module's minute of the hour, and its picture (frame 0) between two loops
+(`everyMinutes` 60 and `atMinute` in `MACHINE_WORK_SHEETS`). Module 1 starts at the hour and each
+next module ten minutes after the one before it, so the motion travels down the line; at 1x a
+module moves for two seconds once a minute, and from 30x the loops follow one another with no stop
+[PIOTR, 11.10: "at the speed it was drawn, but started now and then and not all the time"] (v91;
+v90's loop four times slower looked as if frames were dropped). The moment the clock stops every
+sheet holds, and the next page written draws the six from their pictures. Module 6 with one to nine
+windows on its pallet is drawn with
 the one overlay of that many over it, in the same box and drawable, whether it plays or stands.
 `stack10` is on disk and is not drawn: the tenth window sends the pallet to the gate, and it waits
 for the art side's pallet standing alone and the forklift (L3).

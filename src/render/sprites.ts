@@ -6,7 +6,7 @@
 // corner of the footprint diamond.
 
 import { deliveredFiles, nextOrientation, orientationsFor, pictureFor } from '../engine/ports';
-import type { Orientation } from '../engine/types';
+import type { Clock, Orientation } from '../engine/types';
 import { TILE_HEIGHT, TILE_RISE, TILE_WIDTH, tileToScreen } from './iso';
 
 /** Sprites are delivered at twice the screen size and the loader halves them. */
@@ -170,17 +170,19 @@ export function spriteImage(url: string, box: SpriteBox, extra = ''): string {
 /** A machine's working motion drawn in place of its picture: the same box and the same anchor, an
  *  `<svg>` clipped to one cell by its view box over an `<image>` of the whole sheet, exactly as a
  *  man's figure is drawn (`characterArt`, `cellBox`), marked `data-sheet` with its frame, its frames
- *  and its fps. Frame 0 is the picture pixel for pixel, so the change is never seen as a jump
- *  (CLAUDE.md T30 2.11). */
+ *  and its fps, and with the game minutes between two of its loops and the minute of the hour its
+ *  loop starts at (v91). Frame 0 is the picture pixel for pixel, so the change is never seen as a
+ *  jump (CLAUDE.md T30 2.11). */
 export function sheetArt(
   url: string,
   box: SpriteBox,
-  sheet: { frames: number; fps: number; frameWidth: number; frameHeight: number },
+  sheet: { frames: number; fps: number; frameWidth: number; frameHeight: number; everyMinutes: number; atMinute: number },
   family: string,
 ): string {
   return (
     `<svg class="machine-sheet" data-sheet="${family}" data-frame="0" data-frames="${sheet.frames}" ` +
-    `data-fps="${sheet.fps}" x="${round(box.x)}" y="${round(box.y)}" width="${round(box.width)}" ` +
+    `data-fps="${sheet.fps}" data-every="${sheet.everyMinutes}" data-at="${sheet.atMinute}" ` +
+    `x="${round(box.x)}" y="${round(box.y)}" width="${round(box.width)}" ` +
     `height="${round(box.height)}" viewBox="0 0 ${sheet.frameWidth} ${sheet.frameHeight}" ` +
     'preserveAspectRatio="xMidYMax meet">' +
     `<image href="${url}" x="0" y="0" width="${sheet.frameWidth * sheet.frames}" height="${sheet.frameHeight}" />` +
@@ -188,23 +190,82 @@ export function sheetArt(
   );
 }
 
-/** Moves every machine's sheet on the page on to the frame this moment of real time asks for, the
- *  same for all of them so the line plays in step, at each sheet's own fps whatever the speed of the
- *  clock. It writes the frame and the view box on elements already there, only when the frame
- *  changes, and builds nothing; while the clock stands it holds every sheet where it is, and the
+/** A sheet that has not been on the page for this long in real time (the dinner hour, a pause,
+ *  another page, a night) starts again by waiting for its next minute, or by playing if the clock
+ *  is on that minute, so the six never all start together when the line comes back [TUNE] (v91). */
+export const SHEET_SEEN_GAP_MS = 1000;
+
+/** Where each machine's loop stands, by family: the renderer's own clock, like the walk and the
+ *  doors' swing, and not game state (v91). */
+interface SheetLoop {
+  /** The game's day and minute the sheet was last played at. */
+  day: number;
+  minute: number;
+  /** The real moment it was last played at. */
+  seenMs: number;
+  /** The real moment its last loop started, or minus infinity before the first. */
+  startMs: number;
+  /** A minute came while the loop played: one more loop follows on at its end. */
+  queued: boolean;
+}
+
+const sheetLoops = new Map<string, SheetLoop>();
+
+/** The frame of a sheet at this moment: frame 0, its picture, until the game's clock reaches its
+ *  minute of the hour; then one loop at the sheet's own fps, in real time whatever the speed of the
+ *  clock; then frame 0 again. A minute that comes while a loop plays makes the next loop follow on
+ *  at its end, so from 30x the loops run on with no stop (PIOTR, 11.10; v91). */
+function loopFrame(family: string, frames: number, fps: number, every: number, at: number, clock: Clock, nowMs: number): number {
+  const loopMs = (frames / fps) * 1000;
+  const seen = sheetLoops.get(family);
+  if (
+    seen === undefined ||
+    seen.day !== clock.day ||
+    clock.minute < seen.minute ||
+    nowMs - seen.seenMs > SHEET_SEEN_GAP_MS ||
+    seen.seenMs - nowMs > SHEET_SEEN_GAP_MS
+  ) {
+    const onItsMinute = (((clock.minute - at) % every) + every) % every === 0;
+    const startMs = onItsMinute ? nowMs : Number.NEGATIVE_INFINITY;
+    sheetLoops.set(family, { day: clock.day, minute: clock.minute, seenMs: nowMs, startMs, queued: false });
+    return 0;
+  }
+  const due = Math.floor((clock.minute - at) / every) - Math.floor((seen.minute - at) / every);
+  seen.minute = clock.minute;
+  seen.seenMs = nowMs;
+  if (due > 0) {
+    if (nowMs - seen.startMs < loopMs) seen.queued = true;
+    else seen.startMs = nowMs;
+  }
+  if (seen.queued && nowMs - seen.startMs >= loopMs) {
+    seen.queued = false;
+    seen.startMs = nowMs - seen.startMs < 2 * loopMs ? seen.startMs + loopMs : nowMs;
+  }
+  const elapsed = nowMs - seen.startMs;
+  if (!(elapsed >= 0 && elapsed < loopMs)) return 0;
+  return Math.floor((elapsed / 1000) * fps) % frames;
+}
+
+/** Moves every machine's sheet on the page on to the frame this moment asks for (`loopFrame`). It
+ *  writes the frame and the view box on elements already there, only when the frame changes, and
+ *  builds nothing; while the clock stands (`clock` null) it holds every sheet where it is, and the
  *  next page written draws the machines from their pictures (CLAUDE.md T30 2.11). Called from the
  *  frame loop beside `playCharacters`, and at the end of every page written, which carries frame 0,
  *  so a sheet never flashes back to it (the figures' cure, `syncFigures`, CLAUDE.md T19 2.1). */
-export function playSheets(root: ParentNode, nowMs: number, running: boolean): void {
-  if (!running) return;
-  for (const node of Array.from(root.querySelectorAll('[data-sheet]'))) {
+export function playSheets(root: ParentNode, nowMs: number, clock: Clock | null): void {
+  if (clock === null) return;
+  for (const node of Array.from(root.querySelectorAll('.machine-sheet[data-sheet]'))) {
+    const family = node.getAttribute('data-sheet') ?? '';
     const frames = Number(node.getAttribute('data-frames') ?? '0');
     const fps = Number(node.getAttribute('data-fps') ?? '0');
+    const every = Number(node.getAttribute('data-every') ?? '0');
+    const at = Number(node.getAttribute('data-at') ?? '0');
     const box = (node.getAttribute('viewBox') ?? '').split(/\s+/).map(Number);
     const cellWidth = box[2] ?? 0;
     const cellHeight = box[3] ?? 0;
     if (!Number.isFinite(cellWidth) || cellWidth <= 0 || frames <= 1 || fps <= 0) continue;
-    const frame = Math.floor((nowMs / 1000) * fps) % frames;
+    if (!Number.isFinite(every) || every <= 0 || !Number.isFinite(at)) continue;
+    const frame = loopFrame(family, frames, fps, every, at, clock, nowMs);
     if (node.getAttribute('data-frame') === String(frame)) continue;
     node.setAttribute('data-frame', String(frame));
     node.setAttribute('viewBox', `${frame * cellWidth} 0 ${cellWidth} ${cellHeight}`);

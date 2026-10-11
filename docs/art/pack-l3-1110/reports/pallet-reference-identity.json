@@ -1,0 +1,50 @@
+{
+  "referenceAsset": "windowLine6.standard.stack10",
+  "translationMeters": [
+    -4.225,
+    -1.9,
+    0.0
+  ],
+  "windowCount": 10,
+  "normalComparison": "bitwise",
+  "materialComparison": "exact_tuple_equality",
+  "geometryToleranceMeters": 1e-09,
+  "components": {
+    "windows": {
+      "triangleCount": 1780,
+      "referenceTriangleCount": 1780,
+      "geometryEqualAfterTranslation": true,
+      "normalArraysExactlyEqual": true,
+      "materialsExactlyEqual": true,
+      "maxAbsCoordinateDifferenceMeters": 0.0,
+      "sourceCanonicalSHA256": "4b75b5d33be26cba28f642449bc32b00d3c168a55be090f57ca343ca5e8c7cc4",
+      "translatedCanonicalSHA256": "4b75b5d33be26cba28f642449bc32b00d3c168a55be090f57ca343ca5e8c7cc4",
+      "canonicalHashesMatch": true
+    },
+    "wrap": {
+      "triangleCount": 366,
+      "referenceTriangleCount": 366,
+      "geometryEqualAfterTranslation": true,
+      "normalArraysExactlyEqual": true,
+      "materialsExactlyEqual": true,
+      "maxAbsCoordinateDifferenceMeters": 0.0,
+      "sourceCanonicalSHA256": "932fb204329340339c4b30cbb4b178b203caf1cdebfb962746975b924983d952",
+      "translatedCanonicalSHA256": "932fb204329340339c4b30cbb4b178b203caf1cdebfb962746975b924983d952",
+      "canonicalHashesMatch": true
+    }
+  },
+  "actualBoundsMeters": [
+    [
+      0.27500000000000036,
+      0.0,
+      0.0
+    ],
+    [
+      1.7249999999999996,
+      1.0,
+      1.668
+    ]
+  ],
+  "withinEnvelope": true,
+  "passed": true
+}

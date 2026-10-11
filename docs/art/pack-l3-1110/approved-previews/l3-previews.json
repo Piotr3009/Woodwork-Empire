@@ -1,0 +1,740 @@
+{
+  "schemaVersion": 1,
+  "sourcePixelsUnmodified": true,
+  "sources": [
+    {
+      "path": "frames/drive/sw/00.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "af75f6a58280b3be2badb10d02f26238fa1375bcb50559eb263d0db24130640a"
+    },
+    {
+      "path": "frames/drive/sw/01.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "c54155217a4f4a079b96f850983a5ce8e1b4810a8ba1ca9c59bdaa61e81b9e07"
+    },
+    {
+      "path": "frames/drive/sw/02.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "239cc72c8972cf875a3685e18bcff4d1adf9b887c81337f2821e5cbbf82d249a"
+    },
+    {
+      "path": "frames/drive/sw/03.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "21daee768ee42d90c1e206c6b5e34f117f44146e6569cfc4196a437b5848d40f"
+    },
+    {
+      "path": "frames/drive/sw/04.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "42c3b9a182fa2748bc03d1db612d74abcf60fa4cd12a8a968511e6964f91cf92"
+    },
+    {
+      "path": "frames/drive/sw/05.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "17333c6937e08ac5f4196421e68d200fbf6dd96e03e3f50cdd13beb08b9c624e"
+    },
+    {
+      "path": "frames/drive/se/00.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "175f335f4949db11c16f7853f7e91f3e759142e051575bcfbe1e69a92cabfd70"
+    },
+    {
+      "path": "frames/drive/se/01.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "d0dffb7db45fe949512d11b02ae455041aa9a53294b3b2f60e33f959cc241193"
+    },
+    {
+      "path": "frames/drive/se/02.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "2318d184b7df0d52dbeb74e0f8b438c42f04a9854d552936ce1ea85cbd54b2c1"
+    },
+    {
+      "path": "frames/drive/se/03.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "d5d937d3ba0a9d3728348f82c47f3af806b6d2ef40be3b502a81ada67996af45"
+    },
+    {
+      "path": "frames/drive/se/04.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "3d3ea00fa4d8c84239d033511030d5586b42e68fe8952653d346f6882d99b592"
+    },
+    {
+      "path": "frames/drive/se/05.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "8e216f131a6707d33fb20c4fb2cd2b9d744806b3fcc7c3d0b111e5fe1ef24fed"
+    },
+    {
+      "path": "frames/drive/nw/00.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "bfe958764561b62a749aa7a5ae05c35e375d3d82e8bd64dafeb324b90a504de6"
+    },
+    {
+      "path": "frames/drive/nw/01.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "dbeb21ddd301df9554d581900440e764679dc64fd032d299be6a99612e1c172c"
+    },
+    {
+      "path": "frames/drive/nw/02.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "42b79cabf4c1f5ad951b63956f1b5af58652c88cde7ebc0525a210197981854e"
+    },
+    {
+      "path": "frames/drive/nw/03.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "9b6288fa319afb1b0df17cba572df86605ec41a549c860ea4b40dcc9e5f79c9b"
+    },
+    {
+      "path": "frames/drive/nw/04.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "ab30a3e564a15a05291d8fa5853e6518e9c67bcd08e4ef17d4b4105514e6a164"
+    },
+    {
+      "path": "frames/drive/nw/05.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "f32ee3994520d751d4decbad6405b3df079a2fb845a4883156454913f01613ef"
+    },
+    {
+      "path": "frames/drive/ne/00.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "17405716270e0877ba45e2f0b46d7c470109f3313eca0bb3b6ccadc608dcbcf0"
+    },
+    {
+      "path": "frames/drive/ne/01.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "ed5620db16d90321bce04a957747ddae527cd8ead44322f01de8df9435c123fc"
+    },
+    {
+      "path": "frames/drive/ne/02.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "b085abf502bed0d965736dfec26946cadd1251ac90998e91ec50a947870ca1d7"
+    },
+    {
+      "path": "frames/drive/ne/03.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "9251cacbf7a2da81666fe314934389f7a807eac0c961719e24481cdca84581ab"
+    },
+    {
+      "path": "frames/drive/ne/04.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "820f7ccc53d3a50a732bc72c066e6e10587aa25c8e4d7a91eeb3de2752b4d25c"
+    },
+    {
+      "path": "frames/drive/ne/05.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "05efc04045cecfadae4692cb6bd9828ca914ab87655cb2d9d13bacf95682e359"
+    },
+    {
+      "path": "frames/driveLoaded/sw/00.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "6e311c16c7dedd14325677bd793bfb9a48b203e9d128751feff1de88520e869d"
+    },
+    {
+      "path": "frames/driveLoaded/sw/01.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "a16ca7c508c67a7d9f5820e18f7b560f1a3eb1dd741e39cf4df0f0d9a80aa7b6"
+    },
+    {
+      "path": "frames/driveLoaded/sw/02.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "089cd0ed47db91017e74e40f00d52548a13fe70d5a0e9936263ddb1c20d44674"
+    },
+    {
+      "path": "frames/driveLoaded/sw/03.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "a29f0110ec4326a96987e865d956f554be87a95ae97cc656a30086a72cbb21c4"
+    },
+    {
+      "path": "frames/driveLoaded/sw/04.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "047c6f275338c8c4042352c2f75a378591939cbb71af6dfc2aef1ff49e191ad3"
+    },
+    {
+      "path": "frames/driveLoaded/sw/05.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "2a87d68dbf9caed4405c60d1e1b80c860541fe05f42491418bc020045530f81c"
+    },
+    {
+      "path": "frames/driveLoaded/se/00.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "c86faa2de48568111e9f9d10cb38ff9df3cf7b1e321b4175ca620bd8f7eda99a"
+    },
+    {
+      "path": "frames/driveLoaded/se/01.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "55eafbafd435cc187bb2d46c14ce6d5a9161fa78723facbf9692f3b46099c491"
+    },
+    {
+      "path": "frames/driveLoaded/se/02.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "fff451054617629ea703b51ebcabd9ace423d81f9b1d11f64dd139317714bb1b"
+    },
+    {
+      "path": "frames/driveLoaded/se/03.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "7a9b5abd7bd3c4f4bec0c91c8522f96f92f784e25a61cf2d90287e7f08df5ae3"
+    },
+    {
+      "path": "frames/driveLoaded/se/04.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "a65ce2693e2c79fcb488f1b9e404bf7539b3a24de26568d51e1b33af7c30ea74"
+    },
+    {
+      "path": "frames/driveLoaded/se/05.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "74497cae64636818457f182746dd6a9bdca4f561651175f5ac5e2a775c4e087c"
+    },
+    {
+      "path": "frames/driveLoaded/nw/00.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "5f72374f07a6c0221fb54728319af50044853a1afa9c29239abd6cbe1b2609db"
+    },
+    {
+      "path": "frames/driveLoaded/nw/01.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "c11a5e8fc1d9fc177ef8942e6c15069b4937e3da4c66e57e5dff694e72380d65"
+    },
+    {
+      "path": "frames/driveLoaded/nw/02.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "77fd4abd6e907c8ea6d3198072af4616bf91a540530f42297e211ab270dfd490"
+    },
+    {
+      "path": "frames/driveLoaded/nw/03.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "351708a9721e69bc9f509016eba43b9f822f5fd2ed20d39785da87c563f7360a"
+    },
+    {
+      "path": "frames/driveLoaded/nw/04.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "7d127d61d4c0afb7f68109cb714c7b30fcf649467feeba4e4be6ad5e6ce7e7f6"
+    },
+    {
+      "path": "frames/driveLoaded/nw/05.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "b0e42b5171652fd6b70959ff013e341647dd1b4a715616d9897f3469f332a3dd"
+    },
+    {
+      "path": "frames/driveLoaded/ne/00.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "c59f1115d8e17a8dab38aa8e563ce3b890b080101928514da985d4dcbbafca33"
+    },
+    {
+      "path": "frames/driveLoaded/ne/01.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "aaf02c49cbe088fc6bdf62c03e2191667480737672fe6568cd039fcf81dd30c8"
+    },
+    {
+      "path": "frames/driveLoaded/ne/02.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "1e5786bc7fe507be144d16740fa4f0d1c46d3af2c1df224bc37c3eca06b8cdbe"
+    },
+    {
+      "path": "frames/driveLoaded/ne/03.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "9e5995e72112fdfb550ea54f4e380feb394994f2d86eb387677825a4470f775a"
+    },
+    {
+      "path": "frames/driveLoaded/ne/04.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "434211e4eea021ba0ca187e9fd6e9b03f96c1dc0eb684287ebebd82c5d1c53a8"
+    },
+    {
+      "path": "frames/driveLoaded/ne/05.png",
+      "sizePx": [
+        272,
+        256
+      ],
+      "sha256": "bc904510abc7ffb558bc5b7d8b3bc34cb14d2b99b06d0f00503dcfb32a6eeef5"
+    },
+    {
+      "path": "sprites-2x/0/windowPallet.standard.png",
+      "sizePx": [
+        160,
+        172
+      ],
+      "sha256": "e8511494cd3ed43c0d0d7b24270db1ec661c973e67c60a3a5cbcde800183e6f2"
+    },
+    {
+      "path": "sprites-2x/90/windowPallet.standard.png",
+      "sizePx": [
+        160,
+        172
+      ],
+      "sha256": "5e7d95d3702c6e239f4c15d80a79740c6463a10d252b130be9a319618b7c057a"
+    }
+  ],
+  "sourceCellSizesPx": {
+    "drive": [
+      272,
+      256
+    ],
+    "driveLoaded": [
+      272,
+      256
+    ]
+  },
+  "previewBackground": "#263237",
+  "outputs": [
+    {
+      "file": "L3-podglad-statyczny.png",
+      "canvasPx": [
+        2448,
+        1970
+      ],
+      "bytes": 1078931,
+      "sha256": "8d439faa07b85b1397317e55b8f88407d9cdcbdc34b88552d5bfecb3a844b571"
+    },
+    {
+      "file": "L3-wozek-pusty-sw.gif",
+      "canvasPx": [
+        720,
+        800
+      ],
+      "frames": 6,
+      "fps": 8,
+      "durationsMs": [
+        120,
+        130,
+        120,
+        130,
+        120,
+        130
+      ],
+      "cycleMs": 750,
+      "loop": 0,
+      "disposal": 2,
+      "commonGlobalPalette": true,
+      "vehicleInPlace": true,
+      "bytes": 372445,
+      "sha256": "5068e17af51aabf39913582849516b5be78b857a065945b11dd392f5b24c4beb",
+      "variant": "drive",
+      "direction": "sw",
+      "sourceCellOriginPx": [
+        88,
+        178
+      ],
+      "sourceCellScale": 2.0
+    },
+    {
+      "file": "L3-wozek-pusty-se.gif",
+      "canvasPx": [
+        720,
+        800
+      ],
+      "frames": 6,
+      "fps": 8,
+      "durationsMs": [
+        120,
+        130,
+        120,
+        130,
+        120,
+        130
+      ],
+      "cycleMs": 750,
+      "loop": 0,
+      "disposal": 2,
+      "commonGlobalPalette": true,
+      "vehicleInPlace": true,
+      "bytes": 367599,
+      "sha256": "3d333a98ffd1e9784103c8cb36b5cdba212d895c11154d7c2aa5cc73812a30c6",
+      "variant": "drive",
+      "direction": "se",
+      "sourceCellOriginPx": [
+        88,
+        178
+      ],
+      "sourceCellScale": 2.0
+    },
+    {
+      "file": "L3-wozek-pusty-nw.gif",
+      "canvasPx": [
+        720,
+        800
+      ],
+      "frames": 6,
+      "fps": 8,
+      "durationsMs": [
+        120,
+        130,
+        120,
+        130,
+        120,
+        130
+      ],
+      "cycleMs": 750,
+      "loop": 0,
+      "disposal": 2,
+      "commonGlobalPalette": true,
+      "vehicleInPlace": true,
+      "bytes": 337010,
+      "sha256": "d76e549d6e83ac7bd7a36268d8e141cbd890b30a3f09cc0de82fd05200351d99",
+      "variant": "drive",
+      "direction": "nw",
+      "sourceCellOriginPx": [
+        88,
+        178
+      ],
+      "sourceCellScale": 2.0
+    },
+    {
+      "file": "L3-wozek-pusty-ne.gif",
+      "canvasPx": [
+        720,
+        800
+      ],
+      "frames": 6,
+      "fps": 8,
+      "durationsMs": [
+        120,
+        130,
+        120,
+        130,
+        120,
+        130
+      ],
+      "cycleMs": 750,
+      "loop": 0,
+      "disposal": 2,
+      "commonGlobalPalette": true,
+      "vehicleInPlace": true,
+      "bytes": 338523,
+      "sha256": "af3ac227ecbaa4e2b1100835ebbfed83d1bbe8289222fa31749d6213dcb3f7f9",
+      "variant": "drive",
+      "direction": "ne",
+      "sourceCellOriginPx": [
+        88,
+        178
+      ],
+      "sourceCellScale": 2.0
+    },
+    {
+      "file": "L3-wozek-pusty-4-kierunki.gif",
+      "canvasPx": [
+        1360,
+        1460
+      ],
+      "frames": 6,
+      "fps": 8,
+      "durationsMs": [
+        120,
+        130,
+        120,
+        130,
+        120,
+        130
+      ],
+      "cycleMs": 750,
+      "loop": 0,
+      "disposal": 2,
+      "commonGlobalPalette": true,
+      "vehicleInPlace": true,
+      "bytes": 1333090,
+      "sha256": "5b80282bc4ba3051306b8895246dee924468f3dff57b6e61b6ba9f82a2ea240c",
+      "variant": "drive",
+      "directionOrder": [
+        "sw",
+        "se",
+        "nw",
+        "ne"
+      ],
+      "phasesSynchronized": true
+    },
+    {
+      "file": "L3-wozek-z-paleta-sw.gif",
+      "canvasPx": [
+        720,
+        800
+      ],
+      "frames": 6,
+      "fps": 8,
+      "durationsMs": [
+        120,
+        130,
+        120,
+        130,
+        120,
+        130
+      ],
+      "cycleMs": 750,
+      "loop": 0,
+      "disposal": 2,
+      "commonGlobalPalette": true,
+      "vehicleInPlace": true,
+      "bytes": 422890,
+      "sha256": "0039aa215678e50210f061baa93c7be59d046cdde5d488ec1c2c7f1f04130c2f",
+      "variant": "driveLoaded",
+      "direction": "sw",
+      "sourceCellOriginPx": [
+        88,
+        178
+      ],
+      "sourceCellScale": 2.0
+    },
+    {
+      "file": "L3-wozek-z-paleta-se.gif",
+      "canvasPx": [
+        720,
+        800
+      ],
+      "frames": 6,
+      "fps": 8,
+      "durationsMs": [
+        120,
+        130,
+        120,
+        130,
+        120,
+        130
+      ],
+      "cycleMs": 750,
+      "loop": 0,
+      "disposal": 2,
+      "commonGlobalPalette": true,
+      "vehicleInPlace": true,
+      "bytes": 401242,
+      "sha256": "38df0d7515755e9db42e0cf315bfc4ffd5cbd2f23b0b5b5bee62fd37dde1a4c1",
+      "variant": "driveLoaded",
+      "direction": "se",
+      "sourceCellOriginPx": [
+        88,
+        178
+      ],
+      "sourceCellScale": 2.0
+    },
+    {
+      "file": "L3-wozek-z-paleta-nw.gif",
+      "canvasPx": [
+        720,
+        800
+      ],
+      "frames": 6,
+      "fps": 8,
+      "durationsMs": [
+        120,
+        130,
+        120,
+        130,
+        120,
+        130
+      ],
+      "cycleMs": 750,
+      "loop": 0,
+      "disposal": 2,
+      "commonGlobalPalette": true,
+      "vehicleInPlace": true,
+      "bytes": 394585,
+      "sha256": "060d5685a4ad1385f7b0d6d068dca6da457d76687817155f9f71d895cfdd8b83",
+      "variant": "driveLoaded",
+      "direction": "nw",
+      "sourceCellOriginPx": [
+        88,
+        178
+      ],
+      "sourceCellScale": 2.0
+    },
+    {
+      "file": "L3-wozek-z-paleta-ne.gif",
+      "canvasPx": [
+        720,
+        800
+      ],
+      "frames": 6,
+      "fps": 8,
+      "durationsMs": [
+        120,
+        130,
+        120,
+        130,
+        120,
+        130
+      ],
+      "cycleMs": 750,
+      "loop": 0,
+      "disposal": 2,
+      "commonGlobalPalette": true,
+      "vehicleInPlace": true,
+      "bytes": 409568,
+      "sha256": "2898b0af1f4d1015244ce5ec0f721f7334efcdb8002a24abc3fabdc954ed6bca",
+      "variant": "driveLoaded",
+      "direction": "ne",
+      "sourceCellOriginPx": [
+        88,
+        178
+      ],
+      "sourceCellScale": 2.0
+    },
+    {
+      "file": "L3-wozek-z-paleta-4-kierunki.gif",
+      "canvasPx": [
+        1360,
+        1460
+      ],
+      "frames": 6,
+      "fps": 8,
+      "durationsMs": [
+        120,
+        130,
+        120,
+        130,
+        120,
+        130
+      ],
+      "cycleMs": 750,
+      "loop": 0,
+      "disposal": 2,
+      "commonGlobalPalette": true,
+      "vehicleInPlace": true,
+      "bytes": 1555934,
+      "sha256": "6e8dcad604a8fb51ace6bece034c09f85c0bb1b4aad4ecba04fdcf39dfb6c52e",
+      "variant": "driveLoaded",
+      "directionOrder": [
+        "sw",
+        "se",
+        "nw",
+        "ne"
+      ],
+      "phasesSynchronized": true
+    }
+  ]
+}

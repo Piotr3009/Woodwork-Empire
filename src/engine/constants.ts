@@ -198,7 +198,7 @@ export const STATE_VERSION = 43;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v90';
+export const APP_VERSION = 'v91';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -5372,7 +5372,9 @@ export const LINE_UPGRADES: readonly LineUpgradeSpec[] = [
 ];
 
 /** The figures of a machine's working motion: a sheet of frames in one row, each cell the size of
- *  the machine's own picture, anchored where the picture is (docs/art/SPRITES.md 15.2). */
+ *  the machine's own picture, anchored where the picture is (docs/art/SPRITES.md 15.2), and when
+ *  the game plays it: one loop of the sheet each time the game's clock reaches the machine's minute
+ *  of the hour, and its picture (frame 0) between two loops (v91). */
 export interface WorkSheetFigures {
   frames: number;
   fps: number;
@@ -5381,33 +5383,41 @@ export interface WorkSheetFigures {
   anchorX: number;
   anchorY: number;
   loop: boolean;
+  /** Game minutes from one loop of the sheet to the next. */
+  everyMinutes: number;
+  /** The minute of the hour at which its loop starts. */
+  atMinute: number;
 }
 
-/** The frames a second the art side drew the line's motion at, in its JSON: twelve of them are a
- *  loop of two seconds (CLAUDE.md T30 2.11). */
-const LINE_SHEET_ART_FPS = 6;
-/** How many times slower than the art side drew it the game plays the line's motion [PIOTR, 11.10:
- *  "the graphics run too fast, one window every two hours"; "four times slower at the least"]
- *  (v90): the twelve frames are a loop of eight seconds. */
-export const LINE_SHEET_SLOWDOWN = 4;
+/** Each module plays one loop of its motion once a game hour, and stands on its picture between
+ *  two [PIOTR, 11.10: "at the speed it was drawn, but started now and then and not all the time";
+ *  TUNE: chat: once a game hour] (v91): at 1x a module moves for two seconds once a minute, and
+ *  from 30x on the loops follow one another with no stop. */
+export const LINE_SHEET_EVERY_MINUTES = 60;
+/** Module 1 starts at the hour and each next module ten game minutes after the one before it, so
+ *  the motion travels down the line the way a window does [TUNE: chat] (v91). */
+export const LINE_SHEET_STAGGER_MINUTES = 10;
 
 /** The art side's one set of figures for the six modules' sheets, written once from its JSON (the
- *  six JSONs are kept in docs/art/pack-1110/ and not served): twelve frames, cells of 448 by 376
- *  anchored at 296, 368, played `LINE_SHEET_SLOWDOWN` times slower than drawn (PIOTR, 11.10: "put
- *  the animation pictures into the code"; CLAUDE.md T30 2.11; v90). */
+ *  six JSONs are kept in docs/art/pack-1110/ and not served): twelve frames at 6 a second, a loop
+ *  of two seconds played at the speed it was drawn, in cells of 448 by 376 anchored at 296, 368
+ *  (PIOTR, 11.10: "put the animation pictures into the code"; CLAUDE.md T30 2.11). */
 const LINE_WORK_SHEET: WorkSheetFigures = {
   frames: 12,
-  fps: LINE_SHEET_ART_FPS / LINE_SHEET_SLOWDOWN,
+  fps: 6,
   frameWidth: 448,
   frameHeight: 376,
   anchorX: 296,
   anchorY: 368,
   loop: true,
+  everyMinutes: LINE_SHEET_EVERY_MINUTES,
+  atMinute: 0,
 };
 
-/** The machines that have a working motion, by family: the line's six (CLAUDE.md T30 2.11). */
+/** The machines that have a working motion, by family: the line's six, module N starting its loop
+ *  at minute `(N - 1) * LINE_SHEET_STAGGER_MINUTES` of the hour (CLAUDE.md T30 2.11; v91). */
 export const MACHINE_WORK_SHEETS: Readonly<Record<string, WorkSheetFigures>> = Object.fromEntries(
-  Object.keys(LINE_MODULE_SHARES).map((id) => [id, LINE_WORK_SHEET]),
+  LINE_MODULES.map((id, index) => [id, { ...LINE_WORK_SHEET, atMinute: index * LINE_SHEET_STAGGER_MINUTES }]),
 );
 /** The line's card's own sentence, in the place of a class's description, read off the art side's
  *  six pictures (CLAUDE.md T30 2.3.3) [TUNE]. */
