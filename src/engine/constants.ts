@@ -187,12 +187,18 @@ import type {
  *  are given back to the boss with no job under them, and the player is told by a card at the
  *  first settle. The glass comes the next working day, and a glass already on its way for a later
  *  day is brought forward to the next one (CLAUDE.md T29 section 4). Every v12 to v41 save
- *  loads. */
-export const STATE_VERSION = 42;
+ *  loads.
+ *
+ *  Version 43 is v89, Turn 30 (PIOTR, 10.10 and 11.10). The production line is bought whole: the
+ *  state gains its one field for the line (its contract, its windows, its pallets and its
+ *  upgrades), and Turn 29's modules bought one by one are taken back, their money given back on one
+ *  line of the books and the player told by a card at the first settle (CLAUDE.md T30 section 4).
+ *  Every v12 to v42 save loads. */
+export const STATE_VERSION = 43;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v88';
+export const APP_VERSION = 'v90';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -725,6 +731,20 @@ export const BIG_KIT_UNIT_M2 = 800;
 /** The power a module of the line draws a day, every day as for any machine [TUNE] (CLAUDE.md T29
  *  2.10). */
 export const LINE_MODULE_POWER_PER_DAY = 60;
+/** [PIOTR, 11.10: "make the whole cost 10 million"; TUNE: chat: the shares] The share of the whole
+ *  line each module carries, for the insurance, the books and the sale: the line is bought as one
+ *  and never a module at a time (CLAUDE.md T30 2.3.1). */
+export const LINE_MODULE_SHARES: Readonly<Record<string, number>> = {
+  windowLine1: 2000000,
+  windowLine2: 2500000,
+  windowLine3: 1250000,
+  windowLine4: 1250000,
+  windowLine5: 1500000,
+  windowLine6: 1500000,
+};
+/** What the whole line costs, the sum of its six shares and never a figure of its own (CLAUDE.md
+ *  T30 2.3.1). */
+export const LINE_PRICE = Object.values(LINE_MODULE_SHARES).reduce((total, share) => total + share, 0);
 /** Kit built to order, whose order cannot be called off once it is placed: the money is the
  *  maker's from the click, so an order placed before 30 December and called off in January saves
  *  no tax (CLAUDE.md T29 2.6, 2.10) [TUNE: chat]. Every other machine is still called off in full
@@ -736,6 +756,7 @@ export const BUILT_TO_ORDER: readonly string[] = [
   'windowLine3',
   'windowLine4',
   'windowLine5',
+  'windowLine6',
 ];
 /** What an order built to order says in place of its refund (CLAUDE.md T29 2.10). */
 export const BUILT_TO_ORDER_LINE = 'Built to order: it cannot be called off';
@@ -1933,13 +1954,16 @@ export const MACHINE_CAPACITY: Record<string, Record<string, number>> = {
   // The five axis CNC [TUNE: chat]: the weak one's twelve are four spindle moulders at three men
   // each, which is how Piotr counted them on 04.10 (CLAUDE.md T29 2.6).
   cnc5: { standard: 12, pro: 20, industrial: 32 },
-  // The line's four modules that do a stage [TUNE: chat]: the 800 m2 unit takes 32 joiners and the
-  // owner is counted with them, so 33 is the whole company and the line is never the thing a hall
-  // is short of. Module 5 does no stage and has no row (CLAUDE.md T29 2.9.5).
+  // The line's six modules [TUNE: chat]: the 800 m2 unit takes 32 joiners and the owner is
+  // counted with them, so 33 is the whole company and the line is never the thing a hall is short
+  // of (CLAUDE.md T29 2.9.5). Modules 5 and 6 do the Finishing and the Glazing from Turn 30, and
+  // have the same thirty three (CLAUDE.md T30 2.5).
   windowLine1: { standard: 33 },
   windowLine2: { standard: 33 },
   windowLine3: { standard: 33 },
   windowLine4: { standard: 33 },
+  windowLine5: { standard: 33 },
+  windowLine6: { standard: 33 },
 };
 
 /** The families a hall can be short of: every row of the table but the bench's, whose places
@@ -2216,9 +2240,9 @@ export const SPRAY_ROBOT_VARIANTS: EquipmentVariant[] = [
   },
 ];
 
-/** One class of a module of the line, its price the share of the 5 million the brief gives it
- *  [PIOTR: five stages, 1.5 million to 5 million; TUNE: chat: the share], 60 a day of power
- *  [TUNE], the art side's metres (CLAUDE.md T29 2.9.1, 2.10). */
+/** One class of a module of the line, its price its share of the 10 million (CLAUDE.md T30
+ *  2.3.1), 60 a day of power [TUNE], the art side's metres: 6 by 3 by 3 from Turn 30 (CLAUDE.md
+ *  T29 2.9.1, 2.10; T30 2.2). */
 function lineModuleVariants(name: string, price: number, description: string): EquipmentVariant[] {
   return [
     {
@@ -2227,7 +2251,7 @@ function lineModuleVariants(name: string, price: number, description: string): E
       price,
       width: 6,
       depth: 3,
-      height: 2.5,
+      height: 3,
       zoneWidth: 6,
       zoneDepth: 3,
       enduranceFactor: 1,
@@ -3580,31 +3604,43 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   cnc5: CNC5_VARIANTS,
   sprayBooth: SPRAY_BOOTH_VARIANTS,
   [SPRAY_ROBOT]: SPRAY_ROBOT_VARIANTS,
-  // The line's five modules, one class each (CLAUDE.md T29 2.9.1).
+  // The line's six modules, one class each, each module's sentence read off the art side's
+  // pictures (CLAUDE.md T30 2.3.1).
   windowLine1: lineModuleVariants(
     'Window line, module 1',
-    1500000,
-    'The infeed of the line and a planer that takes the timber to size on all four faces.',
+    LINE_MODULE_SHARES.windowLine1 ?? 0,
+    'A cross cut saw at the infeed and a planer behind it: each board is fed, stopped at the blade, ' +
+      'cut to length and planed on all four faces.',
   ),
   windowLine2: lineModuleVariants(
     'Window line, module 2',
-    750000,
-    'A CNC with two heads built into the line, profiling the frames as they pass.',
+    LINE_MODULE_SHARES.windowLine2 ?? 0,
+    'A five axis CNC built into the line, a gantry over the conveyor with a tilting head and a ' +
+      'carousel of tools: the profiles and the joints of every frame.',
   ),
   windowLine3: lineModuleVariants(
     'Window line, module 3',
-    750000,
-    'Through feed sanding: the profiled frames go in at one end and out sanded at the other.',
+    LINE_MODULE_SHARES.windowLine3 ?? 0,
+    'Through feed sanding: brush heads and a belt over the conveyor, the parts going in at one end ' +
+      'and out sanded at the other.',
   ),
   windowLine4: lineModuleVariants(
     'Window line, module 4',
-    1000000,
-    'A press and a frame assembly station, squaring and cramping each frame in turn.',
+    LINE_MODULE_SHARES.windowLine4 ?? 0,
+    'A frame press: the four sides cramped and the frame squared, then it opens and the next frame ' +
+      'comes in.',
   ),
   windowLine5: lineModuleVariants(
     'Window line, module 5',
-    1000000,
-    'A robot at the end of the line that takes the frames off into a buffer.',
+    LINE_MODULE_SHARES.windowLine5 ?? 0,
+    'A spraying robot in a closed cabin with a clear roof: each frame is lacquered and hung on the ' +
+      'overhead rail.',
+  ),
+  windowLine6: lineModuleVariants(
+    'Window line, module 6',
+    LINE_MODULE_SHARES.windowLine6 ?? 0,
+    'The glazing table: a frame comes off the rail onto the table, suction cups lower the glass into ' +
+      'it, and a robot wraps the window and stacks it on a pallet.',
   ),
   spindleMoulder: SPINDLE_MOULDER_VARIANTS,
   // The cabinet is a family of five from Turn 22, and what a class is for is how many men's hand
@@ -4320,112 +4356,141 @@ const SPEC_DRAFTS: SpecDraft[] = [
   },  {
     ...BASE_SPEC,
     id: 'windowLine1',
-    // Built in by the maker's fitters in a month, every module alike, so none stands before the
-    // one it follows (CLAUDE.md T29 2.9.1) [TUNE: chat].
+    // Built in by the maker's fitters in a month, the six on one day (CLAUDE.md T29 2.9.1, T30
+    // 2.3.4) [TUNE: chat].
     deliveryDays: 30,
-    folder: 'Line module 1',
+    // The line is bought whole [PIOTR, 11.10: "one whole"]: module 1's family stands for it in the
+    // catalogue, its folder the line's and its effect the line's, and modules 2 to 6 come with it
+    // and have no folder of their own (CLAUDE.md T30 2.3.3) [TUNE: chat].
+    folder: 'Production line',
     tab: 'line',
     name: 'Window line, module 1',
-    price: 1500000,
+    price: LINE_MODULE_SHARES.windowLine1 ?? 0,
     category: 'machine',
     width: 6,
     depth: 3,
-    height: 2.5,
+    height: 3,
     zoneWidth: 6,
     zoneDepth: 3,
     spriteKey: 'windowLine1',
     usedOn: 'solidWood',
-    requires: ['cnc5', 'framePress'],
     minUnitM2: BIG_KIT_UNIT_M2,
-    effect: 'The start of the window line: the infeed and the planing of windows and doors.',
+    effect: 'Makes windows from the board to the pallet: six modules in one line, 36 m long.',
   },
   {
     ...BASE_SPEC,
     id: 'windowLine2',
-    // Built in by the maker's fitters in a month, every module alike, so none stands before the
-    // one it follows (CLAUDE.md T29 2.9.1) [TUNE: chat].
+    // Built in by the maker's fitters in a month, the six on one day (CLAUDE.md T29 2.9.1, T30
+    // 2.3.4) [TUNE: chat].
     deliveryDays: 30,
-    folder: 'Line module 2',
+    // Comes with the line and is never bought alone; its effect is what its Owned tile says of it
+    // [TUNE] (CLAUDE.md T30 2.3.3).
+    folder: 'Production line',
     tab: 'line',
     name: 'Window line, module 2',
-    price: 750000,
+    price: LINE_MODULE_SHARES.windowLine2 ?? 0,
     category: 'machine',
     width: 6,
     depth: 3,
-    height: 2.5,
+    height: 3,
     zoneWidth: 6,
     zoneDepth: 3,
     spriteKey: 'windowLine2',
     usedOn: 'solidWood',
-    requires: ['windowLine1'],
     minUnitM2: BIG_KIT_UNIT_M2,
-    effect: 'The window line\u0027s own CNC: the frames of windows and doors are profiled in the line.',
+    effect: 'Module 2 of the production line: moulding.',
   },
   {
     ...BASE_SPEC,
     id: 'windowLine3',
-    // Built in by the maker's fitters in a month, every module alike, so none stands before the
-    // one it follows (CLAUDE.md T29 2.9.1) [TUNE: chat].
+    // Built in by the maker's fitters in a month, the six on one day (CLAUDE.md T29 2.9.1, T30
+    // 2.3.4) [TUNE: chat].
     deliveryDays: 30,
-    folder: 'Line module 3',
+    // Comes with the line and is never bought alone; its effect is what its Owned tile says of it
+    // [TUNE] (CLAUDE.md T30 2.3.3).
+    folder: 'Production line',
     tab: 'line',
     name: 'Window line, module 3',
-    price: 750000,
+    price: LINE_MODULE_SHARES.windowLine3 ?? 0,
     category: 'machine',
     width: 6,
     depth: 3,
-    height: 2.5,
+    height: 3,
     zoneWidth: 6,
     zoneDepth: 3,
     spriteKey: 'windowLine3',
     usedOn: 'solidWood',
-    requires: ['windowLine2'],
     minUnitM2: BIG_KIT_UNIT_M2,
-    effect: 'The window line\u0027s sanding: the frames go through it sanded.',
+    effect: 'Module 3 of the production line: sanding.',
   },
   {
     ...BASE_SPEC,
     id: 'windowLine4',
-    // Built in by the maker's fitters in a month, every module alike, so none stands before the
-    // one it follows (CLAUDE.md T29 2.9.1) [TUNE: chat].
+    // Built in by the maker's fitters in a month, the six on one day (CLAUDE.md T29 2.9.1, T30
+    // 2.3.4) [TUNE: chat].
     deliveryDays: 30,
-    folder: 'Line module 4',
+    // Comes with the line and is never bought alone; its effect is what its Owned tile says of it
+    // [TUNE] (CLAUDE.md T30 2.3.3).
+    folder: 'Production line',
     tab: 'line',
     name: 'Window line, module 4',
-    price: 1000000,
+    price: LINE_MODULE_SHARES.windowLine4 ?? 0,
     category: 'machine',
     width: 6,
     depth: 3,
-    height: 2.5,
+    height: 3,
     zoneWidth: 6,
     zoneDepth: 3,
     spriteKey: 'windowLine4',
     usedOn: 'solidWood',
-    requires: ['windowLine3'],
     minUnitM2: BIG_KIT_UNIT_M2,
-    effect: 'The window line\u0027s press and frame assembly.',
+    effect: 'Module 4 of the production line: pressing.',
   },
   {
     ...BASE_SPEC,
     id: 'windowLine5',
-    // Built in by the maker's fitters in a month, every module alike, so none stands before the
-    // one it follows (CLAUDE.md T29 2.9.1) [TUNE: chat].
+    // Built in by the maker's fitters in a month, the six on one day (CLAUDE.md T29 2.9.1, T30
+    // 2.3.4) [TUNE: chat].
     deliveryDays: 30,
-    folder: 'Line module 5',
+    // Comes with the line and is never bought alone; its effect is what its Owned tile says of it
+    // [TUNE] (CLAUDE.md T30 2.3.3).
+    folder: 'Production line',
     tab: 'line',
     name: 'Window line, module 5',
-    price: 1000000,
+    price: LINE_MODULE_SHARES.windowLine5 ?? 0,
     category: 'machine',
     width: 6,
     depth: 3,
-    height: 2.5,
+    height: 3,
     zoneWidth: 6,
     zoneDepth: 3,
     spriteKey: 'windowLine5',
     usedOn: 'solidWood',
-    requires: ['windowLine4'],
     minUnitM2: BIG_KIT_UNIT_M2,
-    effect: 'The end of the window line: a robot takes the finished frames off it.',
+    effect: 'Module 5 of the production line: the Finishing, sprayed and hung on the overhead rail.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'windowLine6',
+    // Built in by the maker's fitters in a month, the six on one day (CLAUDE.md T29 2.9.1, T30
+    // 2.3.4) [TUNE: chat].
+    deliveryDays: 30,
+    // Comes with the line and is never bought alone; its effect is what its Owned tile says of it
+    // [TUNE] (CLAUDE.md T30 2.3.3).
+    folder: 'Production line',
+    tab: 'line',
+    name: 'Window line, module 6',
+    price: LINE_MODULE_SHARES.windowLine6 ?? 0,
+    category: 'machine',
+    width: 6,
+    depth: 3,
+    height: 3,
+    zoneWidth: 6,
+    zoneDepth: 3,
+    spriteKey: 'windowLine6',
+    usedOn: 'solidWood',
+    minUnitM2: BIG_KIT_UNIT_M2,
+    effect: 'Module 6 of the production line: the Glazing, then wrapped and stacked on a pallet.',
   },
 
 
@@ -4595,7 +4660,7 @@ export const EQUIPMENT_TABS: Array<{ id: EquipmentTab; label: string }> = [
   { id: 'extraction', label: 'Extraction and air' },
   { id: 'cnc', label: 'CNC' },
   { id: 'cncCentre', label: 'CNC centre' },
-  // A twelfth tab beside the eleven Piotr named, for the line's five modules (CLAUDE.md T29 2.9.1)
+  // A twelfth tab beside the eleven Piotr named, for the line (CLAUDE.md T29 2.9.1, T30 2.3.3)
   // [TUNE: chat].
   { id: 'line', label: 'Production line' },
   { id: 'handling', label: 'Handling' },
@@ -5188,35 +5253,168 @@ export const LINE_ENGINEER_MONTHLY_WAGE = 15000;
  *  engineers"; TUNE: chat: a third refused] (CLAUDE.md T29 2.8). */
 export const LINE_ENGINEERS_MAX = 2;
 /** The modules of the line its engineers on duty keep running, by how many are on duty: none with
- *  no engineer, three with one, all five with two [PIOTR: "one or two depending on the size of the
- *  line"; TUNE: chat: where the second begins] (CLAUDE.md T29 2.8, 2.9.4). */
-export const LINE_MODULES_KEPT: readonly number[] = [0, 3, 5];
-/** The five modules of the production line, in the order they are built (CLAUDE.md T29 2.9.1). */
-export const LINE_MODULES: readonly string[] = ['windowLine1', 'windowLine2', 'windowLine3', 'windowLine4', 'windowLine5'];
-/** The cell module 1 stands on: module N stands six cells along x from the one before, at
- *  orientation 0, so the line takes the cells x 5 to 34, y 14 to 16, in the half of the hall the
- *  second extension added. Held by nothing until a module is bought (CLAUDE.md T29 2.9.2)
- *  [TUNE: chat: the cells]. */
-export const WINDOW_LINE_ORIGIN = { x: 5, y: 14 };
+ *  no engineer, three with one, all six with two [PIOTR: "one or two depending on the size of the
+ *  line"; TUNE: chat: where the second begins] (CLAUDE.md T29 2.8, 2.9.4; T30 2.3.6). */
+export const LINE_MODULES_KEPT: readonly number[] = [0, 3, 6];
+/** The six modules of the production line, in their order along it (CLAUDE.md T30 2.3.1). */
+export const LINE_MODULES: readonly string[] = Object.keys(LINE_MODULE_SHARES);
+/** The first cell the line is asked to stand on at its order: module N stands six cells along x
+ *  from the one before, at orientation 0, so the line takes the cells x 2 to 37, y 14 to 16, along
+ *  the middle of the front half of the 800 m2 hall. Taken only when the 36 m by 3 m there is clear;
+ *  otherwise the first clear run cell by cell (CLAUDE.md T30 2.4) [TUNE: chat: the cells]. */
+export const WINDOW_LINE_ORIGIN = { x: 2, y: 14 };
 /** [PIOTR, 04.10: "at each stage output goes up by a percentage"; TUNE: chat: the figures] What
- *  the line gives every stage of a timber job but the Finishing while it runs at a level, by the
- *  level: nothing at nought, 1.4 with one module, up to 2.4 with all five (CLAUDE.md T29 2.9.6). */
-export const LINE_FACTOR: readonly number[] = [1, 1.4, 1.6, 1.8, 2.1, 2.4];
+ *  the line gives every stage of a timber job while it runs at a level, by the level: nothing at
+ *  nought, 1.4 with one module, up to 2.4 with five, and the whole line of six what Turn 29's five
+ *  gave (CLAUDE.md T29 2.9.6; T30 2.5). */
+export const LINE_FACTOR: readonly number[] = [1, 1.4, 1.6, 1.8, 2.1, 2.4, 2.4];
 /** [PIOTR, 04.10: "the same percentage idea for materials"; TUNE: chat] The line cuts to a list
  *  and wastes less: a timber job taken while the line is N modules long is counted this share
- *  fewer boards for each of them (CLAUDE.md T29 2.9.7). */
+ *  fewer boards for each of them, 18 per cent with the whole line of six, and none for a job taken
+ *  while the line works its own contract (CLAUDE.md T29 2.9.7; T30 2.5). */
 export const LINE_BOARD_SAVING = 0.03;
 /** The module of the line that does each stage of a timber job, by its place in the line: the
- *  Cross cutting and the Planing on module 1, the Moulding on 2, the Sanding on 3 and the Pressing
- *  on 4. Module 5 does no stage of its own, and the Finishing and the Glazing are never the line's
- *  (CLAUDE.md T29 2.9.5) [TUNE: chat]. */
+ *  Cross cutting and the Planing on module 1, the Moulding on 2, the Sanding on 3, the Pressing on
+ *  4, the Finishing on 5 (the line sprays from Turn 30, PIOTR 10.10) and the Glazing on 6. A timber
+ *  job's Glazing is its `assembly` stage, and this table is asked of a timber job only, so a sheet
+ *  job's assembly at the bench is untouched (CLAUDE.md T29 2.9.5; T30 2.5) [TUNE: chat]. */
 export const LINE_COVERS: Partial<Record<StageId, number>> = {
   crossCutting: 1,
   planing: 1,
   moulding: 2,
   sanding: 3,
   pressing: 4,
+  finishing: 5,
+  assembly: 6,
 };
+/** What each line module's row on the line's card says after the stage it does, where the stage's
+ *  own word is not the whole of it: the Finishing and the Glazing (CLAUDE.md T30 2.3.3). */
+export const LINE_ROW_TAIL: Partial<Record<StageId, string>> = {
+  finishing: 'sprayed and hung on the overhead rail',
+  assembly: 'then wrapped and stacked on a pallet',
+};
+/** The words the line's card and its catalogue line print for it (CLAUDE.md T30 2.3.3). */
+export const LINE_NAME = 'Window production line';
+/** [PIOTR, 10.10: "about 1,500 pounds a window on average, a standing order"] What the window
+ *  company pays for every window the line makes on its contract (CLAUDE.md T30 2.6). */
+export const LINE_WINDOW_PRICE = 1500;
+/** [PIOTR, 10.10: "material 40"] The share of a window's price its timber and glass cost, booked as
+ *  money for each window made; the labour, twenty per cent, is the two engineers' wages, which the
+ *  month already pays (CLAUDE.md T30 2.6). */
+export const LINE_MATERIAL_SHARE = 0.4;
+/** [PIOTR, 10.10: "one window every two hours"] The minutes a window takes on the line's contract
+ *  (CLAUDE.md T30 2.7). */
+export const LINE_WINDOW_MINUTES = 120;
+/** [PIOTR, 10.10: "ten of them"] The windows a pallet takes before it goes to the gate (CLAUDE.md
+ *  T30 2.8). */
+export const LINE_PALLET_WINDOWS = 10;
+/** Where the full pallets wait for the client: the first row of the floor the second extension
+ *  added, along the left wall just past the end of the gate lane, one box a pallet and two at the
+ *  most, as the finished goods are drawn (CLAUDE.md T30 2.8) [TUNE: chat]. */
+export const LINE_PALLET_LAYOUT = { x: 0, y: 10, width: 2, depth: 1, height: 1.75 };
+/** The line's contract's name: the client has no name (CLAUDE.md T30 2.6) [TUNE: chat]. */
+export const LINE_CONTRACT_NAME = 'Windows off the line';
+
+/** [PIOTR, 11.10: "later add ons can be bought, better new knives, better software, so that it
+ *  later speeds up to one window an hour"; TUNE: chat: the fifteen minutes] What each upgrade of the
+ *  line fitted takes off every window of its contract (CLAUDE.md T30 2.10). */
+export const LINE_UPGRADE_MINUTES = 15;
+/** [PIOTR, 11.10: "up to one window an hour"] The line's contract never makes a window faster than
+ *  this, whatever is fitted (CLAUDE.md T30 2.7, 2.10). */
+export const LINE_WINDOW_MINUTES_MIN = 60;
+/** The working days from the order of an upgrade to the day it is fitted (CLAUDE.md T30 2.10)
+ *  [TUNE: chat]. */
+export const LINE_UPGRADE_DAYS = 10;
+
+/** One upgrade of the line: not kit, with no spec, picture, floor, power, insurance or service, a
+ *  line of its own table (CLAUDE.md T30 2.10). */
+export interface LineUpgradeSpec {
+  id: string;
+  name: string;
+  price: number;
+  /** Its card's sentence, in the place of a class's description. */
+  sentence: string;
+}
+
+/** The four upgrades of the line, to one window an hour [TUNE: chat: the four, their prices and
+ *  their sentences] (CLAUDE.md T30 2.10). */
+export const LINE_UPGRADES: readonly LineUpgradeSpec[] = [
+  {
+    id: 'lineTooling',
+    name: 'Diamond tooling',
+    price: 400000,
+    sentence:
+      'Diamond tipped knives and cutters for modules 1 and 2: the timber feeds faster and the tools are ' +
+      'changed less often.',
+  },
+  {
+    id: 'lineSoftware',
+    name: 'Line software',
+    price: 300000,
+    sentence:
+      'One program for the whole line: each window\'s cutting list and profiles go to every module in ' +
+      'turn, with no stop between sizes.',
+  },
+  {
+    id: 'linePress',
+    name: 'Servo press',
+    price: 500000,
+    sentence: 'Servo cramps and a second table in module 4: one frame is squared while the next is loaded.',
+  },
+  {
+    id: 'lineSprayRobot',
+    name: 'Second spraying robot',
+    price: 600000,
+    sentence:
+      'A second robot in module 5 and a warm drying run on the overhead rail: the lacquer is no longer the ' +
+      'slowest step.',
+  },
+];
+
+/** The figures of a machine's working motion: a sheet of frames in one row, each cell the size of
+ *  the machine's own picture, anchored where the picture is (docs/art/SPRITES.md 15.2). */
+export interface WorkSheetFigures {
+  frames: number;
+  fps: number;
+  frameWidth: number;
+  frameHeight: number;
+  anchorX: number;
+  anchorY: number;
+  loop: boolean;
+}
+
+/** The frames a second the art side drew the line's motion at, in its JSON: twelve of them are a
+ *  loop of two seconds (CLAUDE.md T30 2.11). */
+const LINE_SHEET_ART_FPS = 6;
+/** How many times slower than the art side drew it the game plays the line's motion [PIOTR, 11.10:
+ *  "the graphics run too fast, one window every two hours"; "four times slower at the least"]
+ *  (v90): the twelve frames are a loop of eight seconds. */
+export const LINE_SHEET_SLOWDOWN = 4;
+
+/** The art side's one set of figures for the six modules' sheets, written once from its JSON (the
+ *  six JSONs are kept in docs/art/pack-1110/ and not served): twelve frames, cells of 448 by 376
+ *  anchored at 296, 368, played `LINE_SHEET_SLOWDOWN` times slower than drawn (PIOTR, 11.10: "put
+ *  the animation pictures into the code"; CLAUDE.md T30 2.11; v90). */
+const LINE_WORK_SHEET: WorkSheetFigures = {
+  frames: 12,
+  fps: LINE_SHEET_ART_FPS / LINE_SHEET_SLOWDOWN,
+  frameWidth: 448,
+  frameHeight: 376,
+  anchorX: 296,
+  anchorY: 368,
+  loop: true,
+};
+
+/** The machines that have a working motion, by family: the line's six (CLAUDE.md T30 2.11). */
+export const MACHINE_WORK_SHEETS: Readonly<Record<string, WorkSheetFigures>> = Object.fromEntries(
+  Object.keys(LINE_MODULE_SHARES).map((id) => [id, LINE_WORK_SHEET]),
+);
+/** The line's card's own sentence, in the place of a class's description, read off the art side's
+ *  six pictures (CLAUDE.md T30 2.3.3) [TUNE]. */
+export const LINE_DESCRIPTION =
+  'Six modules of 6 m by 3 m, end to end: a cross cut saw and a planer, a five axis CNC, a through ' +
+  'feed sander, a frame press, a spraying robot in its cabin and the glazing table with its packing ' +
+  'robot.';
 
 export const HIRING_SPECS: HiringSpec[] = [
   ...tieredSpecs(
@@ -5280,7 +5478,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Line engineer',
     monthlyWage: LINE_ENGINEER_MONTHLY_WAGE,
     minReputation: REPUTATION_MIN,
-    duties: 'Keeps the production line running. One keeps up to three modules, two keep all five.',
+    duties: 'Keeps the production line running. One keeps up to three modules, two keep all six.',
   },
   // The manager is a tiered role from Turn 23, four grades and four cards like the joiner, on his
   // own wage table (PIOTR, 20.09; CLAUDE.md T23 2.4).
@@ -5394,6 +5592,7 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   windowLine3: 0,
   windowLine4: 0,
   windowLine5: 0,
+  windowLine6: 0,
   sprayBooth: 0, // its own extraction, off this table
   sprayRobot: 0, // an arm at the booth: no chips, and the booth's extraction is its own (CLAUDE.md T29 2.7)
   spindleMoulder: 0.12, // a bag a day, the figure the Turn 12 comment kept for it (PIOTR)
@@ -5828,6 +6027,7 @@ export const MACHINE_SHORT_WORDS: Record<string, string> = {
   windowLine3: 'line module',
   windowLine4: 'line module',
   windowLine5: 'line module',
+  windowLine6: 'line module',
 };
 
 /** The timber families with places (CLAUDE.md T28 2.4, 2.7): a man is drawn at one of them only
@@ -5845,6 +6045,7 @@ export const TIMBER_FAMILIES: readonly string[] = [
   'windowLine3',
   'windowLine4',
   'windowLine5',
+  'windowLine6',
 ];
 
 /** The first use bubbles, one sentence each, keyed by the screen they open on [TUNE wording]
