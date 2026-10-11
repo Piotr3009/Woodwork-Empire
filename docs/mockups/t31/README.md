@@ -30,8 +30,8 @@ scratchpad, not in the repo, and no server or browser of a shoot was left runnin
 
 **The pictures the pages point at.** The four hall pages (4, 6, 7 and 9) draw the game's own
 `/sprites/` URLs, which load only with `public/sprites` served at the root, as they were for the
-shots. Page 9 reads L3's three pictures from `../../pictures-l3/`, where this ZIP put them; T31-C4
-moves them into `public/sprites/`, after which those three references no longer load. Page 7 draws
+shots. Page 9 read L3's three pictures from `../../pictures-l3/`, where this ZIP put them, when it
+was shot; T31-C4 moved them into `public/sprites/` and pointed the page's three references there. Page 7 draws
 the shelter on the apron (today) from `/sprites/timberShelter.standard.png` and the shelter behind
 the wall (after) from `/sprites/timberShelter.standard.r.png`, the art side's 0 view today; once
 T31-C1 swaps the two files, the HTML shows each side in the other view. The PNGs keep what was shot.
@@ -499,9 +499,9 @@ T31-C1 swaps the two files, the HTML shows each side in the other view. The PNGs
      - **Where the lane's edges lie.** The outer edges lie on the foot of the left wall (x 0) and on
        the front edge of the floor slab (y 20). The inner edge at x 2 runs under module 1's infeed
        between y 14 and 17; it shows in (c).
-   - **The pictures.** The page reads L3's three pictures from `../../pictures-l3/`; after T31-C4
-     moves them into `public/sprites/`, those three references no longer load. The PNG was shot
-     before that.
+   - **The pictures.** The page read L3's three pictures from `../../pictures-l3/` when it was shot;
+     T31-C4 moved them into `public/sprites/` and pointed the page there. The PNG was shot before
+     that.
    - Generator (scratch, not in the repo): `scratchpad/mock-forklift/gen.ts`, run from the export in
      `scratchpad/mock-forklift/snap/`, and shot by `scratchpad/mock-forklift/shoot.cjs`.
 

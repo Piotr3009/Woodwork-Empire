@@ -263,6 +263,11 @@ describe('the file on disk and the footprint in the engine', () => {
     expect(sheets).toHaveLength(6);
     expect(overlays).toHaveLength(10);
     for (const name of [...sheets, ...overlays]) expect(turnedFiles, name).not.toContain(name);
+    // Turn 31's two new kinds of file, the forklift's sheets of four rows and the pallet that is no
+    // family's class, are neither class pictures nor turned ones either (CLAUDE.md T31 2.10).
+    const vehicles = spriteFiles().filter((name) => name.startsWith('vehicle.') && name.endsWith('.sheet.png'));
+    expect(vehicles).toEqual(['vehicle.forklift.drive.sheet.png', 'vehicle.forklift.driveLoaded.sheet.png']);
+    for (const name of [...vehicles, 'windowPallet.standard.png']) expect(turnedFiles, name).not.toContain(name);
   });
 
   it('draws the CNC with its tool changer on the CNC s own canvas, both ways round (v56)', () => {

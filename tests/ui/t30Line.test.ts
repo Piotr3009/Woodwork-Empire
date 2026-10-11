@@ -215,6 +215,10 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     state.windowLine.palletsAtGate = 3;
     hall.innerHTML = renderHall(state);
     expect(hall.querySelectorAll('[data-line-pallet]')).toHaveLength(2);
+    // From Turn 31 each is the art side's pallet standing alone, not a box (CLAUDE.md T31 2.10).
+    for (const pallet of Array.from(hall.querySelectorAll('[data-line-pallet]'))) {
+      expect(pallet.querySelector('image')?.getAttribute('href')).toBe('/sprites/windowPallet.standard.png');
+    }
     expect(hall.textContent).toContain('Windows for collection: 3 pallets');
     state.windowLine.palletsAtGate = 0;
     hall.innerHTML = renderHall(state);

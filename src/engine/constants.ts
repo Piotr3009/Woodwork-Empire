@@ -5323,6 +5323,9 @@ export const LINE_PALLET_WINDOWS = 10;
  *  added, along the left wall just past the end of the gate lane, one box a pallet and two at the
  *  most, as the finished goods are drawn (CLAUDE.md T30 2.8) [TUNE: chat]. */
 export const LINE_PALLET_LAYOUT = { x: 0, y: 10, width: 2, depth: 1, height: 1.75 };
+/** The pallets drawn at the gate at the most, each the art side's pallet of 2 m by 1 m, the second
+ *  beside the first along x, at x 2 to 3 (CLAUDE.md T31 2.10) [TUNE: chat]. */
+export const LINE_PALLETS_DRAWN = 2;
 /** [PIOTR, 11.10: "two yellow lines from the end of the production line to the door, for the
  *  forklift"; "yes" to two metres] The width of the forklift's lane: its front strip along the front
  *  wall and its left strip up the left wall to the pallets at the gate (CLAUDE.md T31 2.6). */
@@ -5457,6 +5460,61 @@ const LINE_WORK_SHEET: WorkSheetFigures = {
 export const MACHINE_WORK_SHEETS: Readonly<Record<string, WorkSheetFigures>> = Object.fromEntries(
   LINE_MODULES.map((id, index) => [id, { ...LINE_WORK_SHEET, atMinute: index * LINE_SHEET_STAGGER_MINUTES }]),
 );
+/** The figures of a vehicle's driving sheet: four rows, one a direction, of cells the same size,
+ *  each with the vehicle's anchor in it, played at the sheet's own frames a second (docs/art/
+ *  SPRITES.md 16). The shape of a figure's sheet (SPRITES.md 10.3), written here so the engine's
+ *  constants hold it and the renderer reads it. */
+export interface VehicleSheetFigures {
+  file: string;
+  cellWidth: number;
+  cellHeight: number;
+  anchorX: number;
+  anchorY: number;
+  frames: number;
+  fps: number;
+  rows: Readonly<Record<'sw' | 'se' | 'nw' | 'ne', number>>;
+  loop: boolean;
+}
+
+/** The art side's figures for the line's forklift, empty and with the pallet of ten windows on its
+ *  forks, written once from the two JSONs of L3 (docs/art/pack-l3-1110/sheets/, not served): six
+ *  frames at 8 a second in cells of 272 by 256 anchored at 136, 192, four rows `sw`, `se`, `nw` and
+ *  `ne` (PIOTR, 11.10: "akceptacja jest"; CLAUDE.md T31 2.10) [TUNE: the name]. */
+export const FORKLIFT_SHEETS: Readonly<Record<'empty' | 'loaded', VehicleSheetFigures>> = {
+  empty: {
+    file: 'vehicle.forklift.drive.sheet.png',
+    cellWidth: 272,
+    cellHeight: 256,
+    anchorX: 136,
+    anchorY: 192,
+    frames: 6,
+    fps: 8,
+    rows: { sw: 0, se: 1, nw: 2, ne: 3 },
+    loop: true,
+  },
+  loaded: {
+    file: 'vehicle.forklift.driveLoaded.sheet.png',
+    cellWidth: 272,
+    cellHeight: 256,
+    anchorX: 136,
+    anchorY: 192,
+    frames: 6,
+    fps: 8,
+    rows: { sw: 0, se: 1, nw: 2, ne: 3 },
+    loop: true,
+  },
+};
+
+/** How fast the line's forklift drives, in cells of real time a second, at every speed of the clock
+ *  below `WALK_SKIPPED_FROM_SPEED` and while it is paused: twice a man's walk (CLAUDE.md T31 2.10)
+ *  [TUNE: chat]. */
+export const FORKLIFT_CELLS_PER_SECOND = 3;
+
+/** How far ahead of the forklift's anchor the middle of the pallet on its forks is, along the way it
+ *  drives: the art side's own figure, `loadCenterXM` in docs/art/pack-l3-1110/reports/
+ *  load-contact-QA.json (CLAUDE.md T31 2.10). */
+export const FORKLIFT_LOAD_AHEAD = 1.225;
+
 /** The line's card's own sentence, in the place of a class's description, read off the art side's
  *  six pictures (CLAUDE.md T30 2.3.3) [TUNE]. */
 export const LINE_DESCRIPTION =

@@ -8,6 +8,8 @@ import {
   FINISHED_GOODS_LAYOUT,
   LINE_MODULES,
   LINE_PALLET_LAYOUT,
+  LINE_PALLETS_DRAWN,
+  FORKLIFT_SHEETS,
   LINE_PALLET_WINDOWS,
   MACHINE_WORK_SHEETS,
   GATE_CROWD_LIMIT,
@@ -145,6 +147,7 @@ import {
 } from './sprites';
 import { lineMakesWindows, runningLineContract } from '../engine/lineContract';
 import { lineLane } from '../engine/layout';
+import { forkliftArt, forkliftPoints } from './forklift';
 import { placeholder } from './placeholder';
 import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
@@ -2183,23 +2186,41 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
+  // The line's own forklift, waiting at the line's end on its lane while the six stand and it has
+  // one; `src/render/forklift.ts` drives it from frame to frame (CLAUDE.md T31 2.10).
+  const forkliftAt = forkliftPoints(state);
+  if (forkliftAt !== null && files.includes(FORKLIFT_SHEETS.empty.file)) {
+    drawables.push(forkliftArt(forkliftAt.wait));
+  }
+
   // The full pallets of the line's windows wait for the client just past the end of the gate lane,
-  // drawn as the finished goods are: one box a pallet in the kit stock colours, two at the most, and
-  // one label hung under the front of their floor so that it does not sit on the finished goods'.
-  // Nothing holds the cells; until the art side's pallet and forklift come, no forklift is drawn
-  // (CLAUDE.md T30 2.8) [TUNE: chat].
+  // each drawn from the art side's pallet of ten standing alone on its 2 m by 1 m, the second beside
+  // the first along x and two at the most, a part pallet drawn as a full one, and one label hung
+  // under the front of their floor so that it does not sit on the finished goods' (CLAUDE.md T30
+  // 2.8, T31 2.10) [TUNE: chat]. The line's forklift hides the newest while it is on its forks.
   const pallets = state.windowLine.palletsAtGate;
   if (pallets > 0) {
     const gate = LINE_PALLET_LAYOUT;
-    const shown = Math.min(pallets, gate.width);
+    const shown = Math.min(pallets, LINE_PALLETS_DRAWN);
     for (let index = 0; index < shown; index += 1) {
-      const x = gate.x + index;
-      const faces = boxPolygons(x, gate.y, 1, gate.depth, gate.height);
+      const x = gate.x + index * gate.width;
       drawables.push({
         depth: depthKey(x, gate.y),
         svg:
           `<g data-line-pallet="${index}"><title>Windows for collection</title>` +
-          box(faces, 'var(--kit-stock)', 'var(--kit-stock-dark)') +
+          objectArt({
+            files,
+            spriteKey: 'windowPallet',
+            tier: 'standard',
+            x,
+            y: gate.y,
+            width: gate.width,
+            depth: gate.depth,
+            height: gate.height,
+            fill: 'var(--kit-stock)',
+            shade: 'var(--kit-stock-dark)',
+            label: 'Windows for collection',
+          }) +
           '</g>',
       });
     }

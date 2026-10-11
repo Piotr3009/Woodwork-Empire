@@ -47,3 +47,11 @@ the line, its men's metre and its lane would meet; `lineFits` asks the line and 
 (`No room in the hall for the line and its lane`) and in setup mode (`... and its lane`);
 `canPlaceSpec` alone refuses everything else on it (`That is the forklift's lane`); `laneBlocked`
 under `boardsAtTheGate`; drawn first in the hall's live part in `--lane-yellow`, the one new token.
+
+**T31-C4 The line's forklift and the pallet standing alone (L3).** The three pictures moved by `git
+mv` into `public/sprites/`, byte for byte, and `docs/pictures-l3/` gone; `FORKLIFT_SHEETS` from the
+two JSONs; `src/render/forklift.ts` (no game state) waits on the front strip facing `nw`, takes each
+new pallet to the gate (`nw`, `ne`) and comes back (`sw`, `se`) at 3 cells a second of real time,
+hiding the pallet on its forks, set again after every page and forgotten at a load, a new morning, a
+move, a sale and from 30x; the pallets at the gate drawn from `windowPallet.standard.png`, two at the
+most. The two new kinds of file taught to the Sprite check page and the counting tests; SPRITES.md 16.
