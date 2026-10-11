@@ -156,7 +156,10 @@ describe('the game writing itself down as it is played', () => {
     same.done = true;
     advanceMinutes(1);
     expect(readStore().state).not.toBeNull();
-  });
+    // Four real waits of the once a second autosave make this test about 4.8 s by design, at v91
+    // as tonight, against vitest's 5 s: under the whole suite's load it ran over once (T31-E5), so it
+    // is given the time its waits take, and nothing it asserts is changed.
+  }, 15000);
 
   it('writes it again when a modal is shut with Escape as well as with the cross', async () => {
     // Twice: the first wait lets the trailing write of the test before this one land, and the
