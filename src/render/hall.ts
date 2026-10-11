@@ -6,7 +6,10 @@ import {
   CNC_TOOL_CHANGER_SPRITE,
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
+  LINE_MODULES,
   LINE_PALLET_LAYOUT,
+  LINE_PALLET_WINDOWS,
+  MACHINE_WORK_SHEETS,
   GATE_CROWD_LIMIT,
   NO_AIR_LINE,
   GATE_LAYOUT,
@@ -33,6 +36,7 @@ import {
   machineIsOut,
   machinesDueService,
   machinesInService,
+  isLineModule,
   isServiced,
   sawdustPiles,
   serviceIsDue,
@@ -127,6 +131,7 @@ import {
   characterTop,
 } from './characters';
 import {
+  SPRITE_DIR,
   SPRITE_SCALE,
   contactShadow,
   mirrorNeeded,
@@ -134,9 +139,11 @@ import {
   placeholderKindFor,
   spriteBox,
   spriteFiles,
+  sheetArt,
   spriteImage,
   spriteUrl,
 } from './sprites';
+import { lineMakesWindows, runningLineContract } from '../engine/lineContract';
 import { placeholder } from './placeholder';
 import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
@@ -881,6 +888,55 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
   // is never drawn at all (CLAUDE.md T6 3.5, T7 3.6).
   if (item.specId === 'edgebander') return { className: '', svg: chipStream(point) };
   return NO_FX;
+}
+
+/** True while a module of the line plays its working motion: only while the clock runs (the test
+ *  the hall's sound makes: a speed, no card open, the game not over), and then, while the line's
+ *  contract runs, all six in the minutes the line makes windows, and without it a module the hall
+ *  already reads as in use, a man drawn at it this minute, the one test the blades, the chips and
+ *  the breathing read, so what moves and what is seen are one picture (CLAUDE.md T30 2.11)
+ *  [TUNE: chat]. */
+export function moduleWorks(state: GameState, item: Equipment): boolean {
+  if (!isLineModule(item.specId)) return false;
+  if (!(state.speed > 0 && state.activeEvent === null && state.gameOver === null)) return false;
+  if (runningLineContract(state) !== null) return lineMakesWindows(state);
+  return machineInUse(state, item);
+}
+
+/** The work sheet of this machine's class when the art side has delivered it, or null. */
+function workSheetFile(item: Equipment, files: readonly string[]): string | null {
+  const name = `${item.spriteKey}.${item.variantId}.work.sheet.png`;
+  return MACHINE_WORK_SHEETS[item.specId] !== undefined && files.includes(name) ? name : null;
+}
+
+/** A working module drawn from its sheet, in the box, on the anchor and over the shadow its picture
+ *  has (CLAUDE.md T30 2.11). */
+function workingArt(item: Equipment, stands: { x: number; y: number; width: number; depth: number; height: number }, files: readonly string[]): string {
+  const file = workSheetFile(item, files);
+  const sheet = MACHINE_WORK_SHEETS[item.specId];
+  if (file === null || sheet === undefined) return '';
+  const at = spriteBox(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  return contactShadow(stands.x, stands.y, stands.width, stands.depth) + sheetArt(`${SPRITE_DIR}/${file}`, at, sheet, item.specId);
+}
+
+/** The windows standing on module 6's pallet, one to nine, drawn by the one overlay of that many
+ *  over the module, in its box and on its anchor and in its own drawable, so nothing is painted
+ *  between them; none on an empty pallet. The tenth sends the pallet to the gate, so `stack10` is on
+ *  disk and waits for the art side's forklift (CLAUDE.md T30 2.12). Whether the module plays its
+ *  sheet or stands on its picture. */
+function palletStack(
+  state: GameState,
+  item: Equipment,
+  stands: { x: number; y: number; width: number; depth: number; height: number },
+  files: readonly string[],
+): string {
+  if (item.specId !== LINE_MODULES[LINE_MODULES.length - 1]) return '';
+  const windows = state.windowLine.onPallet;
+  if (windows < 1 || windows >= LINE_PALLET_WINDOWS) return '';
+  const file = `${item.spriteKey}.${item.variantId}.stack${String(windows).padStart(2, '0')}.png`;
+  if (!files.includes(file)) return '';
+  const at = spriteBox(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  return spriteImage(`${SPRITE_DIR}/${file}`, at, `class="pallet-stack" data-stack="${windows}"`);
 }
 
 /** How tall a seat or a locker is drawn on the canteen roof, in metres, and how far its box is
@@ -1835,20 +1891,23 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
         `class="clickable${fx.className}">` +
         `<title>${escapeText(tooltip)}</title>` +
-        objectArt({
-          files,
-          spriteKey: artKeyOf(item, headed, files),
-          tier: item.variantId,
-          orientation: item.orientation,
-          x: stands.x,
-          y: stands.y,
-          width: stands.width,
-          depth: stands.depth,
-          height: stands.height,
-          fill,
-          shade,
-          label: name,
-        }) +
+        (isLineModule(item.specId) && moduleWorks(state, item) && workSheetFile(item, files) !== null
+          ? workingArt(item, stands, files)
+          : objectArt({
+              files,
+              spriteKey: artKeyOf(item, headed, files),
+              tier: item.variantId,
+              orientation: item.orientation,
+              x: stands.x,
+              y: stands.y,
+              width: stands.width,
+              depth: stands.depth,
+              height: stands.height,
+              fill,
+              shade,
+              label: name,
+            })) +
+        palletStack(state, item, stands, files) +
         (unconnected ? notConnectedLabel(stands) : '') +
         (sheetCapacityOf(item) > 0 ? rackCount(item, sheetsOnRack(state, item)) : '') +
         (boardCapacityOf(item) > 0 ? rackCount(item, boardsOnStore(state, item)) : '') +

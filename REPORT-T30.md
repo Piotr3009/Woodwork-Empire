@@ -69,3 +69,12 @@ pallet to the gate (`LINE_PALLET_LAYOUT`, one box a pallet and the label), taken
 open with no ledger line; a part pallet goes on `End it` or the sale. The Contracts tab shows its
 block first; the line's card says it can work one. The scenarios (zz) and (bbb) of Turn 29 end or
 turn the offer down, since they are about the jobs and the joiners' contract.
+
+**T30-C4 The sheets and the windows on the pallet.** `MACHINE_WORK_SHEETS` holds the art side's one
+set of figures for the six; a module that works (`moduleWorks`: the clock running, and the
+contract's window minutes or a man drawn at it) is drawn by `sheetArt` in place of its picture, in
+the same box, anchor and shadow, marked `data-sheet`. `playSheets` (in `src/render/sprites.ts`, the
+shape of `playCharacters`) writes only the frame and the view box, only when the frame changes, on
+real time at 6 a second, holds while the clock stands, and is called in `runFrame` and at the end
+of `render()`, so a page written mid loop keeps its frame. Module 6 draws the one overlay of the
+windows on its pallet, `stack01` to `stack09`, in its own drawable; none on an empty pallet.

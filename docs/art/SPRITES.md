@@ -690,4 +690,17 @@ picture by its exact name (`pictureFor`, `pickSprite` build `${spriteKey}${tier}
 no code reads the manifest by pattern, so neither kind is ever taken for a class picture or a turned
 one. The tests that count class pictures and turned pictures say so. The characters' manifest is
 built from `character.*.json` only and is not touched, and the six JSONs of the sheets' figures
-are not served (they are in `docs/art/pack-1110/`).
+are not served (they are in `docs/art/pack-1110/`): their one set of figures is a constant of the
+game, `MACHINE_WORK_SHEETS`.
+
+How the game uses them (CLAUDE.md T30 2.11, 2.12). A module that works is drawn from its sheet in
+place of its picture: the same box, the same anchor, the same shadow and name, an `<svg>` clipped to
+one cell by its view box over an `<image>` of the whole sheet, as a man's figure is drawn. It works
+only while the clock runs, and then, while the line's contract runs, all six in the minutes the line
+makes windows, and without the contract a module a man is drawn at this minute. The frame comes from
+real time, the same for all six, so the line plays in step, at its own 6 frames a second whatever
+the speed of the clock; the moment the clock stops every sheet holds, and the next page written
+draws the six from their pictures. Module 6 with one to nine windows on its pallet is drawn with
+the one overlay of that many over it, in the same box and drawable, whether it plays or stands.
+`stack10` is on disk and is not drawn: the tenth window sends the pallet to the gate, and it waits
+for the art side's pallet standing alone and the forklift (L3).

@@ -108,7 +108,7 @@ import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
 import { OWNER, hasCentralExtraction, isLineModule } from '../engine/machines';
-import { nextSpriteOrientation } from '../render/sprites';
+import { nextSpriteOrientation, playSheets } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
@@ -1266,6 +1266,9 @@ export function render(): void {
   // And the doors, which the fresh markup has just written back to the state the hall computed
   // for this frame: the swing is the renderer's, like the walk (CLAUDE.md T19 2.3).
   syncDoors(parts.page, nowMs());
+  // And the machines' sheets, which the fresh markup has just put back to frame 0: on the frame real
+  // time asks for, so a page written mid loop never shakes them (CLAUDE.md T30 2.11).
+  playSheets(parts.page, nowMs(), clockRuns());
   restoreFocus(memory);
 }
 
@@ -2860,6 +2863,13 @@ export function advanceMinutes(wholeMinutes: number, render = true): number {
  *  The loops are set to exactly what the hall is running; the one shots are offered every frame
  *  and the engine thins them to one a second each, so x10 and x30 do not rattle. Nothing plays
  *  before the first click, because nothing is unlocked before it. */
+/** True while the workshop's clock runs: a speed, no card open, the game not over. A stopped clock
+ *  is a stopped workshop, and the one test the sound and the machines' sheets read (CLAUDE.md T19
+ *  2.10, T30 2.11). */
+function clockRuns(): boolean {
+  return state !== null && ui.screen === 'game' && state.speed > 0 && state.activeEvent === null && state.gameOver === null;
+}
+
 function driveSound(now: number): void {
   if (state === null || ui.screen !== 'game') {
     stopAllSounds();
@@ -2867,7 +2877,7 @@ function driveSound(now: number): void {
   }
   applySoundSettings(state.settings.sound);
   // A stopped clock is a stopped workshop: nothing is being cut while the player reads a modal.
-  const running = state.speed > 0 && state.activeEvent === null && state.gameOver === null;
+  const running = clockRuns();
   if (!running) {
     stopAllSounds();
     return;
@@ -2904,6 +2914,8 @@ function runFrame(now: number): void {
     // the page is written again under them and the swing is not game state (CLAUDE.md T19 2.3).
     stepDoors(root, now);
     playCharacters(root, now);
+    // The machines' sheets beside the figures, on the same real time (CLAUDE.md T30 2.11).
+    playSheets(root, now, clockRuns());
     driveSound(now);
   }
   // One frame, one writing of the page, whatever the clock did inside it: ten game minutes at

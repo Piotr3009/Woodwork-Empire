@@ -5314,6 +5314,37 @@ export const LINE_PALLET_WINDOWS = 10;
 export const LINE_PALLET_LAYOUT = { x: 0, y: 10, width: 2, depth: 1, height: 1.75 };
 /** The line's contract's name: the client has no name (CLAUDE.md T30 2.6) [TUNE: chat]. */
 export const LINE_CONTRACT_NAME = 'Windows off the line';
+
+/** The figures of a machine's working motion: a sheet of frames in one row, each cell the size of
+ *  the machine's own picture, anchored where the picture is (docs/art/SPRITES.md 15.2). */
+export interface WorkSheetFigures {
+  frames: number;
+  fps: number;
+  frameWidth: number;
+  frameHeight: number;
+  anchorX: number;
+  anchorY: number;
+  loop: boolean;
+}
+
+/** The art side's one set of figures for the six modules' sheets, written once from its JSON (the
+ *  six JSONs are kept in docs/art/pack-1110/ and not served): twelve frames, six a second, a loop
+ *  of two seconds, cells of 448 by 376 anchored at 296, 368 (PIOTR, 11.10: "put the animation
+ *  pictures into the code"; CLAUDE.md T30 2.11). */
+const LINE_WORK_SHEET: WorkSheetFigures = {
+  frames: 12,
+  fps: 6,
+  frameWidth: 448,
+  frameHeight: 376,
+  anchorX: 296,
+  anchorY: 368,
+  loop: true,
+};
+
+/** The machines that have a working motion, by family: the line's six (CLAUDE.md T30 2.11). */
+export const MACHINE_WORK_SHEETS: Readonly<Record<string, WorkSheetFigures>> = Object.fromEntries(
+  Object.keys(LINE_MODULE_SHARES).map((id) => [id, LINE_WORK_SHEET]),
+);
 /** The line's card's own sentence, in the place of a class's description, read off the art side's
  *  six pictures (CLAUDE.md T30 2.3.3) [TUNE]. */
 export const LINE_DESCRIPTION =

@@ -167,6 +167,50 @@ export function spriteImage(url: string, box: SpriteBox, extra = ''): string {
   );
 }
 
+/** A machine's working motion drawn in place of its picture: the same box and the same anchor, an
+ *  `<svg>` clipped to one cell by its view box over an `<image>` of the whole sheet, exactly as a
+ *  man's figure is drawn (`characterArt`, `cellBox`), marked `data-sheet` with its frame, its frames
+ *  and its fps. Frame 0 is the picture pixel for pixel, so the change is never seen as a jump
+ *  (CLAUDE.md T30 2.11). */
+export function sheetArt(
+  url: string,
+  box: SpriteBox,
+  sheet: { frames: number; fps: number; frameWidth: number; frameHeight: number },
+  family: string,
+): string {
+  return (
+    `<svg class="machine-sheet" data-sheet="${family}" data-frame="0" data-frames="${sheet.frames}" ` +
+    `data-fps="${sheet.fps}" x="${round(box.x)}" y="${round(box.y)}" width="${round(box.width)}" ` +
+    `height="${round(box.height)}" viewBox="0 0 ${sheet.frameWidth} ${sheet.frameHeight}" ` +
+    'preserveAspectRatio="xMidYMax meet">' +
+    `<image href="${url}" x="0" y="0" width="${sheet.frameWidth * sheet.frames}" height="${sheet.frameHeight}" />` +
+    '</svg>'
+  );
+}
+
+/** Moves every machine's sheet on the page on to the frame this moment of real time asks for, the
+ *  same for all of them so the line plays in step, at each sheet's own fps whatever the speed of the
+ *  clock. It writes the frame and the view box on elements already there, only when the frame
+ *  changes, and builds nothing; while the clock stands it holds every sheet where it is, and the
+ *  next page written draws the machines from their pictures (CLAUDE.md T30 2.11). Called from the
+ *  frame loop beside `playCharacters`, and at the end of every page written, which carries frame 0,
+ *  so a sheet never flashes back to it (the figures' cure, `syncFigures`, CLAUDE.md T19 2.1). */
+export function playSheets(root: ParentNode, nowMs: number, running: boolean): void {
+  if (!running) return;
+  for (const node of Array.from(root.querySelectorAll('[data-sheet]'))) {
+    const frames = Number(node.getAttribute('data-frames') ?? '0');
+    const fps = Number(node.getAttribute('data-fps') ?? '0');
+    const box = (node.getAttribute('viewBox') ?? '').split(/\s+/).map(Number);
+    const cellWidth = box[2] ?? 0;
+    const cellHeight = box[3] ?? 0;
+    if (!Number.isFinite(cellWidth) || cellWidth <= 0 || frames <= 1 || fps <= 0) continue;
+    const frame = Math.floor((nowMs / 1000) * fps) % frames;
+    if (node.getAttribute('data-frame') === String(frame)) continue;
+    node.setAttribute('data-frame', String(frame));
+    node.setAttribute('viewBox', `${frame * cellWidth} 0 ${cellWidth} ${cellHeight}`);
+  }
+}
+
 /** The soft ellipse the game draws under every object, sprite or box, so nothing floats. A sprite
  *  with its own shadow baked in would give a double one, which is why the contract forbids it. */
 export function contactShadow(x: number, y: number, width: number, depth: number): string {
