@@ -89,3 +89,8 @@ three pieces from `hallBackgroundDeep.png`, nothing painted or scaled (SPRITES.m
 cut is x 28 to 39 and why a flat ground piece is laid under all of it); the frame, the camera and the
 fit read the hall's own length. A second reader's finding put right before the commit: the end now
 comes in over the last piece's last metre, so the join at the end never shows the ground through.
+
+**T31-E1 Notes and art requests.** `docs/notes-t31.md`: where each task lives, the save, the readings
+taken, section 10's choices with what was built, what was found and left, the questions for Piotr.
+`docs/art/REQUESTS-T31.md`: nothing new asked tonight; S1 (the outside sheet store) named for the next
+turn, the forklift family's own pictures for Piotr, and what may sit badly for E4 to look at.
