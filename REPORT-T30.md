@@ -131,3 +131,20 @@ asserted: no window on the second shift, nothing ordered or unloaded and no man'
 offered and taken with three standing contracts running, and `playSheets` in the frame loop itself
 (a mutation of that call turns the test red). The README's one sentence beyond the brief's lines
 (on the packs) is taken out.
+
+**T30-E4 Look and shoot.** Twenty two pictures in `docs/report-t30/`. Every one is drawn by the
+game's own app, mounted in jsdom, its state set up by the engine and the tests' helpers and clicked
+to the screen through its own `data-do` handlers, then saved with the game's stylesheet and shot in
+headless Chromium. Nothing in the markup is written by hand. How they were shot:
+- A modal shot whole is let out to its full height (`.modal`, `.modal-body`), as in Turn 29.
+- The closer views are the app's own camera: `zoomTo` and `cameraTransform` written on the scene
+  as `applyCamera` writes it, the closest at 4, the wheel's limit.
+- The setup drags are the app's own mouse handlers, as `tests/ui/t30Line.test.ts` drives them.
+- The strip of frames is six moments of real time (frames 0, 2, 4, 6, 8 and 10) put through the
+  app's own `render()` and `playSheets`; the walk is the renderer's own `stepWalkers` and
+  `playCharacters`, the two steps of the frame loop, with no game minute between them. Both
+  strips are crops of the game's own shots laid side by side, not scaled.
+- The Sprite check pictures are the page's own cells for the sanders, the cutter cases and the six
+  modules, taken out of the app's page whole.
+- The shooting scripts were throwaway files in the scratchpad and are not committed; their static
+  server was stopped before the session went on.
