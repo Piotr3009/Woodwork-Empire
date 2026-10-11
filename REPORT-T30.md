@@ -89,3 +89,12 @@ for each fitted, never below 60, so the offer card, the running block and the li
 production line`, `Being fitted: ready on <day>`, `Fitted`, `Not enough cash`); emptied for nothing
 when the line is sold. The line's card now ends `...its price; the upgrades go with it`. New:
 `tests/engine/t30Upgrades.test.ts`.
+
+**T30-E1 Notes and the art side's requests.** `docs/notes-t30.md`: where each task lives, the lift,
+the readings of the brief the code marks [TUNE], section 10's thirteen choices each with what was
+built, how to read the line (`lineModules`, `lineLevel`, the new `lineLevelForJobs`), what of
+section 8 the turn touched and the questions for Piotr. `docs/art/REQUESTS-T30.md`: L3 (the pallet
+of ten wrapped windows standing alone, proposed at 2 by 1 by 1.75 m, 160 by 172, anchor 104, 164,
+and the forklift with its driver in four directions, empty and loaded, as one row sheets), whether
+the servo press and the second robot are drawn, the line's 90 degree convention, and what to look
+for on the hall (the seams, the conveyor at 0.9 m, module 5's clear roof, the boxes at the gate).
