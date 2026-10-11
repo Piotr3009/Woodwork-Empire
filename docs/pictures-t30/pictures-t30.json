@@ -1,0 +1,635 @@
+{
+  "what": "The production line of Turn 30: the art side's L1 (six modules, two views) and L2 (six work sheets, ten stack overlays), as delivered on 11.10.2026. Checked by chat: sizes, RGBA, the canvas and anchors of the sprite contract for 6 x 3 x 3 m, and frame 0 of every sheet identical pixel for pixel to its static picture.",
+  "sheet": {
+    "frames": 12,
+    "fps": 6,
+    "frameWidth": 448,
+    "frameHeight": 376,
+    "anchorX": 296,
+    "anchorY": 368,
+    "loop": true
+  },
+  "nextModuleOffsetPx": {
+    "view0": [
+      288,
+      144
+    ]
+  },
+  "conveyorPx": {
+    "entry": [
+      80,
+      144.8
+    ],
+    "exit": [
+      368,
+      288.8
+    ],
+    "heightM": 0.9
+  },
+  "overheadRailPx": {
+    "entry": [
+      80,
+      53.6
+    ],
+    "exit": [
+      368,
+      197.6
+    ],
+    "heightM": 2.8,
+    "modules": [
+      "windowLine5",
+      "windowLine6"
+    ]
+  },
+  "files": [
+    {
+      "file": "windowLine1.standard.png",
+      "family": "windowLine1",
+      "kind": "class picture, view 0",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 69209,
+      "sha256": "1612c2a53c4495035b17c311e22caf6a6b4a88cf867f731f239270d5bc387205"
+    },
+    {
+      "file": "windowLine1.standard.r.png",
+      "family": "windowLine1",
+      "kind": "turned view (the art side's 90, never drawn: the line is never turned)",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        152,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 66335,
+      "sha256": "e9fe5bf2ed0854f0971e960f358fc674a790143520060c2a8878d9eeec9202a4"
+    },
+    {
+      "file": "windowLine1.standard.work.sheet.png",
+      "family": "windowLine1",
+      "kind": "work sheet",
+      "px": [
+        5376,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 130844,
+      "sha256": "b423e5f081c494100c6f382dc7f6b4df76abb7131f5026315598807b623881c7"
+    },
+    {
+      "file": "windowLine2.standard.png",
+      "family": "windowLine2",
+      "kind": "class picture, view 0",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 89567,
+      "sha256": "cc55cd7f346f8e2add714b7c18ae3f9988379895116f280042db61b87076ff66"
+    },
+    {
+      "file": "windowLine2.standard.r.png",
+      "family": "windowLine2",
+      "kind": "turned view (the art side's 90, never drawn: the line is never turned)",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        152,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 71573,
+      "sha256": "e749cd5208f7fd4715e3c097118505fd9dcf08d25e75bb238bd77fcad9125298"
+    },
+    {
+      "file": "windowLine2.standard.work.sheet.png",
+      "family": "windowLine2",
+      "kind": "work sheet",
+      "px": [
+        5376,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 210003,
+      "sha256": "08e58c44a8b5404bac40bb5bd2954efede8442b4625d24d9d3f4b009fb5863a2"
+    },
+    {
+      "file": "windowLine3.standard.png",
+      "family": "windowLine3",
+      "kind": "class picture, view 0",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 70572,
+      "sha256": "0957a2ec65f5e62ea144c1ef0d3697ed1f3b04d6fda1330cdd5624bd8f0a3b67"
+    },
+    {
+      "file": "windowLine3.standard.r.png",
+      "family": "windowLine3",
+      "kind": "turned view (the art side's 90, never drawn: the line is never turned)",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        152,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 61333,
+      "sha256": "9280971349635dbce45583a3d30fa11f70bd58c96290281f1b0b3ac31e260f8f"
+    },
+    {
+      "file": "windowLine3.standard.work.sheet.png",
+      "family": "windowLine3",
+      "kind": "work sheet",
+      "px": [
+        5376,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 157319,
+      "sha256": "adbcb08fcabc5e2dad4b81953603a8a36191eb77c821489054df530557a8e77b"
+    },
+    {
+      "file": "windowLine4.standard.png",
+      "family": "windowLine4",
+      "kind": "class picture, view 0",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 64888,
+      "sha256": "4ff3ccca66c7b8b45e567800198424ca251468c95fb9c1ccfe2c5d7de65be480"
+    },
+    {
+      "file": "windowLine4.standard.r.png",
+      "family": "windowLine4",
+      "kind": "turned view (the art side's 90, never drawn: the line is never turned)",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        152,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 67569,
+      "sha256": "9a905324d44424e9ac6c0c5db1782a701bf80beb620e337006ab6bfe1f361590"
+    },
+    {
+      "file": "windowLine4.standard.work.sheet.png",
+      "family": "windowLine4",
+      "kind": "work sheet",
+      "px": [
+        5376,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 173921,
+      "sha256": "5ddfae3f14e9f04f056e91eace648d87d9439c71a54f923dbcdd37674773ab98"
+    },
+    {
+      "file": "windowLine5.standard.png",
+      "family": "windowLine5",
+      "kind": "class picture, view 0",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 84381,
+      "sha256": "286b5159be687f2ca6dd586c9ae043390a6c60879991021508a6e24a4d50232d"
+    },
+    {
+      "file": "windowLine5.standard.r.png",
+      "family": "windowLine5",
+      "kind": "turned view (the art side's 90, never drawn: the line is never turned)",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        152,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 68519,
+      "sha256": "25c8ffccec7cef0f2b3c72d9abdd3ad520e813d0b97d0b3cd0b80f0485cb9490"
+    },
+    {
+      "file": "windowLine5.standard.work.sheet.png",
+      "family": "windowLine5",
+      "kind": "work sheet",
+      "px": [
+        5376,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 262871,
+      "sha256": "2c7780a225200f3cf9bd70d143a16a05cd78e856cd3aff059f68058faf1d9dda"
+    },
+    {
+      "file": "windowLine6.standard.png",
+      "family": "windowLine6",
+      "kind": "class picture, view 0",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 75933,
+      "sha256": "146ae9dd149fafccc84a96d3729f22eac4b89f9cbabe299d9f5c2ff76884d406"
+    },
+    {
+      "file": "windowLine6.standard.r.png",
+      "family": "windowLine6",
+      "kind": "turned view (the art side's 90, never drawn: the line is never turned)",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        152,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 70420,
+      "sha256": "6a88d2b8124f18637a006041786a34769776ed9913862fe8d55ad5edf72fb31c"
+    },
+    {
+      "file": "windowLine6.standard.stack01.png",
+      "family": "windowLine6",
+      "kind": "stack overlay",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 5637,
+      "sha256": "b9e491f0a56f67c0a4c6ebcba0d15ad79bd9f0a38130e46b197c4f910e144de2"
+    },
+    {
+      "file": "windowLine6.standard.stack02.png",
+      "family": "windowLine6",
+      "kind": "stack overlay",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 6798,
+      "sha256": "68e1f441b0ef64e500da3f4689a63c4fa973958993f94d8877e115107560123c"
+    },
+    {
+      "file": "windowLine6.standard.stack03.png",
+      "family": "windowLine6",
+      "kind": "stack overlay",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 7837,
+      "sha256": "95271ff85d02969444ab74d98335147b964c16cf1f412bf8df22a0ab8d7a27dd"
+    },
+    {
+      "file": "windowLine6.standard.stack04.png",
+      "family": "windowLine6",
+      "kind": "stack overlay",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 8488,
+      "sha256": "28efd83cbbf93f8cf9af3fa21fe352e2f7ab12512e21e7fb520061e0a212e1ff"
+    },
+    {
+      "file": "windowLine6.standard.stack05.png",
+      "family": "windowLine6",
+      "kind": "stack overlay",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 9263,
+      "sha256": "5ccdcd9e046eb25aabd3ec8cf4e7e60c74a02aa774c3602760e1abeb960c6949"
+    },
+    {
+      "file": "windowLine6.standard.stack06.png",
+      "family": "windowLine6",
+      "kind": "stack overlay",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 10215,
+      "sha256": "3a87af2d504c86b1cf6dc03bf88d3a15d2f4f768173c034f49483bc3dd965571"
+    },
+    {
+      "file": "windowLine6.standard.stack07.png",
+      "family": "windowLine6",
+      "kind": "stack overlay",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 10730,
+      "sha256": "d8c65d4acf6b947bedad983db90b9fbac399323d17a6fe1975916d0f4e1ddf62"
+    },
+    {
+      "file": "windowLine6.standard.stack08.png",
+      "family": "windowLine6",
+      "kind": "stack overlay",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 11170,
+      "sha256": "be6bdce83842fdfeb6ce78bb12673dd266a5341e2e71d663cf8ef0d97a3d033a"
+    },
+    {
+      "file": "windowLine6.standard.stack09.png",
+      "family": "windowLine6",
+      "kind": "stack overlay",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 11737,
+      "sha256": "a4a1b3cc1c3da76708f4acc71f95312c635803b4b4d7b4a5d7c0c0000800e29c"
+    },
+    {
+      "file": "windowLine6.standard.stack10.png",
+      "family": "windowLine6",
+      "kind": "stack overlay",
+      "px": [
+        448,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 12168,
+      "sha256": "c6d91e4142ad89ed935e388c7c040218418218566b707af3aee16a8da628a461"
+    },
+    {
+      "file": "windowLine6.standard.work.sheet.png",
+      "family": "windowLine6",
+      "kind": "work sheet",
+      "px": [
+        5376,
+        376
+      ],
+      "anchor": [
+        296,
+        368
+      ],
+      "metres": [
+        6,
+        3,
+        3
+      ],
+      "mode": "RGBA",
+      "bytes": 239274,
+      "sha256": "b6af8b729deb22a0060d5df8433740deb14ca8b5e25959739673a253ed6b4a4b"
+    }
+  ],
+  "problems": []
+}

@@ -1,0 +1,366 @@
+{
+  "schemaVersion": 1,
+  "package": "L1",
+  "pixelScale": "2x",
+  "projection": "orthographic dimetric 2:1",
+  "assets": {
+    "windowLine1.standard": {
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "views": {
+        "0": {
+          "file": "sprites-2x/0/windowLine1.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            296,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              80,
+              144.8
+            ],
+            "exitPx": [
+              368,
+              288.8
+            ]
+          }
+        },
+        "90": {
+          "file": "sprites-2x/90/windowLine1.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            152,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              368,
+              144.8
+            ],
+            "exitPx": [
+              80,
+              288.8
+            ]
+          }
+        }
+      }
+    },
+    "windowLine2.standard": {
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "views": {
+        "0": {
+          "file": "sprites-2x/0/windowLine2.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            296,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              80,
+              144.8
+            ],
+            "exitPx": [
+              368,
+              288.8
+            ]
+          }
+        },
+        "90": {
+          "file": "sprites-2x/90/windowLine2.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            152,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              368,
+              144.8
+            ],
+            "exitPx": [
+              80,
+              288.8
+            ]
+          }
+        }
+      }
+    },
+    "windowLine3.standard": {
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "views": {
+        "0": {
+          "file": "sprites-2x/0/windowLine3.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            296,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              80,
+              144.8
+            ],
+            "exitPx": [
+              368,
+              288.8
+            ]
+          }
+        },
+        "90": {
+          "file": "sprites-2x/90/windowLine3.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            152,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              368,
+              144.8
+            ],
+            "exitPx": [
+              80,
+              288.8
+            ]
+          }
+        }
+      }
+    },
+    "windowLine4.standard": {
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "views": {
+        "0": {
+          "file": "sprites-2x/0/windowLine4.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            296,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              80,
+              144.8
+            ],
+            "exitPx": [
+              368,
+              288.8
+            ]
+          }
+        },
+        "90": {
+          "file": "sprites-2x/90/windowLine4.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            152,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              368,
+              144.8
+            ],
+            "exitPx": [
+              80,
+              288.8
+            ]
+          }
+        }
+      }
+    },
+    "windowLine5.standard": {
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "views": {
+        "0": {
+          "file": "sprites-2x/0/windowLine5.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            296,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              80,
+              144.8
+            ],
+            "exitPx": [
+              368,
+              288.8
+            ]
+          },
+          "overheadRail": {
+            "entryPx": [
+              80,
+              53.6
+            ],
+            "exitPx": [
+              368,
+              197.6
+            ]
+          }
+        },
+        "90": {
+          "file": "sprites-2x/90/windowLine5.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            152,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              368,
+              144.8
+            ],
+            "exitPx": [
+              80,
+              288.8
+            ]
+          },
+          "overheadRail": {
+            "entryPx": [
+              368,
+              53.6
+            ],
+            "exitPx": [
+              80,
+              197.6
+            ]
+          }
+        }
+      }
+    },
+    "windowLine6.standard": {
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "views": {
+        "0": {
+          "file": "sprites-2x/0/windowLine6.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            296,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              80,
+              144.8
+            ],
+            "exitPx": [
+              368,
+              288.8
+            ]
+          },
+          "overheadRail": {
+            "entryPx": [
+              80,
+              53.6
+            ],
+            "exitPx": [
+              368,
+              197.6
+            ]
+          }
+        },
+        "90": {
+          "file": "sprites-2x/90/windowLine6.standard.png",
+          "canvasPx": [
+            448,
+            376
+          ],
+          "anchorPx": [
+            152,
+            368
+          ],
+          "exactProjectionVerified": true,
+          "conveyor": {
+            "entryPx": [
+              368,
+              144.8
+            ],
+            "exitPx": [
+              80,
+              288.8
+            ]
+          },
+          "overheadRail": {
+            "entryPx": [
+              368,
+              53.6
+            ],
+            "exitPx": [
+              80,
+              197.6
+            ]
+          }
+        }
+      }
+    }
+  }
+}
