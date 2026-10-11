@@ -134,8 +134,9 @@ describe('a fresh game in this build', () => {
     // 42: four joiners to a contract, and the glass a day (CLAUDE.md T29 section 4). v85 is state 42
     // too: pictures and the logo only (PIOTR, 08.10). v86 is state 42 as well: the start screen only
     // (PIOTR, 08.10). v87 is state 42 too: the same game, counted faster (PIOTR, 10.10). So is
-    // v88: the same game, drawn at a steadier pace (PIOTR, 10.10).
-    expect(APP_VERSION).toBe('v88');
+    // v88: the same game, drawn at a steadier pace (PIOTR, 10.10). v89 is Turn 30 (CLAUDE.md T30):
+    // state 42 until its task C1 lifts it.
+    expect(APP_VERSION).toBe('v89');
     expect(STATE_VERSION).toBe(42);
   });
 

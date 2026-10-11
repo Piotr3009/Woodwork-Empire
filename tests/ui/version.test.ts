@@ -56,7 +56,9 @@ describe('the version in the corner', () => {
     // picture, and the bags read off the extractors alone (PIOTR, 10.10). v88 keeps a big hall
     // moving at 30x and 100x: a frame makes up for a tenth of a second at most, the page follows
     // the clock five times a second from 30x up, and the catalogue is asked by id (PIOTR, 10.10).
-    expect(APP_VERSION).toBe('v88');
+    // v89 is Turn 30: the line bought whole, its windows contract, its upgrades and its moving
+    // pictures (PIOTR, 10.10 and 11.10).
+    expect(APP_VERSION).toBe('v89');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -72,7 +74,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v88'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v89'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });
