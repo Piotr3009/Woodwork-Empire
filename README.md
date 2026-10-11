@@ -23,8 +23,7 @@ asks for is listed in `docs/art/REQUESTS-T13.md`, the art Turn 14 asks for in
 `docs/art/REQUESTS-T22.md`, Turn 23's in `docs/art/REQUESTS-T23.md`, Turn 25's in
 `docs/art/REQUESTS-T25.md`, Turn 26's in `docs/art/REQUESTS-T26.md`, Turn 28's in
 `docs/art/REQUESTS-T28.md`, Turn 29's in `docs/art/REQUESTS-T29.md` and Turn 30's in
-`docs/art/REQUESTS-T30.md` (Turns 24 and 27 asked for none). The art side's packs, as delivered,
-are kept under `docs/art/` (`docs/art/pack-0910/`, `docs/art/pack-1110/`).
+`docs/art/REQUESTS-T30.md` (Turns 24 and 27 asked for none).
 
 ## Requirements
 

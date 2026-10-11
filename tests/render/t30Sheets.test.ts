@@ -203,3 +203,42 @@ describe('a page written mid loop (CLAUDE.md T30 2.11)', () => {
     }
   });
 });
+
+describe('the frame loop (CLAUDE.md T30 2.11)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('moves the six on to the frame real time asks for in the loop itself, before any page is written', () => {
+    // The loop's next frame is caught instead of run, so the test runs it with the moment it likes.
+    let loop: FrameRequestCallback | null = null;
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      loop = callback;
+      return 1;
+    });
+    vi.spyOn(performance, 'now').mockReturnValue(0);
+    try {
+      localStorage.clear();
+    } catch {
+      // No storage: nothing kept.
+    }
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.querySelector<HTMLElement>('#app');
+    if (root === null) throw new Error('the app root is wanted');
+    mount(root);
+    root.querySelector<HTMLButtonElement>('[data-do="startGame"]')?.click();
+    const state = currentState();
+    if (state === null) throw new Error('a game is wanted');
+    Object.assign(state, working());
+    render();
+    const frames = (): Array<string | null> => Array.from(root.querySelectorAll('[data-sheet]')).map((node) => node.getAttribute('data-frame'));
+    expect(frames()).toEqual(['0', '0', '0', '0', '0', '0']);
+    // Half a second on at 1x: no game minute is due, so no page is written, and the loop alone
+    // moves the sheets on.
+    const next = loop as FrameRequestCallback | null;
+    if (next === null) throw new Error('the loop asked for a frame');
+    next(500);
+    expect(frames()).toEqual(['3', '3', '3', '3', '3', '3']);
+  });
+});

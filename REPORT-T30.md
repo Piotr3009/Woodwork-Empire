@@ -116,3 +116,18 @@ earlier scenarios, each restated with one line of reason in C1 and C3: (zz) of T
 bought whole: 10,000,000, the six at x 2 + 6 (N - 1), level 3 with one engineer, sold from any
 module, the contract ended because (zz) is about the jobs) and (bbb) (the line's offer turned down
 for the year, since the week measures the joiners' contract).
+
+**T30-E3 The cross check.** Section 7 read bullet by bullet against the code and the tests by a
+read only sub-agent, and the mechanical checks run: no `.skip`, `.only`, `.todo`, `xit` or
+`xdescribe` in the tree; the thirteen pictures of pack 1 and the line's 28 byte for byte against the
+packs' own hashes and all in the manifest; no file of the pack in the root; `docs/pictures-t30/`
+gone; `git diff main --stat -- src/ui/styles.css` empty; no em or en dash in any file changed since
+main; the Skylon header on every new code file; v89, 43 and 12. What it found and this task mended:
+the offer's seeded stream check compared a state the play never changes, so it could not fail (now
+the morning with the card against the same morning with the offer put off: the same stream and the
+same enquiries drawn); and five things of section 7 were true in the code with no assertion, now
+asserted: no window on the second shift, nothing ordered or unloaded and no man's minute booked
+(against the same day with no contract), the material paid past the overdraft floor, the contract
+offered and taken with three standing contracts running, and `playSheets` in the frame loop itself
+(a mutation of that call turns the test red). The README's one sentence beyond the brief's lines
+(on the packs) is taken out.

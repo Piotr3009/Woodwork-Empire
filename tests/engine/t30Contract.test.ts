@@ -22,6 +22,7 @@ import {
 } from '../../src/engine/constants';
 import type { GameEvent, GameState, Worker } from '../../src/engine/index';
 import { applyAction, runMinutes } from '../../src/engine/index';
+import { contractsFull, drawContract } from '../../src/engine/contracts';
 import { sellMachine } from '../../src/engine/game';
 import { lineMaterialPerWindow, lineWindowMinutes } from '../../src/engine/lineContract';
 import { lineFactor, lineLevel } from '../../src/engine/machines';
@@ -84,8 +85,13 @@ describe('the offer (CLAUDE.md T30 2.6)', () => {
   it('comes by a card at the open of a working day once the six stand and two engineers are on the books', () => {
     const seen: GameEvent[] = [];
     const before = withLine(bigUnit());
-    const rng = before.rng;
-    nextDay(before, seen);
+    // The same company with the offer put off for a year: what the morning draws off the seeded
+    // stream must be the same with the card as without it (flipped in E3: the old check read the
+    // state before the play, which the play never changes).
+    const quiet = structuredClone(before);
+    quiet.windowLine.nextOfferDay = quiet.clock.day + 365;
+    const offered = nextDay(before, seen);
+    const without = nextDay(quiet);
     const card = seen.find((event) => event.kind === 'lineContractOffered');
     expect(card?.title).toBe('Windows off the line');
     expect(card?.body).toBe(
@@ -98,7 +104,26 @@ describe('the offer (CLAUDE.md T30 2.6)', () => {
       { id: 'take', label: 'Take it' },
       { id: 'notNow', label: 'Not now' },
     ]);
-    expect(before.rng).toBe(rng);
+    expect(without.windowLine.contract).toBeNull();
+    expect(offered.clock.day).toBe(without.clock.day);
+    expect(offered.rng).toBe(without.rng);
+    // The same enquiries drawn; only what they are locked for differs, since the line taken on its
+    // contract stands in for nothing on the board (CLAUDE.md T30 2.6).
+    const drawn = (state: GameState): unknown[] => state.enquiries.map((entry) => ({ ...entry, lockReason: null }));
+    expect(drawn(offered)).toEqual(drawn(without));
+  });
+
+  it('is offered and taken with three standing contracts running, and is not counted against them', () => {
+    const state = withLine(bigUnit());
+    const like = drawContract(state, structuredClone(state));
+    state.contracts = [1, 2, 3].map((n) => ({ ...structuredClone(like), id: `contract-${n}`, status: 'active' as const }));
+    expect(contractsFull(state)).toBe(true);
+    const seen: GameEvent[] = [];
+    const next = nextDay(state, seen);
+    expect(seen.some((event) => event.kind === 'lineContractOffered')).toBe(true);
+    expect(next.windowLine.contract?.status).toBe('active');
+    expect(next.contracts.filter((contract) => contract.status === 'active')).toHaveLength(3);
+    expect(contractsFull(next)).toBe(true);
   });
 
   it('is not offered with one engineer, with no line, or with the line short of a module', () => {
@@ -175,6 +200,38 @@ describe('the windows (CLAUDE.md T30 2.7)', () => {
     for (const item of day.equipment.filter((entry) => LINE_MODULES.includes(entry.specId))) {
       expect(item.hoursUsed, item.id).toBe(0);
     }
+  });
+
+  it('makes none on the second shift, orders and unloads nothing, and books no man a minute', () => {
+    const state = taken(withLine(bigUnit()));
+    state.shift.second = true;
+    // The same day with no contract: what the men did must be what they did beside it.
+    const quiet = structuredClone(state);
+    quiet.windowLine.contract = null;
+    quiet.windowLine.nextOfferDay = quiet.clock.day + 365;
+    const home = (event: GameEvent): string => (event.kind === 'goingHome' ? 'home' : event.choices[0]?.id ?? 'ok');
+    const morning = state.clock.day;
+    const day = play(state, DAY_END_MINUTE + 60, home);
+    const plain = play(quiet, DAY_END_MINUTE + 60, home);
+    // The day's four, and none in the night that followed it.
+    const windows = day.ledger.filter((entry) => entry.label === 'Windows off the line: windows' && entry.day === morning);
+    expect(windows.map((entry) => entry.amount)).toEqual([4 * LINE_WINDOW_PRICE]);
+    expect(day.onOrder).toEqual(plain.onOrder);
+    expect(day.deliveries).toEqual(plain.deliveries);
+    expect(day.tasks.filter((task) => task.kind === 'unload')).toEqual(plain.tasks.filter((task) => task.kind === 'unload'));
+    expect(day.workers.map((worker) => [worker.id, worker.minutesWorked])).toEqual(plain.workers.map((worker) => [worker.id, worker.minutesWorked]));
+    expect(day.owner.minutesWorked).toBe(plain.owner.minutesWorked);
+  });
+
+  it('pays the timber and the glass past the overdraft floor', () => {
+    const state = taken(withLine(bigUnit()));
+    state.cash = state.finance.overdraftLimit - 1000;
+    const cash = state.cash;
+    const after = play(state, LINE_WINDOW_MINUTES, (event) => event.choices[0]?.id ?? 'ok');
+    expect(after.windowLine.contract?.windowsMade).toBe(1);
+    const material = after.ledger.filter((entry) => entry.label === 'Windows off the line: timber and glass');
+    expect(material.map((entry) => entry.amount)).toEqual([-lineMaterialPerWindow()]);
+    expect(after.cash).toBe(cash + LINE_WINDOW_PRICE - lineMaterialPerWindow());
   });
 
   it('makes none in the dinner hour whether the owner takes it or works through it, and none after five', () => {
