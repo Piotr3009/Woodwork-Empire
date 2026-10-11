@@ -54,7 +54,9 @@ import { cancelledLoadWords, createDelivery, isBoards, lineLoadWords } from './m
 import { crewHasGoneHome, lineEngineers } from './staff';
 import { firstOnDutyOf, movingMachines } from './tasks';
 import { inWords, plural } from './text';
-import type { Delivery, GameState, LineContract, LineDay, LineSince, WindowLineState } from './types';
+import { bookLineMinute, bookLineUpgrade, bookLineWindow, emptyLineDay, emptyLineSince, openLineBooks } from './lineBooks';
+import type { LineLostCause } from './lineBooks';
+import type { Delivery, GameState, LineContract, WindowLineState } from './types';
 
 /** The line's state of a company that has never had a line: no contract, no offer yet, no window
  *  in hand, an empty pallet, nothing at the gate and no upgrade (CLAUDE.md T30 section 4); from
@@ -75,27 +77,6 @@ export function emptyWindowLine(day = 0): WindowLineState {
     days: [],
     since: emptyLineSince(),
   };
-}
-
-/** A day of the line's day book with nothing in it yet (CLAUDE.md T31 2.5). */
-export function emptyLineDay(day: number): LineDay {
-  return {
-    day,
-    windows: 0,
-    turnover: 0,
-    material: 0,
-    engineers: 0,
-    power: 0,
-    cover: 0,
-    possibleMinutes: 0,
-    possibleWindows: 0,
-    lost: { engineer: 0, moving: 0, timber: 0, glass: 0 },
-  };
-}
-
-/** The totals of a line that has never stood (CLAUDE.md T31 2.5). */
-export function emptyLineSince(): LineSince {
-  return { firstDay: null, windows: 0, turnover: 0, material: 0, engineers: 0, power: 0, cover: 0 };
 }
 
 /** What the timber and the glass of one window cost, written from the price and the share and
@@ -353,6 +334,8 @@ export function buyLineUpgrade(state: GameState, upgradeId: string): { ok: boole
   const spec = LINE_UPGRADES.find((entry) => entry.id === upgradeId);
   if (spec === undefined) return check;
   pay(state, 'equipment', `Line upgrade: ${spec.name}`, spec.price);
+  // Into what the line has cost, for its paid back line (CLAUDE.md T31 2.5).
+  bookLineUpgrade(state, spec.price);
   state.windowLine.upgrades.push({ id: spec.id, fittedOnDay: addWorkingDays(state.clock.day, LINE_UPGRADE_DAYS) });
   return check;
 }
@@ -404,6 +387,8 @@ export function lineOfferBody(state: GameState): string {
  *  starts the week's count, and the contract is offered when it may be (CLAUDE.md T30 2.6, 2.8);
  *  then the office looks at the line's timber and glass (CLAUDE.md T31 2.3). */
 export function runLineDay(state: GameState): void {
+  // The day book first: yesterday and the days since closed, today opened (CLAUDE.md T31 2.5).
+  openLineBooks(state);
   const line = state.windowLine;
   // Taken at no cost and with no line in the ledger: its windows were paid as they were made.
   line.palletsAtGate = 0;
@@ -487,13 +472,35 @@ export function endLineContract(state: GameState): void {
  *  a window's boards and glass: a minute with too little is a minute it stands (CLAUDE.md T31
  *  2.1). */
 export function lineMakesWindows(state: GameState): boolean {
+  return lineContractMinute(state) && lineStoppedBy(state) === null;
+}
+
+/** A working minute of the line's contract: the contract running, a working day, not the dinner
+ *  hour and not after five. */
+function lineContractMinute(state: GameState): boolean {
   if (runningLineContract(state) === null) return false;
   if (!isWorkingDay(state.clock.day)) return false;
   if (isBreak(state.clock.minute)) return false;
-  if (crewHasGoneHome(state)) return false;
-  if (movingMachines(state) !== null) return false;
-  if (lineLevel(state) < LINE_MODULES.length) return false;
-  return lineShortOf(state) === null;
+  return !crewHasGoneHome(state);
+}
+
+/** What stops a working minute of the line's contract, or null when nothing does: too few engineers
+ *  on duty first, then the move, then the timber, then the glass (CLAUDE.md T31 2.5) [TUNE: the
+ *  order]. */
+function lineStoppedBy(state: GameState): LineLostCause | null {
+  if (lineLevel(state) < LINE_MODULES.length) return 'engineer';
+  if (movingMachines(state) !== null) return 'moving';
+  if (!lineHasTimber(state)) return 'timber';
+  if (!lineHasGlass(state)) return 'glass';
+  return null;
+}
+
+/** A working minute of the line's contract into its day book: on a working day, not the dinner
+ *  hour and not after five, while the contract runs, whether the line runs it or stands; the
+ *  minutes its contract ran are what its efficiency is reckoned against (CLAUDE.md T31 2.5). */
+function bookContractMinute(state: GameState): void {
+  if (!lineContractMinute(state)) return;
+  bookLineMinute(state, lineWindowMinutes(state), lineStoppedBy(state));
 }
 
 /** The line's own minute, beside the men's: the window in hand moves on by one, and at its minutes
@@ -501,6 +508,7 @@ export function lineMakesWindows(state: GameState): boolean {
  *  labourer do not touch it, and no minute of any man or machine is booked for it (CLAUDE.md T30
  *  2.7) [TUNE]. */
 export function runLineMinute(state: GameState): void {
+  bookContractMinute(state);
   if (!lineMakesWindows(state)) return;
   const line = state.windowLine;
   line.minutes += 1;
@@ -522,6 +530,9 @@ function makeWindow(state: GameState): void {
   if (contract === null) return;
   const line = state.windowLine;
   charge(state, 'contract', `${LINE_CONTRACT_NAME}: windows`, LINE_WINDOW_PRICE, { merge: true });
+  // And into the line's own day book: the window, its turnover and the material it used
+  // (CLAUDE.md T31 2.5).
+  bookLineWindow(state, LINE_WINDOW_PRICE, lineMaterialPerWindow());
   line.boards -= LINE_BOARDS_PER_WINDOW;
   state.stock.sheets = Math.max(0, state.stock.sheets - LINE_BOARDS_PER_WINDOW);
   line.glass -= LINE_GLASS_PER_WINDOW;

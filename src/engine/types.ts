@@ -810,8 +810,8 @@ export interface LineLostMinutes {
 }
 
 /** The line's day in hand (CLAUDE.md T31 2.5): the windows made, their turnover and the material
- *  they used, the working minutes its contract ran and the windows it could have made in them,
- *  the minutes lost by cause, and the engineers', power's and cover's shares of the calendar day. */
+ *  they used, the working minutes its contract ran, the minutes lost by cause and the windows they
+ *  would have made, and the engineers', power's and cover's shares of the calendar day. */
 export interface LineDay {
   day: number;
   windows: number;
@@ -821,7 +821,7 @@ export interface LineDay {
   power: number;
   cover: number;
   possibleMinutes: number;
-  possibleWindows: number;
+  lostWindows: number;
   lost: LineLostMinutes;
 }
 
@@ -829,6 +829,8 @@ export interface LineDay {
  *  is null until the line has stood. */
 export interface LineSince {
   firstDay: number | null;
+  /** What the upgrades bought for the line cost, kept when they go with a sale. */
+  upgrades: number;
   windows: number;
   turnover: number;
   material: number;

@@ -42,3 +42,19 @@ every new field of the turn, and a running line given one batch of each, free. N
 line of a window (`t30Contract`, `turn30` (eee)), the material wanted by `t30Upgrades`,
 `t30Sheets`, `t30Line` and `turn30` (fff, ggg), `WARNING_ORDER` and the windowLine shape of the v42
 lift.
+
+**T31-B2 The line's books.** A day book of the line's own in `src/engine/lineBooks.ts`:
+`windowLine.today` (the windows, their turnover and the material they used, the working minutes its
+contract ran and the windows it could have made in them, the minutes lost by cause, and the
+engineers', power's and cover's shares of the calendar day), `days` (one record a calendar day,
+written at the open of each working day for the days since the last one, weekends among them, kept
+400 days) and `since` (the totals since the line first stood). The Accounting page's fifth tab,
+`Production line`, after `Finance`, shown once the line has stood and read off the day book whether
+or not the books are up to date: four columns in the Summary's classes with the eight rows of 2.5,
+and under them the month's working day, the year at the month's pace, the paid back line and what
+the month lost. The efficiency reads the windows made of those made and the whole windows its lost
+minutes would have made, so a day that lost nothing reads 100 whatever minutes a window carried over
+[TUNE]; the pace and the working day are reckoned over the month's days closed in the book; the paid
+back line counts every upgrade bought, kept after a sale; a lifted save whose line stands starts its
+book that morning. New test: `tests/ui/t31Books.test.ts`, a played month row by row, the turnover
+against the ledger, the efficiency on a day an engineer was away, the 400 days kept.

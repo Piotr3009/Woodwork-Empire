@@ -1,6 +1,7 @@
 // Accounting in four tabs: the month day by day, the totals with the earned labour rate, the
-// months the company has closed, and the bank (CLAUDE.md 10.1, T6 3.9, T23 2.14). Nothing arrives
-// as a letter, it is all here.
+// months the company has closed, and the bank (CLAUDE.md 10.1, T6 3.9, T23 2.14); and a fifth, the
+// production line's own books, once the line has stood (CLAUDE.md T31 2.5). Nothing arrives as a
+// letter, it is all here.
 
 import {
   booksBehind,
@@ -23,22 +24,33 @@ import {
 } from '../engine/index';
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
 import { monthlyPremiums, nextInstalmentFor } from '../engine/index';
-import { AGENCY_MONTHLY_FEE } from '../engine/constants';
+import { AGENCY_MONTHLY_FEE, LINE_PRICE } from '../engine/constants';
+import { lineColumns, lineHasStood, lineMonthPace, linePaidBack } from '../engine/lineBooks';
+import type { LineColumn } from '../engine/lineBooks';
+import type { LineLostMinutes } from '../engine/types';
 import { renderFinance } from './finance';
-import { button, escapeHtml, money, tabBar, whyLink } from './modal';
+import { button, escapeHtml, money, plural, tabBar, whyLink } from './modal';
 
 /** The three ways of looking at the books (CLAUDE.md T6 3.9), and the loan and the overdraft
  *  (CLAUDE.md T13 3.14). The running ledger had a screen of its own until Turn 23: Piotr read it
  *  and said it was made for an accountant and not for a player, so the months the company has
  *  closed stand there instead. The ledger itself stays in the engine as the record it is, and the
  *  Days tab, the Summary tab and the bank all read it [PIOTR, 20.09] (CLAUDE.md T23 2.14). */
-export type AccountingTab = 'days' | 'summary' | 'reports' | 'finance';
+export type AccountingTab = 'days' | 'summary' | 'reports' | 'finance' | 'line';
 const TABS: Array<[AccountingTab, string]> = [
   ['days', 'Days'],
   ['summary', 'Summary'],
   ['reports', 'Monthly reports'],
   ['finance', 'Finance'],
+  // The production line's own books, after the Finance tab, shown once the company has had the
+  // line standing (CLAUDE.md T31 2.5) [TUNE].
+  ['line', 'Production line'],
 ];
+
+/** The tabs this company has: the line's once it has stood. */
+function tabsOf(state: GameState): Array<[AccountingTab, string]> {
+  return TABS.filter(([id]) => id !== 'line' || lineHasStood(state));
+}
 
 export function accountingTabFrom(value: string | undefined): AccountingTab {
   const found = TABS.find(([id]) => id === value);
@@ -243,6 +255,87 @@ function monthlyBillsLine(state: GameState): string {
   return items.join(', ');
 }
 
+/** One column of the Production line tab, in the Summary tab's own classes: the windows, the
+ *  turnover, the four costs, the net profit as the total row and the efficiency (CLAUDE.md T31
+ *  2.5). */
+function lineColumnBlock(title: string, column: LineColumn): string {
+  // Coloured by the Summary's own rule: under nought red, else green.
+  const cost = (label: string, amount: number): string =>
+    `<div class="row"><span class="row-main">${escapeHtml(label)}</span>` +
+    `<span class="row-figure ${amount > 0 ? 'bad' : 'good'}">${money(-amount)}</span></div>`;
+  const efficiency =
+    column.efficiency === null
+      ? `${column.windows} of ${column.couldMake}`
+      : `${column.windows} of ${column.couldMake}, ${column.efficiency}%`;
+  return (
+    `<div class="col"><h3>${escapeHtml(title)}</h3>` +
+    `<div class="row"><span class="row-main">Windows made</span><span class="row-figure">${column.windows}</span></div>` +
+    `<div class="row"><span class="row-main">Turnover</span><span class="row-figure good">${money(column.turnover)}</span></div>` +
+    cost('Timber and glass', column.material) +
+    cost('Engineers', column.engineers) +
+    cost('Power', column.power) +
+    cost('Property cover', column.cover) +
+    `<div class="row is-total"><span class="row-main">Net profit</span>` +
+    `<span class="row-figure ${column.net < 0 ? 'bad' : 'good'}">${money(column.net)}</span></div>` +
+    `<div class="row"><span class="row-main">Efficiency</span><span class="row-figure">${efficiency}</span></div>` +
+    '</div>'
+  );
+}
+
+/** Minutes lost in the words the lost line reads: `6 h`, `1 h 30 min`, `45 min`. */
+function lostTime(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+/** What the month's efficiency lost, by cause, in the order the line is stopped by them, or
+ *  nothing when it lost none (CLAUDE.md T31 2.5) [TUNE: the words]. */
+function lostLine(lost: LineLostMinutes): string {
+  const causes: Array<[keyof LineLostMinutes, string]> = [
+    ['engineer', 'for want of an engineer'],
+    ['moving', 'while it was moved'],
+    ['timber', 'for want of timber'],
+    ['glass', 'for want of glass'],
+  ];
+  const said = causes.filter(([key]) => lost[key] > 0).map(([key, words]) => `${lostTime(lost[key])} ${words}`);
+  return said.length === 0 ? '' : `<p class="figures">Lost this month: ${escapeHtml(said.join(', '))}</p>`;
+}
+
+/** A count of windows with one place where it is not whole: `4 windows`, `3.8 windows` [TUNE]. */
+function windowsWords(windows: number): string {
+  const rounded = Math.round(windows * 10) / 10;
+  return Number.isInteger(rounded) ? plural(rounded, 'window', 'windows') : `${rounded} windows`;
+}
+
+/** The Production line tab: the four columns from the line's own day book, the month's working
+ *  day, the year at the month's pace, the paid back line and what the month lost (CLAUDE.md T31
+ *  2.5). Read off the day book and never the ledger, so it reads the same whether or not the books
+ *  are up to date [TUNE]. */
+function lineTab(state: GameState): string {
+  const columns = lineColumns(state);
+  const pace = lineMonthPace(state);
+  const paid = linePaidBack(state);
+  // The line's price, and the upgrades' beside it once any was bought [TUNE: the words].
+  const of = paid.upgrades > 0 ? `${money(LINE_PRICE)} and the upgrades' ${money(paid.upgrades)}` : money(LINE_PRICE);
+  return (
+    '<div class="cols">' +
+    lineColumnBlock('Today', columns.today) +
+    lineColumnBlock('This week', columns.week) +
+    lineColumnBlock('This month', columns.month) +
+    lineColumnBlock('This year', columns.year) +
+    '</div>' +
+    (pace === null
+      ? ''
+      : `<p class="figures">A working day on average this month: ${windowsWords(pace.windowsADay)}, ` +
+        `${money(pace.netADay)} net</p>` +
+        `<p class="figures">A year at this month's pace: ${money(pace.year)} net</p>`) +
+    `<p class="figures">Paid back: ${money(paid.net)} of ${of}, ${paid.share}%</p>` +
+    lostLine(columns.month.lost)
+  );
+}
+
 /** What the workshop earns for an hour of somebody's time, machines and all (CLAUDE.md T6 3.8). */
 function earnedRateLine(state: GameState): string {
   return (
@@ -292,21 +385,25 @@ export function renderAccounting(
     `<div class="row"><span class="row-main">Monthly bills, ${formatCalendarDay(due.monthly)}</span>` +
     `<span class="row-figure">${escapeHtml(monthlyBillsLine(state))}</span></div>` +
     '';
+  // The line's tab only once it has stood: a tab asked for before that is the Days tab.
+  const shown = tab === 'line' && !lineHasStood(state) ? 'days' : tab;
   const body =
-    tab === 'days'
+    shown === 'days'
       ? daysTab(state, entries, openDays, month ?? monthOfDay(state.clock.day))
-      : tab === 'reports'
+      : shown === 'reports'
         ? reportsTab(state)
-        : tab === 'finance'
+        : shown === 'finance'
           ? renderFinance(state, loanTyped)
-          : summaryTab;
+          : shown === 'line'
+            ? lineTab(state)
+            : summaryTab;
   return (
     `<p class="figures"><strong>${money(state.cash)}</strong> in the bank. ` +
     `Overdraft limit ${money(state.finance.overdraftLimit)}. ` +
     `Deposit held by the landlord ${money(state.unit.depositHeld)}` +
     `${whyLink(state, 'depositReturn')}</p>` +
     banner +
-    tabBar('accountingTab', TABS, tab) +
+    tabBar('accountingTab', tabsOf(state), shown) +
     body +
     `<p class="hint">${button('copyState', 'Copy state as JSON')}</p>`
   );

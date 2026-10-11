@@ -21,7 +21,7 @@ import { orientationsFor } from '../../src/engine/ports';
 import { spriteFiles } from '../../src/render/sprites';
 import { acceptNow, buyStartingKit, newGame, placeEnquiry, placeEquipment, twoMenOnSheetWork } from '../helpers';
 import { canPlace, firstFreeCell } from '../../src/engine/layout';
-import { emptyLineDay, emptyLineSince } from '../../src/engine/lineContract';
+import { emptyLineDay, emptyLineSince } from '../../src/engine/lineBooks';
 import { nextWorkingDay } from '../../src/engine/clock';
 
 /** A game saved by v18 on the morning of day 2, with a full bag on the saw, the question about
@@ -1696,9 +1696,16 @@ describe('a v43 save (CLAUDE.md T31 section 4)', () => {
     raw.windowLine.contract = {
       status: 'active', startDay: 990, windowsThisWeek: 2, weekStartDay: 995, windowsMade: 88, revenue: 132000, materialCost: 52800,
     };
+    // The six standing whole, as v89 stood them.
+    for (let n = 1; n <= 6; n += 1) raw.equipment.push({ ...moduleStanding(raw, n, 1000000), anchorX: 2 + 6 * (n - 1) });
     const counter = raw.stock.sheets;
     const opened = migrateState(raw, 43);
     if (opened === null) throw new Error('the lift refused a whole version 43 state');
+    // Its books start the morning the save is opened, so its tab is there at once (CLAUDE.md T31
+    // 2.5).
+    expect(opened.windowLine.since.firstDay).toBe(999);
+    expect(opened.windowLine.today.day).toBe(999);
+    expect(opened.windowLine.today.power).toBe(360);
     expect(opened.windowLine.boards).toBe(40);
     expect(opened.stock.sheets).toBe(counter + 40);
     expect(opened.windowLine.glass).toBe(20);

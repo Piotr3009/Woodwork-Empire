@@ -38,9 +38,10 @@ import {
   standsBehindTheWall,
   standsOutside,
 } from './layout';
-import { findSpec, isLineModule, isSold } from './machines';
+import { findSpec, isLineModule, isSold, lineStandsWhole } from './machines';
 import { queueEvent } from './events';
-import { emptyLineDay, emptyLineSince, emptyWindowLine, lineOrderBoards } from './lineContract';
+import { emptyWindowLine, lineOrderBoards } from './lineContract';
+import { emptyLineDay, emptyLineSince, startLineBooks } from './lineBooks';
 import { planPlaces } from './production';
 import { rolesForTask } from './tasks';
 import type { Equipment, GameState, OnOrderItem, Orientation, TaskKind, WorkerRole, WorkerTier } from './types';
@@ -1377,10 +1378,12 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       // Not a whole hall, with no books to pay it back through.
     }
   }
-  // A line on its contract given its first batch of timber and glass (v91).
+  // A line on its contract given its first batch of timber and glass, and a line that stands given
+  // its first day in its own books, so its tab is there from the morning the save is opened (v91).
   if (version < 44 && isRecord(lifted.windowLine) && isRecord(lifted.stock)) {
     try {
       giveTheLineItsFirstBatch(lifted);
+      if (lineStandsWhole(lifted)) startLineBooks(lifted);
     } catch {
       // Not a whole state: nothing to give it to.
     }
