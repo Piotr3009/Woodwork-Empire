@@ -193,12 +193,18 @@ import type {
  *  state gains its one field for the line (its contract, its windows, its pallets and its
  *  upgrades), and Turn 29's modules bought one by one are taken back, their money given back on one
  *  line of the books and the player told by a card at the first settle (CLAUDE.md T30 section 4).
- *  Every v12 to v42 save loads. */
-export const STATE_VERSION = 43;
+ *  Every v12 to v42 save loads.
+ *
+ *  Version 44 is v92, Turn 31 (PIOTR, 11.10). The line's timber and glass, the glass on its way and
+ *  its own day book; the hall made longer along its rear wall; the quiet weeks of the contracts.
+ *  Every new field of the turn is written with its default by the one lift, and a line whose
+ *  contract runs is given one batch of timber and glass, free (CLAUDE.md T31 section 4). Every v12
+ *  to v43 save loads. */
+export const STATE_VERSION = 44;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v91';
+export const APP_VERSION = 'v92';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -477,6 +483,18 @@ export const UNIT_SECOND_EXTENSION_PRICE = 1000000;
  *  times two: insurance, security, power"] (v82). The rent, the rates, the standing power and a
  *  security firm's month are doubled by the area itself, as they were by the first extension. */
 export const UNIT_SECOND_EXTENSION_COST_FACTOR = 2;
+/** The hall that grows [PIOTR, 11.10: "adding 200 m² at a time, each time 20 per cent dearer than
+ *  the present price for 200"; "from 600"; "as many as the player wants"]. Once the second
+ *  extension is open the hall can be made longer again and again, one at a time: each adds this
+ *  many metres along the rear wall, which is 200 m2 of a hall twenty metres deep, and the n-th of
+ *  them (n from 0) costs the first price times the growth to the n, rounded to the pound
+ *  (CLAUDE.md T31 2.7). The landlord's deposit on the bigger rent is on top of it. */
+export const UNIT_LONG_EXTENSION_CELLS = 10;
+/** The floor of the unit the second extension makes, forty metres by twenty: what the long
+ *  extensions are reckoned past (CLAUDE.md T31 2.7). */
+export const UNIT_SECOND_EXTENSION_M2 = 800;
+export const UNIT_LONG_EXTENSION_PRICE = 600000;
+export const UNIT_LONG_EXTENSION_GROWTH = 1.2;
 
 /** Where the second extension of a unit stands. No save from before v82 carries the field, and
  *  that is a unit that has not had one (v82). */
@@ -484,10 +502,13 @@ export function secondExtensionOf(unit: { secondExtension?: UnitExtension }): Un
   return unit.secondExtension ?? 'none';
 }
 
-/** What the insurer and a flat security level multiply their figure by for this unit: two once
- *  the second extension is open, and one until then (v82). */
-export function unitCostFactor(unit: { secondExtension?: UnitExtension }): number {
-  return secondExtensionOf(unit) === 'open' ? UNIT_SECOND_EXTENSION_COST_FACTOR : 1;
+/** What the insurer and a flat security level multiply their figure by for this unit: one until
+ *  the second extension is open, and from then the area over 400 m2, which is two in the 800 m2
+ *  unit as it always was and goes up with every long extension: 2.5 at 1,000 m2 (v82; CLAUDE.md
+ *  T31 2.7) [TUNE: chat]. */
+export function unitCostFactor(unit: { secondExtension?: UnitExtension; areaM2: number }): number {
+  if (secondExtensionOf(unit) !== 'open') return 1;
+  return (UNIT_SECOND_EXTENSION_COST_FACTOR * unit.areaM2) / UNIT_SECOND_EXTENSION_M2;
 }
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
@@ -2199,23 +2220,25 @@ export const TIMBER_RACK_VARIANTS: EquipmentVariant[] = [
   },
 ];
 
-/** The timber shelter's one class: 400 boards out on the apron, under a roof [TUNE: chat]
- *  (CLAUDE.md T29 2.11.1). */
+/** The timber shelter's one class: 400 boards outside behind the hall, under a roof [TUNE: chat]
+ *  (CLAUDE.md T29 2.11.1, T31 2.8). */
 export const TIMBER_SHELTER_VARIANTS: EquipmentVariant[] = [
   {
     id: STANDARD_VARIANT,
     name: 'Timber shelter',
     price: 18000,
-    width: 3,
-    depth: 6,
+    // As the art side drew it, 6 m along the wall by 3 m deep: Turn 29 declared it 3 by 6 only
+    // because the apron is 3 m wide (CLAUDE.md T31 2.8).
+    width: 6,
+    depth: 3,
     height: 3,
-    zoneWidth: 3,
-    zoneDepth: 6,
+    zoneWidth: 6,
+    zoneDepth: 3,
     boardCapacity: 400,
     enduranceFactor: 1,
     powerPerDay: 1,
     description:
-      'A lean to roof over racks of boards, open at the front, standing outside on the apron so ' +
+      'A lean to roof over racks of boards, open at the front, standing outside behind the hall so ' +
       'it takes no floor of the hall.',
   },
 ];
@@ -3971,14 +3994,14 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Timber shelter',
     price: 18000,
     category: 'storage',
-    width: 3,
-    depth: 6,
+    width: 6,
+    depth: 3,
     height: 3,
-    zoneWidth: 3,
-    zoneDepth: 6,
+    zoneWidth: 6,
+    zoneDepth: 3,
     spriteKey: 'timberShelter',
     boardCapacity: 400,
-    effect: 'Holds ten times a rack\u0027s boards outside on the apron, and takes no floor of the hall.',
+    effect: 'Holds ten times a rack\u0027s boards outside behind the hall, and takes no floor of the hall.',
   },
 
   {
@@ -4866,6 +4889,9 @@ export const CANTEEN_LOCKERS_WIDE = CANTEEN_PLATES_WIDE.length;
  *  that unit takes [PIOTR, 04.10: "thirty two workers"] (v82). Its picture has the sixteen doors
  *  it was painted with, so the room shows the thirty two sixteen at a time. */
 export const CANTEEN_LOCKERS_DEEP = CANTEEN_LOCKERS_WIDE * 2;
+/** And this many more in an enlarged canteen for every 200 m2 the hall has grown past 800, so the
+ *  lockers keep up with the joiners the longer hall takes (CLAUDE.md T31 2.7) [TUNE: chat]. */
+export const CANTEEN_LOCKERS_PER_LONG_EXTENSION = 8;
 
 /** The counter over the banks, where the room says how many of the eight are in use [PIOTR]. */
 export const CANTEEN_COUNTER: RoomRect = { x: 95, y: 35, w: 450, h: 65 };
@@ -4917,9 +4943,10 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   edgebander: { x: 13, y: 6 },
   forklift: { x: 18, y: 6 },
   van: { x: 0, y: 7, yard: true },
-  // The timber shelter stands outside on the apron as the van does, its first cell x 0, y 1 of it
-  // (CLAUDE.md T29 2.11.1).
-  timberShelter: { x: 0, y: 1, yard: true },
+  // The timber shelter stands outside behind the rear wall with the plant, where it hides nothing
+  // of the hall [PIOTR, 11.10: "it hides our hall; rather where the extractors are, or behind them;
+  // nothing in the hall may be hidden"] (CLAUDE.md T31 2.8). On the apron the van stands alone.
+  timberShelter: { x: 0, y: 1, yard: true, rear: true },
 };
 
 /** Bench slots, in order, along the middle of the hall clear of the rooms and the personnel door.
@@ -5260,8 +5287,9 @@ export const LINE_MODULES_KEPT: readonly number[] = [0, 3, 6];
 export const LINE_MODULES: readonly string[] = Object.keys(LINE_MODULE_SHARES);
 /** The first cell the line is asked to stand on at its order: module N stands six cells along x
  *  from the one before, at orientation 0, so the line takes the cells x 2 to 37, y 14 to 16, along
- *  the middle of the front half of the 800 m2 hall. Taken only when the 36 m by 3 m there is clear;
- *  otherwise the first clear run cell by cell (CLAUDE.md T30 2.4) [TUNE: chat: the cells]. */
+ *  the middle of the front half of the 800 m2 hall, its men at y 17 and its lane at y 18 and 19
+ *  and x 0 and 1. Taken only when the 36 m by 3 m there and its lane are clear; otherwise the first
+ *  clear run cell by cell (CLAUDE.md T30 2.4, T31 2.6) [TUNE: chat: the cells]. */
 export const WINDOW_LINE_ORIGIN = { x: 2, y: 14 };
 /** [PIOTR, 04.10: "at each stage output goes up by a percentage"; TUNE: chat: the figures] What
  *  the line gives every stage of a timber job while it runs at a level, by the level: nothing at
@@ -5298,9 +5326,10 @@ export const LINE_NAME = 'Window production line';
 /** [PIOTR, 10.10: "about 1,500 pounds a window on average, a standing order"] What the window
  *  company pays for every window the line makes on its contract (CLAUDE.md T30 2.6). */
 export const LINE_WINDOW_PRICE = 1500;
-/** [PIOTR, 10.10: "material 40"] The share of a window's price its timber and glass cost, booked as
- *  money for each window made; the labour, twenty per cent, is the two engineers' wages, which the
- *  month already pays (CLAUDE.md T30 2.6). */
+/** [PIOTR, 10.10: "material 40"] The share of a window's price its timber and glass cost: from
+ *  Turn 31 paid at their order and taken off what the line holds as each window is made; the
+ *  labour, twenty per cent, is the two engineers' wages, which the month already pays (CLAUDE.md
+ *  T30 2.6; T31 2.1). */
 export const LINE_MATERIAL_SHARE = 0.4;
 /** [PIOTR, 10.10: "one window every two hours"] The minutes a window takes on the line's contract
  *  (CLAUDE.md T30 2.7). */
@@ -5312,8 +5341,38 @@ export const LINE_PALLET_WINDOWS = 10;
  *  added, along the left wall just past the end of the gate lane, one box a pallet and two at the
  *  most, as the finished goods are drawn (CLAUDE.md T30 2.8) [TUNE: chat]. */
 export const LINE_PALLET_LAYOUT = { x: 0, y: 10, width: 2, depth: 1, height: 1.75 };
+/** The pallets drawn at the gate at the most, each the art side's pallet of 2 m by 1 m, the second
+ *  beside the first along x, at x 2 to 3 (CLAUDE.md T31 2.10) [TUNE: chat]. */
+export const LINE_PALLETS_DRAWN = 2;
+/** [PIOTR, 11.10: "two yellow lines from the end of the production line to the door, for the
+ *  forklift"; "yes" to two metres] The width of the forklift's lane: its front strip along the front
+ *  wall and its left strip up the left wall to the pallets at the gate (CLAUDE.md T31 2.6). */
+export const FORKLIFT_LANE_CELLS = 2;
+/** The metre in front of the line where its men stand, the front side of `STATION_TABLE` for every
+ *  module, which the line's lane never overlaps (CLAUDE.md T31 2.6). */
+export const LINE_FRONT_CELLS = 1;
 /** The line's contract's name: the client has no name (CLAUDE.md T30 2.6) [TUNE: chat]. */
 export const LINE_CONTRACT_NAME = 'Windows off the line';
+/** [PIOTR, 11.10: "yes" to chat's proposal] The boards a window of the line's contract takes off
+ *  the timber stores as it is made; at `SHEET_VALUE` each they are 400 of its 600 (CLAUDE.md T31
+ *  2.1) [TUNE: chat: the split]. */
+export const LINE_BOARDS_PER_WINDOW = 2;
+/** [PIOTR, 11.10: "yes"] The glass a window takes, one window's worth, from what stands at module
+ *  6: the rest of its 600 (CLAUDE.md T31 2.1). */
+export const LINE_GLASS_PER_WINDOW = 1;
+/** [PIOTR, 11.10: "yes"] Module 6 holds glass for this many windows, what is on its way counted
+ *  in (CLAUDE.md T31 2.1, 2.2). */
+export const LINE_GLASS_WINDOWS_MAX = 40;
+/** [PIOTR, 11.10: "yes"] One order of the line's timber or glass is for this many windows: 40
+ *  boards, or glass for 20 windows (CLAUDE.md T31 2.2). */
+export const LINE_ORDER_WINDOWS = 20;
+/** The calendar days the line's own day book keeps behind the day in hand: more than a year of
+ *  the game's, so the tab's year is always whole (CLAUDE.md T31 2.5). */
+export const LINE_DAYS_KEPT = 400;
+/** [PIOTR, 11.10: "the office admin orders by himself when two days are left"] The office orders
+ *  the line's timber or glass when what it holds and what is on its way are fewer than this many
+ *  working days of windows at the line's pace (CLAUDE.md T31 2.3). */
+export const LINE_REORDER_DAYS = 2;
 
 /** [PIOTR, 11.10: "later add ons can be bought, better new knives, better software, so that it
  *  later speeds up to one window an hour"; TUNE: chat: the fifteen minutes] What each upgrade of the
@@ -5419,6 +5478,61 @@ const LINE_WORK_SHEET: WorkSheetFigures = {
 export const MACHINE_WORK_SHEETS: Readonly<Record<string, WorkSheetFigures>> = Object.fromEntries(
   LINE_MODULES.map((id, index) => [id, { ...LINE_WORK_SHEET, atMinute: index * LINE_SHEET_STAGGER_MINUTES }]),
 );
+/** The figures of a vehicle's driving sheet: four rows, one a direction, of cells the same size,
+ *  each with the vehicle's anchor in it, played at the sheet's own frames a second (docs/art/
+ *  SPRITES.md 16). The shape of a figure's sheet (SPRITES.md 10.3), written here so the engine's
+ *  constants hold it and the renderer reads it. */
+export interface VehicleSheetFigures {
+  file: string;
+  cellWidth: number;
+  cellHeight: number;
+  anchorX: number;
+  anchorY: number;
+  frames: number;
+  fps: number;
+  rows: Readonly<Record<'sw' | 'se' | 'nw' | 'ne', number>>;
+  loop: boolean;
+}
+
+/** The art side's figures for the line's forklift, empty and with the pallet of ten windows on its
+ *  forks, written once from the two JSONs of L3 (docs/art/pack-l3-1110/sheets/, not served): six
+ *  frames at 8 a second in cells of 272 by 256 anchored at 136, 192, four rows `sw`, `se`, `nw` and
+ *  `ne` (PIOTR, 11.10: "akceptacja jest"; CLAUDE.md T31 2.10) [TUNE: the name]. */
+export const FORKLIFT_SHEETS: Readonly<Record<'empty' | 'loaded', VehicleSheetFigures>> = {
+  empty: {
+    file: 'vehicle.forklift.drive.sheet.png',
+    cellWidth: 272,
+    cellHeight: 256,
+    anchorX: 136,
+    anchorY: 192,
+    frames: 6,
+    fps: 8,
+    rows: { sw: 0, se: 1, nw: 2, ne: 3 },
+    loop: true,
+  },
+  loaded: {
+    file: 'vehicle.forklift.driveLoaded.sheet.png',
+    cellWidth: 272,
+    cellHeight: 256,
+    anchorX: 136,
+    anchorY: 192,
+    frames: 6,
+    fps: 8,
+    rows: { sw: 0, se: 1, nw: 2, ne: 3 },
+    loop: true,
+  },
+};
+
+/** How fast the line's forklift drives, in cells of real time a second, at every speed of the clock
+ *  below `WALK_SKIPPED_FROM_SPEED` and while it is paused: twice a man's walk (CLAUDE.md T31 2.10)
+ *  [TUNE: chat]. */
+export const FORKLIFT_CELLS_PER_SECOND = 3;
+
+/** How far ahead of the forklift's anchor the middle of the pallet on its forks is, along the way it
+ *  drives: the art side's own figure, `loadCenterXM` in docs/art/pack-l3-1110/reports/
+ *  load-contact-QA.json (CLAUDE.md T31 2.10). */
+export const FORKLIFT_LOAD_AHEAD = 1.225;
+
 /** The line's card's own sentence, in the place of a class's description, read off the art side's
  *  six pictures (CLAUDE.md T30 2.3.3) [TUNE]. */
 export const LINE_DESCRIPTION =
@@ -5900,6 +6014,19 @@ export const CONTRACT_SHORT_WEEK_REPUTATION = 1;
 export const CONTRACT_SHORT_WEEKS_ALLOWED = 2;
 export const CONTRACT_RENEW_FULL_WEEK = 0.01;
 export const CONTRACT_RENEW_SHORT_WEEK = 0.02;
+/** [PIOTR, 11.10: "yes" to 3 per cent] At each week's close of a running contract for sheet pieces,
+ *  the chance that the client goes elsewhere and ends it, with no other term (CLAUDE.md T31 2.9). */
+export const CONTRACT_CLIENT_LEAVES_CHANCE = 0.03;
+/** [PIOTR, 11.10: "yes"] From the day a contract is lost no standing contract is offered for this
+ *  many days, drawn once at the loss, both ends included (CLAUDE.md T31 2.9). */
+export const CONTRACT_QUIET_DAYS_MIN = 14;
+export const CONTRACT_QUIET_DAYS_MAX = 21;
+/** [TUNE: chat] The chance that a sheet contract's client, offering another term at its end, offers
+ *  less than the price a piece it had: by `CONTRACT_RENEWAL_CUT_MIN` to `_MAX` per cent [PIOTR, 11.10:
+ *  "yes" to 5 to 15], drawn in whole per cent (CLAUDE.md T31 2.9). */
+export const CONTRACT_RENEWAL_CUT_CHANCE = 0.25;
+export const CONTRACT_RENEWAL_CUT_MIN = 5;
+export const CONTRACT_RENEWAL_CUT_MAX = 15;
 
 // ---------------------------------------------------------------------------
 // T13 3.17 Security, five levels

@@ -254,6 +254,8 @@ describe('what turning does to the picture', () => {
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
     expect(turned).toHaveLength(108);
     expect(turned.some((name) => name.includes('.work.sheet') || /\.stack\d\d/.test(name))).toBe(false);
+    // Nor a vehicle's sheet or the line's pallet of Turn 31 (CLAUDE.md T31 2.10).
+    expect(turned.some((name) => name.startsWith('vehicle.') || name.startsWith('windowPallet'))).toBe(false);
     for (const family of ['cnc', 'cncToolChanger', 'compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'sprayBooth', 'tableSaw', 'toolCabinet', 'workbench']) {
       for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
         expect(turned, `${family}.${tier}`).toContain(`${family}.${tier}.r.png`);

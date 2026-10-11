@@ -5,7 +5,7 @@ import { standsOutsideTheHall } from '../../src/engine/walk';
 import { describe, expect, it } from 'vitest';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { findSpec, footprintOf, standsInTheHall, zoneOf } from '../../src/engine/machines';
-import { boxOf, canPlaceSpec, firstFreeCell } from '../../src/engine/layout';
+import { boxOf, canPlaceSpec, firstFreeCell, standsBehindTheWall } from '../../src/engine/layout';
 import { footprintIn } from '../../src/render/hall';
 import { spriteAnchorIn, spriteBox } from '../../src/render/sprites';
 import { tileToScreen } from '../../src/render/iso';
@@ -165,9 +165,13 @@ describe('the whole catalogue on one floor', () => {
         state = buyNow(state, spec.id);
       }
     }
-    // Everything the catalogue sells is in the hall, and nothing is standing on anything else.
+    // Everything the catalogue sells is in the hall, and nothing is standing on anything else; but
+    // from Turn 31 the timber shelter stands behind the rear wall with the plant, and the 20 m wall
+    // of this unit has no length left for all of it bought twice over: what is missing is only what
+    // the wall refuses (CLAUDE.md T31 2.8).
     for (const spec of forSale) {
-      expect(state.equipment.some((item) => item.specId === spec.id), spec.id).toBe(true);
+      const bought = state.equipment.some((item) => item.specId === spec.id);
+      expect(bought || (standsBehindTheWall(spec.id) && canBuy(state, spec.id).reason === 'No room behind the hall'), spec.id).toBe(true);
     }
     for (const item of state.equipment) {
       if (!standsInTheHall(item.specId, item.variantId)) continue;

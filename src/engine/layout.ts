@@ -4,22 +4,28 @@
 import {
   CANTEEN_LOCKERS,
   CANTEEN_LOCKERS_DEEP,
+  CANTEEN_LOCKERS_PER_LONG_EXTENSION,
   CANTEEN_LOCKERS_WIDE,
+  FORKLIFT_LANE_CELLS,
   GATE_LANE,
+  LINE_FRONT_CELLS,
   LINE_MODULES,
+  LINE_PALLET_LAYOUT,
   LOCKER_SLOT_LAYOUT,
   LOCKER_SLOT_LAYOUT_WIDE,
   M2_PER_PERSON,
   WELFARE_IN_THE_CANTEEN,
   REAR_YARD_GAP_CELLS,
   STARTING_LAYOUT,
+  UNIT_AREA_M2,
+  UNIT_SECOND_EXTENSION_M2,
   WINDOW_LINE_ORIGIN,
   YARD_WIDTH_CELLS,
   roomsOf,
   secondExtensionOf,
 } from './constants';
 import type { LayoutSlot } from './constants';
-import { findSpec, isLineModule, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
+import { findSpec, isLineModule, isSold, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
 import { metresBy } from './text';
 import { standsOutsideTheHall } from './walk';
@@ -93,15 +99,15 @@ function boxOfItem(
 }
 
 /** True for the kit that stands outside and not on the hall floor: the two central systems, the
- *  pelletiser and the van (`STARTING_LAYOUT`). */
+ *  pelletiser, the timber shelter and the van (`STARTING_LAYOUT`). */
 export function standsOutside(specId: string): boolean {
   return STARTING_LAYOUT[specId]?.yard === true;
 }
 
-/** True for the kit that stands outside behind the rear wall: the two central systems, and from
- *  v83 the pelletiser beside them. On the apron at the end of the hall they stood in front of the
- *  benches and hid them, and behind the wall they hide nothing (PIOTR, 03.10 and 05.10; v73,
- *  CLAUDE.md T28 2.1). The van stays on the apron. */
+/** True for the kit that stands outside behind the rear wall: the two central systems, from v83
+ *  the pelletiser beside them, and from v92 the timber shelter. On the apron at the end of the hall
+ *  they stood in front of the benches and hid them, and behind the wall they hide nothing (PIOTR,
+ *  03.10, 05.10 and 11.10; v73, CLAUDE.md T28 2.1, T31 2.8). The van stays on the apron alone. */
 export function standsBehindTheWall(specId: string): boolean {
   return STARTING_LAYOUT[specId]?.rear === true;
 }
@@ -236,7 +242,95 @@ export function canPlaceSpec(
   // The welfare kit lives inside the canteen and nowhere else: a man's locker belongs out of the
   // dust, and it takes no hall cell at all (PIOTR, 17.09; CLAUDE.md T17 2.2, T23 2.11).
   const ignore = new Set(ignoreItemId === null ? [] : [ignoreItemId]);
-  return canPlaceBox(state, box, ignore, WELFARE_IN_THE_CANTEEN.includes(specId));
+  const check = canPlaceBox(state, box, ignore, WELFARE_IN_THE_CANTEEN.includes(specId));
+  if (!check.ok) return check;
+  // Nothing but the line stands on the forklift's lane while the line stands or is on order. It is
+  // asked here and only here, so the line's own lane never refuses the line's move (CLAUDE.md T31
+  // 2.6).
+  if (!isLineModule(specId) && (lineLane(state) ?? []).some((strip) => overlaps(box, strip))) {
+    return { ok: false, reason: FORKLIFT_LANE_REFUSAL };
+  }
+  return OK;
+}
+
+/** What setup mode and every purchase's search say of a cell of the forklift's lane (CLAUDE.md T31
+ *  2.6) [TUNE]. */
+export const FORKLIFT_LANE_REFUSAL = 'That is the forklift\'s lane';
+
+/** True for an item the player can take hold of in setup mode: its own place is good, or the only
+ *  thing wrong with it is the forklift's lane, kit that stood there before the line, or a line whose
+ *  lane is blocked or cannot be, which is exactly what the strip tells him to move (CLAUDE.md T31
+ *  2.6). */
+export function canBeMoved(state: GameState, itemId: string): boolean {
+  const item = state.equipment.find((entry) => entry.id === itemId);
+  if (item === undefined) return false;
+  const check = canPlace(state, itemId, item.anchorX, item.anchorY);
+  return check.ok || check.reason === FORKLIFT_LANE_REFUSAL || check.reason === lineNeedsRoom();
+}
+
+/** Why a line standing at this cell has no lane: too near the front wall for its men's metre and
+ *  the front strip, or over the left strip below the pallets at the gate. Null when it has one
+ *  (CLAUDE.md T31 2.6). */
+export function laneTrouble(state: GameState, at: { x: number; y: number }): 'frontWall' | 'leftWall' | null {
+  if (forkliftLane(state, at) !== null) return null;
+  const line = lineBox(at);
+  return line.y + line.depth + LINE_FRONT_CELLS > state.unit.depthCells - FORKLIFT_LANE_CELLS ? 'frontWall' : 'leftWall';
+}
+
+/** Where module 1 of the line stands, not sold, or is held on order: the line's place, from which
+ *  its lane is worked out. Null with no line (CLAUDE.md T31 2.6). */
+export function linePlace(state: GameState): { x: number; y: number } | null {
+  const first = LINE_MODULES[0];
+  const standing = hallItems(state).find((item) => item.specId === first && !isSold(item));
+  if (standing !== undefined) return { x: standing.anchorX, y: standing.anchorY };
+  const ordered = reservedItems(state).find((item) => item.specId === first);
+  return ordered === undefined ? null : { x: ordered.anchorX, y: ordered.anchorY };
+}
+
+/** The forklift's lane of a line whose module 1 is at this cell, two metres wide, from the line's
+ *  end to the gate: the front strip along the front wall from x 0 to the line's end, and the left
+ *  strip up the left wall from the pallets at the gate to the front wall [TUNE: chat: no strip round
+ *  the line's end]. The lane follows the line, not the hall's length. Null where the lane cannot be:
+ *  the line, the metre in front of it where its men stand and its lane overlapping, or the lane off
+ *  the floor (CLAUDE.md T31 2.6). */
+export function forkliftLane(state: GameState, at: { x: number; y: number }): Box[] | null {
+  const depth = state.unit.depthCells;
+  const line = lineBox(at);
+  const front: Box = { x: 0, y: depth - FORKLIFT_LANE_CELLS, width: line.x + line.width, depth: FORKLIFT_LANE_CELLS };
+  const left: Box = { x: 0, y: LINE_PALLET_LAYOUT.y, width: FORKLIFT_LANE_CELLS, depth: depth - LINE_PALLET_LAYOUT.y };
+  const men: Box = { x: line.x, y: line.y + line.depth, width: line.width, depth: LINE_FRONT_CELLS };
+  if (men.y + men.depth > depth || front.x + front.width > state.unit.widthCells || left.depth <= 0) return null;
+  for (const strip of [front, left]) {
+    if (overlaps(strip, line) || overlaps(strip, men)) return null;
+  }
+  return [front, left];
+}
+
+/** The lane of the line where it stands or is on order, or null with no line or no room for one. */
+export function lineLane(state: GameState): Box[] | null {
+  const at = linePlace(state);
+  return at === null ? null : forkliftLane(state, at);
+}
+
+/** Can the line stand with module 1 at this cell: its 36 m by 3 m clear as `canPlaceBox` asks, and
+ *  every box of the lane that place would have clear of everything standing or held for a delivery
+ *  but what `ignore` names. The one question the order and the move ask (CLAUDE.md T31 2.6). */
+export function lineFits(state: GameState, at: { x: number; y: number }, ignore: ReadonlySet<string>): boolean {
+  if (!canPlaceBox(state, lineBox(at), ignore).ok) return false;
+  const lane = forkliftLane(state, at);
+  return lane !== null && lane.every((strip) => canPlaceBox(state, strip, ignore).ok);
+}
+
+/** What stands on the line's lane, standing or on order, the line's own modules apart: the
+ *  catalogue's ids, each once, for the strip (CLAUDE.md T31 2.6). */
+export function standingOnTheLane(state: GameState): string[] {
+  const found: string[] = [];
+  for (const strip of lineLane(state) ?? []) {
+    for (const specId of standingOn(state, strip)) {
+      if (!isLineModule(specId) && !found.includes(specId)) found.push(specId);
+    }
+  }
+  return found;
 }
 
 /** Can this piece of floor take a thing: inside the hall, on no room (the canteen excepted for the
@@ -308,11 +402,12 @@ export function lineModuleCell(at: { x: number; y: number }, specId: string): { 
  *  what `canPlaceBox` asks. Null when the hall has none (CLAUDE.md T30 2.4) [TUNE: chat]. */
 export function lineSite(state: GameState): { x: number; y: number } | null {
   const none = new Set<string>();
-  if (canPlaceBox(state, lineBox(WINDOW_LINE_ORIGIN), none).ok) return { ...WINDOW_LINE_ORIGIN };
+  // From Turn 31 a place is taken only where the line's lane is clear too (CLAUDE.md T31 2.6).
+  if (lineFits(state, WINDOW_LINE_ORIGIN, none)) return { ...WINDOW_LINE_ORIGIN };
   const size = lineBox({ x: 0, y: 0 });
   for (let y = 0; y + size.depth <= state.unit.depthCells; y += 1) {
     for (let x = 0; x + size.width <= state.unit.widthCells; x += 1) {
-      if (canPlaceBox(state, lineBox({ x, y }), none).ok) return { x, y };
+      if (lineFits(state, { x, y }, none)) return { x, y };
     }
   }
   return null;
@@ -328,8 +423,11 @@ export function reservationById(state: GameState, itemId: string): OnOrderItem |
  *  clear 36 m by 3 m (CLAUDE.md T30 2.4). */
 export const LINE_NEVER_TURNED = 'The line is never turned';
 export function lineNeedsRoom(): string {
-  return `The line needs a clear ${metresBy(lineBox({ x: 0, y: 0 }))}`;
+  return `The line needs a clear ${metresBy(lineBox({ x: 0, y: 0 }))} and its lane`;
 }
+
+/** The order's refusal for want of floor: the line and its lane (CLAUDE.md T31 2.6) [TUNE]. */
+export const LINE_NO_ROOM = 'No room in the hall for the line and its lane';
 
 /** The ids of the whole line as it stands this minute: its modules on the floor, or its outlines on
  *  order. They move together and never stand in one another's way (CLAUDE.md T30 2.4). */
@@ -352,7 +450,7 @@ function canPlaceLine(
   if (orientation !== undefined && orientation !== 0) return { ok: false, reason: LINE_NEVER_TURNED };
   const offset = lineModuleCell({ x: 0, y: 0 }, specId);
   const box = lineBox({ x: x - offset.x, y: y - offset.y });
-  if (!canPlaceBox(state, box, new Set(lineGroup(state, onOrder))).ok) return { ok: false, reason: lineNeedsRoom() };
+  if (!lineFits(state, box, new Set(lineGroup(state, onOrder)))) return { ok: false, reason: lineNeedsRoom() };
   return OK;
 }
 
@@ -503,7 +601,10 @@ export function crewLimit(state: GameState): number {
  *  count by (PIOTR, 20.09, 03.10 and 04.10; CLAUDE.md T23 2.10; v67, v82). */
 export function canteenLockers(state: GameState): number {
   if (!state.unit.canteenWide) return CANTEEN_LOCKERS;
-  return secondExtensionOf(state.unit) === 'open' ? CANTEEN_LOCKERS_DEEP : CANTEEN_LOCKERS_WIDE;
+  if (secondExtensionOf(state.unit) !== 'open') return CANTEEN_LOCKERS_WIDE;
+  // Eight more for every 200 m2 past 800, for the joiners a longer hall takes (CLAUDE.md T31 2.7).
+  const past = Math.max(0, Math.floor((state.unit.areaM2 - UNIT_SECOND_EXTENSION_M2) / UNIT_AREA_M2));
+  return CANTEEN_LOCKERS_DEEP + CANTEEN_LOCKERS_PER_LONG_EXTENSION * past;
 }
 
 /** The figures a canteen can hold, in a word each. */

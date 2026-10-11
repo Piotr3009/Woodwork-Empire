@@ -20,6 +20,9 @@
 import {
   UNIT_DEPTH_CELLS,
   UNIT_EXTENSION_PRICE,
+  UNIT_LONG_EXTENSION_CELLS,
+  UNIT_LONG_EXTENSION_GROWTH,
+  UNIT_LONG_EXTENSION_PRICE,
   UNIT_SECOND_EXTENSION_PRICE,
   UNIT_WIDTH_CELLS,
   canteenGrowthBox,
@@ -36,7 +39,7 @@ import { canteenLockers, crewLimit, standingOn } from './layout';
 import { findSpec } from './machines';
 import { routePipe } from './pipes';
 import { securitySubscriptionMonthly } from './security';
-import { andList, inASentence } from './text';
+import { andList, inASentence, inWords } from './text';
 import type { ExtensionStage, GameState, UnitExtension, UnitState } from './types';
 
 export interface PremisesCheck {
@@ -73,26 +76,40 @@ export interface ExtensionTerms {
   powerNow: number;
   powerThen: number;
   /** What the security level held costs a month. A firm charges by the area, so its month goes up
-   *  with either extension; a flat level is what it was after the first and twice it after the
-   *  second (v82). */
+   *  with every extension; a flat level is what it was after the first, twice it after the second
+   *  (v82), and up by the area with every long one (CLAUDE.md T31 2.7). */
   securityNow: number;
   securityThen: number;
-  /** What the 1st takes for the covers held. The first extension leaves it as it is and the
-   *  second doubles it (v82). */
+  /** What the 1st takes for the covers held. The first extension leaves it as it is, the second
+   *  doubles it (v82), and every long one puts it up by the area (CLAUDE.md T31 2.7). */
   insuranceNow: number;
   insuranceThen: number;
 }
 
-/** Where a stage of the unit's extension stands. */
+/** Where a stage of the unit's extension stands. A long extension is never `open`: there is always
+ *  another to be had (CLAUDE.md T31 2.7). */
 export function extensionStatus(unit: UnitState, stage: ExtensionStage): UnitExtension {
+  if (stage === 'long') return unit.longExtension;
   return stage === 'first' ? unit.extension : secondExtensionOf(unit);
 }
 
+/** The metres a stage adds along the rear wall. */
+function addsAlongTheWall(stage: ExtensionStage): number {
+  if (stage === 'first') return UNIT_WIDTH_CELLS;
+  return stage === 'long' ? UNIT_LONG_EXTENSION_CELLS : 0;
+}
+
+/** The floor of the unit the second extension made, 800 m2, whatever long extensions it has had
+ *  since: what the second extension's card names it by (CLAUDE.md T31 2.7). */
+export function secondExtensionAreaM2(unit: UnitState): number {
+  return (unit.widthCells - unit.longExtensions * UNIT_LONG_EXTENSION_CELLS) * unit.depthCells;
+}
+
 /** The unit as it is the morning a stage opens: twenty metres more of rear wall for the first,
- *  ten metres more of depth for the second, and every figure the floor sets in the same
- *  proportion. */
+ *  ten metres more of depth for the second, ten more of rear wall for each long one, and every
+ *  figure the floor sets in the same proportion. */
 function unitWith(unit: UnitState, stage: ExtensionStage): UnitState {
-  const widthCells = unit.widthCells + (stage === 'first' ? UNIT_WIDTH_CELLS : 0);
+  const widthCells = unit.widthCells + addsAlongTheWall(stage);
   const depthCells = unit.depthCells + (stage === 'second' ? UNIT_DEPTH_CELLS : 0);
   const areaM2 = widthCells * depthCells;
   const factor = areaM2 / unit.areaM2;
@@ -106,8 +123,20 @@ function unitWith(unit: UnitState, stage: ExtensionStage): UnitState {
     benchSlots: Math.round(unit.benchSlots * factor),
   };
   if (stage === 'first') grown.extension = 'open';
-  else grown.secondExtension = 'open';
+  else if (stage === 'second') grown.secondExtension = 'open';
+  else {
+    grown.longExtensions = unit.longExtensions + 1;
+    grown.longExtension = 'none';
+  }
   return grown;
+}
+
+/** The builder's price of a stage: the long one's goes up by the growth with each one already
+ *  open, rounded to the pound: 600,000, 720,000, 864,000, 1,036,800 and on (CLAUDE.md T31 2.7). */
+function extensionPrice(unit: UnitState, stage: ExtensionStage): number {
+  if (stage === 'first') return UNIT_EXTENSION_PRICE;
+  if (stage === 'second') return UNIT_SECOND_EXTENSION_PRICE;
+  return Math.round(UNIT_LONG_EXTENSION_PRICE * UNIT_LONG_EXTENSION_GROWTH ** unit.longExtensions);
 }
 
 /** The terms of an extension of the unit as it stands this minute: the unit as it will be, and
@@ -118,7 +147,7 @@ export function extensionTerms(state: GameState, stage: ExtensionStage = 'first'
   const unit = state.unit;
   const grown = unitWith(unit, stage);
   const then: GameState = { ...state, unit: grown };
-  const price = stage === 'first' ? UNIT_EXTENSION_PRICE : UNIT_SECOND_EXTENSION_PRICE;
+  const price = extensionPrice(unit, stage);
   const deposit = Math.max(0, unitDepositFor(grown.rentMonthly) - unit.depositHeld);
   return {
     price,
@@ -155,6 +184,11 @@ export function extendUnitCheck(state: GameState, stage: ExtensionStage = 'first
   if (stage === 'second' && state.unit.extension !== 'open') {
     return { ok: false, reason: 'Extend the unit first' };
   }
+  // The hall grows longer once it is twenty metres deep; the card is not offered before that
+  // (CLAUDE.md T31 2.7) [TUNE: the words].
+  if (stage === 'long' && secondExtensionOf(state.unit) !== 'open') {
+    return { ok: false, reason: 'Extend the unit along the front first' };
+  }
   const terms = extensionTerms(state, stage);
   // The card prints the figure beside the button, so the reason is the short one.
   if (state.cash < terms.total) return { ok: false, reason: 'Not enough in the account' };
@@ -173,7 +207,8 @@ export function extendUnit(state: GameState, stage: ExtensionStage = 'first'): P
     state.unit.depositHeld += terms.deposit;
   }
   if (stage === 'first') state.unit.extension = 'building';
-  else state.unit.secondExtension = 'building';
+  else if (stage === 'second') state.unit.secondExtension = 'building';
+  else state.unit.longExtension = 'building';
   return OK;
 }
 
@@ -227,33 +262,36 @@ function firstOpened(terms: ExtensionTerms): EventDraft {
 }
 
 /** And the card of the second: the hall twice as deep, the costs the 1st takes for it, and the
- *  lockers the canteen holds now, or would hold enlarged (v82). */
-function secondOpened(state: GameState, terms: ExtensionTerms): EventDraft {
+ *  lockers the canteen holds now, or would hold enlarged (v82). A long extension's card says the
+ *  same of the longer hall under its own title (CLAUDE.md T31 2.7) [TUNE: the title]. */
+function secondOpened(state: GameState, terms: ExtensionTerms, stage: ExtensionStage): EventDraft {
   const canteen = state.unit.canteenWide
     ? `The canteen holds ${terms.lockers} lockers now.`
     : `Enlarged, the canteen holds ${terms.lockers} lockers: enlarge it from the laptop, under Premises.`;
   return {
     kind: 'unitExtended',
-    title: 'The second extension is open',
+    title:
+      stage === 'long' ? `The hall is ${inWords(UNIT_LONG_EXTENSION_CELLS)} metres longer` : 'The second extension is open',
     body:
       `The builders are out. The hall is ${terms.widthCells} by ${terms.depthCells} m now, ` +
-      `${terms.areaM2} m², with room for ${terms.joiners} joiners and ${terms.benches} benches. ` +
+      `${terms.areaM2.toLocaleString('en-GB')} m², with room for ${terms.joiners} joiners and ${terms.benches} benches. ` +
       'The rent, the rates and the power are charged on the bigger unit from today, and the ' +
       `insurer and the security charge for it from the 1st. ${canteen}`,
     data: { areaM2: terms.areaM2, widthCells: terms.widthCells, depthCells: terms.depthCells },
   };
 }
 
-/** One stage, the morning after its click. The first takes the kerb at the hall's end out with
- *  it. The second is along the front, where nothing stands and nothing has to move: the apron is
- *  past the end of the hall and stays there. */
+/** One stage, the morning after its click. The first and every long one take the kerb at the
+ *  hall's end out with them; the plant behind the rear wall stays where it stands, and the longer
+ *  wall has room for more. The second is along the front, where nothing stands and nothing has to
+ *  move: the apron is past the end of the hall and stays there. */
 function openStage(state: GameState, stage: ExtensionStage): void {
   const unit = state.unit;
   if (extensionStatus(unit, stage) !== 'building') return;
   const terms = extensionTerms(state, stage);
-  if (stage === 'first') moveTheApron(state, unit.widthCells, terms.widthCells - unit.widthCells);
+  if (stage !== 'second') moveTheApron(state, unit.widthCells, terms.widthCells - unit.widthCells);
   Object.assign(unit, unitWith(unit, stage));
-  queueEvent(state, stage === 'first' ? firstOpened(terms) : secondOpened(state, terms));
+  queueEvent(state, stage === 'first' ? firstOpened(terms) : secondOpened(state, terms, stage));
 }
 
 /** The morning after the click: the new floor is there. Called at the day's open, before the day
@@ -261,6 +299,7 @@ function openStage(state: GameState, stage: ExtensionStage): void {
 export function openExtension(state: GameState): void {
   openStage(state, 'first');
   openStage(state, 'second');
+  openStage(state, 'long');
 }
 
 /** What the canteen is and what it becomes, for the card: its floor and its lockers, as built and

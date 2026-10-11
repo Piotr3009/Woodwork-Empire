@@ -52,6 +52,11 @@ function working(): GameState {
     revenue: 0,
     materialCost: 0,
   };
+  // And its timber and glass: from Turn 31 the line makes windows only with a window's worth of
+  // each (CLAUDE.md T31 2.1).
+  state.windowLine.boards = 40;
+  state.stock.sheets += 40;
+  state.windowLine.glass = 20;
   state.clock.minute = 60;
   state.speed = 1;
   state.activeEvent = null;

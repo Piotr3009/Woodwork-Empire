@@ -140,10 +140,11 @@ describe('footprints in metres', () => {
       windowLine4: [6, 3, 3],
       windowLine5: [6, 3, 3],
       windowLine6: [6, 3, 3],
-      // The two timber stores, the art side's metres; the shelter declared 3 wide by 6 deep
-      // (CLAUDE.md T29 2.4, 2.11.1).
+      // The two timber stores, the art side's metres; the shelter declared as the art side drew it,
+      // 6 m along the rear wall by 3 m deep, since it stands behind the wall from Turn 31 (CLAUDE.md
+      // T29 2.4, 2.11.1; T31 2.8).
       timberRack: [4, 1, 2.5],
-      timberShelter: [3, 6, 3],
+      timberShelter: [6, 3, 3],
     };
     // Every line of the catalogue is in one of the two lists: nothing slips in unmeasured.
     expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(

@@ -2,7 +2,7 @@
 // placeholder box, and the picture beside it when the art side has delivered one. This page is
 // the acceptance tool of docs/art/SPRITES.md item 7 (CLAUDE.md T3 3.6).
 
-import { CNC_TOOL_CHANGER_SPRITE, CUTTER_SETS, EQUIPMENT_SPECS } from '../engine/constants';
+import { CNC_TOOL_CHANGER_SPRITE, CUTTER_SETS, EQUIPMENT_SPECS, FORKLIFT_SHEETS, LINE_PALLET_LAYOUT } from '../engine/constants';
 import {
   HALL_CANVAS,
   HALL_LAYERS,
@@ -17,6 +17,7 @@ import {
 import { OFFICE_CANVAS, OFFICE_LAYERS, OFFICE_LIT_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import {
+  SPRITE_DIR,
   SPRITE_SCALE,
   placeholderKindFor,
   spriteAnchorIn,
@@ -147,6 +148,20 @@ export function spriteTargets(): SpriteTarget[] {
     zoneWidth: PALLET_LAYOUT.width,
     zoneDepth: PALLET_LAYOUT.depth,
     where: 'at the gate',
+  });
+  // The pallet of the line's ten windows standing alone, which is no family's class either: its
+  // size is where it stands at the gate (CLAUDE.md T31 2.10).
+  add({
+    name: 'windowPallet.standard',
+    specId: 'windowPallet',
+    spriteKey: 'windowPallet',
+    tier: 'standard',
+    width: LINE_PALLET_LAYOUT.width,
+    depth: LINE_PALLET_LAYOUT.depth,
+    height: LINE_PALLET_LAYOUT.height,
+    zoneWidth: LINE_PALLET_LAYOUT.width,
+    zoneDepth: LINE_PALLET_LAYOUT.depth,
+    where: "at the gate, the line's",
   });
   return targets;
 }
@@ -401,6 +416,43 @@ function characterCell(role: string, animation: Animation): string {
   );
 }
 
+/** The line's forklift, its two sheets whole: four rows, one a direction (`sw`, `se`, `nw`, `ne`
+ *  from the top), six frames a row, at 2x like every sprite, the anchor marked in every cell
+ *  (CLAUDE.md T31 2.10). A vehicle's sheet is no class's picture and no turn of one. */
+function vehicleSection(): string {
+  const cells = (['empty', 'loaded'] as const).map((load) => {
+    const sheet = FORKLIFT_SHEETS[load];
+    const width = (sheet.cellWidth * sheet.frames) / SPRITE_SCALE;
+    const height = (sheet.cellHeight * Object.keys(sheet.rows).length) / SPRITE_SCALE;
+    const anchors = Object.values(sheet.rows)
+      .flatMap((row) =>
+        Array.from(
+          { length: sheet.frames },
+          (_, frame) =>
+            `<circle class="sprite-anchor" cx="${(frame * sheet.cellWidth + sheet.anchorX) / SPRITE_SCALE}" ` +
+            `cy="${(row * sheet.cellHeight + sheet.anchorY) / SPRITE_SCALE}" r="2" />`,
+        ),
+      )
+      .join('');
+    return (
+      `<div class="sprite-cell is-wide" data-vehicle-key="${escapeHtml(sheet.file)}">` +
+      `<svg class="sprite-strip" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">` +
+      `<image href="${SPRITE_DIR}/${sheet.file}" x="0" y="0" width="${width}" height="${height}" />${anchors}</svg>` +
+      `<p class="sprite-key">${escapeHtml(sheet.file)}</p>` +
+      `<p class="sprite-figures">${sheet.frames} frames at ${sheet.fps} a second, rows ` +
+      `${escapeHtml(Object.keys(sheet.rows).join(', '))}, cells ${sheet.cellWidth} by ${sheet.cellHeight}, ` +
+      `anchor ${sheet.anchorX}, ${sheet.anchorY}</p></div>`
+    );
+  });
+  return (
+    '<h3>The line\u2019s forklift, 2 sheets</h3>' +
+    '<p class="hint">Empty and with the pallet of ten windows on its forks, at true size. The dot is ' +
+    'the anchor, the same point of the floor in every cell of both sheets: the game moves the ' +
+    'forklift and the sheet drives on the spot.</p>' +
+    `<div class="sprite-wide-grid">${cells.join('')}</div>`
+  );
+}
+
 function characterSection(): string {
   const cells = CHARACTER_ROLES.flatMap((role) =>
     ANIMATIONS.map((animation) => characterCell(role, animation)),
@@ -447,7 +499,10 @@ export function renderSpriteCheck(ports: Record<string, Port> = PORTS): string {
       'The layers a unit that has grown is painted with in place of its own: the background at ' +
         'forty metres, on a longer canvas with the same origin, the background at forty metres ' +
         'by twenty, on a canvas with an origin of its own, and the canteen block at four by four ' +
-        'on the first canvas. All of them are made of the three pictures above (v67, v82).',
+        'on the first canvas. All of them are made of the three pictures above (v67, v82). The hall ' +
+        'longer than forty metres is the 800 m² picture with ten metres of it laid on again for each ' +
+        'long extension, its end past the last, and its flat ground under all of it, each cut from ' +
+        'that picture where it is drawn (CLAUDE.md T31 2.7).',
       HALL_WIDE_LAYERS.map((layer) => {
         const canvas = layer.canvas ?? HALL_CANVAS;
         return {
@@ -474,6 +529,7 @@ export function renderSpriteCheck(ports: Record<string, Port> = PORTS): string {
       OFFICE_CANVAS,
     ) +
     characterSection() +
+    vehicleSection() +
     '</div>'
   );
 }

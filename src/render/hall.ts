@@ -8,6 +8,8 @@ import {
   FINISHED_GOODS_LAYOUT,
   LINE_MODULES,
   LINE_PALLET_LAYOUT,
+  LINE_PALLETS_DRAWN,
+  FORKLIFT_SHEETS,
   LINE_PALLET_WINDOWS,
   MACHINE_WORK_SHEETS,
   GATE_CROWD_LIMIT,
@@ -18,6 +20,7 @@ import {
   ROOM_DOOR,
   ROOM_LAYOUT,
   UNIT_DEPTH_CELLS,
+  UNIT_LONG_EXTENSION_CELLS,
   UNIT_WIDTH_CELLS,
   WELFARE_IN_THE_CANTEEN,
   YARD_WIDTH_CELLS,
@@ -144,6 +147,8 @@ import {
   spriteUrl,
 } from './sprites';
 import { lineMakesWindows, runningLineContract } from '../engine/lineContract';
+import { lineLane } from '../engine/layout';
+import { forkliftArt, forkliftPoints } from './forklift';
 import { placeholder } from './placeholder';
 import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
@@ -468,6 +473,29 @@ export const HALL_CANVAS_DEEP = {
 
 export type HallCanvas = typeof HALL_CANVAS;
 
+/** The pieces a hall longer than forty metres is laid of, each on a canvas of its own registered
+ *  where it was cut out of the 800 m2 picture, whose origin is 1080, 288 (docs/art/SPRITES.md 9.9;
+ *  CLAUDE.md T31 2.7): ten metres of the hall, x 28 to 39 at every depth, 1490 by 914 in the file
+ *  and cut from 1462, 790 of that picture; and its end, everything of the hall from x 39 on coming
+ *  in over the metre before it, 1060 by 700 and cut from 1942, 1030. Each is laid ten metres
+ *  further along than the one before by moving its origin (`hallLayersOf`). */
+export const HALL_CANVAS_LONG = {
+  width: 1490 / SPRITE_SCALE,
+  height: 914 / SPRITE_SCALE,
+  originX: (1080 - 1462) / SPRITE_SCALE,
+  originY: (288 - 790) / SPRITE_SCALE,
+};
+export const HALL_CANVAS_END = {
+  width: 1060 / SPRITE_SCALE,
+  height: 700 / SPRITE_SCALE,
+  originX: (1080 - 1942) / SPRITE_SCALE,
+  originY: (288 - 1030) / SPRITE_SCALE,
+};
+/** The flat ground the 800 m2 picture is painted on outside the hall, one step of the hall's
+ *  growth of it, laid edge to edge under everything a longer scene shows past that picture
+ *  (docs/art/SPRITES.md 9.9). */
+export const HALL_GROUND_TILE = { width: 480 / SPRITE_SCALE, height: 240 / SPRITE_SCALE };
+
 export interface HallLayer {
   /** The sprite key, which is the file name in public/sprites. */
   key: string;
@@ -496,7 +524,40 @@ export const HALL_WIDE_LAYERS: HallLayer[] = [
   { key: 'hallBackgroundWide', name: 'Hall background, extended', room: 'wc', canvas: HALL_CANVAS_WIDE },
   { key: 'hallBackgroundDeep', name: 'Hall background, 800 m²', room: 'wc', canvas: HALL_CANVAS_DEEP },
   { key: 'hallCanteenWide', name: 'Canteen block, enlarged', room: 'canteen' },
+  // The hall longer than forty metres, made of the 800 m2 picture (CLAUDE.md T31 2.7).
+  { key: 'hallBackgroundLong', name: 'Hall background, ten metres more', room: 'wc', canvas: HALL_CANVAS_LONG },
+  { key: 'hallBackgroundEnd', name: 'Hall background, the end', room: 'wc', canvas: HALL_CANVAS_END },
+  {
+    key: 'hallBackgroundGround',
+    name: 'Hall background, the ground',
+    room: 'wc',
+    canvas: { ...HALL_GROUND_TILE, originX: 0, originY: 0 },
+  },
 ];
+
+/** How many long extensions this unit's hall has: the ten metres pieces past forty metres of a hall
+ *  twenty deep (CLAUDE.md T31 2.7). Read off the hall's own length, as everything that draws it is. */
+export function longPiecesOf(unit: { widthCells: number; depthCells?: number }): number {
+  if ((unit.depthCells ?? UNIT_DEPTH_CELLS) <= UNIT_DEPTH_CELLS) return 0;
+  return Math.max(0, Math.floor((unit.widthCells - 2 * UNIT_WIDTH_CELLS) / UNIT_LONG_EXTENSION_CELLS));
+}
+
+/** A canvas moved this many steps of ten metres along the hall: its origin that much further back
+ *  on it, so the picture lands that much further along. */
+function alongTheHall(canvas: HallCanvas, steps: number): HallCanvas {
+  const step = tileToScreen(UNIT_LONG_EXTENSION_CELLS, 0);
+  return { ...canvas, originX: canvas.originX - step.x * steps, originY: canvas.originY - step.y * steps };
+}
+
+/** The frame of the whole painted scene: the background's own canvas, and ten metres more of it
+ *  along the hall for every long extension, which is what the scene, the camera's bounds and the
+ *  zoom that fits the hall read (CLAUDE.md T31 2.7). */
+export function hallFrameCanvas(unit: { widthCells: number; depthCells?: number; canteenWide?: boolean }): HallCanvas {
+  const canvas = hallLayersOf(unit)[0]?.canvas ?? HALL_CANVAS;
+  const step = tileToScreen(UNIT_LONG_EXTENSION_CELLS, 0);
+  const pieces = longPiecesOf(unit);
+  return { ...canvas, width: canvas.width + step.x * pieces, height: canvas.height + step.y * pieces };
+}
 
 /** The picture a grown unit has in place of this layer, or the layer itself. */
 function grownLayer(layer: HallLayer, key: string | null): HallLayer {
@@ -505,7 +566,10 @@ function grownLayer(layer: HallLayer, key: string | null): HallLayer {
 
 /** The layers this unit is painted with, back to front: the first three, with the extended
  *  background once the hall is longer than it was built, the 800 m2 one once it is deeper, and
- *  the enlarged canteen block once the canteen is (v67, v82). */
+ *  the enlarged canteen block once the canteen is (v67, v82). A hall longer than forty metres is
+ *  the 800 m2 picture with one piece of ten metres laid on it for each long extension, each further
+ *  along than the one before, and the end laid past the last of them, all before the office and
+ *  the canteen (CLAUDE.md T31 2.7). */
 export function hallLayersOf(unit: {
   widthCells: number;
   depthCells?: number;
@@ -514,12 +578,22 @@ export function hallLayersOf(unit: {
   const deep = (unit.depthCells ?? UNIT_DEPTH_CELLS) > UNIT_DEPTH_CELLS;
   const extended = unit.widthCells > UNIT_WIDTH_CELLS;
   const background = deep ? 'hallBackgroundDeep' : extended ? 'hallBackgroundWide' : null;
-  return HALL_LAYERS.map((layer) => {
-    if (layer.room === 'wc') return grownLayer(layer, background);
-    if (layer.room === 'canteen') {
-      return grownLayer(layer, unit.canteenWide === true ? 'hallCanteenWide' : null);
+  const pieces = longPiecesOf(unit);
+  return HALL_LAYERS.flatMap((layer) => {
+    if (layer.room === 'wc') {
+      if (pieces === 0) return [grownLayer(layer, background)];
+      const long = grownLayer(layer, 'hallBackgroundLong');
+      const end = grownLayer(layer, 'hallBackgroundEnd');
+      return [
+        grownLayer(layer, background),
+        ...Array.from({ length: pieces }, (_, index) => ({ ...long, canvas: alongTheHall(HALL_CANVAS_LONG, index + 1) })),
+        { ...end, canvas: alongTheHall(HALL_CANVAS_END, pieces) },
+      ];
     }
-    return layer;
+    if (layer.room === 'canteen') {
+      return [grownLayer(layer, unit.canteenWide === true ? 'hallCanteenWide' : null)];
+    }
+    return [layer];
   });
 }
 
@@ -1342,19 +1416,22 @@ const RACK_COUNT = {
   type: 26 / RACK_COUNT_SHRINK,
 };
 
+/** How far over the rear wall's top, in metres, a plate hung over it stands: high enough that the
+ *  plate of three figures clears the wall's clip at its lower corner too [TUNE]. */
+const RACK_COUNT_OVER_WALL = 0.6;
+
 /** The sheets in the rack, over its own front face, big, in the hand, on the class's colour
  *  (PIOTR, 17.09; CLAUDE.md T17 2.8). The count used to be glued into the object's name, and
  *  `objectArt` throws the name away whenever a sprite file exists, so in the real game the number
  *  was invisible: the rack draws it itself now, and it moves with the stock. */
 function rackCount(item: Equipment, sheets: number): string {
   const stands = footprintIn(item);
-  const at = centreOf(
-    stands.x,
-    stands.y,
-    stands.width,
-    stands.depth,
-    stands.height * RACK_COUNT.up,
-  );
+  // A store behind the rear wall is hidden by it up to its top, so its plate is hung over the
+  // wall's top above it, where the player can read and click it (CLAUDE.md T31 2.8) [TUNE: chat].
+  const at =
+    item.anchorY < 0
+      ? tileToScreen(stands.x + stands.width / 2, -REAR_WALL.back, REAR_WALL.top + RACK_COUNT_OVER_WALL)
+      : centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height * RACK_COUNT.up);
   const text = String(Math.max(0, Math.round(sheets)));
   const width = RACK_COUNT.pad * 2 + text.length * RACK_COUNT.digit;
   const colour = CLASS_BADGE[item.variantId]?.colour ?? 'var(--kit-stock)';
@@ -1613,6 +1690,32 @@ export function rearWallClip(widthCells: number): string {
   );
 }
 
+/** The forklift's lane of the line where it stands or is on order: the outline of its L, from the
+ *  pallets at the gate down the left wall and along the front wall to the line's end, in the one
+ *  token for it. Nothing when the line has no lane (CLAUDE.md T31 2.6) [TUNE: the outline]. */
+function laneArt(state: GameState): string {
+  const lane = lineLane(state);
+  const front = lane?.[0];
+  const left = lane?.[1];
+  if (front === undefined || left === undefined) return '';
+  const depth = front.y + front.depth;
+  const corners = [
+    { x: left.x, y: left.y },
+    { x: left.x + left.width, y: left.y },
+    { x: left.x + left.width, y: front.y },
+    { x: front.x + front.width, y: front.y },
+    { x: front.x + front.width, y: depth },
+    { x: left.x, y: depth },
+  ].map((corner) => tileToScreen(corner.x, corner.y));
+  return (
+    `<polygon data-lane="1" points="${points(corners)}" fill="none" stroke="var(--lane-yellow)" ` +
+    `stroke-width="${LANE_STROKE}" stroke-linejoin="miter" pointer-events="none" />`
+  );
+}
+
+/** The lane's lines, in the scene's pixels at x1 [TUNE]. */
+const LANE_STROKE = 2;
+
 /** The outline of something bought and not here yet, on the cells held for it (T8 3.2). */
 export function reservedOutline(item: OnOrderItem): string {
   const zone = itemZone(item);
@@ -1705,6 +1808,21 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const characterOptions: CharacterOptions = { files, sheets: options.characters };
 
   if (painted) {
+    // A hall longer than forty metres shows more than the 800 m2 picture holds: the flat ground it
+    // is painted on is laid edge to edge under all of it first, so whatever the pieces leave is the
+    // picture's own ground (CLAUDE.md T31 2.7; docs/art/SPRITES.md 9.9).
+    const ground = layerUrl('hallBackgroundGround');
+    if (longPiecesOf(unit) > 0 && ground !== null) {
+      const frame = hallLayerBox(hallFrameCanvas(unit));
+      parts.push(
+        '<defs><pattern id="hall-ground" patternUnits="userSpaceOnUse" ' +
+          `x="${frame.x}" y="${frame.y}" width="${HALL_GROUND_TILE.width}" height="${HALL_GROUND_TILE.height}">` +
+          `<image href="${ground}" x="0" y="0" width="${HALL_GROUND_TILE.width}" ` +
+          `height="${HALL_GROUND_TILE.height}" preserveAspectRatio="none" /></pattern></defs>` +
+          `<rect class="hall-layer" data-layer="hallBackgroundGround" x="${frame.x}" y="${frame.y}" ` +
+          `width="${frame.width}" height="${frame.height}" fill="url(#hall-ground)" />`,
+      );
+    }
     // The layers sit at the canvas origin, every one of them, which is what keeps the two room
     // blocks on their own cells (docs/art/SPRITES.md 9.3). The extended background is a bigger
     // canvas with the same origin, so it is laid on its own box and the blocks stay where they are.
@@ -1993,7 +2111,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const task = taskId === null ? undefined : state.tasks.find((entry) => entry.id === taskId);
     if (task === undefined || task.kind !== 'unload') return loopEnds(STATION_RACK);
     const far = unloadFarStation(state, task);
-    // Boards with only a shelter: he stays at the gate, and nobody is walked onto the apron.
+    // Boards with only a shelter: he stays at the gate, and nobody is walked out of the hall to it.
     if (far === STATION_GATE) return '';
     return loopEnds(far);
   };
@@ -2115,7 +2233,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       svg:
         `<g data-van="${waiting.id}" data-sprite="${PALLET_SPRITE}" class="clickable pallet">` +
         '<title>Click the pallet to decide who unloads it</title>' +
-        palletArt(files, `Delivery: ${loadWords(state, waiting)}`) +
+        // The line's timber in its own words (CLAUDE.md T31 2.2).
+        palletArt(files, waiting.line === true ? loadWords(state, waiting) : `Delivery: ${loadWords(state, waiting)}`) +
         '</g>',
     });
   }
@@ -2153,23 +2272,41 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
+  // The line's own forklift, waiting at the line's end on its lane while the six stand and it has
+  // one; `src/render/forklift.ts` drives it from frame to frame (CLAUDE.md T31 2.10).
+  const forkliftAt = forkliftPoints(state);
+  if (forkliftAt !== null && files.includes(FORKLIFT_SHEETS.empty.file)) {
+    drawables.push(forkliftArt(forkliftAt.wait));
+  }
+
   // The full pallets of the line's windows wait for the client just past the end of the gate lane,
-  // drawn as the finished goods are: one box a pallet in the kit stock colours, two at the most, and
-  // one label hung under the front of their floor so that it does not sit on the finished goods'.
-  // Nothing holds the cells; until the art side's pallet and forklift come, no forklift is drawn
-  // (CLAUDE.md T30 2.8) [TUNE: chat].
+  // each drawn from the art side's pallet of ten standing alone on its 2 m by 1 m, the second beside
+  // the first along x and two at the most, a part pallet drawn as a full one, and one label hung
+  // under the front of their floor so that it does not sit on the finished goods' (CLAUDE.md T30
+  // 2.8, T31 2.10) [TUNE: chat]. The line's forklift hides the newest while it is on its forks.
   const pallets = state.windowLine.palletsAtGate;
   if (pallets > 0) {
     const gate = LINE_PALLET_LAYOUT;
-    const shown = Math.min(pallets, gate.width);
+    const shown = Math.min(pallets, LINE_PALLETS_DRAWN);
     for (let index = 0; index < shown; index += 1) {
-      const x = gate.x + index;
-      const faces = boxPolygons(x, gate.y, 1, gate.depth, gate.height);
+      const x = gate.x + index * gate.width;
       drawables.push({
         depth: depthKey(x, gate.y),
         svg:
           `<g data-line-pallet="${index}"><title>Windows for collection</title>` +
-          box(faces, 'var(--kit-stock)', 'var(--kit-stock-dark)') +
+          objectArt({
+            files,
+            spriteKey: 'windowPallet',
+            tier: 'standard',
+            x,
+            y: gate.y,
+            width: gate.width,
+            depth: gate.depth,
+            height: gate.height,
+            fill: 'var(--kit-stock)',
+            shade: 'var(--kit-stock-dark)',
+            label: 'Windows for collection',
+          }) +
           '</g>',
       });
     }
@@ -2187,6 +2324,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   placeFigures(drawables);
   // Everything from here on is the live part: it changes with the state, minute by minute.
   const live: string[] = [];
+
+  // The forklift's lane, two yellow lines on the floor along its outer edges with the corners
+  // joined, first of the live drawing so it is under every piece of kit and every man and follows
+  // a purchase and a move (the painted shell is cached) (CLAUDE.md T31 2.6).
+  live.push(laneArt(state));
 
   // The name on the rear wall, lettered into the wall plane so it leans with the blockwork
   // (CLAUDE.md T6 3.2). It is live text and not part of the shell: the company the player typed
@@ -2251,7 +2393,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
 
   // With the painting there, the frame is the canvas: the view box is the art's own edges, so the
   // registration cannot drift whatever else is in the hall. Without it, the grid sets the frame.
-  const layerAt = hallLayerBox(background?.canvas);
+  // The frame reads the hall's own length: the background's canvas and ten metres more of it for
+  // every long extension (CLAUDE.md T31 2.7).
+  const layerAt = hallLayerBox(hallFrameCanvas(unit));
   const size = painted
     ? {
         x: layerAt.x,

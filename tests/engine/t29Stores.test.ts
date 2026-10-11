@@ -105,7 +105,7 @@ function unloadTaskOf(state: GameState, delivery: Delivery): string {
 }
 
 describe('the two timber stores (CLAUDE.md T29 2.11.1)', () => {
-  it('are the table s two families, a rack on the floor and a shelter on the apron', () => {
+  it('are the table s two families, a rack on the floor and a shelter behind the rear wall', () => {
     expect(findSpec('timberRack')).toMatchObject({
       name: 'Timber rack',
       folder: 'Timber racks',
@@ -126,8 +126,9 @@ describe('the two timber stores (CLAUDE.md T29 2.11.1)', () => {
       folder: 'Timber shelters',
       price: 18000,
       deliveryDays: 15,
-      width: 3,
-      depth: 6,
+      // 6 m along the wall by 3 m deep from Turn 31 (CLAUDE.md T31 2.8).
+      width: 6,
+      depth: 3,
       height: 3,
       boardCapacity: 400,
       sheetCapacity: 0,
@@ -136,19 +137,23 @@ describe('the two timber stores (CLAUDE.md T29 2.11.1)', () => {
     expect(isHeavy('timberShelter', 'standard')).toBe(false);
   });
 
-  it('stands the shelter on the apron, refuses one with no room there, and never drags its outline in', () => {
+  it('stands the shelter behind the rear wall with the plant, refuses one with no room there, and never drags its outline in', () => {
+    // From Turn 31 it stands where the extractors are, its 3 m depth a metre behind the wall, and
+    // never on the apron, where the van stands alone (PIOTR, 11.10; CLAUDE.md T31 2.8).
     const state = windowHall('none');
     expect(placeEquipmentOrder(state, 'timberShelter').ok).toBe(true);
     const order = state.onOrder.find((item) => item.specId === 'timberShelter');
-    expect(order).toMatchObject({ anchorX: state.unit.widthCells, anchorY: 1 });
+    expect(order).toMatchObject({ anchorY: -4 });
     if (order === undefined) throw new Error('the shelter is on order');
+    expect(order.anchorX + 6).toBeLessThanOrEqual(state.unit.widthCells);
     expect(canPlace(state, order.id, 10, 8)).toEqual({ ok: false, reason: 'It stands in the yard' });
-    // A second has no six metres of apron left beside the van, the first held for it on order or
-    // standing.
-    expect(canBuy(state, 'timberShelter')).toEqual({ ok: false, reason: 'No room on the apron' });
-    const landed = buyNow(windowHall('shelter'), 'timberShelter');
-    expect(landed.equipment.filter((item) => item.specId === 'timberShelter')).toHaveLength(1);
-    expect(canBuy(landed, 'timberShelter')).toEqual({ ok: false, reason: 'No room on the apron' });
+    // More are stood along the wall while it has length for them, the first held for it on order;
+    // then the wall is full.
+    for (let more = 0; more < 6 && canBuy(state, 'timberShelter').ok; more += 1) {
+      expect(placeEquipmentOrder(state, 'timberShelter').ok).toBe(true);
+    }
+    expect(canBuy(state, 'timberShelter')).toEqual({ ok: false, reason: 'No room behind the hall' });
+    expect(state.onOrder.filter((item) => item.specId === 'timberShelter').every((item) => item.anchorY === -4)).toBe(true);
     // And it is bought in the 200 m2 unit, as the rack and the robot are.
     expect(state.unit.areaM2).toBe(200);
   });

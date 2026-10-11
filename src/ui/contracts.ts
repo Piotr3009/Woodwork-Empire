@@ -51,9 +51,25 @@ import {
   weekPace,
 } from '../engine/contracts';
 import { OWNER, lineEngineersOnDuty, lineLevel } from '../engine/machines';
-import { LINE_CONTRACT_NAME, LINE_MODULES, LINE_PALLET_WINDOWS, LINE_WINDOW_PRICE } from '../engine/constants';
 import {
+  LINE_BOARDS_PER_WINDOW,
+  LINE_CONTRACT_NAME,
+  LINE_MODULES,
+  LINE_ORDER_WINDOWS,
+  LINE_PALLET_WINDOWS,
+  LINE_WINDOW_PRICE,
+} from '../engine/constants';
+import {
+  lineBoardsOnTheWay,
+  lineGlassBatchCost,
+  lineGlassCheck,
+  lineGlassOnTheWay,
+  lineGlassWindows,
   lineMaterialPerWindow,
+  lineShortOf,
+  lineTimberBatch,
+  lineTimberBatchCost,
+  lineTimberCheck,
   lineWindowEvery,
   lineWindowMinutes,
   lineWindowsAWeek,
@@ -247,6 +263,14 @@ function activeBlock(state: GameState, contract: Contract): string {
 function endedBlock(state: GameState, contract: Contract): string {
   const report = closingReport(state, contract);
   const offered = contract.renegotiatedPrice ?? contract.pricePerPiece;
+  // A client who went elsewhere offers no other term: no offer on the weeks line and no `Renew`,
+  // only `Let it go`, which takes it off the tab (CLAUDE.md T31 2.9).
+  const lost = contract.endedBy === 'lost';
+  const offer = lost
+    ? ''
+    : ` The client offers <strong>${money(offered)} a piece</strong> for another term of ` +
+      `${plural(contract.termWeeks, 'week', 'weeks')}, ${signedMoney(offered - contract.pricePerPiece)} on ` +
+      `${money(contract.pricePerPiece)}.`;
   return (
     `<div class="contract-ended" data-contract="${contract.id}">` +
     `<h3>${escapeHtml(contract.name)}: ${escapeHtml(endedLine(contract))}</h3>` +
@@ -256,12 +280,9 @@ function endedBlock(state: GameState, contract: Contract): string {
     figureRow(`Labour, ${report.labourHours} hours at cost`, -report.labourCost) +
     figureRow('Machine wear over those hours', -report.machineWear) +
     figureRow('Net margin', report.margin) +
-    `<p class="figures">${fullWeeksOf(contract)} full weeks, ${shortWeeksOf(contract)} short. ` +
-    `The client offers <strong>${money(offered)} a piece</strong> for another term of ` +
-    `${plural(contract.termWeeks, 'week', 'weeks')}, ${signedMoney(offered - contract.pricePerPiece)} on ` +
-    `${money(contract.pricePerPiece)}.</p>` +
+    `<p class="figures">${fullWeeksOf(contract)} full weeks, ${shortWeeksOf(contract)} short.${offer}</p>` +
     `<div class="row"><span class="row-main"></span><span class="row-action">` +
-    `${renewButton(state, contract, offered)}` +
+    `${lost ? '' : renewButton(state, contract, offered)}` +
     `${button('renewContract', 'Let it go', `data-id="${contract.id}" data-accept="0"`)}</span></div>` +
     '</div>'
   );
@@ -279,23 +300,62 @@ function lineContractBlock(state: GameState): string {
   const minutesEach = lineWindowMinutes(state);
   const level = lineLevel(state);
   const onDuty = lineEngineersOnDuty(state);
-  // Short of the two that keep it whole there is one engineer on duty, or none.
+  // Short of the two that keep it whole there is one engineer on duty, or none; with both on duty
+  // it is the timber or the glass that stops it (CLAUDE.md T31 2.4). The engineer is said first.
+  const short = lineShortOf(state);
   const still =
-    level >= LINE_MODULES.length
-      ? ''
-      : countRow('Standing still', `${onDuty === 0 ? 'no' : inWords(onDuty)} engineer on duty`, 'bad');
+    level < LINE_MODULES.length
+      ? countRow('Standing still', `${onDuty === 0 ? 'no' : inWords(onDuty)} engineer on duty`, 'bad')
+      : short !== null
+        ? countRow('Standing still', `no ${short}`, 'bad')
+        : '';
   return (
     '<div class="contract-active" data-line-contract="1">' +
     `<div class="row"><span class="row-main"><h3>${escapeHtml(LINE_CONTRACT_NAME)}</h3></span>` +
     `<span class="row-action">${button('endLineContract', 'End it')}</span></div>` +
     `<p class="figures"><strong class="contract-count">This week: ${plural(contract.windowsThisWeek, 'window', 'windows')}. ` +
     `In all: ${contract.windowsMade}</strong> · ${money(LINE_WINDOW_PRICE)} a window; the timber and the glass ` +
-    `${money(lineMaterialPerWindow())} a window</p>` +
+    `${money(lineMaterialPerWindow())} a window, ordered ahead</p>` +
     `<p class="hint">One window every ${escapeHtml(lineWindowEvery(minutesEach))}: about ${lineWindowsAWeek(state)} a week</p>` +
     countRow('On the pallet', `${line.onPallet} of ${LINE_PALLET_WINDOWS}`) +
     (line.palletsAtGate > 0 ? countRow('At the gate for collection', plural(line.palletsAtGate, 'pallet', 'pallets')) : '') +
     still +
+    lineMaterialRows(state) +
     '</div>'
+  );
+}
+
+/** The line's timber and glass under the running block's rows, and the row of its two order
+ *  buttons, each locked with its reason under the row, a reason said once (CLAUDE.md T31 2.2, 2.4)
+ *  [TUNE: the reasons under the row]. */
+function lineMaterialRows(state: GameState): string {
+  const line = state.windowLine;
+  const boardsComing = lineBoardsOnTheWay(state);
+  const glassComing = lineGlassOnTheWay(state);
+  const timber =
+    `${plural(line.boards, 'board', 'boards')}, for ${plural(Math.floor(line.boards / LINE_BOARDS_PER_WINDOW), 'window', 'windows')}` +
+    (boardsComing > 0 ? `, ${boardsComing} more on the way` : '');
+  const glass =
+    `for ${plural(lineGlassWindows(state), 'window', 'windows')}` +
+    (glassComing > 0 ? `, ${glassComing} more on the way` : '');
+  const timberCheck = lineTimberCheck(state);
+  const glassCheck = lineGlassCheck(state);
+  const timberLabel = `Order timber: ${plural(lineTimberBatch(), 'board', 'boards')}, ${money(lineTimberBatchCost())}`;
+  const glassLabel = `Order glass: ${plural(LINE_ORDER_WINDOWS, 'window', 'windows')}, ${money(lineGlassBatchCost())}`;
+  const control = (check: { ok: boolean; reason: string }, action: string, label: string): string =>
+    check.ok ? button(action, label) : lockedButton(label, check.reason);
+  const reasons = [timberCheck, glassCheck]
+    .filter((check) => !check.ok)
+    .map((check) => check.reason)
+    .filter((reason, index, all) => all.indexOf(reason) === index);
+  return (
+    countRow('Timber on the stores', timber) +
+    countRow('Glass at module 6', glass) +
+    '<div class="row"><span class="row-main"></span><span class="row-action">' +
+    control(timberCheck, 'orderLineTimber', timberLabel) +
+    control(glassCheck, 'orderLineGlass', glassLabel) +
+    '</span></div>' +
+    reasons.map((reason) => `<p class="lock">${escapeHtml(reason)}</p>`).join('')
   );
 }
 

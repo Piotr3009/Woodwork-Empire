@@ -29,15 +29,17 @@ import {
 import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
 import { paperworkDone, takeOffOutstanding } from './jobs';
-import { bagStore, boardRoom, lineEngineersOnDuty, lineLevel, lineModules } from './machines';
+import { bagStore, boardRoom, findSpec, lineEngineersOnDuty, lineLevel, lineModules } from './machines';
 import { canUnload, isBoards } from './materials';
-import { inWords } from './text';
+import { lineShortOf, runningLineContract } from './lineContract';
+import { andList, inASentence, inWords } from './text';
+import { laneTrouble, linePlace, standingOnTheLane } from './layout';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine, hasOfficeAdmin } from './staff';
 import { taxComingLine } from './tax';
 import { closureComingLine } from './closures';
-import { designOutstandingFor } from './tasks';
+import { designOutstandingFor, movingMachines } from './tasks';
 import type { GameState, LedgerCategory } from './types';
 
 export type WarningKey =
@@ -48,6 +50,9 @@ export type WarningKey =
   | 'nobodyAssigned'
   /** Modules of the line stand that no engineer on duty keeps (CLAUDE.md T29 2.9.4). */
   | 'lineNeedsEngineer'
+  /** The line's contract runs, its two engineers are on duty, and it stands for want of timber or
+   *  glass for its next window (CLAUDE.md T31 2.4). */
+  | 'lineNeedsMaterial'
   | 'deadlineAtRisk'
   /** The drawing is finished and the material list is the next thing to do (PIOTR, 03.10; v78). */
   | 'drawingDone'
@@ -56,6 +61,9 @@ export type WarningKey =
   /** A load of boards stands at the gate for want of room on the timber stores (CLAUDE.md T29
    *  2.11.2). */
   | 'boardsAtTheGate'
+  /** Kit stands on the forklift's lane, or the line stands where its lane cannot be (CLAUDE.md T31
+   *  2.6). */
+  | 'laneBlocked'
   | 'noInsurance'
   /** The money speaks before the month end (PIOTR accepted, 17.09; CLAUDE.md T18 2.6). */
   | 'belowZero'
@@ -89,6 +97,9 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   // Directly under it: a line that stands still or runs short is a hall of kit making nothing
   // (CLAUDE.md T29 2.9.4) [TUNE].
   'lineNeedsEngineer',
+  // Directly under it: the line with its engineers and nothing to make windows of (CLAUDE.md T31
+  // 2.4) [TUNE].
+  'lineNeedsMaterial',
   'deadlineAtRisk',
   // Under the deadlines and above the standing lines: the job's calendar is running and nothing
   // can be ordered for it until the list is made, where the lines below can stand for weeks and
@@ -100,6 +111,8 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   // Directly under it: a window's boards at the gate with nowhere to go, which stops the job as
   // the glass does (CLAUDE.md T29 2.11.2) [TUNE].
   'boardsAtTheGate',
+  // Directly under it: the lane the line's pallets go out by is blocked (CLAUDE.md T31 2.6) [TUNE].
+  'laneBlocked',
   'noInsurance',
   'belowZero',
   'spendingOverEarning',
@@ -223,10 +236,43 @@ function boardsAtTheGateWarning(state: GameState): Warning | null {
   );
   if (waiting === undefined) return null;
   const job = state.jobs.find((entry) => entry.id === waiting.jobId);
-  const name = job?.name ?? 'a job';
+  // The line's own load names the line where a job's names the job (CLAUDE.md T31 2.2).
+  const name = waiting.line === true ? "the line's timber" : (job?.name ?? 'a job');
   return boardRoom(state) <= 0
     ? { key: 'boardsAtTheGate', text: `Boards at the gate, no timber store: ${name}` }
     : { key: 'boardsAtTheGate', text: `Boards at the gate, no room on the stores: ${name}` };
+}
+
+/** The line stands on its contract with both engineers on duty, for want of a window's timber or
+ *  glass: said only while the material is what stops it (CLAUDE.md T31 2.4). */
+function lineNeedsMaterialWarning(state: GameState): Warning | null {
+  if (runningLineContract(state) === null) return null;
+  if (lineLevel(state) < lineModules(state) || lineModules(state) === 0) return null;
+  // While the line is being moved it is the move that stops it.
+  if (movingMachines(state) !== null) return null;
+  const short = lineShortOf(state);
+  if (short === null) return null;
+  return { key: 'lineNeedsMaterial', text: `The line stands: no ${short} for its next window` };
+}
+
+/** The line's lane blocked by kit that stood there before it, named as the catalogue names it, kit
+ *  on order among it, until it is moved; or a line of Turn 30 standing where its lane cannot be,
+ *  which keeps its place with no lane (CLAUDE.md T31 2.6) [TUNE: the words]. */
+function laneBlockedWarning(state: GameState): Warning | null {
+  const at = linePlace(state);
+  if (at === null) return null;
+  const trouble = laneTrouble(state, at);
+  if (trouble === 'frontWall') {
+    return { key: 'laneBlocked', text: 'The line stands too near the front wall for its lane: move it back' };
+  }
+  // A line over the left strip has to move along it, not back [TUNE: the words].
+  if (trouble === 'leftWall') {
+    return { key: 'laneBlocked', text: 'The line stands on the way to the gate for its lane: move it along' };
+  }
+  const on = standingOnTheLane(state);
+  if (on.length === 0) return null;
+  const names = on.map((specId) => `the ${inASentence(findSpec(specId)?.name ?? specId)}`);
+  return { key: 'laneBlocked', text: `Kit stands on the forklift's lane: ${andList(names)}` };
 }
 
 function noInsuranceWarning(state: GameState): Warning | null {
@@ -346,10 +392,12 @@ const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   pastTheLimit: pastTheLimitWarning,
   nobodyAssigned: nobodyAssignedWarning,
   lineNeedsEngineer: lineNeedsEngineerWarning,
+  lineNeedsMaterial: lineNeedsMaterialWarning,
   deadlineAtRisk: deadlineWarning,
   drawingDone: drawingDoneWarning,
   glassNotOrdered: glassNotOrderedWarning,
   boardsAtTheGate: boardsAtTheGateWarning,
+  laneBlocked: laneBlockedWarning,
   noInsurance: noInsuranceWarning,
   belowZero: belowZeroWarning,
   spendingOverEarning: spendingOverEarningWarning,

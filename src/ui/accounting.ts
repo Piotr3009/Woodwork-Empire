@@ -24,21 +24,32 @@ import {
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
 import { monthlyPremiums, nextInstalmentFor } from '../engine/index';
 import { AGENCY_MONTHLY_FEE } from '../engine/constants';
+import { lineBooks, lineBooksShown, lineMonthPace, linePaidBack } from '../engine/lineBooks';
+import type { LineColumn } from '../engine/lineBooks';
+import type { LineLostMinutes } from '../engine/index';
 import { renderFinance } from './finance';
-import { button, escapeHtml, money, tabBar, whyLink } from './modal';
+import { button, escapeHtml, money, plural, tabBar, whyLink } from './modal';
 
 /** The three ways of looking at the books (CLAUDE.md T6 3.9), and the loan and the overdraft
  *  (CLAUDE.md T13 3.14). The running ledger had a screen of its own until Turn 23: Piotr read it
  *  and said it was made for an accountant and not for a player, so the months the company has
  *  closed stand there instead. The ledger itself stays in the engine as the record it is, and the
  *  Days tab, the Summary tab and the bank all read it [PIOTR, 20.09] (CLAUDE.md T23 2.14). */
-export type AccountingTab = 'days' | 'summary' | 'reports' | 'finance';
+export type AccountingTab = 'days' | 'summary' | 'reports' | 'finance' | 'line';
 const TABS: Array<[AccountingTab, string]> = [
   ['days', 'Days'],
   ['summary', 'Summary'],
   ['reports', 'Monthly reports'],
   ['finance', 'Finance'],
+  // The fifth, the line's own books, drawn only once the company has had the line standing
+  // (CLAUDE.md T31 2.5).
+  ['line', 'Production line'],
 ];
+
+/** The tabs this company's page draws: the line's only once it has stood. */
+function tabsFor(state: GameState): Array<[AccountingTab, string]> {
+  return lineBooksShown(state) ? TABS : TABS.filter(([id]) => id !== 'line');
+}
 
 export function accountingTabFrom(value: string | undefined): AccountingTab {
   const found = TABS.find(([id]) => id === value);
@@ -243,6 +254,83 @@ function monthlyBillsLine(state: GameState): string {
   return items.join(', ');
 }
 
+/** One row of the line's column: money in or out, the Summary's own markup. */
+function lineMoneyRow(label: string, amount: number, total = false): string {
+  return (
+    `<div class="row${total ? ' is-total' : ''}"><span class="row-main">${escapeHtml(label)}</span>` +
+    `<span class="row-figure ${amount < 0 ? 'bad' : 'good'}">${money(amount)}</span></div>`
+  );
+}
+
+/** The windows made of the windows the line could have made in the working minutes its contract
+ *  ran: `88 of 96, 92%`, never past a hundred though a window in hand may cross a day [TUNE]. */
+function efficiencyWords(column: LineColumn): string {
+  const possible = Math.round(column.possibleWindows);
+  if (column.possibleWindows <= 0) return `${column.windows} of ${possible}`;
+  const share = Math.min(100, Math.round((column.windows / column.possibleWindows) * 100));
+  return `${column.windows} of ${possible}, ${share}%`;
+}
+
+/** One column of the Production line tab, in the Summary's classes (CLAUDE.md T31 2.5). */
+function lineColumn(title: string, column: LineColumn): string {
+  return (
+    `<div class="col"><h3>${escapeHtml(title)}</h3>` +
+    `<div class="row"><span class="row-main">Windows made</span><span class="row-figure">${column.windows}</span></div>` +
+    lineMoneyRow('Turnover', column.turnover) +
+    lineMoneyRow('Timber and glass', -column.material) +
+    lineMoneyRow('Engineers', -column.engineers) +
+    lineMoneyRow('Power', -column.power) +
+    lineMoneyRow('Property cover', -column.cover) +
+    lineMoneyRow('Net profit', column.net, true) +
+    `<div class="row"><span class="row-main">Efficiency</span><span class="row-figure">${escapeHtml(efficiencyWords(column))}</span></div>` +
+    '</div>'
+  );
+}
+
+/** Minutes of the line lost, in hours: `6 h`, and under the hour in minutes [TUNE]. */
+function lostWords(minutes: number): string {
+  return minutes < 60 ? `${Math.round(minutes)} min` : `${Math.round(minutes / 60)} h`;
+}
+
+/** What each cause of a lost minute is called on the line under the columns (CLAUDE.md T31 2.5)
+ *  [TUNE]. */
+const LOST_WORDS: Record<keyof LineLostMinutes, string> = {
+  engineer: 'for want of an engineer',
+  timber: 'for want of timber',
+  glass: 'for want of glass',
+  timberAndGlass: 'for want of timber and glass',
+  move: 'while it was moved',
+};
+
+/** The line's own books: four columns off its day book, then the month's pace, a year at it, what
+ *  it has paid back, and what the month's efficiency lost, when it lost any (CLAUDE.md T31 2.5). */
+function lineTab(state: GameState): string {
+  const books = lineBooks(state);
+  const pace = lineMonthPace(state);
+  const back = linePaidBack(state);
+  const cost = back.line + back.upgrades;
+  const share = cost > 0 ? Math.round((back.net / cost) * 100) : 0;
+  const lost = (Object.keys(LOST_WORDS) as Array<keyof LineLostMinutes>)
+    .filter((cause) => books.month.lost[cause] > 0)
+    .map((cause) => `${lostWords(books.month.lost[cause])} ${LOST_WORDS[cause]}`);
+  return (
+    '<div class="cols">' +
+    lineColumn('Today', books.today) +
+    lineColumn('This week', books.week) +
+    lineColumn('This month', books.month) +
+    lineColumn('This year', books.year) +
+    '</div>' +
+    (pace === null
+      ? ''
+      : `<p class="figures">A working day on average this month: ${plural(Math.round(pace.windowsPerDay), 'window', 'windows')}, ` +
+        `${money(pace.netPerDay)} net</p>` +
+        `<p class="figures">A year at this month's pace: ${money(pace.yearNet)} net</p>`) +
+    `<p class="figures">Paid back: ${money(back.net)} of ${money(back.line)}` +
+    `${back.upgrades > 0 ? ` and the upgrades' ${money(back.upgrades)}` : ''}, ${share}%</p>` +
+    (lost.length === 0 ? '' : `<p class="hint">Lost this month: ${escapeHtml(lost.join(', '))}</p>`)
+  );
+}
+
 /** What the workshop earns for an hour of somebody's time, machines and all (CLAUDE.md T6 3.8). */
 function earnedRateLine(state: GameState): string {
   return (
@@ -292,21 +380,25 @@ export function renderAccounting(
     `<div class="row"><span class="row-main">Monthly bills, ${formatCalendarDay(due.monthly)}</span>` +
     `<span class="row-figure">${escapeHtml(monthlyBillsLine(state))}</span></div>` +
     '';
+  // A save with no line opened on its tab reads the Days, as an unknown tab does.
+  const shown = tab === 'line' && !lineBooksShown(state) ? 'days' : tab;
   const body =
-    tab === 'days'
+    shown === 'days'
       ? daysTab(state, entries, openDays, month ?? monthOfDay(state.clock.day))
-      : tab === 'reports'
+      : shown === 'reports'
         ? reportsTab(state)
-        : tab === 'finance'
+        : shown === 'finance'
           ? renderFinance(state, loanTyped)
-          : summaryTab;
+          : shown === 'line'
+            ? lineTab(state)
+            : summaryTab;
   return (
     `<p class="figures"><strong>${money(state.cash)}</strong> in the bank. ` +
     `Overdraft limit ${money(state.finance.overdraftLimit)}. ` +
     `Deposit held by the landlord ${money(state.unit.depositHeld)}` +
     `${whyLink(state, 'depositReturn')}</p>` +
     banner +
-    tabBar('accountingTab', TABS, tab) +
+    tabBar('accountingTab', tabsFor(state), shown) +
     body +
     `<p class="hint">${button('copyState', 'Copy state as JSON')}</p>`
   );

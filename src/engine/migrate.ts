@@ -11,7 +11,9 @@ import {
   CONTRACT_MAX_JOINERS,
   EQUIPMENT_SPECS,
   HIRING_SPECS,
+  LINE_GLASS_PER_WINDOW,
   LINE_MODULES,
+  LINE_ORDER_WINDOWS,
   LINE_PRICE,
   LOCKER_SLOT_LAYOUT,
   PRODUCT_TEMPLATES,
@@ -38,7 +40,7 @@ import {
 } from './layout';
 import { findSpec, isLineModule, isSold } from './machines';
 import { queueEvent } from './events';
-import { emptyWindowLine } from './lineContract';
+import { lineTimberBatch } from './lineContract';
 import { planPlaces } from './production';
 import { rolesForTask } from './tasks';
 import type { Equipment, GameState, OnOrderItem, Orientation, TaskKind, WorkerRole, WorkerTier } from './types';
@@ -1194,7 +1196,10 @@ function liftToVersion42(state: Raw): void {
  *  modules, bought one by one, are taken back on the whole state after the lifts, because the money
  *  goes back through the books (`takeTheLineBack`). Nothing else of a save is touched. */
 function liftToVersion43(state: Raw): void {
-  if (!isRecord(state.windowLine)) state.windowLine = emptyWindowLine();
+  // Turn 30's shape of the field, as it was written then: the lift to 44 adds Turn 31's parts.
+  if (!isRecord(state.windowLine)) {
+    state.windowLine = { contract: null, nextOfferDay: null, minutes: 0, onPallet: 0, palletsAtGate: 0, upgrades: [] };
+  }
   state.version = 43;
 }
 
@@ -1239,6 +1244,61 @@ function takeTheLineBack(state: GameState): void {
   });
 }
 
+/** Version 43 to 44 (v92, Turn 31). Every new field of the turn with its default, the parts later
+ *  tasks use among them, so the version moves once (CLAUDE.md T31 section 4): the line's timber,
+ *  its glass and the glass on its way, all none, and its day book empty from the save's own day;
+ *  the hall made longer no time and none being built; and no quiet weeks of the contracts. A line
+ *  whose contract runs is given one batch of timber and glass on the whole state after the lifts
+ *  (`giveTheLineItsFirstBatch`). Nothing else of a save is touched. */
+function liftToVersion44(state: Raw): void {
+  const clock = isRecord(state.clock) ? state.clock : {};
+  const day = typeof clock.day === 'number' ? clock.day : 0;
+  if (!isRecord(state.windowLine)) {
+    state.windowLine = { contract: null, nextOfferDay: null, minutes: 0, onPallet: 0, palletsAtGate: 0, upgrades: [] };
+  }
+  // Turn 31's shape of the field, as it is written tonight, so a later lift adds its own parts.
+  const line = state.windowLine as Raw;
+  if (typeof line.boards !== 'number') line.boards = 0;
+  if (typeof line.glass !== 'number') line.glass = 0;
+  if (!Array.isArray(line.glassOnTheWay)) line.glassOnTheWay = [];
+  if (!isRecord(line.today)) {
+    line.today = {
+      day,
+      windows: 0,
+      turnover: 0,
+      material: 0,
+      engineers: 0,
+      power: 0,
+      cover: 0,
+      possibleMinutes: 0,
+      possibleWindows: 0,
+      lost: { engineer: 0, timber: 0, glass: 0, timberAndGlass: 0, move: 0 },
+    };
+  }
+  if (!Array.isArray(line.days)) line.days = [];
+  if (!isRecord(line.since)) {
+    line.since = { firstDay: null, windows: 0, turnover: 0, material: 0, engineers: 0, power: 0, cover: 0 };
+  }
+  if (isRecord(state.unit)) {
+    if (typeof state.unit.longExtensions !== 'number') state.unit.longExtensions = 0;
+    if (state.unit.longExtension !== 'building') state.unit.longExtension = 'none';
+  }
+  if (state.contractQuietUntilDay === undefined) state.contractQuietUntilDay = null;
+  state.version = 44;
+}
+
+/** A line that ran on Turn 30's rule, its material bought as each window was made, does not stop on
+ *  the morning the rule changes: a save whose line contract runs is given one batch of each, free,
+ *  forty boards on the line and on the counter and glass for twenty windows. Its boards may stand
+ *  over the stores' room until they are used, as any load may (CLAUDE.md T31 section 4) [TUNE:
+ *  chat]. */
+function giveTheLineItsFirstBatch(state: GameState): void {
+  if (state.windowLine.contract?.status !== 'active') return;
+  state.windowLine.boards += lineTimberBatch();
+  state.stock.sheets += lineTimberBatch();
+  state.windowLine.glass += LINE_ORDER_WINDOWS * LINE_GLASS_PER_WINDOW;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -1271,6 +1331,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   40: liftToVersion41,
   41: liftToVersion42,
   42: liftToVersion43,
+  43: liftToVersion44,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -1334,6 +1395,24 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       takeTheLineBack(lifted);
     } catch {
       // Not a whole hall, with no books to pay it back through.
+    }
+  }
+  // The timber shelter off the apron and behind the rear wall with the plant, where it hides
+  // nothing of the hall, on its footprint of 6 by 3; one the wall has no length left for stays where
+  // it is (v92; CLAUDE.md T31 2.8, section 4). Outside the chain above, which is the plant's own.
+  if (version < 44 && Array.isArray(lifted.equipment) && Array.isArray(lifted.onOrder) && lifted.unit) {
+    try {
+      standThePlantBehindTheWall(lifted, 'timberShelter');
+    } catch {
+      // Not a whole hall: no wall to stand it behind.
+    }
+  }
+  // A line on its contract given its first batch of timber and glass (v92).
+  if (version < 44 && isRecord(lifted.windowLine) && isRecord(lifted.stock)) {
+    try {
+      giveTheLineItsFirstBatch(lifted);
+    } catch {
+      // Not a whole state: no line to give it to.
     }
   }
   // Who has a place, worked out the moment the save is open rather than left for the first

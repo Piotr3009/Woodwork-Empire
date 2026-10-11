@@ -12,8 +12,8 @@ archived in `docs`: `docs/turn-1-brief.md`, `docs/turn-2-brief.md`, `docs/turn-3
 `docs/turn-19-brief.md`, `docs/turn-20-brief.md`, `docs/turn-21-brief.md`,
 `docs/turn-22-brief.md`, `docs/turn-23-brief.md`, `docs/turn-24-brief.md`,
 `docs/turn-25-brief.md`, `docs/turn-26-brief.md`, `docs/turn-27-brief.md`,
-`docs/turn-28-brief.md` and `docs/turn-29-brief.md`. The build reports are `REPORT-T1.md` to
-`REPORT-T30.md`.
+`docs/turn-28-brief.md`, `docs/turn-29-brief.md` and `docs/turn-30-brief.md`. The build reports
+are `REPORT-T1.md` to `REPORT-T31.md`.
 
 The sprite contract between the art side and the game is `docs/art/SPRITES.md`; the art Turn 13
 asks for is listed in `docs/art/REQUESTS-T13.md`, the art Turn 14 asks for in

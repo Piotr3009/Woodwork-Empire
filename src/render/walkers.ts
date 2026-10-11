@@ -157,24 +157,30 @@ export function resortFigures(root: ParentNode): number {
     const key = node.getAttribute('data-figure');
     const walker = key === null ? undefined : walkers.get(key);
     if (walker === undefined) continue;
-    const depth = figureDepth(walker);
-    node.setAttribute('data-depth', String(Math.round(depth * 1000) / 1000));
-    const parent = node.parentNode;
-    if (parent === null) continue;
-    const { run, index } = runAround(node);
-    if (run.length === 0) continue;
-    const slot = figureSlot(
-      run.map((sibling) => ({ depth: depthOf(sibling) ?? 0, foot: footOf(sibling) })),
-      { depth, feet: { x: walker.at.x + 0.5, y: walker.at.y + 0.5 } },
-    );
-    // Already there: nothing to do this frame.
-    if (slot === index) continue;
-    const after = run[slot];
-    if (after !== undefined) parent.insertBefore(node, after);
-    else parent.insertBefore(node, (run[run.length - 1] as Element).nextSibling);
-    moved += 1;
+    if (placeAmongDrawables(node, figureDepth(walker), { x: walker.at.x + 0.5, y: walker.at.y + 0.5 })) moved += 1;
   }
   return moved;
+}
+
+/** Writes a moving thing's depth for this frame and puts it in the painter's order among the
+ *  drawables round it, as a figure is put: the one insertion the figures and the line's forklift
+ *  share (CLAUDE.md T31 2.10). True when it was moved. */
+export function placeAmongDrawables(node: Element, depth: number, feet: { x: number; y: number }): boolean {
+  node.setAttribute('data-depth', String(Math.round(depth * 1000) / 1000));
+  const parent = node.parentNode;
+  if (parent === null) return false;
+  const { run, index } = runAround(node);
+  if (run.length === 0) return false;
+  const slot = figureSlot(
+    run.map((sibling) => ({ depth: depthOf(sibling) ?? 0, foot: footOf(sibling) })),
+    { depth, feet },
+  );
+  // Already there: nothing to do this frame.
+  if (slot === index) return false;
+  const after = run[slot];
+  if (after !== undefined) parent.insertBefore(node, after);
+  else parent.insertBefore(node, (run[run.length - 1] as Element).nextSibling);
+  return true;
 }
 
 /** The walker of a figure, for the tests and nobody else. */

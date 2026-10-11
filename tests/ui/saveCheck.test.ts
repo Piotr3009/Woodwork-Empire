@@ -137,9 +137,10 @@ describe('a fresh game in this build', () => {
     // v88: the same game, drawn at a steadier pace (PIOTR, 10.10). v89 is Turn 30 and state 43:
     // the line bought whole, and its own field (CLAUDE.md T30 section 4). v90 is state 43 too: the
     // line's motion played slower (PIOTR, 11.10). So is v91: the line's motion played now and then
-    // (PIOTR, 11.10).
-    expect(APP_VERSION).toBe('v91');
-    expect(STATE_VERSION).toBe(43);
+    // (PIOTR, 11.10). v92 is Turn 31 and state 44: the line's timber, glass and day book, the hall
+    // made longer, the quiet weeks (CLAUDE.md T31 section 4).
+    expect(APP_VERSION).toBe('v92');
+    expect(STATE_VERSION).toBe(44);
   });
 
   it('saves through the store, the file and the cloud row on day 1, and loads back three ways', async () => {

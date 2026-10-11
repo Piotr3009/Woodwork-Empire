@@ -35,7 +35,7 @@ import { lockReasonFor, template } from '../../src/engine/catalog';
 import { buyEquipment, cancelOrder, canBuy, canSell, placeEquipmentOrder, sellMachine } from '../../src/engine/game';
 import { insuredValue, propertyPremiumYearly } from '../../src/engine/insurance';
 import { stagedJob } from '../../src/engine/jobs';
-import { canPlace, canPlaceBox, lineBox } from '../../src/engine/layout';
+import { canPlace, lineFits } from '../../src/engine/layout';
 import {
   findSpec,
   hallPace,
@@ -204,7 +204,8 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     for (let y = 0; y < full.unit.depthCells; y += 1) {
       placeEquipment(full, 'planer', { variantId: 'standard', x: 18, y, id: `kit-wall-${y}` });
     }
-    expect(canBuy(full, 'windowLine1')).toEqual({ ok: false, reason: 'No free 36 m by 3 m in the hall' });
+    // From Turn 31 the line's lane is asked with it (CLAUDE.md T31 2.6).
+    expect(canBuy(full, 'windowLine1')).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
     // And in that order when more than one fails.
     const poorAndSmall = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     poorAndSmall.cash = 1000;
@@ -222,15 +223,17 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
   });
 
   it('takes the first clear 36 m by 3 m from x 2, y 14, and names nothing that stands on its first place', () => {
-    const state = bigUnit();
+    // From Turn 31 a place wants its lane clear too, so this hall leaves the five axis CNC out to
+    // have a second place for the line (CLAUDE.md T31 2.6).
+    const state = bigUnit(['cnc5']);
     placeEquipment(state, 'planer', { variantId: 'standard', x: 5, y: 14, id: 'kit-planer-2' });
     expect(canBuy(state, 'windowLine1')).toEqual({ ok: true, reason: '' });
     // The first clear run in the order a machine's place is found: row by row from the top, cell by
-    // cell along each row, asked of the whole 36 m by 3 m.
+    // cell along each row, asked of the whole 36 m by 3 m and its lane.
     let expected: { x: number; y: number } | null = null;
     for (let y = 0; y + 3 <= state.unit.depthCells && expected === null; y += 1) {
       for (let x = 0; x + 36 <= state.unit.widthCells; x += 1) {
-        if (canPlaceBox(state, lineBox({ x, y }), new Set()).ok) {
+        if (lineFits(state, { x, y }, new Set())) {
           expected = { x, y };
           break;
         }

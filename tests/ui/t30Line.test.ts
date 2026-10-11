@@ -113,11 +113,12 @@ describe('the line dragged in setup mode (CLAUDE.md T30 2.4)', () => {
     };
     required(root.querySelector<HTMLButtonElement>('[data-do="startSetup"]')).click();
     required(root.querySelector('[data-kit="kit-line-3"]')).dispatchEvent(mouse('mousedown', 14, 14));
-    window.dispatchEvent(mouse('mousemove', 14, 17));
+    // Back from the front wall, where its lane lets it stand (CLAUDE.md T31 2.6).
+    window.dispatchEvent(mouse('mousemove', 14, 11));
     const ghost = required(root.querySelector('[data-ghost]'));
     expect(ghost.querySelectorAll('[data-ghost-part]')).toHaveLength(6);
     expect(ghost.textContent).toBe('Drop it here');
-    window.dispatchEvent(mouse('mouseup', 14, 17));
+    window.dispatchEvent(mouse('mouseup', 14, 11));
     // The six went by the same cells, wherever the mouse put module 3.
     const moved = required(currentState()).equipment.filter((item) => LINE_MODULES.includes(item.specId));
     const first = required(moved[0]);
@@ -148,6 +149,10 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     };
     state.windowLine.onPallet = 7;
     state.windowLine.palletsAtGate = 1;
+    // Its timber and glass, from Turn 31 (CLAUDE.md T31 2.1).
+    state.windowLine.boards = 40;
+    state.stock.sheets += 40;
+    state.windowLine.glass = 20;
     return state;
   }
 
@@ -160,7 +165,7 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     const text = block?.textContent ?? '';
     for (const words of [
       'Windows off the line',
-      '£1,500 a window; the timber and the glass £600 a window',
+      '£1,500 a window; the timber and the glass £600 a window, ordered ahead',
       'One window every 2 hours: about 20 a week',
       'This week: 7 windows. In all: 112',
       'On the pallet',
@@ -210,6 +215,10 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     state.windowLine.palletsAtGate = 3;
     hall.innerHTML = renderHall(state);
     expect(hall.querySelectorAll('[data-line-pallet]')).toHaveLength(2);
+    // From Turn 31 each is the art side's pallet standing alone, not a box (CLAUDE.md T31 2.10).
+    for (const pallet of Array.from(hall.querySelectorAll('[data-line-pallet]'))) {
+      expect(pallet.querySelector('image')?.getAttribute('href')).toBe('/sprites/windowPallet.standard.png');
+    }
     expect(hall.textContent).toContain('Windows for collection: 3 pallets');
     state.windowLine.palletsAtGate = 0;
     hall.innerHTML = renderHall(state);

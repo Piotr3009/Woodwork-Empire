@@ -28,7 +28,9 @@ describe('the sprite check page', () => {
     // class and a class has its own footprint (CLAUDE.md T7 3.5). A family with one class is
     // asked for once, by the family key. The office desk items went with the desk (T4 3.1) and
     // the rooms are the hall layers now (docs/art/SPRITES.md 9.3).
-    const wanted = new Set<string>([PALLET_SPRITE]);
+    // And from Turn 31 the line's pallet of ten windows standing alone, which is no family's class
+    // (CLAUDE.md T31 2.10).
+    const wanted = new Set<string>([PALLET_SPRITE, 'windowPallet.standard']);
     for (const spec of EQUIPMENT_SPECS) {
       if (spec.variants.length > 1) {
         for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);

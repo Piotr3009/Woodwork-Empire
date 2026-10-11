@@ -323,6 +323,50 @@ unchanged. Floor corners on it: (0,20) = 120, 768; (40,0) = 3000, 1248; (40,20) 
 the art side repaints any of the three layers of 9.3, run `scripts/hall-wide.py`, then this
 script, and then `npm run sprites:manifest`.
 
+### 9.9 The hall that grows (Turn 31, PIOTR 11.10.2026: "adding 200 m² at a time")
+
+From its second extension the hall can be made 10 m longer along the rear wall as many times as
+the player wants (CLAUDE.md T31 2.7): 50 × 20 m, 60 × 20 m and on. Nothing is painted for it. Three
+pieces are cut out of `hallBackgroundDeep.png` by `scripts/hall-long.py`, pixel for pixel, none of
+them scaled:
+
+| File in `public/sprites/` | Format | Contents | Cut from 9.8's canvas at |
+|---|---|---|---|
+| `hallBackgroundLong.png` | RGBA, 1490 × 914 | ten metres of the hall, x 28 to 39 at every depth: the floor, the rear wall and its top, the front kerb, the first metre (28 to 29) coming in from nothing | x 1462, y 790 |
+| `hallBackgroundEnd.png` | RGBA, 1060 × 700 | the end of the hall, everything of it from x 39 on: the kerb under the end, the end of the rear wall and of its top, the corner of the front kerb, coming in over the metre before it (38 to 39) | x 1942, y 1030 |
+| `hallBackgroundGround.png` | RGB, 480 × 240 | the flat ground the picture is painted on outside the hall (34, 36, 40), one step of the hall's growth, from its top right corner | x 2640, y 0 |
+
+On the wall and above it a piece is cut along the screen's upright, where the wall at x stands; on
+the floor and below it along the floor's own x. The two cuts meet on the foot of the rear wall,
+which a step of ten metres along the hall lays on itself. The sky over the wall and the ground in
+front of the kerb are the picture's flat ground, and that is left out of the long piece and the end
+(transparent): the ground piece under them is the same colour, and a feathered metre over flat
+ground drew a line one level darker than the ground on either side of it.
+
+**The cut the picture asked for.** The brief's piece was the hall from x 30 to 40, feathered over
+its first metre. The painted floor stops at x 39.06, where the kerb under the end of the hall
+begins, and the wall's corner shade is at 39.7 to 40. A piece cut to 40 would leave a kerb and a
+shade across the floor every ten metres. So the piece is cut ten metres long from 29 to 39, with
+its feathered metre 28 to 29. Laid ten metres further along than the one before, its feather comes
+in over floor that is there, and its first whole metre covers the kerb under the end of the one
+before it. The end comes in over the metre 38 to 39, which is the last piece's last metre and the
+same metre of the picture, so the last piece and the end meet as they were drawn: cut hard at the
+same x, the two edges, each drawn and scaled on its own, let the ground show through the join.
+
+**The ground.** The longer scene is a bigger rectangle, and at its top right and its bottom left it
+shows more ground and sky than any number of pieces laid along the hall can cover: those corners
+grow with every piece. So a third piece, the picture's own flat ground, is laid edge to edge under
+all of it (an SVG pattern of the file at its own size, nothing stretched). Whatever the long pieces
+and the end leave is the picture's own ground.
+
+**How the game lays them.** For a hall of `40 + 10n` m the scene is 9.8's picture, then the ground
+under it all, then `n` long pieces, the k-th (from 0) laid 480 × 240 px (2x) further along than the
+cut's own place for each of `k + 1` steps, then the end, laid `n` steps along. The office and the
+canteen layers sit on top unchanged. The frame of the scene, which the camera's bounds and the zoom
+that fits the hall read, is 9.8's canvas and 480 × 240 px more for each piece: `-540 -144 2040 1164`
+at 1x for 60 m, `-540 -144 3000 1644` for 100 m. If `hallBackgroundDeep.png` is made again, run
+`scripts/hall-long.py` after `scripts/hall-deep.py`, then `npm run sprites:manifest`.
+
 ---
 
 ## 10. Characters (accepted by Piotr, 13.09.2026): frame sheets from the 3D model
@@ -563,7 +607,7 @@ anchor with no table of pixels.
 | `windowLine4.standard.png` | `windowLine4` | 6 × 3 × 2.5 | 448 × 352 | 296 / 152, 344 | `windowLine.stage4` |
 | `windowLine5.standard.png` | `windowLine5` | 6 × 3 × 2.5 | 448 × 352 | 296 / 152, 344 | `windowLine.stage5` |
 | `timberRack.standard.png` | `timberRack` | 4 × 1 × 2.5 | 256 × 256 | 200 / 56, 248 | `timberStorage.rack` |
-| `timberShelter.standard.png` | `timberShelter` | 3 × 6 × 3 | 448 × 376 | 152 / 296, 368 | `timberStorage.shelter`, its 90 view |
+| `timberShelter.standard.png` | `timberShelter` | 6 × 3 × 3 | 448 × 376 | 296 / 152, 368 | `timberStorage.shelter` (from Turn 31 its 0 view again) |
 
 Why the names changed. A family in this game has the five classes or one class called `standard`
 (the five axis CNC, from tonight, an unbroken run of three of them: `standard`, `pro`,
@@ -571,11 +615,16 @@ Why the names changed. A family in this game has the five classes or one class c
 families of one class each, the way the high capacity rack is a family of its own beside the rack,
 and their files carry `.standard`. Chat renamed them and touched no pixel.
 
-The shelter's two views changed places. The art side drew it 6 m long by 3 m deep. It stands
-outside on the apron, which is 3 m wide, so the game declares it 3 wide by 6 deep: the art side's
-90 view is `timberShelter.standard.png` and its 0 view is the `.r`. Kit outside is never turned,
-so the shelter's `.r` (like the van's) is on disk for the tests and the Sprite check page and is
-never drawn on the hall.
+The shelter's two views changed places in Turn 29 and changed back in Turn 31. The art side drew
+it 6 m long by 3 m deep. Turn 29 stood it outside on the apron, which is 3 m wide, so the game
+declared it 3 wide by 6 deep and drew the art side's 90 view. From Turn 31 it stands behind the rear
+wall with the plant [PIOTR, 11.10: "it hides our hall; rather where the extractors are, or behind
+them"], declared as the art side drew it, 6 m along the wall by 3 m deep, so
+`timberShelter.standard.png` is the art side's 0 view again and its 90 view is the `.r` (the two
+files changed places by `git mv` through a temporary name, nothing edited; CLAUDE.md T31 2.8). Kit
+outside is never turned, so the shelter's `.r` (like the van's) is on disk for the tests and the
+Sprite check page and is never drawn on the hall. Behind the wall it is drawn through the rear
+wall's clip, as the plant is, and its plate is hung over the wall's top above it.
 
 What they are:
 
@@ -709,5 +758,61 @@ v90's loop four times slower looked as if frames were dropped). The moment the c
 sheet holds, and the next page written draws the six from their pictures. Module 6 with one to nine
 windows on its pallet is drawn with
 the one overlay of that many over it, in the same box and drawable, whether it plays or stands.
-`stack10` is on disk and is not drawn: the tenth window sends the pallet to the gate, and it waits
-for the art side's pallet standing alone and the forklift (L3).
+`stack10` is on disk and is not drawn: the tenth window sends the pallet to the gate, where from
+Turn 31 the art side's pallet standing alone and the line's forklift (L3, section 16) take it.
+
+## 16. The line's forklift and its pallet (L3, Turn 31, 11.10.2026)
+
+Piotr approved the art side's L3 on the evening of 11.10 ("akceptacja jest") and asked for it in Turn
+31 ("won't we add it to this turn?"). Its three pictures went into `public/sprites/` byte for byte
+(each matches its line in `docs/art/pack-l3-1110/checksums.sha256`), moved by `git mv` from
+`docs/pictures-l3/`, where the ZIP put them; the rest of the pack (its notes, figures, reports, the
+approved previews, its source, the two sheets' JSONs and the pallet's 90 degree view, which nothing
+turns and which is not served) is in `docs/art/pack-l3-1110/`, with `EDITED.md` (CLAUDE.md T31 2.10).
+No agent altered a pixel.
+
+| File in public/sprites/ | What it is | File, px | Anchor |
+|---|---|---|---|
+| `windowPallet.standard.png` | the pallet of ten wrapped windows standing alone, view 0, 2 × 1 × 1.75 m | 160 × 172 | 104, 164 |
+| `vehicle.forklift.drive.sheet.png` | the line's forklift and its driver, forks empty: four rows of six cells | 1,632 × 1,024, cells 272 × 256 | 136, 192 in every cell |
+| `vehicle.forklift.driveLoaded.sheet.png` | the same with the pallet of ten windows on its forks | 1,632 × 1,024, cells 272 × 256 | 136, 192 in every cell |
+
+**The pallet.** The contract's canvas for 2 × 1 × 1.75 m (`(2 + 1) × 48 + 16` = 160 by `(2 + 1) × 24
++ 1.75 × 48 + 16` = 172, the anchor at `8 + 48 × 2` = 104, 172 - 8); its windows and its pallet are
+module 6's (`stack10` and the pallet drawn in module 6's picture). The game draws it at
+`LINE_PALLET_LAYOUT` (x 0, y 10, 2 by 1, view 0, on the box's nearest corner as every picture is), a
+second beside it along x at x 2 to 3, two at the most, a part pallet drawn as a full one, with the
+label `Windows for collection: N pallets`.
+
+**The sheets.** Six frames at 8 a second, a loop of three quarters of a second; the rows are the
+figures' four directions in the game's own sense: row 0 `sw` (along +y), row 1 `se` (+x), row 2 `nw`
+(-x), row 3 `ne` (-y), as `facingTowards` gives them, the forks pointing the way it drives in every
+row, none mirrored. Every cell of a row has the same bounds, so the forklift drives on the spot and
+the game moves it. The anchor is one point of the floor under the forklift with its load, the same in
+both sheets, so the empty forklift is not centred on it and is not to be centred again. The figures
+are written once as `FORKLIFT_SHEETS` in `src/engine/constants.ts`, from the two JSONs, as
+`MACHINE_WORK_SHEETS` was. The middle of the pallet on the forks is 1.225 m ahead of the anchor
+(`loadCenterXM` in the pack's `reports/load-contact-QA.json`), written once as `FORKLIFT_LOAD_AHEAD`.
+
+**True size.** The forklift is drawn at true size, as the art side's model is, where the forklift
+family's own pictures (the five classes the company may own, which
+unload the lorries) are a 1 × 1 × 1 m frame (`docs/art/REQUESTS-T30.md` 2.1). Those are not touched.
+
+**Two new kinds of file.** A vehicle's sheet of four rows, `vehicle.<name>.<variant>.sheet.png`, and
+the picture of a thing that is no family's class, `windowPallet.standard.png`. Neither is a class's
+picture or a turned one: the game picks every picture by its exact name, and the tests that count
+class pictures and turned ones say so (`tests/render/spriteClasses.test.ts`,
+`tests/engine/rotate.test.ts`). The Sprite check page lists the pallet among its targets, at the gate
+on its 2 by 1, and the two sheets whole with the anchor marked in every cell.
+
+**How the game uses them** (CLAUDE.md T31 2.10). The forklift is the line's own: it comes with the
+line and goes with it, costs nothing and is no kit, and its driver is part of the picture. It is the
+renderer's, as the walkers and the doors are (`src/render/forklift.ts`), with no game state. It waits
+on the lane's front strip in front of module 6's pallet, facing `nw`, on frame 0 of the empty sheet,
+while the six stand and the line has its lane. Whenever a pallet leaves module 6 for the gate it
+drives it there along the front strip (`nw`) and up the left strip (`ne`) until the pallet on its
+forks is over its place at the gate, sets it down, and comes back empty (`sw`, then `se`), at three
+cells a second of real time, a corner a turn on the spot, its six frames playing while it moves. The
+newest pallet at the gate is not drawn while it is on the forks. Nothing is drawn of the forks lifting
+or setting down, and from 30x no trip is drawn.
+
