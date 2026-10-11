@@ -1781,6 +1781,14 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // The line's own contract, one click and nothing asked (CLAUDE.md T30 2.6).
       dispatch({ type: 'END_LINE_CONTRACT' });
       return;
+    case 'orderLineTimber':
+      // Forty boards for the line, one click (CLAUDE.md T31 2.2).
+      dispatch({ type: 'ORDER_LINE_TIMBER' });
+      return;
+    case 'orderLineGlass':
+      // Glass for twenty windows, one click (CLAUDE.md T31 2.2).
+      dispatch({ type: 'ORDER_LINE_GLASS' });
+      return;
     case 'buyLineUpgrade':
       // An upgrade of the line, paid at the click and fitted ten working days on (CLAUDE.md T30
       // 2.10).

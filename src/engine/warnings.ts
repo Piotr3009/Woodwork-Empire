@@ -31,13 +31,14 @@ import { overdraftInterestForDay } from './finance';
 import { paperworkDone, takeOffOutstanding } from './jobs';
 import { bagStore, boardRoom, lineEngineersOnDuty, lineLevel, lineModules } from './machines';
 import { canUnload, isBoards } from './materials';
+import { lineShortOf, runningLineContract } from './lineContract';
 import { inWords } from './text';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine, hasOfficeAdmin } from './staff';
 import { taxComingLine } from './tax';
 import { closureComingLine } from './closures';
-import { designOutstandingFor } from './tasks';
+import { designOutstandingFor, movingMachines } from './tasks';
 import type { GameState, LedgerCategory } from './types';
 
 export type WarningKey =
@@ -48,6 +49,9 @@ export type WarningKey =
   | 'nobodyAssigned'
   /** Modules of the line stand that no engineer on duty keeps (CLAUDE.md T29 2.9.4). */
   | 'lineNeedsEngineer'
+  /** The line's contract runs, its two engineers are on duty, and it stands for want of timber or
+   *  glass for its next window (CLAUDE.md T31 2.4). */
+  | 'lineNeedsMaterial'
   | 'deadlineAtRisk'
   /** The drawing is finished and the material list is the next thing to do (PIOTR, 03.10; v78). */
   | 'drawingDone'
@@ -89,6 +93,9 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   // Directly under it: a line that stands still or runs short is a hall of kit making nothing
   // (CLAUDE.md T29 2.9.4) [TUNE].
   'lineNeedsEngineer',
+  // Directly under it: the line with its engineers and nothing to make windows of (CLAUDE.md T31
+  // 2.4) [TUNE].
+  'lineNeedsMaterial',
   'deadlineAtRisk',
   // Under the deadlines and above the standing lines: the job's calendar is running and nothing
   // can be ordered for it until the list is made, where the lines below can stand for weeks and
@@ -223,10 +230,23 @@ function boardsAtTheGateWarning(state: GameState): Warning | null {
   );
   if (waiting === undefined) return null;
   const job = state.jobs.find((entry) => entry.id === waiting.jobId);
-  const name = job?.name ?? 'a job';
+  // The line's own load names the line where a job's names the job (CLAUDE.md T31 2.2).
+  const name = waiting.line === true ? "the line's timber" : (job?.name ?? 'a job');
   return boardRoom(state) <= 0
     ? { key: 'boardsAtTheGate', text: `Boards at the gate, no timber store: ${name}` }
     : { key: 'boardsAtTheGate', text: `Boards at the gate, no room on the stores: ${name}` };
+}
+
+/** The line stands on its contract with both engineers on duty, for want of a window's timber or
+ *  glass: said only while the material is what stops it (CLAUDE.md T31 2.4). */
+function lineNeedsMaterialWarning(state: GameState): Warning | null {
+  if (runningLineContract(state) === null) return null;
+  if (lineLevel(state) < lineModules(state) || lineModules(state) === 0) return null;
+  // While the line is being moved it is the move that stops it.
+  if (movingMachines(state) !== null) return null;
+  const short = lineShortOf(state);
+  if (short === null) return null;
+  return { key: 'lineNeedsMaterial', text: `The line stands: no ${short} for its next window` };
 }
 
 function noInsuranceWarning(state: GameState): Warning | null {
@@ -346,6 +366,7 @@ const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   pastTheLimit: pastTheLimitWarning,
   nobodyAssigned: nobodyAssignedWarning,
   lineNeedsEngineer: lineNeedsEngineerWarning,
+  lineNeedsMaterial: lineNeedsMaterialWarning,
   deadlineAtRisk: deadlineWarning,
   drawingDone: drawingDoneWarning,
   glassNotOrdered: glassNotOrderedWarning,

@@ -491,6 +491,9 @@ export interface OwnerState {
 /** Where the second 200 m2 stand: not asked for, paid for and opening the next working morning,
  *  or open (PIOTR, 03.10; v67). */
 export type UnitExtension = 'none' | 'building' | 'open';
+/** The long extension of the hall, ten metres more along the rear wall at a time: none being built,
+ *  or one being built that opens the next working morning (CLAUDE.md T31 2.7). */
+export type LongExtension = 'none' | 'building';
 
 /** The two times a unit can be extended, in the order they are built: the second 200 m2 along the
  *  rear wall, and then 400 m2 along the front of that (v67, v82). */
@@ -514,6 +517,10 @@ export interface UnitState {
   /** True once the canteen has been enlarged from two by four metres to four by four, which is
    *  what takes its lockers from eight to sixteen (PIOTR, 03.10; v67). */
   canteenWide: boolean;
+  /** How many long extensions are open, each ten metres more along the rear wall, and whether one
+   *  is being built (CLAUDE.md T31 2.7) [TUNE: the names]. */
+  longExtensions: number;
+  longExtension: LongExtension;
 }
 
 export interface Worker {
@@ -789,9 +796,57 @@ export interface LineUpgrade {
   fittedOnDay: number;
 }
 
+/** Glass for the line ordered from the glazier and not yet in: the windows it is for and the day it
+ *  comes (CLAUDE.md T31 2.1, 2.2). */
+export interface LineGlassOnTheWay {
+  windows: number;
+  day: number;
+}
+
+/** The minutes of a day the line's contract could have made windows in and did not, by why: no two
+ *  engineers on duty, no timber, no glass, neither, or the line being moved (CLAUDE.md T31 2.5). */
+export interface LineLostMinutes {
+  engineer: number;
+  timber: number;
+  glass: number;
+  timberAndGlass: number;
+  move: number;
+}
+
+/** One calendar day of the line's own day book (CLAUDE.md T31 2.5): the windows made on its
+ *  contract, their price, the timber and glass they used, the day's share of the engineers, the
+ *  power and the property cover, the working minutes the contract ran and the windows it could
+ *  have made in them, and the minutes lost by why. The day in hand is kept in the same shape, its
+ *  three costs written when it is closed at the next working open. */
+export interface LineDay {
+  day: number;
+  windows: number;
+  turnover: number;
+  material: number;
+  engineers: number;
+  power: number;
+  cover: number;
+  possibleMinutes: number;
+  possibleWindows: number;
+  lost: LineLostMinutes;
+}
+
+/** What the line has made and cost since it first stood, the days closed so far: the first day it
+ *  stood, null while it never has (CLAUDE.md T31 2.5). */
+export interface LineSince {
+  firstDay: number | null;
+  windows: number;
+  turnover: number;
+  material: number;
+  engineers: number;
+  power: number;
+  cover: number;
+}
+
 /** The line's own state, everything of it that is not kit on the floor (CLAUDE.md T30 section 4):
  *  its contract, the day it may be offered again, the minutes into the window in hand, the windows
- *  on module 6's pallet, the full pallets waiting at the gate, and the upgrades. */
+ *  on module 6's pallet, the full pallets waiting at the gate, and the upgrades. From Turn 31 its
+ *  timber and glass, the glass on its way, and its own day book (CLAUDE.md T31 2.1, 2.5). */
 export interface WindowLineState {
   contract: LineContract | null;
   /** Null until the first offer; a week on whenever an offer is turned down or a contract ends. */
@@ -800,6 +855,17 @@ export interface WindowLineState {
   onPallet: number;
   palletsAtGate: number;
   upgrades: LineUpgrade[];
+  /** The boards the line holds on the timber stores, on the one counter and held: never free
+   *  stock, never a job's (CLAUDE.md T31 2.1). */
+  boards: number;
+  /** The windows' glass standing at module 6, on no store. */
+  glass: number;
+  glassOnTheWay: LineGlassOnTheWay[];
+  /** The day in hand, the calendar days closed (the last 400) and the totals since it first
+   *  stood. */
+  today: LineDay;
+  days: LineDay[];
+  since: LineSince;
 }
 
 /** One item the player has dragged, and the tile it stood on before he started. An item put back
@@ -831,6 +897,9 @@ export interface Delivery {
    *  and never on a sheet rack. A delivery without the mark is read from its job, so a save's
    *  deliveries need no lift (CLAUDE.md T29 2.11.2). */
   boards?: true;
+  /** A load of boards for the line's contract, no job's and never stock: unloaded whole onto the
+   *  timber stores and the line's from then on (CLAUDE.md T31 2.2). No save carries it before v92. */
+  line?: true;
 }
 
 export type TaskKind =
@@ -1544,6 +1613,9 @@ export interface GameState {
   /** The production line's own state: its contract, its windows and its upgrades (CLAUDE.md T30
    *  section 4). */
   windowLine: WindowLineState;
+  /** No standing contract is offered before this day: the quiet weeks after a client went
+   *  elsewhere (CLAUDE.md T31 2.9). Null when there are none. */
+  contractQuietUntilDay: number | null;
 }
 
 export type GameAction =
@@ -1552,6 +1624,9 @@ export type GameAction =
   | { type: 'END_LINE_CONTRACT' }
   /** An upgrade of the line bought, fitted ten working days on (CLAUDE.md T30 2.10). */
   | { type: 'BUY_LINE_UPGRADE'; upgradeId: string }
+  /** The line's timber and its glass ordered for twenty windows, at one click (CLAUDE.md T31 2.2). */
+  | { type: 'ORDER_LINE_TIMBER' }
+  | { type: 'ORDER_LINE_GLASS' }
   /** Run the clock at 4x until the task the owner is out on is over (CLAUDE.md T8 3.3). */
   | { type: 'SKIP_AHEAD' }
   | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }

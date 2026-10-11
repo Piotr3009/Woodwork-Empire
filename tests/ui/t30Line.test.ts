@@ -148,6 +148,10 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     };
     state.windowLine.onPallet = 7;
     state.windowLine.palletsAtGate = 1;
+    // Its timber and glass, from Turn 31 (CLAUDE.md T31 2.1).
+    state.windowLine.boards = 40;
+    state.stock.sheets += 40;
+    state.windowLine.glass = 20;
     return state;
   }
 
@@ -160,7 +164,7 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     const text = block?.textContent ?? '';
     for (const words of [
       'Windows off the line',
-      '£1,500 a window; the timber and the glass £600 a window',
+      '£1,500 a window; the timber and the glass £600 a window, ordered ahead',
       'One window every 2 hours: about 20 a week',
       'This week: 7 windows. In all: 112',
       'On the pallet',

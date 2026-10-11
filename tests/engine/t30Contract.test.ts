@@ -47,10 +47,15 @@ function engineer(id: string): Worker {
   return { ...testJoiner(id, id), role: 'lineEngineer', tier: null, rate: 0, monthlyWage: 15000 };
 }
 
-/** The whole line standing from (2, 14), with this many engineers on the books. */
+/** The whole line standing from (2, 14), with this many engineers on the books. From Turn 31 a
+ *  window wants its two boards and its glass (CLAUDE.md T31 2.1): the line holds one batch of each,
+ *  forty boards on the counter and glass for twenty windows, as the lift gives a running line. */
 function withLine(state: GameState, engineers = 2): GameState {
   LINE_MODULES.forEach((id, index) => placeEquipment(state, id, { x: 2 + 6 * index, y: 14, id: `kit-line-${index + 1}` }));
   for (let n = 1; n <= engineers; n += 1) state.workers.push(engineer(`eng-${n}`));
+  state.windowLine.boards = 40;
+  state.stock.sheets += 40;
+  state.windowLine.glass = 20;
   return state;
 }
 
@@ -95,10 +100,11 @@ describe('the offer (CLAUDE.md T30 2.6)', () => {
     const card = seen.find((event) => event.kind === 'lineContractOffered');
     expect(card?.title).toBe('Windows off the line');
     expect(card?.body).toBe(
+      // From Turn 31 the material is ordered ahead (CLAUDE.md T31 2.4).
       'A window company will take every window your line makes, at £1,500 a window. The timber and ' +
-        'the glass for each one are bought as it is made, £600 a window. The line makes one every 2 ' +
-        'hours, about 20 a week, and the client collects each pallet of ten the next working day. It ' +
-        'runs until you end it.',
+        'the glass cost £600 a window, ordered ahead: on the Contracts tab, or by the office. The line ' +
+        'makes one every 2 hours, about 20 a week, and the client collects each pallet of ten the next ' +
+        'working day. It runs until you end it.',
     );
     expect(card?.choices).toEqual([
       { id: 'take', label: 'Take it' },
@@ -181,18 +187,23 @@ function withOffer(state: GameState): GameState {
 }
 
 describe('the windows (CLAUDE.md T30 2.7)', () => {
-  it('makes one every 120 minutes, four a working day, each 1,500 in and 600 out on one growing line a day', () => {
+  it('makes one every 120 minutes, four a working day, each 1,500 in on one growing line a day and its timber and glass taken off what the line holds', () => {
     const state = taken(withLine(bigUnit()));
     expect(lineWindowMinutes(state)).toBe(LINE_WINDOW_MINUTES);
     const morning = state.clock.day;
+    const sheets = state.stock.sheets;
     const day = play(state, DAY_END_MINUTE + 60, (event) => (event.kind === 'goingHome' ? 'home' : event.choices[0]?.id ?? 'ok'));
     const contract = day.windowLine.contract;
     // The day it was taken: taken at its open, so the whole of its 480 working minutes.
     expect(contract?.windowsMade).toBe(4);
     const windows = day.ledger.filter((entry) => entry.label === 'Windows off the line: windows' && entry.day === morning);
-    const material = day.ledger.filter((entry) => entry.label === 'Windows off the line: timber and glass' && entry.day === morning);
     expect(windows.map((entry) => [entry.category, entry.amount])).toEqual([['contract', 4 * LINE_WINDOW_PRICE]]);
-    expect(material.map((entry) => [entry.category, entry.amount])).toEqual([['material', -4 * lineMaterialPerWindow()]]);
+    // From Turn 31 the material was paid at its order and nothing of it is booked as a window is
+    // made: two boards off the line and the counter, and one glass, a window (CLAUDE.md T31 2.1).
+    expect(day.ledger.some((entry) => entry.label === 'Windows off the line: timber and glass')).toBe(false);
+    expect(day.windowLine.boards).toBe(40 - 4 * 2);
+    expect(day.stock.sheets).toBe(sheets - 4 * 2);
+    expect(day.windowLine.glass).toBe(20 - 4);
     expect(lineMaterialPerWindow()).toBe(600);
     expect(contract?.revenue).toBe(6000);
     expect(contract?.materialCost).toBe(2400);
@@ -223,15 +234,15 @@ describe('the windows (CLAUDE.md T30 2.7)', () => {
     expect(day.owner.minutesWorked).toBe(plain.owner.minutesWorked);
   });
 
-  it('pays the timber and the glass past the overdraft floor', () => {
+  it('makes its window past the overdraft floor, its timber and glass paid at their order', () => {
     const state = taken(withLine(bigUnit()));
     state.cash = state.finance.overdraftLimit - 1000;
     const cash = state.cash;
     const after = play(state, LINE_WINDOW_MINUTES, (event) => event.choices[0]?.id ?? 'ok');
     expect(after.windowLine.contract?.windowsMade).toBe(1);
-    const material = after.ledger.filter((entry) => entry.label === 'Windows off the line: timber and glass');
-    expect(material.map((entry) => entry.amount)).toEqual([-lineMaterialPerWindow()]);
-    expect(after.cash).toBe(cash + LINE_WINDOW_PRICE - lineMaterialPerWindow());
+    // From Turn 31 a window made books no material: it was paid at its order (CLAUDE.md T31 2.1).
+    expect(after.ledger.some((entry) => entry.label === 'Windows off the line: timber and glass')).toBe(false);
+    expect(after.cash).toBe(cash + LINE_WINDOW_PRICE);
   });
 
   it('makes none in the dinner hour whether the owner takes it or works through it, and none after five', () => {

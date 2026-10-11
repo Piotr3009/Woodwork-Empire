@@ -2115,7 +2115,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       svg:
         `<g data-van="${waiting.id}" data-sprite="${PALLET_SPRITE}" class="clickable pallet">` +
         '<title>Click the pallet to decide who unloads it</title>' +
-        palletArt(files, `Delivery: ${loadWords(state, waiting)}`) +
+        // The line's timber in its own words (CLAUDE.md T31 2.2).
+        palletArt(files, waiting.line === true ? loadWords(state, waiting) : `Delivery: ${loadWords(state, waiting)}`) +
         '</g>',
     });
   }

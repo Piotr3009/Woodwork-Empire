@@ -222,12 +222,16 @@ import {
 } from './jobs';
 import {
   answerLineOffer,
+  arriveLineGlass,
   buyLineUpgrade,
   emptyLineUpgrades,
   emptyWindowLine,
   endLineContract,
+  orderLineGlass,
+  orderLineTimber,
   runLineDay,
   runLineMinute,
+  writeOffLineMaterial,
 } from './lineContract';
 import {
   arriveDeliveries,
@@ -242,6 +246,7 @@ import {
   stockIsLow,
   unloadIntoStock,
   isBoards,
+  lineLoadInWords,
   loadWords,
 } from './materials';
 import {
@@ -420,6 +425,9 @@ export function createGame(options: NewGameOptions): GameState {
       // The unit as it was rented: not extended, and the canteen as it was built (v67).
       extension: 'none',
       canteenWide: false,
+      // And never made longer along its rear wall (CLAUDE.md T31 2.7).
+      longExtensions: 0,
+      longExtension: 'none',
     },
     owner: {
       present: true,
@@ -530,6 +538,7 @@ export function createGame(options: NewGameOptions): GameState {
     summaryCadence: 'daily',
     gameOver: null,
     windowLine: emptyWindowLine(),
+    contractQuietUntilDay: null,
   };
   startDay(state);
   settle(state);
@@ -640,8 +649,10 @@ function startDay(state: GameState): void {
     });
   }
   const arriving = arriveDeliveries(state);
-  // The glass due today is at the benches, carried in by the glazier (CLAUDE.md T28 2.9).
+  // The glass due today is at the benches, carried in by the glazier (CLAUDE.md T28 2.9), and the
+  // line's at module 6 (CLAUDE.md T31 2.2).
   arriveGlass(state);
+  arriveLineGlass(state);
   const kit = arriveEquipmentOrders(state);
   collectSoldMachines(state);
   runBookedTransport(state);
@@ -989,7 +1000,8 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
 /** The lorry's card in the words of its load: sheets want a rack, and boards room on the timber
  *  stores for the whole load (CLAUDE.md T2 3.6, T29 2.11.2). */
 function deliveryCardBody(state: GameState, delivery: Delivery, room: boolean): string {
-  const load = loadWords(state, delivery);
+  // The line's timber inside the card's sentences: `40 boards for the line` (CLAUDE.md T31 2.2).
+  const load = delivery.line === true ? lineLoadInWords(delivery.sheets) : loadWords(state, delivery);
   if (room) return `${load} have arrived. Nothing can be made until they are inside.`;
   if (!isBoards(state, delivery)) {
     return `${load} have arrived and there is no shelving to put them on. Buy some from the catalogue.`;
@@ -998,7 +1010,9 @@ function deliveryCardBody(state: GameState, delivery: Delivery, room: boolean): 
   if (stores <= 0) return `${load} have arrived and there is no timber store to put them on. Buy one from the catalogue.`;
   return (
     `${load} have arrived and the timber stores have room for ${freeBoardRoom(state)}. ` +
-    'They wait at the gate until a job uses its boards or another store is bought.'
+    (delivery.line === true
+      ? 'They wait at the gate until the line or a job uses its boards or another store is bought.'
+      : 'They wait at the gate until a job uses its boards or another store is bought.')
   );
 }
 
@@ -2477,6 +2491,16 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       // The cash leaves at the click; the upgrade is fitted ten working days on (CLAUDE.md T30 2.10).
       buyLineUpgrade(next, action.upgradeId);
       break;
+    case 'ORDER_LINE_TIMBER':
+      // Forty boards for the line, paid at the click, on the next working day's lorry (CLAUDE.md T31
+      // 2.2).
+      orderLineTimber(next);
+      break;
+    case 'ORDER_LINE_GLASS':
+      // Glass for twenty windows, paid at the click, at module 6 the next working day (CLAUDE.md T31
+      // 2.2).
+      orderLineGlass(next);
+      break;
     case 'SET_SECOND_SHIFT':
       // No manager, no second shift (CLAUDE.md T13 3.9).
       if (managerOnDuty(next) || !action.on) next.shift.second = action.on;
@@ -3080,7 +3104,9 @@ export function cancelOrder(state: GameState, orderId: string): BuyCheck {
   if (!delivery) return { ok: false, reason: 'Nothing on order' };
   if (delivery.arrived) return { ok: false, reason: 'It is at the gate' };
   if (timeIsPaused(state)) state.speed = 1;
-  refund(state, 'material', `Order cancelled: ${loadWords(state, delivery)}`, delivery.pricePaid);
+  // The line's timber in its own words (CLAUDE.md T31 2.2).
+  const what = delivery.line === true ? lineLoadInWords(delivery.sheets) : loadWords(state, delivery);
+  refund(state, 'material', `Order cancelled: ${what}`, delivery.pricePaid);
   state.deliveries = state.deliveries.filter((entry) => entry.id !== delivery.id);
   const job = delivery.jobId === null ? null : findJob(state, delivery.jobId);
   if (job !== null && job.stage === 'materialOrdered') {
@@ -3137,6 +3163,9 @@ export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
   if (isLineModule(item.specId)) {
     endLineContract(state);
     emptyLineUpgrades(state);
+    // And its timber and glass are written off, its loads on the way called off (CLAUDE.md T31
+    // 2.1).
+    writeOffLineMaterial(state);
   }
   return OK;
 }

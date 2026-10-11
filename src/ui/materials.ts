@@ -12,6 +12,9 @@ import { deliveriesInYard, deliveriesOnTheWay, formatCalendarDay, openJobs } fro
 import { restockCheck, sheetPriceFor, stockLines } from '../engine/index';
 // Straight off its own module: the public API does not carry it (REPORT-T13 10).
 import { boardsLine, loadWords, restockSheets, restockSplit } from '../engine/materials';
+import { lineStandsWhole } from '../engine/machines';
+import { LINE_GLASS_WINDOWS_MAX } from '../engine/constants';
+import { lineGlassWindows } from '../engine/lineContract';
 import type { Delivery, GameState, Job, StockLine } from '../engine/index';
 import { placeholderSvg } from '../render/placeholder';
 import { button, emptyLine, escapeHtml, lockedButton, money, plural } from './modal';
@@ -64,6 +67,23 @@ function boardsRow(state: GameState): string {
     `<span class="row-figure stock-free">Held ${held}</span>` +
     `<span class="row-figure stock-reserved">Room ${Math.max(0, room - held)}</span>` +
     `<span class="row-figure stock-total">Total ${held} of ${room}</span>` +
+    '</div>'
+  );
+}
+
+/** The line's glass, in the stock line's own markup: the windows it has glass for at module 6 and
+ *  the windows module 6 holds glass for. Shown only while the line stands (CLAUDE.md T31 2.4). */
+function lineGlassRow(state: GameState): string {
+  if (!lineStandsWhole(state)) return '';
+  const windows = lineGlassWindows(state);
+  return (
+    '<div class="stock-line" data-stock="lineGlass">' +
+    '<span class="stock-thumb">' +
+    placeholderSvg('thumb.glass', THUMB_SIZE, { label: 'Glass' }) +
+    '</span>' +
+    '<span class="row-main"><span class="stock-name">Glass at the line</span></span>' +
+    `<span class="row-figure stock-free">For ${plural(windows, 'window', 'windows')}</span>` +
+    `<span class="row-figure stock-total">Total ${windows} of ${LINE_GLASS_WINDOWS_MAX}</span>` +
     '</div>'
   );
 }
@@ -169,7 +189,7 @@ export function renderMaterials(state: GameState, sheets: string): string {
         'delivered.</p>') +
     '<div class="row stock-head"><span class="row-main">Stock</span>' +
     `${restockControl(state, sheets)}</div>` +
-    `<div class="stock-list">${lines.map(stockRow).join('')}${boardsRow(state)}</div>` +
+    `<div class="stock-list">${lines.map(stockRow).join('')}${boardsRow(state)}${lineGlassRow(state)}</div>` +
     (state.stock.tempStorageSheets > 0
       ? `<p class="hint">${plural(state.stock.tempStorageSheets, 'sheet is', 'sheets are')} in paid storage.</p>`
       : '') +

@@ -97,7 +97,8 @@ describe('a save from before v67', () => {
     old.version = 34;
     const lifted = migrateState(old, 34);
     expect(lifted?.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(43);
+    // 44 from v92 (CLAUDE.md T31 section 4).
+    expect(STATE_VERSION).toBe(44);
     expect(lifted?.unit.extension).toBe('none');
     expect(lifted?.unit.canteenWide).toBe(false);
     // And everything else of the unit is what it was.

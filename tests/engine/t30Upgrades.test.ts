@@ -47,10 +47,15 @@ function engineer(id: string): Worker {
   return { ...testJoiner(id, id), role: 'lineEngineer', tier: null, rate: 0, monthlyWage: 15000 };
 }
 
-/** The whole line standing from (2, 14), with its two engineers on the books. */
+/** The whole line standing from (2, 14), with its two engineers on the books, and from Turn 31 one
+ *  batch of its timber and glass: eight windows a day want sixteen boards and eight glass
+ *  (CLAUDE.md T31 2.1). */
 function withLine(state: GameState): GameState {
   LINE_MODULES.forEach((id, index) => placeEquipment(state, id, { x: 2 + 6 * index, y: 14, id: `kit-line-${index + 1}` }));
   for (const id of ['eng-1', 'eng-2']) state.workers.push(engineer(id));
+  state.windowLine.boards = 40;
+  state.stock.sheets += 40;
+  state.windowLine.glass = 20;
   return state;
 }
 

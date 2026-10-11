@@ -287,21 +287,22 @@ export function boardCapacityOf(item: { specId: string; variantId: string }): nu
   return variantOf(spec, item.variantId).boardCapacity ?? spec.boardCapacity ?? 0;
 }
 
-/** The boards in the workshop. A board is never free stock: it is always a timber job's own,
- *  ordered for it and held for it, so the boards on the one counter are what the timber jobs hold,
- *  and everything else on it is sheets (CLAUDE.md T29 2.11.2). Written here and not in
- *  `materials.ts`, which reads this module, as `sheetsStrandedBySale` is. */
+/** The boards in the workshop. A board is never free stock: it is always a timber job's own or the
+ *  line's, ordered for it and held for it, so the boards on the one counter are what the timber
+ *  jobs and the line hold, and everything else on it is sheets (CLAUDE.md T29 2.11.2, T31 2.1).
+ *  Written here and not in `materials.ts`, which reads this module, as `sheetsStrandedBySale` is. */
 export function boardsHeld(state: GameState): number {
   let held = 0;
   for (const job of state.jobs) {
     if (job.timber !== true || job.stage === 'completed') continue;
     held += job.sheetsReserved;
   }
-  return held;
+  // And the line's own, held for its windows as a job's are for its pieces (CLAUDE.md T31 2.1).
+  return held + state.windowLine.boards;
 }
 
-/** The sheets on the one counter: everything on it but the timber jobs' boards, never below
- *  nought (CLAUDE.md T29 2.11.2, 2.11.4). */
+/** The sheets on the one counter: everything on it but the timber jobs' and the line's boards,
+ *  never below nought (CLAUDE.md T29 2.11.2, 2.11.4, T31 2.1). */
 export function sheetsOnCounter(state: GameState): number {
   return Math.max(0, state.stock.sheets - boardsHeld(state));
 }

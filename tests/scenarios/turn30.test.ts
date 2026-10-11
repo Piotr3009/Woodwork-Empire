@@ -18,11 +18,12 @@
 //       a turn, and put back; two engineers are hired; a window job's Cross cutting is on module 1,
 //       its Finishing on module 5 and its Glazing on module 6, at the engine's own pace.
 // (eee) The offer card comes at the first working morning with the six standing and two engineers
-//       on the books; taken; a window every 120 minutes and four a working day, each £1,500 in and
-//       £600 out; none in the dinner hour when the owner works through it; the tenth goes to the
-//       gate and is gone the next working morning; with one engineer away no window is made that
-//       day; a window job taken while it runs gets no line and no boards saved; ended, the jobs have
-//       the line again and the card comes back a week later.
+//       on the books; taken, and from Turn 31 its timber and glass ordered at the same minute and in
+//       the next working morning (CLAUDE.md T31 2.2); a window every 120 minutes and four a working
+//       day, each £1,500 in; none in the dinner hour when the owner works through it; the tenth goes
+//       to the gate and is gone the next working morning; with one engineer away no window is made
+//       that day; a window job taken while it runs gets no line and no boards saved; ended, the jobs
+//       have the line again and the card comes back a week later.
 // (fff) The four upgrades bring the window to 60 minutes and eight a day; the line sold takes them
 //       with it, for 5,000,000 on one ledger line.
 // (ggg) The hall draws the six from their sheets while the contract runs and the clock runs, and
@@ -45,7 +46,7 @@ import type { GameEvent, GameState, StagedJob } from '../../src/engine/index';
 import { isOvertime, isWorkingDay } from '../../src/engine/clock';
 import { canBuy } from '../../src/engine/game';
 import { stagedJob } from '../../src/engine/jobs';
-import { lineMaterialPerWindow, lineWindowMinutes } from '../../src/engine/lineContract';
+import { lineWindowMinutes } from '../../src/engine/lineContract';
 import { lineLevel, lineModules } from '../../src/engine/machines';
 import { migrateState } from '../../src/engine/migrate';
 import { jobPace, stagePlanFor } from '../../src/engine/stages';
@@ -157,7 +158,8 @@ function anchors(state: GameState): Array<[number, number]> {
   });
 }
 
-/** The day's windows on its one growing line, and their material on its own. */
+/** The day's windows on its one growing line, and the material booked as they were made: none from
+ *  Turn 31, which pays the timber and the glass at their order (CLAUDE.md T31 2.1). */
 function windowsBooked(state: GameState, on: number): { windows: number[]; material: number[] } {
   return {
     windows: state.ledger.filter((entry) => entry.label === 'Windows off the line: windows' && entry.day === on).map((entry) => entry.amount),
@@ -165,6 +167,28 @@ function windowsBooked(state: GameState, on: number): { windows: number[]; mater
       .filter((entry) => entry.label === 'Windows off the line: timber and glass' && entry.day === on)
       .map((entry) => entry.amount),
   };
+}
+
+/** Plays on in half hours until the line's timber is off the lorry and on the stores and its glass
+ *  is in, which is the morning after the order (CLAUDE.md T31 2.2). */
+function untilTheMaterialIsIn(state: GameState): GameState {
+  let next = state;
+  for (let guard = 0; (next.windowLine.boards < 40 || next.windowLine.glass < 20) && guard < 200; guard += 1) {
+    next = minutes(next, 30);
+  }
+  return next;
+}
+
+/** The player keeps the line in timber and glass, as the Contracts tab's two buttons let him: an
+ *  order of each when what it holds and what is on its way would not last two days at an hour a
+ *  window (CLAUDE.md T31 2.2). */
+function keepInMaterial(state: GameState): GameState {
+  let next = state;
+  const boardsComing = next.deliveries.filter((delivery) => delivery.line === true && !delivery.unloaded).reduce((total, delivery) => total + delivery.sheets, 0);
+  const glassComing = next.windowLine.glassOnTheWay.reduce((total, entry) => total + entry.windows, 0);
+  if (next.windowLine.boards + boardsComing < 32) next = act(next, { type: 'ORDER_LINE_TIMBER' });
+  if (next.windowLine.glass + glassComing < 16) next = act(next, { type: 'ORDER_LINE_GLASS' });
+  return next;
 }
 
 /** A company in the 800 m² unit, the second extension open, with the timber kit and a timber
@@ -339,7 +363,15 @@ for (let guard = 0; atOffer === null && guard < 10; guard += 1) {
   });
 }
 const offered: GameState = atOffer ?? hiring;
-const taken = hiring;
+// Taken at the card, and from Turn 31 its timber and glass ordered at the same minute from the
+// Contracts tab, in the next working morning: the windows start once the boards are off the lorry
+// (CLAUDE.md T31 2.2).
+const ordered = act(act(act(offered, { type: 'RESOLVE_EVENT', choiceId: 'take' }), { type: 'ORDER_LINE_TIMBER' }), {
+  type: 'ORDER_LINE_GLASS',
+});
+let reachedMorning = day(ordered);
+while (!isWorkingDay(reachedMorning.clock.day)) reachedMorning = day(reachedMorning);
+const taken = untilTheMaterialIsIn(reachedMorning);
 
 describe('(ddd) with two engineers, before the contract (CLAUDE.md T30 2.5)', () => {
   it('does the window s Cross cutting on module 1, its Finishing on module 5 and its Glazing on module 6, at the engine s own pace', () => {
@@ -371,24 +403,38 @@ describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () 
     expect(isWorkingDay(offered.clock.day)).toBe(true);
     expect(offered.workers.filter((worker) => worker.role === 'lineEngineer' && worker.startDay <= offered.clock.day)).toHaveLength(2);
     expect(taken.windowLine.contract?.status).toBe('active');
-    expect(taken.contracts.length).toBe(offered.contracts.length);
+    // Not one of the standing contracts (played a day further from Turn 31, so a standing offer of
+    // the card's morning may have lapsed by then, and the count is not the check).
+    expect(taken.contracts.some((contract) => contract.name === 'Windows off the line')).toBe(false);
+    // Its timber and glass were paid at the click on the material line (CLAUDE.md T31 2.2).
+    const orders = taken.ledger.filter((entry) => entry.day === offered.clock.day && /for the line/.test(entry.label));
+    expect(orders.map((entry) => [entry.label, entry.amount])).toEqual([
+      ['Timber for the line: 40 boards', -8000],
+      ['Glass for the line: 20 windows', -4000],
+    ]);
   });
 
-  it('makes a window every 120 minutes and four a working day, each £1,500 in and £600 out', () => {
-    const running = act(offered, { type: 'RESOLVE_EVENT', choiceId: 'take' });
+  it('makes a window every 120 minutes and four a working day, each £1,500 in', () => {
+    // From Turn 31 the windows start once the timber is on the stores, the morning after the order,
+    // and none of their material is booked as they are made (CLAUDE.md T31 2.1, 2.2).
+    const running = taken;
+    expect(windowsBooked(day(offered), offered.clock.day).windows).toEqual([]);
     expect(lineWindowMinutes(running)).toBe(120);
-    expect(minutes(running, 119).windowLine.contract?.windowsMade).toBe(0);
-    expect(minutes(running, 120).windowLine.contract?.windowsMade).toBe(1);
-    const whole = day(running);
-    expect(windowsBooked(whole, offered.clock.day)).toEqual({
-      windows: [4 * LINE_WINDOW_PRICE],
-      material: [-4 * lineMaterialPerWindow()],
-    });
+    // Counted from the minutes the window in hand already has: the half hour the material came in.
+    const from = running.windowLine.minutes;
+    expect(running.windowLine.contract?.windowsMade).toBe(0);
+    expect(minutes(running, 119 - from).windowLine.contract?.windowsMade).toBe(0);
+    expect(minutes(running, 120 - from).windowLine.contract?.windowsMade).toBe(1);
+    let whole = day(running);
+    while (!isWorkingDay(whole.clock.day)) whole = day(whole);
+    const morning = whole.clock.day;
+    whole = day(whole);
+    expect(windowsBooked(whole, morning)).toEqual({ windows: [4 * LINE_WINDOW_PRICE], material: [] });
   });
 
   it('makes none in the dinner hour when the owner works through it', () => {
-    const running = act(offered, { type: 'RESOLVE_EVENT', choiceId: 'take' });
-    const toNoon = minutes(running, BREAK_START_MINUTE);
+    const running = taken;
+    const toNoon = minutes(running, BREAK_START_MINUTE - running.clock.minute);
     const through = minutes(toNoon, BREAK_MINUTES, (event) => (event.kind === 'breakTime' ? 'skip' : undefined));
     expect(through.clock.minute).toBeGreaterThanOrEqual(BREAK_START_MINUTE + BREAK_MINUTES);
     expect(through.windowLine.contract?.windowsMade).toBe(toNoon.windowLine.contract?.windowsMade);
@@ -404,9 +450,12 @@ describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () 
       state = minutes(state, 540 - state.clock.minute);
       if ((state.windowLine.contract?.windowsMade ?? 0) < LINE_PALLET_WINDOWS) state = day(state);
     }
-    expect(state.windowLine.contract?.windowsMade).toBe(12);
+    // From Turn 31 the first day starts once the timber is unloaded, so the count at the tenth's
+    // evening moves with the hour it was in (CLAUDE.md T31 2.2).
+    const made = state.windowLine.contract?.windowsMade ?? 0;
+    expect(made).toBeGreaterThanOrEqual(LINE_PALLET_WINDOWS);
     expect(state.windowLine.palletsAtGate).toBe(1);
-    expect(state.windowLine.onPallet).toBe(2);
+    expect(state.windowLine.onPallet).toBe(made - LINE_PALLET_WINDOWS);
     const ledger = state.ledger.length;
     let next = day(state);
     while (!isWorkingDay(next.clock.day)) next = day(next);
@@ -471,8 +520,9 @@ describe('(fff) the four upgrades, and the line sold (CLAUDE.md T30 2.10, 2.3.5)
   for (const upgrade of LINE_UPGRADES) state = act(state, { type: 'BUY_LINE_UPGRADE', upgradeId: upgrade.id });
   const bought = state;
   const ready = Math.max(...bought.windowLine.upgrades.map((upgrade) => upgrade.fittedOnDay));
-  for (let guard = 0; state.clock.day < ready && guard < 30; guard += 1) state = day(state);
-  const fitted = state;
+  // The player keeps the line in timber and glass through the ten working days (CLAUDE.md T31 2.2).
+  for (let guard = 0; state.clock.day < ready && guard < 30; guard += 1) state = day(keepInMaterial(state));
+  const fitted = keepInMaterial(state);
 
   it('brings the window to 60 minutes and eight a working day', () => {
     expect(bought.ledger.filter((entry) => entry.label.startsWith('Line upgrade: ')).map((entry) => entry.amount)).toEqual(
@@ -480,8 +530,13 @@ describe('(fff) the four upgrades, and the line sold (CLAUDE.md T30 2.10, 2.3.5)
     );
     expect(lineWindowMinutes(fitted)).toBe(60);
     expect(fitted.windowLine.contract?.status).toBe('active');
-    const morning = fitted.clock.day;
-    const whole = day(fitted);
+    // The second working day at 60 minutes: from Turn 31 the line stood now and then for its
+    // material in the ten days before, so the first day's count carries the minutes of a slower
+    // window in hand (CLAUDE.md T31 2.1).
+    let next = day(fitted);
+    while (!isWorkingDay(next.clock.day)) next = day(next);
+    const morning = next.clock.day;
+    const whole = day(keepInMaterial(next));
     expect(windowsBooked(whole, morning).windows).toEqual([8 * LINE_WINDOW_PRICE]);
   });
 
