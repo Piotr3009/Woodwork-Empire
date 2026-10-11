@@ -30,7 +30,7 @@ import {
 } from '../../src/engine/constants';
 import type { GameState, Worker } from '../../src/engine/index';
 import { applyAction, runMinutes } from '../../src/engine/index';
-import { isWorkingDay, monthOfDay } from '../../src/engine/clock';
+import { isWorkingDay, monthOfDay, weekOfDay, yearOfDay } from '../../src/engine/clock';
 import { lineBooks, lineBooksShown, lineMonthPace, linePaidBack } from '../../src/engine/lineBooks';
 import { lineMaterialPerWindow } from '../../src/engine/lineContract';
 import { lineValue } from '../../src/engine/insurance';
@@ -148,10 +148,30 @@ describe('the day book (CLAUDE.md T31 2.5)', () => {
     expect(column.lost).toEqual({ engineer: 0, timber: 0, glass: 0, timberAndGlass: 0, move: 0 });
   });
 
-  it('adds today into the week, the month and the year', () => {
+  it('adds today into the week, the month and the year, each column the day book of its own span', () => {
     expect(books.week.windows).toBeGreaterThanOrEqual(books.today.windows);
     expect(books.month.windows).toBeGreaterThanOrEqual(books.week.windows);
     expect(books.year.windows).toBeGreaterThanOrEqual(books.month.windows);
+    // Today, This week and This year reckoned as the month is, from the records of their own days.
+    const all = [...played.windowLine.days, played.windowLine.today];
+    const spans: Array<[keyof typeof books, (day: number) => boolean]> = [
+      ['today', (day) => day === played.clock.day],
+      ['week', (day) => weekOfDay(day) === weekOfDay(played.clock.day)],
+      ['year', (day) => yearOfDay(day) === yearOfDay(played.clock.day)],
+    ];
+    for (const [column, inSpan] of spans) {
+      const records = all.filter((record) => inSpan(record.day));
+      const sum = (key: 'windows' | 'turnover' | 'material' | 'engineers' | 'power' | 'cover'): number =>
+        records.reduce((total, record) => total + record[key], 0);
+      expect(books[column].windows, column).toBe(sum('windows'));
+      expect(books[column].turnover, column).toBe(sum('windows') * LINE_WINDOW_PRICE);
+      expect(books[column].material, column).toBe(sum('windows') * lineMaterialPerWindow());
+      expect(books[column].engineers, column).toBeCloseTo(sum('engineers'), 6);
+      expect(books[column].power, column).toBe(sum('power'));
+      expect(books[column].cover, column).toBeCloseTo(sum('cover'), 6);
+      expect(books[column].net, column).toBeCloseTo(sum('turnover') - sum('material') - sum('engineers') - sum('power') - sum('cover'), 6);
+    }
+    expect(books.year.windows).toBe(played.windowLine.since.windows);
   });
 
   it('gives the month s pace, a year at it, and the paid back since the line first stood', () => {

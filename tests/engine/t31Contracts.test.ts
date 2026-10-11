@@ -104,6 +104,15 @@ function running(state: GameState, id: string, pieceId = 'cutSheetPack'): Contra
   return contract;
 }
 
+describe('the figures (CLAUDE.md T31 2.9)', () => {
+  it('are Piotr s 3 per cent, 14 to 21 quiet days and 5 to 15 per cent, and chat s one in four', () => {
+    expect(CONTRACT_CLIENT_LEAVES_CHANCE).toBe(0.03);
+    expect([CONTRACT_QUIET_DAYS_MIN, CONTRACT_QUIET_DAYS_MAX]).toEqual([14, 21]);
+    expect(CONTRACT_RENEWAL_CUT_CHANCE).toBe(0.25);
+    expect([CONTRACT_RENEWAL_CUT_MIN, CONTRACT_RENEWAL_CUT_MAX]).toEqual([5, 15]);
+  });
+});
+
 describe('a client goes elsewhere (CLAUDE.md T31 2.9)', () => {
   it('ends a running sheet contract at a week s close, as the client ends one, with no second week and no other term', () => {
     const state = joinerHall();
@@ -165,6 +174,27 @@ describe('a client goes elsewhere (CLAUDE.md T31 2.9)', () => {
     expect(contract.endedBy).toBe('term');
     expect(contract.renegotiatedPrice).not.toBeNull();
     expect(state.contractQuietUntilDay).toBeNull();
+  });
+
+  it('never touches the line s own contract: a loss beside it, and the quiet after it, leave it as it was', () => {
+    const state = joinerHall();
+    const contract = running(state, idThat(joinerHall(), 8, CONTRACT_LOSS_SALT, CONTRACT_CLIENT_LEAVES_CHANCE, true));
+    state.windowLine.contract = {
+      status: 'active',
+      startDay: 1,
+      windowsThisWeek: 3,
+      weekStartDay: 1,
+      windowsMade: 12,
+      revenue: 18000,
+      materialCost: 0,
+    };
+    const line = structuredClone(state.windowLine.contract);
+    state.clock.day = 8;
+    runContractDay(state);
+    expect(contract.endedBy).toBe('lost');
+    expect(contractsQuiet(state)).toBe(true);
+    expect(state.windowLine.contract).toEqual(line);
+    expect(state.contracts.some((entry) => entry.name === 'Windows off the line')).toBe(false);
   });
 
   it('is let go off the tab with one button, and offers no term to renew', () => {

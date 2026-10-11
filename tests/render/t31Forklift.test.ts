@@ -128,7 +128,14 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
     const up = points.corner.y - points.drop.y;
     expect(points.drop.y).toBeCloseTo(10.5 + FORKLIFT_LOAD_AHEAD, 6);
     // Two seconds out: six cells along the front strip, loaded, facing nw, frames playing.
-    drive(written, state, 100, 2100);
+    const frames = new Set<string>();
+    for (let at = 200; at <= 2100; at += 100) {
+      stepForklift(written, state, at);
+      frames.add(written.querySelector('[data-forklift-art]')?.getAttribute('data-frame') ?? '');
+    }
+    // Its six frames play while it moves, at the sheet's 8 a second: 19 steps of a tenth see most.
+    expect(frames.size).toBeGreaterThanOrEqual(4);
+    for (const frame of frames) expect(Number(frame)).toBeLessThan(FORKLIFT_SHEETS.loaded.frames);
     const now = forkliftNow();
     expect(now?.at.x).toBeCloseTo(points.wait.x - 2 * FORKLIFT_CELLS_PER_SECOND, 1);
     expect(now?.facing).toBe('nw');
@@ -140,16 +147,19 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
     drive(written, state, 2100, 100 + toCorner + 1000);
     expect(forkliftNow()?.facing).toBe('ne');
     expect(forkliftNow()?.leg).toBe('out');
+    expect(written.querySelector('[data-forklift-art]')?.getAttribute('data-row')).toBe(String(FORKLIFT_SHEETS.loaded.rows.ne));
     // Set down: the pallet is drawn at the gate and the forklift is empty, on its way back.
     const out = toCorner + (up / FORKLIFT_CELLS_PER_SECOND) * 1000;
     drive(written, state, 100 + toCorner + 1000, 100 + out + 300);
     expect(forkliftNow()?.leg).toBe('back');
     expect(forkliftNow()?.facing).toBe('sw');
+    expect(written.querySelector('[data-forklift-art]')?.getAttribute('data-row')).toBe(String(FORKLIFT_SHEETS.empty.rows.sw));
     expect(written.querySelector('[data-line-pallet="0"]')?.hasAttribute('visibility')).toBe(false);
     expect(written.querySelector('[data-forklift-art] image')?.getAttribute('href')).toBe(`/sprites/${FORKLIFT_SHEETS.empty.file}`);
     // Down the left strip, along the front, and waiting again facing nw on frame 0.
     drive(written, state, 100 + out + 300, 100 + out + (up / FORKLIFT_CELLS_PER_SECOND) * 1000 + 500);
     expect(forkliftNow()?.facing).toBe('se');
+    expect(written.querySelector('[data-forklift-art]')?.getAttribute('data-row')).toBe(String(FORKLIFT_SHEETS.empty.rows.se));
     drive(written, state, 100 + out + (up / FORKLIFT_CELLS_PER_SECOND) * 1000 + 500, 100 + 2 * out + 1000);
     expect(forkliftNow()?.leg).toBe('wait');
     expect(forkliftNow()?.facing).toBe('nw');
@@ -197,6 +207,18 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
     expect(forkliftNow()?.leg).toBe('wait');
     expect(page(fast, 100).querySelector('[data-line-pallet="0"]')?.hasAttribute('visibility')).toBe(false);
     setWalkPace(1);
+    // A trip under way when the clock goes to 30x: forgotten, the pallet at the gate at once.
+    resetForklift();
+    const racing = withLine();
+    const raced = page(racing, 0);
+    racing.windowLine.palletsAtGate = 1;
+    drive(raced, racing, 0, 1000);
+    expect(forkliftNow()?.leg).toBe('out');
+    setWalkPace(WALK_SKIPPED_FROM_SPEED);
+    stepForklift(raced, racing, 1100);
+    expect(forkliftNow()?.leg).toBe('wait');
+    expect(page(racing, 1100).querySelector('[data-line-pallet="0"]')?.hasAttribute('visibility')).toBe(false);
+    setWalkPace(1);
     // A move: the line elsewhere, the trip forgotten.
     const state = withLine();
     const moving = page(state, 0);
@@ -210,9 +232,16 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
     for (const item of state.equipment) if (LINE_MODULES.includes(item.specId)) item.soldOnDay = state.clock.day + 1;
     stepForklift(moving, state, 1200);
     expect(forkliftNow()).toBeNull();
-    // A load or a new morning is the app's `resetForklift`.
+    // A load or a new morning is the app's `resetForklift`, called wherever a view is built from
+    // nothing: beside every `resetWalkers` of the app (the new morning is driven in the app below).
     resetForklift();
     expect(forkliftNow()).toBeNull();
+    const app = readFileSync('src/ui/app.ts', 'utf8').split('\n');
+    const walkers = app.map((line, index) => (line.includes('resetWalkers();') ? index : -1)).filter((index) => index >= 0);
+    expect(walkers.length).toBeGreaterThanOrEqual(6);
+    for (const index of walkers) {
+      expect(app.slice(index, index + 4).some((line) => line.includes('resetForklift();')), `app.ts:${index + 1}`).toBe(true);
+    }
   });
 
   it('changes nothing of the game', () => {
@@ -314,5 +343,10 @@ describe('in the app (CLAUDE.md T31 2.10)', () => {
     next(100);
     next(600);
     expect(root.querySelector('[data-forklift]')?.getAttribute('transform')).not.toBe(before);
+    // A new morning builds the view from nothing: the trip is forgotten, the forklift waits.
+    state.clock.day += 1;
+    render();
+    expect(root.querySelector('[data-forklift]')?.getAttribute('data-forklift')).toBe('wait');
+    expect(root.querySelector('[data-line-pallet="0"]')?.hasAttribute('visibility')).toBe(false);
   });
 });

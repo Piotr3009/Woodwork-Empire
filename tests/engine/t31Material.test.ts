@@ -47,14 +47,16 @@ import {
   freeSheets,
   loadWords,
   pendingStockSheets,
+  reserveSheetsFor,
   reservedSheets,
   unloadIntoStock,
 } from '../../src/engine/materials';
 import { shoppingList } from '../../src/engine/orders';
+import { acceptContract, drawContract, reserveContractSheets } from '../../src/engine/contracts';
 import { warnings } from '../../src/engine/warnings';
 import { isWorkingDay } from '../../src/engine/clock';
 import { movingMachines } from '../../src/engine/tasks';
-import { act, buyStartingKit, newGame, nextDay, placeEquipment, testJoiner, withAir } from '../helpers';
+import { acceptNow, act, buyStartingKit, newGame, nextDay, placeEnquiry, placeEquipment, testJoiner, withAir } from '../helpers';
 
 // The smallest timber store holds a batch, 40, so a hall whose stores hold fewer is asked of the one
 // count of their room, wrapped so one test can say so.
@@ -195,6 +197,28 @@ describe('the line s boards are held (CLAUDE.md T31 2.1)', () => {
     expect(boardsOnStore(state, { id: 'kit-store' })).toBe(held + 40);
     expect(boardsLine(state).held).toBe(held + 40);
   });
+
+  it('never lets a sheet job or a standing sheet contract take one of them', () => {
+    const state = stocked(running(), 40, 0);
+    // Nothing on the counter but the line's own forty.
+    state.stock.sheets = state.windowLine.boards;
+    expect(freeSheets(state)).toBe(0);
+    const taken = acceptNow(state, placeEnquiry(state, {}).id);
+    const job = taken.jobs[taken.jobs.length - 1];
+    if (job === undefined) throw new Error('the job is wanted');
+    expect(job.materialKind).toBe('sheet');
+    expect(job.sheetsReserved).toBe(0);
+    expect(reserveSheetsFor(taken, job)).toBe(0);
+    const contract = drawContract(taken, structuredClone(taken));
+    contract.pieceId = 'cutSheetPack';
+    taken.contracts.push(contract);
+    expect(acceptContract(taken, contract.id).ok).toBe(true);
+    expect(reserveContractSheets(taken, contract)).toBe(0);
+    // The forty are still the line's, on the one counter, and none of them a sheet.
+    expect(taken.windowLine.boards).toBe(40);
+    expect(taken.stock.sheets).toBe(40);
+    expect(sheetsOnCounter(taken)).toBe(0);
+  });
 });
 
 describe('ordering the line s timber (CLAUDE.md T31 2.2)', () => {
@@ -333,6 +357,24 @@ describe('the office orders it (CLAUDE.md T31 2.3)', () => {
     expect(state.windowLine.contract?.status).toBe('active');
     expect(state.deliveries.filter((delivery) => delivery.line === true)).toHaveLength(1);
     expect(state.windowLine.glassOnTheWay).toHaveLength(1);
+  });
+
+  it('orders only what the buttons allow: nothing past the overdraft, and no timber with no store', () => {
+    const broke = stocked(running(), 0, 0);
+    broke.workers.push(admin());
+    broke.cash = -1e9;
+    expect(lineTimberCheck(broke).ok).toBe(false);
+    expect(lineGlassCheck(broke).ok).toBe(false);
+    officeOrdersLineMaterial(broke);
+    expect(broke.deliveries.some((delivery) => delivery.line === true)).toBe(false);
+    expect(broke.windowLine.glassOnTheWay).toEqual([]);
+    const storeless = stocked(running(null), 0, 0);
+    storeless.workers.push(admin());
+    expect(lineTimberCheck(storeless)).toEqual({ ok: false, reason: 'No timber store' });
+    officeOrdersLineMaterial(storeless);
+    expect(storeless.deliveries.some((delivery) => delivery.line === true)).toBe(false);
+    // The glass, which no store holds, is ordered all the same.
+    expect(storeless.windowLine.glassOnTheWay).toHaveLength(1);
   });
 
   it('does not order while two days are on hand, and orders the timber only into free room', () => {

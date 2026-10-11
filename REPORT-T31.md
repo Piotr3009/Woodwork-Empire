@@ -102,3 +102,16 @@ sheet contracts (seed 20261012 chosen to show a loss and a cut: five losses, two
 draws the suite pinned before tonight asserted never to come up. The figures that moved were re-pinned
 in their tasks with one line of reason each (B1: turn30's material and minutes; C2: turn29's and
 turn30's rack moved off the lane, the refusal's words); none moved for D1.
+
+**T31-E3 The cross check.** Section 7 read claim by claim against the code and the tests by four
+readers (the material and the books; the lane, the hall and the shelter; the contracts and the
+forklift; the standing rules and section 6): 192 claims, none untrue in the code. What was true and
+not asserted is asserted now: the line's boards never taken by a sheet job or a sheet contract, the
+admin refused what the buttons refuse, the Today, week and year columns each reckoned from the day
+book, the chances pinned, the line's contract untouched by a loss and its quiet, the lane's drawn
+corners, the forklift's drawn row on every leg and its frames playing, a trip forgotten at 30x and at
+a new morning in the app, the app's reset beside every `resetWalkers`, and the strip's
+`lineNeedsMaterial` in (hhh) asserted unconditionally. Two claims are left to the report: the longer
+hall's pieces are the 800 m² picture's own pixels (checked with numpy: every visible pixel equal, max
+difference 0), and no CSS token but `--lane-yellow` is new (`git diff 0d4dd31 --stat --
+src/ui/styles.css`: 3 insertions, the one token and its comment).

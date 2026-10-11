@@ -25,6 +25,7 @@ import { ownedTile } from '../../src/ui/catalogue';
 import { isFree } from '../../src/engine/walk';
 import { warnings } from '../../src/engine/warnings';
 import { renderHall } from '../../src/render/hall';
+import { tileToScreen } from '../../src/render/iso';
 import { act, buyNow, buyStartingKit, newGame, nextDay, placeEquipment, withAir } from '../helpers';
 
 /** A company in the 800 m² unit with the day one kit and money for the line. */
@@ -197,13 +198,23 @@ describe('the lane drawn (CLAUDE.md T31 2.6)', () => {
     holder.innerHTML = renderHall(state);
     const all = Array.from(holder.querySelectorAll('[data-lane], [data-depth]'));
     expect(all[0]?.hasAttribute('data-lane')).toBe(true);
+    // Its outer edges, the corners joined: the left wall's line from y 10 to the front wall, the front
+    // wall's line to the line's end at x 38, and the inner edge back round the corner at (2, 18); the
+    // two short ends close it across the strip at the gate (y 10) and at the line's end (x 38), as the
+    // mockup drew it.
+    const at = (x: number, y: number): string => {
+      const point = tileToScreen(x, y);
+      return `${point.x},${point.y}`;
+    };
+    const corners = [at(0, 10), at(2, 10), at(2, 18), at(38, 18), at(38, 20), at(0, 20)];
+    expect(drawn?.getAttribute('points')?.split(' ')).toEqual(corners);
     const before = drawn?.getAttribute('points');
     const moved = act(state, { type: 'MOVE_ITEM', itemId: 'kit-line-1', x: 3, y: 12 });
     expect(lane(moved)?.getAttribute('points')).not.toBe(before);
     expect(lane(bigUnit())).toBeNull();
   });
 
-  it('has its one colour token, and no other is new', () => {
+  it('has its one colour token, the one the brief allows (that no other is new is the report s git diff)', () => {
     const css = readFileSync('src/ui/styles.css', 'utf8');
     expect(css).toContain('--lane-yellow: #e3b51f;');
   });

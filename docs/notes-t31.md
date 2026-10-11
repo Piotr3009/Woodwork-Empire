@@ -193,7 +193,8 @@ These are the choices the code made beyond the brief's own figures and section 1
   Contracts tab.` after it, as the mockup has it.
 - **The salts 2 and 9** (`CONTRACT_LOSS_SALT`, `CONTRACT_CUT_SALT`) were chosen so that none of the 34
   draws the scenarios and tests made before Turn 31 comes up (2.9's "choose its seed"): no scenario
-  moved, and E2's (lll) is to choose its seeds to show the three.
+  moved. E2's (lll) chose its own seed, 20261012, to show the three: its played year of three sheet
+  contracts has five losses and two renewal cuts.
 - **The day's offer is drawn before the week closes**, as the open of the day always ran
   (`offerContract` before `runContractDay`), so an offer drawn on the morning a client leaves is on
   the board and stays takeable through the quiet days; the quiet days stop the draws, not the taking.

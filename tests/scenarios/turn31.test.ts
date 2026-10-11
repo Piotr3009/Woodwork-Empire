@@ -186,6 +186,11 @@ describe('(hhh) the line s timber and glass, ordered by the player and by the of
   let dry = after;
   for (let guard = 0; lineShortOf(dry) === null && guard < 30; guard += 1) dry = minutes(dry, 120);
   dry = minutes(dry, 30);
+  // On to a working hour with both engineers on duty, which is when the strip says it.
+  let onDuty = dry;
+  for (let guard = 0; !(isWorkingDay(onDuty.clock.day) && onDuty.clock.minute >= 60 && onDuty.clock.minute < 480) && guard < 100; guard += 1) {
+    onDuty = minutes(onDuty, 30);
+  }
 
   it('orders nothing by itself with no admin: the line stands for both from the take', () => {
     expect(take.windowLine.boards).toBe(0);
@@ -230,12 +235,13 @@ describe('(hhh) the line s timber and glass, ordered by the player and by the of
     expect(dry.windowLine.boards).toBe(0);
     expect(dry.windowLine.glass).toBe(20);
     expect((dry.windowLine.contract?.windowsMade ?? 0) - before.windows).toBe(20);
-    if (isWorkingDay(dry.clock.day) && dry.clock.minute < 480) {
-      expect(warnings(dry).find((warning) => warning.key === 'lineNeedsMaterial')?.text).toBe('The line stands: no timber for its next window');
-    }
+    expect(lineShortOf(onDuty)).toBe('timber');
+    expect(warnings(onDuty).find((warning) => warning.key === 'lineNeedsMaterial')?.text).toBe('The line stands: no timber for its next window');
     const holder = document.createElement('div');
-    holder.innerHTML = renderContracts(dry);
-    expect(holder.textContent).toContain('no timber');
+    holder.innerHTML = renderContracts(onDuty);
+    // The row's label and its figure, in the two cells every figure row has.
+    const still = Array.from(holder.querySelectorAll('.row')).find((row) => row.querySelector('.row-main')?.textContent === 'Standing still');
+    expect(still?.querySelector('.row-figure')?.textContent).toBe('no timber');
   });
 });
 
