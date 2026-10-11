@@ -1750,11 +1750,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // The one machine of each family too few for the crew that wears the mark: the first of it with
   // places, in the order they are filled (PIOTR, 24.09: "an exclamation at the saw"; v53).
   const markedMachines = new Map<string, string>();
-  // The hall's shortages, reckoned once for the whole picture: every machine's hover below reads
+  // The hall's shortages, reckoned once for the whole picture: every machine's tooltip below reads
   // its family's line off this one list, where each machine asked the whole hall again and a big
   // hall stuttered (PIOTR, 10.10; v87).
   const hallShortages = placeShortages(state);
-  // Who is at which machine, read once for the picture and handed to every machine's hover, as
+  // Who is at which machine, read once for the picture and handed to every machine's tooltip, as
   // the shortages are (v88).
   const atPlaces = menAtPlaces(state);
   // Nothing is marked while the hall is at its dinner, a machine no more than a man (T22 2.5).
