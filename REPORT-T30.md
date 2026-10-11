@@ -98,3 +98,21 @@ of ten wrapped windows standing alone, proposed at 2 by 1 by 1.75 m, 160 by 172,
 and the forklift with its driver in four directions, empty and loaded, as one row sheets), whether
 the servo press and the second robot are drawn, the line's 90 degree convention, and what to look
 for on the hall (the seams, the conveyor at 0.9 m, module 5's clear roof, the boxes at the gate).
+
+**T30-E2 The scenarios.** `tests/scenarios/turn30.test.ts`, (ccc) to (ggg), played through the
+engine and answered as a player answers: (ccc) a v42 save of Piotr's shape opens with 1,500,000
+back, no module and the `lineRefunded` card as the first thing seen, and one with no module raises
+none; (ddd) the three refusals, one click for 10,000,000 on one line, the six standing on their due
+morning at x 2 to 37, y 14 to 16, moved as one, refused onto a rack and a turn, put back, two
+engineers hired and a window's Cross cutting, Finishing and Glazing on modules 1, 5 and 6 at the
+engine's own sum; (eee) the offer at the first working morning with both on the books, a window
+every 120 minutes and four a day for 6,000 in and 2,400 out, none in the dinner hour worked
+through, the tenth to the gate and gone the next working morning, none with one engineer away, a
+window job taken while it runs with no line and no boards saved, and the card again a week after
+`End it`; (fff) the four upgrades to 60 minutes and eight windows a day, then the line sold for
+5,000,000 on one line and one card, the upgrades gone; (ggg) the sheets while the clock runs, the
+pictures once paused, module 6's `stack07` and none on an empty pallet. The moved figures of
+earlier scenarios, each restated with one line of reason in C1 and C3: (zz) of Turn 29 (the line
+bought whole: 10,000,000, the six at x 2 + 6 (N - 1), level 3 with one engineer, sold from any
+module, the contract ended because (zz) is about the jobs) and (bbb) (the line's offer turned down
+for the year, since the week measures the joiners' contract).
