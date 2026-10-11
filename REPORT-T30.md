@@ -56,3 +56,16 @@ the whole line: `canPlace` asks the 36 by 3 at the new place clear of everything
 question alone, its delivery still built in) and Put them back puts the six back. The ghost is the
 36 by 3 with each module drawn in it (`Ghost.parts`); the app's guard and `LINE_STANDS_WHERE_BUILT`
 are gone. New: `tests/engine/t30Move.test.ts` and the drag in `tests/ui/t30Line.test.ts`.
+
+**T30-C3 The line's contract, its windows, the pallet and the gate.** A record of its own
+(`state.windowLine.contract`, `src/engine/lineContract.ts`), never one of `state.contracts` and
+drawing nothing off the seeded stream: offered by the `lineContractOffered` card (two choices, so no
+cross and no Escape) at the end of `startDay` once the six stand and two engineers are on the books,
+and a week on after `Not now` or an end. While it runs, `runLineMinute` (beside the men's minute in
+`advanceMinute`) moves the window on in the day's working minutes only, with two engineers on duty
+and nothing being moved: £1,500 in on the contract line and £600 out on the material line a window,
+each one growing line a day, the material past the overdraft floor; the tenth window sends the
+pallet to the gate (`LINE_PALLET_LAYOUT`, one box a pallet and the label), taken at the next working
+open with no ledger line; a part pallet goes on `End it` or the sale. The Contracts tab shows its
+block first; the line's card says it can work one. The scenarios (zz) and (bbb) of Turn 29 end or
+turn the offer down, since they are about the jobs and the joiners' contract.

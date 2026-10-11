@@ -73,6 +73,7 @@ import {
 } from '../engine/constants';
 import { boardCapacityOf, findVariant, insuranceForClass, isLineModule } from '../engine/machines';
 import { lineBox } from '../engine/layout';
+import { lineWindowEvery, lineWindowMinutes } from '../engine/lineContract';
 import { andList, inWords } from '../engine/text';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
@@ -368,7 +369,7 @@ function figureLines(lines: Line[]): string {
 /** The line's own lines on its card, from the constants and never in written figures: a row a
  *  module with the stages it does (`LINE_COVERS`), what the line gives the window jobs with its two
  *  engineers, and how it is sold (CLAUDE.md T30 2.3.3). */
-function lineLines(): Line[] {
+function lineLines(state: GameState): Line[] {
   const rows = LINE_MODULES.map((_, index) => {
     const place = index + 1;
     const stages = TIMBER_STAGES.filter((stage) => LINE_COVERS[stage.id] === place);
@@ -384,6 +385,7 @@ function lineLines(): Line[] {
   return [
     ...rows,
     line(`With ${inWords(engineers)} engineers, timber work goes ${factor} times as fast`),
+    line(`It can make windows on a contract of its own: one every ${lineWindowEvery(lineWindowMinutes(state))}`),
     line(`Sold whole, for ${SALE_FRACTION === 0.5 ? 'half' : `${Math.round(SALE_FRACTION * 100)} per cent of`} its price`),
   ];
 }
@@ -537,7 +539,7 @@ function lineCard(state: GameState, spec: EquipmentSpec, variant: EquipmentVaria
     `${onTheList ? ' is-ordered' : ''}" data-variant="${variant.id}" data-line="1">` +
     `<h3 class="tile-name">${escapeHtml(LINE_NAME)} ${owned}</h3>` +
     pictureSlot(pictureKeyOf(spec), variant.id) +
-    `<div class="card-effects">${figureLines(lineLines())}</div>` +
+    `<div class="card-effects">${figureLines(lineLines(state))}</div>` +
     `<div class="card-costs"><p class="tile-price">${money(LINE_PRICE)}</p>` +
     `${figureLines(lineCostLines(state, spec, variant))}</div>` +
     `<p class="tile-text card-description">${escapeHtml(LINE_DESCRIPTION)}</p>` +

@@ -405,6 +405,11 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10; f
   it('runs all six with two engineers, three with one, stands still with none, and is sold whole', () => {
     let state = act(landed, { type: 'HIRE', role: 'lineEngineer', tier: null });
     state = playDays(state, 3);
+    // With two engineers on the books the line is offered its own contract, and the days played
+    // take it; (zz) is about the window jobs, so it is ended, and the jobs have the line again
+    // (CLAUDE.md T30 2.6).
+    expect(state.windowLine.contract?.status).toBe('active');
+    state = act(state, { type: 'END_LINE_CONTRACT' });
     expect(lineModules(state)).toBe(6);
     expect(lineLevel(state)).toBe(6);
     expect(warnings(state).some((entry) => entry.key === 'lineNeedsEngineer')).toBe(false);
@@ -659,6 +664,9 @@ describe('(bbb) windows on a standing contract (CLAUDE.md T29 2.12)', () => {
   for (const id of ['e-kev', 'e-raj']) {
     lined.workers.push({ ...testJoiner(id, id), role: 'lineEngineer', tier: null, rate: 0, monthlyWage: 15000 });
   }
+  // The line's own contract of Turn 30 turned down for the year, so the week measures what the line
+  // does for the joiners' contract and nothing else (CLAUDE.md T30 2.6).
+  lined.windowLine.nextOfferDay = lined.clock.day + 365;
   const withLine = aWeek(connectAll(lined), offer?.id ?? '');
 
   it('is offered sash windows in the 800 m² unit, named in the plural, and takes it with four men', () => {

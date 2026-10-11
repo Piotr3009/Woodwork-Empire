@@ -5295,6 +5295,25 @@ export const LINE_ROW_TAIL: Partial<Record<StageId, string>> = {
 };
 /** The words the line's card and its catalogue line print for it (CLAUDE.md T30 2.3.3). */
 export const LINE_NAME = 'Window production line';
+/** [PIOTR, 10.10: "about 1,500 pounds a window on average, a standing order"] What the window
+ *  company pays for every window the line makes on its contract (CLAUDE.md T30 2.6). */
+export const LINE_WINDOW_PRICE = 1500;
+/** [PIOTR, 10.10: "material 40"] The share of a window's price its timber and glass cost, booked as
+ *  money for each window made; the labour, twenty per cent, is the two engineers' wages, which the
+ *  month already pays (CLAUDE.md T30 2.6). */
+export const LINE_MATERIAL_SHARE = 0.4;
+/** [PIOTR, 10.10: "one window every two hours"] The minutes a window takes on the line's contract
+ *  (CLAUDE.md T30 2.7). */
+export const LINE_WINDOW_MINUTES = 120;
+/** [PIOTR, 10.10: "ten of them"] The windows a pallet takes before it goes to the gate (CLAUDE.md
+ *  T30 2.8). */
+export const LINE_PALLET_WINDOWS = 10;
+/** Where the full pallets wait for the client: the first row of the floor the second extension
+ *  added, along the left wall just past the end of the gate lane, one box a pallet and two at the
+ *  most, as the finished goods are drawn (CLAUDE.md T30 2.8) [TUNE: chat]. */
+export const LINE_PALLET_LAYOUT = { x: 0, y: 10, width: 2, depth: 1, height: 1.75 };
+/** The line's contract's name: the client has no name (CLAUDE.md T30 2.6) [TUNE: chat]. */
+export const LINE_CONTRACT_NAME = 'Windows off the line';
 /** The line's card's own sentence, in the place of a class's description, read off the art side's
  *  six pictures (CLAUDE.md T30 2.3.3) [TUNE]. */
 export const LINE_DESCRIPTION =

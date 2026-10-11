@@ -220,7 +220,7 @@ import {
   takeOverJob,
   transportLabel,
 } from './jobs';
-import { emptyWindowLine } from './lineContract';
+import { answerLineOffer, emptyWindowLine, endLineContract, runLineDay, runLineMinute } from './lineContract';
 import {
   arriveDeliveries,
   arriveGlass,
@@ -651,6 +651,10 @@ function startDay(state: GameState): void {
   delegateTasks(state);
   queueDeliveryEvents(state, arriving);
   queueKitDeliveryEvents(state, kit);
+  // The line's own step, last, after the day's kit has landed and its cards are queued: so a line
+  // that lands with two engineers already hired is offered its contract that morning (CLAUDE.md
+  // T30 2.6, 2.8).
+  runLineDay(state);
 }
 
 /** The first working day of the month, before the board: the month's report, once per month
@@ -2113,6 +2117,9 @@ function advanceMinute(state: GameState): boolean {
   const onTask = state.owner.currentTaskId !== null;
   runMinute(state);
   runProductionMinute(state, onTask);
+  // The line's own minute, beside the men's and outside it, so a minute nobody works still runs the
+  // line (CLAUDE.md T30 2.7).
+  runLineMinute(state);
   state.clock.minute += 1;
   refreshBoardAtMidday(state);
   if (shouldFinishDay(state)) finishDay(state);
@@ -2171,6 +2178,10 @@ function resolveEvent(state: GameState, choiceId: string, remember = false): voi
     case 'moveConfirm':
       if (choiceId === 'do') startTheMove(state);
       else putThemBack(state);
+      break;
+    case 'lineContractOffered':
+      // Taken, it runs from this minute; Not now, it comes back a week on (CLAUDE.md T30 2.6).
+      answerLineOffer(state, choiceId);
       break;
     case 'deliveryArrived':
       if (choiceId === 'unload') {
@@ -2449,6 +2460,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       // After the first month he may walk away, and it costs him nothing but the work
       // (CLAUDE.md T17 2.22).
       endContractNow(next, action.contractId);
+      break;
+    case 'END_LINE_CONTRACT':
+      // The line's own contract ends at one click, asking nothing, at any time (CLAUDE.md T30 2.6).
+      endLineContract(next);
       break;
     case 'SET_SECOND_SHIFT':
       // No manager, no second shift (CLAUDE.md T13 3.9).
@@ -3105,6 +3120,8 @@ export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
     // Off the extraction the day it is sold; the buyer's van takes the machine, not the pipe.
     disconnectExtraction(state, sold.id);
   }
+  // A running line contract ends the day the line is sold (CLAUDE.md T30 2.3.5, 2.6).
+  if (isLineModule(item.specId)) endLineContract(state);
   return OK;
 }
 

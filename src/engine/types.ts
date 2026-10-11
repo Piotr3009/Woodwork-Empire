@@ -954,7 +954,11 @@ export type GameEventKind =
   /** The first settle of a save that held Turn 29's modules of the line, bought one by one: they
    *  were taken back by the lift and their money given back, and this says what (CLAUDE.md T30
    *  section 4). */
-  | 'lineRefunded';
+  | 'lineRefunded'
+  /** The open of a working day with the line standing whole and two engineers on the books: a
+   *  window company offers to take every window it makes (CLAUDE.md T30 2.6). Two choices, so it
+   *  has no cross and Escape does not close it. */
+  | 'lineContractOffered';
 
 export interface GameEventChoice {
   id: string;
@@ -1544,6 +1548,8 @@ export interface GameState {
 
 export type GameAction =
   | { type: 'SET_SPEED'; speed: Speed }
+  /** The line's own contract ended at one click, asking nothing (CLAUDE.md T30 2.6). */
+  | { type: 'END_LINE_CONTRACT' }
   /** Run the clock at 4x until the task the owner is out on is over (CLAUDE.md T8 3.3). */
   | { type: 'SKIP_AHEAD' }
   | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }

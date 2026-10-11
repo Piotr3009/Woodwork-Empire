@@ -17,6 +17,9 @@ import { LINE_MODULES } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { placeEquipmentOrder } from '../../src/engine/game';
 import { catalogueTabFrom, renderCatalogue } from '../../src/ui/catalogue';
+import { renderContracts, renderContractsTab } from '../../src/ui/contracts';
+import { renderHall } from '../../src/render/hall';
+import { testJoiner } from '../helpers';
 import { currentState, mount, render } from '../../src/ui/app';
 import { tileToScreen } from '../../src/render/iso';
 import { act, buyStartingKit, newGame, nextDay, placeEquipment, withAir } from '../helpers';
@@ -124,5 +127,91 @@ describe('the line dragged in setup mode (CLAUDE.md T30 2.4)', () => {
     );
     delete (SVGSVGElement.prototype as unknown as Record<string, unknown>).getScreenCTM;
     delete (SVGSVGElement.prototype as unknown as Record<string, unknown>).createSVGPoint;
+  });
+});
+
+describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () => {
+  function running(): GameState {
+    const state = bigUnit();
+    LINE_MODULES.forEach((id, index) => placeEquipment(state, id, { x: 2 + 6 * index, y: 14, id: `kit-line-${index + 1}` }));
+    for (const id of ['eng-1', 'eng-2']) {
+      state.workers.push({ ...testJoiner(id, id), role: 'lineEngineer', tier: null, rate: 0, monthlyWage: 15000 });
+    }
+    state.windowLine.contract = {
+      status: 'active',
+      startDay: state.clock.day,
+      windowsThisWeek: 7,
+      weekStartDay: state.clock.day,
+      windowsMade: 112,
+      revenue: 168000,
+      materialCost: 67200,
+    };
+    state.windowLine.onPallet = 7;
+    state.windowLine.palletsAtGate = 1;
+    return state;
+  }
+
+  it('stands first on the Orders board s Contracts tab, in a running contract s classes, with End it', () => {
+    const tab = document.createElement('div');
+    tab.innerHTML = renderContracts(running());
+    const block = tab.querySelector('.contract-active[data-line-contract]');
+    expect(block).not.toBeNull();
+    expect(tab.querySelector('.contract-active')).toBe(block);
+    const text = block?.textContent ?? '';
+    for (const words of [
+      'Windows off the line',
+      '£1,500 a window; the timber and the glass £600 a window',
+      'One window every 2 hours: about 20 a week',
+      'This week: 7 windows. In all: 112',
+      'On the pallet',
+      '7 of 10',
+      'At the gate for collection',
+      '1 pallet',
+    ]) {
+      expect(text, words).toContain(words);
+    }
+    expect(text).not.toContain('Standing still');
+    expect(block?.querySelector('[data-do="endLineContract"]')?.textContent).toBe('End it');
+    // Nobody is put on it, so the Work Plan's Contracts tab has none of it.
+    const plan = document.createElement('div');
+    plan.innerHTML = renderContractsTab(running(), null, null);
+    expect(plan.textContent).not.toContain('Windows off the line');
+  });
+
+  it('says it stands still for want of an engineer, and nothing of a gate with no pallet at it', () => {
+    const state = running();
+    state.workers = state.workers.filter((worker) => worker.id !== 'eng-2');
+    state.windowLine.palletsAtGate = 0;
+    const tab = document.createElement('div');
+    tab.innerHTML = renderContracts(state);
+    const text = tab.querySelector('[data-line-contract]')?.textContent ?? '';
+    expect(text).toContain('Standing still');
+    expect(text).toContain('one engineer on duty');
+    expect(text).not.toContain('At the gate');
+    state.workers = state.workers.filter((worker) => worker.id !== 'eng-1');
+    tab.innerHTML = renderContracts(state);
+    expect(tab.querySelector('[data-line-contract]')?.textContent).toContain('no engineer on duty');
+  });
+
+  it('draws the pallets at the gate with their label, and none with nothing there', () => {
+    const state = running();
+    const hall = document.createElement('div');
+    hall.innerHTML = renderHall(state);
+    expect(hall.querySelectorAll('[data-line-pallet]')).toHaveLength(1);
+    expect(hall.textContent).toContain('Windows for collection: 1 pallet');
+    state.windowLine.palletsAtGate = 3;
+    hall.innerHTML = renderHall(state);
+    expect(hall.querySelectorAll('[data-line-pallet]')).toHaveLength(2);
+    expect(hall.textContent).toContain('Windows for collection: 3 pallets');
+    state.windowLine.palletsAtGate = 0;
+    hall.innerHTML = renderHall(state);
+    expect(hall.querySelector('[data-line-pallet]')).toBeNull();
+    expect(hall.textContent).not.toContain('Windows for collection');
+  });
+
+  it('says on the line s card that it can make windows on a contract of its own', () => {
+    const page = document.createElement('div');
+    page.innerHTML = renderCatalogue(bigUnit(), '', catalogueTabFrom('line'), 'windowLine1');
+    expect(page.textContent).toContain('It can make windows on a contract of its own: one every 2 hours');
   });
 });

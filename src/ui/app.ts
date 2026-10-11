@@ -1773,6 +1773,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'endContract':
       dispatch({ type: 'END_CONTRACT', contractId: id });
       return;
+    case 'endLineContract':
+      // The line's own contract, one click and nothing asked (CLAUDE.md T30 2.6).
+      dispatch({ type: 'END_LINE_CONTRACT' });
+      return;
     case 'setSecondShift':
       dispatch({ type: 'SET_SECOND_SHIFT', on: element.dataset.on === '1' });
       return;

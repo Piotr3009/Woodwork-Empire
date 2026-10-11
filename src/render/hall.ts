@@ -6,6 +6,7 @@ import {
   CNC_TOOL_CHANGER_SPRITE,
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
+  LINE_PALLET_LAYOUT,
   GATE_CROWD_LIMIT,
   NO_AIR_LINE,
   GATE_LAYOUT,
@@ -116,6 +117,7 @@ import {
   tileToScreen,
 } from './iso';
 import { formatCalendarDay, formatTime, isBreak } from '../engine/clock';
+import { plural } from '../engine/text';
 import { compressorIsLow, extractionCheck, hallAirCheck } from '../engine/media';
 import {
   sheetRoleFor,
@@ -2088,6 +2090,35 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       svg: label(
         centreOf(apronX, apron.y, apron.width, apron.depth, apron.height),
         `At the gate: ${waitingPieces.length}`,
+      ),
+    });
+  }
+
+  // The full pallets of the line's windows wait for the client just past the end of the gate lane,
+  // drawn as the finished goods are: one box a pallet in the kit stock colours, two at the most, and
+  // one label hung under the front of their floor so that it does not sit on the finished goods'.
+  // Nothing holds the cells; until the art side's pallet and forklift come, no forklift is drawn
+  // (CLAUDE.md T30 2.8) [TUNE: chat].
+  const pallets = state.windowLine.palletsAtGate;
+  if (pallets > 0) {
+    const gate = LINE_PALLET_LAYOUT;
+    const shown = Math.min(pallets, gate.width);
+    for (let index = 0; index < shown; index += 1) {
+      const x = gate.x + index;
+      const faces = boxPolygons(x, gate.y, 1, gate.depth, gate.height);
+      drawables.push({
+        depth: depthKey(x, gate.y),
+        svg:
+          `<g data-line-pallet="${index}"><title>Windows for collection</title>` +
+          box(faces, 'var(--kit-stock)', 'var(--kit-stock-dark)') +
+          '</g>',
+      });
+    }
+    drawables.push({
+      depth: depthKey(gate.x, gate.y) + 0.3,
+      svg: label(
+        centreOf(gate.x, gate.y, gate.width, gate.depth),
+        `Windows for collection: ${plural(pallets, 'pallet', 'pallets')}`,
       ),
     });
   }
