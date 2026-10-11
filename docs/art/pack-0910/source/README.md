@@ -23,7 +23,7 @@ Wszystkie nowe rendery, podglądy i raporty trafiają do `regenerated/`. Polecen
 python source/render_all.py sander.standard
 ```
 
-Pełny walidator oczekuje wszystkich 13 plików, więc uruchamiaj go po wygenerowaniu całej paczki. `source/brief.txt` zawiera kontrakt używany przez walidator. `source/meshes/` zawiera zatwierdzone siatki, normalne, materiały i obwiednie AO jako NPZ bez pickle. `source/legacy/` to zależności istniejących generatorów, które utrzymują te same modele. Nie uruchamiaj generatorów legacy jako osobnych programów — wejściem tej paczki jest `render_all.py`.
+Pełny walidator oczekuje wszystkich 13 plików, więc uruchamiaj go po wygenerowaniu całej paczki. `source/brief.txt` zawiera kontrakt używany przez walidator. `source/meshes/` zawiera zatwierdzone siatki, normalne, materiały i obwiednie AO jako NPZ bez pickle. `source/legacy/` to zależności istniejących generatorów, które utrzymują te same modele. Nie uruchamiaj generatorów legacy jako osobnych programów: wejściem tej paczki jest `render_all.py`.
 
 ## Kamera i jakość
 

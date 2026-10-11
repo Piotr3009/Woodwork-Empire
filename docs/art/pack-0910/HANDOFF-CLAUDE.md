@@ -1,4 +1,4 @@
-# Przekazanie dla Claude’a — paczka 1
+# Przekazanie dla Claude’a: paczka 1
 
 Piotr zatwierdził podglądy i polecił przygotować komplet 09.10.2026. To gotowa paczka grafik; zmiany w kodzie gry wykonuje Claude.
 
@@ -13,9 +13,9 @@ Skopiuj `sprites-2x/` z zachowaniem nazw i podziału na `0/` oraz `90/`.
 | `sander.standard.png` | 0, 90 | 160 × 160 | 104, 152 | 56, 152 |
 | `sander.pro.png` | 0, 90 | 256 × 220 | 152, 212 | 104, 212 |
 | `sander.industrial.png` | 0, 90 | 400 × 304 | 296, 296 | 104, 296 |
-| `cuttersSash.standard.png` | 0 | 112 × 112 | 56, 104 | — |
-| `cuttersCasement.standard.png` | 0 | 112 × 112 | 56, 104 | — |
-| `cuttersDoor.standard.png` | 0 | 112 × 112 | 56, 104 | — |
+| `cuttersSash.standard.png` | 0 | 112 × 112 | 56, 104 | , |
+| `cuttersCasement.standard.png` | 0 | 112 × 112 | 56, 104 | , |
+| `cuttersDoor.standard.png` | 0 | 112 × 112 | 56, 104 | , |
 
 `dimensions.json` ma strukturę zgodną z wcześniejszą paczką 1: tablica `sprites`, `viewDeg`, `canvasPx:{w,h}`, `anchorPx:{x,y}`. Kotwice odnoszą się do pełnego płótna w pikselach pliku 2x.
 

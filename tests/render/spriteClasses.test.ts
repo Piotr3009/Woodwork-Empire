@@ -211,8 +211,9 @@ describe('the file on disk and the footprint in the engine', () => {
     // 2.11). Ninety nine from v84: the three five axis CNCs (CLAUDE.md T29 2.4). A hundred with
     // the spraying robot (CLAUDE.md T29 2.7), a hundred and five with the line's five modules
     // (CLAUDE.md T29 2.9.1), and a hundred and seven with the two timber stores (CLAUDE.md T29
-    // 2.11.1).
-    expect(checked).toBe(107);
+    // 2.11.1). A hundred and ten from v89: the three cutter cases of pack 1 (09.10), each on the
+    // canvas of the 1 by 1 by 1 its set declares (CLAUDE.md T30 2.1).
+    expect(checked).toBe(110);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }

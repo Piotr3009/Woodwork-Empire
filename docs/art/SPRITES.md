@@ -517,7 +517,8 @@ What they are:
 - **Pack 2, `sander`, 10 files:** as the art side delivered them. They are not drawn to the
   contract's 2 to 1 projection: their rows climb flatter than the hall's, and the industrial pair
   stands low in its canvas, so the measured ports of these files are right on the picture and
-  their cells approximate.
+  their cells approximate. Replaced in Turn 30 by the art side's pack 1 of 09.10, rendered from a
+  model to the contract (section 15).
 - **Pack 2, `framePress` and `glueTable`, 12 files:** the art side's files of 05.10 were cut wrong
   (half size, off the anchor, with pieces of the neighbouring machine), and chat's stand ins cut
   from the preview board took their place until v85. On 08.10 the art side delivered the twelve
@@ -532,8 +533,8 @@ What they are:
 The ports of the classes that want extraction (every cross cut saw, every planer, and the sanders
 from `budget` up; the used sander has a vacuum of its own and the presses and the glue table make
 no dust) are measured off these files, one line a file, `.r` among them, in `src/engine/ports.ts`
-[TUNE until Piotr confirms them on the hall]. The three cutter sets of 2.5 have no picture: the
-catalogue shows its empty picture box for them until the art side delivers.
+[TUNE until Piotr confirms them on the hall]. The three cutter sets of 2.5 had no picture until
+Turn 30, which put the art side's three cases of pack 1 in (section 15).
 
 ## 13. The five axis CNC, the spraying robot, the line and the timber stores (Turn 29, 05.10.2026)
 
@@ -612,3 +613,42 @@ link's picture got a background of its own because the pack's README says the ba
 where the logo is used, and a pasted link's preview has none: some sites fill a transparent
 picture with black. The other variants, the originals and the larger icons stay in the art side's
 pack and are not in the repo. The tab's title is the logo's words, `Woodwork Empire Tycoon`.
+
+## 15. The production line of six modules, its motion and pack 1 of 09.10 (Turn 30, 11.10.2026)
+
+### 15.1 Pack 1 of 09.10: the sanders and the cutter cases
+
+Piotr's words of 09.10: "ok, but remember to keep to the angles, it is mega important; code it".
+The art side's pack 1 drew the five sanders again, in two views, and the three cutter cases. Piotr
+pushed it into the root of the repo (commit 46713f3), and Turn 30 put the thirteen pictures into
+`public/sprites/` byte for byte (CLAUDE.md T30 2.1): no agent altered a pixel. The rest of the pack
+(its README, the handoff, the masters at six times the size, the sources, the meshes, the checks and
+the art side's checksums) is kept as delivered in `docs/art/pack-0910/`, with `EDITED.md` naming
+the five text files whose em dashes were replaced.
+
+Each sander is the engine's own canvas for the metres the game already gives its class, its anchor
+at `(8 + w × 48, H + 8)` in view 0 and `(8 + d × 48, H + 8)` in the `.r`. The pack's 90 view turns
+the model `(x, y, z)` to `(y, w - x, z)` (its `camera-QA.md`), which is the game's own `.r`. Both
+views are rendered from a model to the 2 to 1 projection (`exactProjectionVerified: true`), so the
+two of Turn 28 that stood off their anchors stand on them now.
+
+| File in public/sprites/ (and its `.r`) | Metres | File, px | Anchor, view 0 / `.r` | The pack called it |
+|---|---|---|---|---|
+| `sander.used.png` | 2 × 1 × 1 | 160 × 136 | 104 / 56, 128 | `sprites-2x/0/` and `90/sander.used.png` |
+| `sander.budget.png` | 2 × 1 × 1.25 | 160 × 148 | 104 / 56, 140 | the same, `budget` |
+| `sander.standard.png` | 2 × 1 × 1.5 | 160 × 160 | 104 / 56, 152 | the same, `standard` |
+| `sander.pro.png` | 3 × 2 × 1.75 | 256 × 220 | 152 / 104, 212 | the same, `pro` |
+| `sander.industrial.png` | 6 × 2 × 2 | 400 × 304 | 296 / 104, 296 | the same, `industrial` |
+| `cuttersSash.standard.png` | 1 × 1 × 1 | 112 × 112 | 56, 104 (view 0 only) | `sprites-2x/0/cuttersSash.standard.png` |
+| `cuttersCasement.standard.png` | 1 × 1 × 1 | 112 × 112 | 56, 104 (view 0 only) | `sprites-2x/0/cuttersCasement.standard.png` |
+| `cuttersDoor.standard.png` | 1 × 1 × 1 | 112 × 112 | 56, 104 (view 0 only) | `sprites-2x/0/cuttersDoor.standard.png` |
+
+The cutter cases are catalogue pictures: a cutter set holds no floor and is never drawn on the hall
+(CLAUDE.md T28 2.5). The catalogue's class tile and the Sprite check page draw them. Their 1 × 1 × 1
+frames the canvas and is not the case's size (the pack's own README says so).
+
+The sanders' ports (the stub on the downdraught table, the duct of the edge sander, the hoods of the
+through feed sanders; the used sander has a vacuum of its own and no port) are measured again off
+these files, one line a file, `.r` among them, in `src/engine/ports.ts` [TUNE until Piotr confirms
+them on the hall].
+

@@ -1,4 +1,4 @@
-# Kamera — paczka 1
+# Kamera: paczka 1
 
 Wszystkie 13 plików: `exactProjectionVerified: true`. Obrazy po zatwierdzeniu pozostały identyczne bajtowo.
 

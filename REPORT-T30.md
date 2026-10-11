@@ -21,3 +21,14 @@ which is which and every line written by hand: the Production line tab and the l
 states with the four upgrade cards, the offer card beside End of day, the Contracts tab's running
 block, the hall with the line whole and a pallet at the gate, setup mode dragging the line, the
 Owned tile's `Sell the line for £5,000,000`, and the card of a lifted save. No CSS token or class.
+
+**T30-B1 Pack 1 of 09.10.** The thirteen pictures are in `public/sprites/` byte for byte (each
+matches the pack's own SHA256 line): the five sanders and their `.r` over Turn 28's, and the three
+cutter cases, which the catalogue's tile and the Sprite check page now draw where they showed an
+empty box and `no file yet` (`tests/ui/t28Families.test.ts` flipped; the measured class files 107
+to 110 in `tests/render/spriteClasses.test.ts`). The eight sander ports are measured again, off
+the art side's own mesh through the pack's own matrix and checked by eye (`src/engine/ports.ts`,
+[TUNE until Piotr confirms]); no test pinned the old figures. The root is as it was before 09.10:
+the game's README is back with this turn's lines, and the rest of the pack is in
+`docs/art/pack-0910/` with `EDITED.md` (the five files whose eleven em dashes were replaced, and
+`SHA256SUMS.txt` left as delivered). SPRITES.md section 15.1 carries the thirteen files.

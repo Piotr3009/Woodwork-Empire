@@ -257,7 +257,7 @@ def main():
     report['missingFiles']=sorted(expected-actual);report['unexpectedFiles']=sorted(actual-expected)
     report['exactProjectionVerified']=all(r['camera']['exactProjectionVerified'] for r in report['files'])
     report['technicalChecksPassed']=bool(all(r['passed'] for r in report['files']) and not report['missingFiles'] and not report['unexpectedFiles'])
-    report['visualApproval']='pending — preview only'
+    report['visualApproval']='pending: preview only'
     destination=args.report or args.output/'independent-validation.json';destination.parent.mkdir(parents=True,exist_ok=True)
     destination.write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n')
     print(json.dumps({'report':str(destination),'sprites':len(report['files']),'exactProjectionVerified':report['exactProjectionVerified'],'technicalChecksPassed':report['technicalChecksPassed'],'failures':[r['file'] for r in report['files'] if not r['passed']]},ensure_ascii=False))
