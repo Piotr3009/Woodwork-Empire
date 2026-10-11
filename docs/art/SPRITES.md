@@ -517,8 +517,7 @@ What they are:
 - **Pack 2, `sander`, 10 files:** as the art side delivered them. They are not drawn to the
   contract's 2 to 1 projection: their rows climb flatter than the hall's, and the industrial pair
   stands low in its canvas, so the measured ports of these files are right on the picture and
-  their cells approximate. Replaced in Turn 30 by the art side's pack 1 of 09.10, rendered from a
-  model to the contract (section 15).
+  their cells approximate.
 - **Pack 2, `framePress` and `glueTable`, 12 files:** the art side's files of 05.10 were cut wrong
   (half size, off the anchor, with pieces of the neighbouring machine), and chat's stand ins cut
   from the preview board took their place until v85. On 08.10 the art side delivered the twelve
@@ -533,13 +532,10 @@ What they are:
 The ports of the classes that want extraction (every cross cut saw, every planer, and the sanders
 from `budget` up; the used sander has a vacuum of its own and the presses and the glue table make
 no dust) are measured off these files, one line a file, `.r` among them, in `src/engine/ports.ts`
-[TUNE until Piotr confirms them on the hall]. The three cutter sets of 2.5 had no picture until
-Turn 30, which put the art side's three cases of pack 1 in (section 15).
+[TUNE until Piotr confirms them on the hall]. The three cutter sets of 2.5 have no picture: the
+catalogue shows its empty picture box for them until the art side delivers.
 
 ## 13. The five axis CNC, the spraying robot, the line and the timber stores (Turn 29, 05.10.2026)
-
-The five modules of the line below are replaced by the six of Turn 30, 3 m high, with their motion
-(section 15.2); what follows is kept as the history of Turn 29.
 
 Piotr's words of 05.10: "you have it in the zip", "put everything into the next turn". The 22 files
 below came from the art side in three packs (the robot and the five axis CNC; the line's five
@@ -583,6 +579,9 @@ What they are:
   of Turn 28's pack 1 and not in the look of the September machines; Piotr has seen that and it
   stays for now. The industrial five axis CNC is drawn blue with a grey cabinet where the standard
   and the pro are green.
+- **Module 1 is drawn as an infeed and a planer with no saw** (the art side's own table: feeding,
+  planing and profiling). The game gives it the Cross cutting all the same (CLAUDE.md T29 2.4,
+  [TUNE: chat]), and a saw at module 1's infeed is on `docs/art/REQUESTS-T29.md` for the art side.
 - **The two timber stores are drawn full of timber**, with no empty picture and no layer: a store
   bought this morning shows a full load over a plate of `0 / 40`. Known and left tonight; the
   stores drawn empty are on `docs/art/REQUESTS-T29.md`.
@@ -613,96 +612,3 @@ link's picture got a background of its own because the pack's README says the ba
 where the logo is used, and a pasted link's preview has none: some sites fill a transparent
 picture with black. The other variants, the originals and the larger icons stay in the art side's
 pack and are not in the repo. The tab's title is the logo's words, `Woodwork Empire Tycoon`.
-
-## 15. The production line of six modules, its motion and pack 1 of 09.10 (Turn 30, 11.10.2026)
-
-### 15.1 Pack 1 of 09.10: the sanders and the cutter cases
-
-Piotr's words of 09.10: "ok, but remember to keep to the angles, it is mega important; code it".
-The art side's pack 1 drew the five sanders again, in two views, and the three cutter cases. Piotr
-pushed it into the root of the repo (commit 46713f3), and Turn 30 put the thirteen pictures into
-`public/sprites/` byte for byte (CLAUDE.md T30 2.1): no agent altered a pixel. The rest of the pack
-(its README, the handoff, the masters at six times the size, the sources, the meshes, the checks and
-the art side's checksums) is kept as delivered in `docs/art/pack-0910/`, with `EDITED.md` naming
-the five text files whose em dashes were replaced.
-
-Each sander is the engine's own canvas for the metres the game already gives its class, its anchor
-at `(8 + w × 48, H + 8)` in view 0 and `(8 + d × 48, H + 8)` in the `.r`. The pack's 90 view turns
-the model `(x, y, z)` to `(y, w - x, z)` (its `camera-QA.md`), which is the game's own `.r`. Both
-views are rendered from a model to the 2 to 1 projection (`exactProjectionVerified: true`), so the
-two of Turn 28 that stood off their anchors stand on them now.
-
-| File in public/sprites/ (and its `.r`) | Metres | File, px | Anchor, view 0 / `.r` | The pack called it |
-|---|---|---|---|---|
-| `sander.used.png` | 2 × 1 × 1 | 160 × 136 | 104 / 56, 128 | `sprites-2x/0/` and `90/sander.used.png` |
-| `sander.budget.png` | 2 × 1 × 1.25 | 160 × 148 | 104 / 56, 140 | the same, `budget` |
-| `sander.standard.png` | 2 × 1 × 1.5 | 160 × 160 | 104 / 56, 152 | the same, `standard` |
-| `sander.pro.png` | 3 × 2 × 1.75 | 256 × 220 | 152 / 104, 212 | the same, `pro` |
-| `sander.industrial.png` | 6 × 2 × 2 | 400 × 304 | 296 / 104, 296 | the same, `industrial` |
-| `cuttersSash.standard.png` | 1 × 1 × 1 | 112 × 112 | 56, 104 (view 0 only) | `sprites-2x/0/cuttersSash.standard.png` |
-| `cuttersCasement.standard.png` | 1 × 1 × 1 | 112 × 112 | 56, 104 (view 0 only) | `sprites-2x/0/cuttersCasement.standard.png` |
-| `cuttersDoor.standard.png` | 1 × 1 × 1 | 112 × 112 | 56, 104 (view 0 only) | `sprites-2x/0/cuttersDoor.standard.png` |
-
-The cutter cases are catalogue pictures: a cutter set holds no floor and is never drawn on the hall
-(CLAUDE.md T28 2.5). The catalogue's class tile and the Sprite check page draw them. Their 1 × 1 × 1
-frames the canvas and is not the case's size (the pack's own README says so).
-
-The sanders' ports (the stub on the downdraught table, the duct of the edge sander, the hoods of the
-through feed sanders; the used sander has a vacuum of its own and no port) are measured again off
-these files, one line a file, `.r` among them, in `src/engine/ports.ts` [TUNE until Piotr confirms
-them on the hall].
-
-### 15.2 The line of six modules, its motion and the windows on its pallet
-
-Piotr's words of 11.10: "super" for the six modules, and "put the animation pictures into the code
-and the zip". The art side's L1 (the six modules in two views) and L2 (their working motion and the
-windows stacking on module 6's pallet) came as 28 pictures, which Turn 30 put into `public/sprites/`
-as they were delivered (CLAUDE.md T30 2.2). No agent altered a pixel. Chat renamed the art side's
-90 degree views `.r` and touched nothing else. Their notes, the sheets' figures, the measurements and
-chat's check (`pictures-t30.json`, every file's size, anchor, metres, kind and hash) are kept in
-`docs/art/pack-1110/`.
-
-| Files in public/sprites/ | What they are | File, px | Anchor |
-|---|---|---|---|
-| `windowLine1.standard.png` to `windowLine6.standard.png` | the six modules, view 0, 6 × 3 × 3 m each | 448 × 376 | 296, 368 |
-| `windowLine1.standard.r.png` to `windowLine6.standard.r.png` | the art side's 90 degree views (see below) | 448 × 376 | 152, 368 |
-| `windowLine1.standard.work.sheet.png` to `windowLine6.standard.work.sheet.png` | the working motion: twelve cells of 448 × 376 in one row, 6 frames a second, a loop of two seconds | 5,376 × 376 | 296, 368 in each cell |
-| `windowLine6.standard.stack01.png` to `stack10.png` | one to ten wrapped windows standing on module 6's pallet, view 0 only, the windows alone (no pallet, floor or shadow) | 448 × 376 | 296, 368 |
-
-Every canvas is the contract's for 6 × 3 × 3 m (section 2: `(6 + 3) × 48 + 16` = 448 by
-`(6 + 3) × 24 + 3 × 48 + 16` = 376, the anchor at `8 + 48 × 6` = 296 in view 0 and `8 + 48 × 3` =
-152 in the turned view, at `376 - 8`). The first cell of every sheet is its module's picture pixel
-for pixel. The conveyor runs through every module at 0.9 m, in at (80, 144.8) and out at (368,
-288.8) in view 0, and the overhead rail of modules 5 and 6 at 2.8 m, (80, 53.6) to (368, 197.6). The
-next module stands at (+288, +144) px, six metres along x, so modules six cells apart meet end to
-end: the gap Turn 29's five showed is gone. Module 5's roof is clear so that its robot shows, and
-module 6 has an empty pallet on the floor at the end of its rollers, which the overlays stand on.
-Module 1 is drawn with its saw.
-
-**The 90 degree views are the other turn.** The art side's is `X = 3 - y, Y = x`, the game's `.r` is
-`X = y, Y = w - x`. The line is never turned (CLAUDE.md T30 2.4), so its six `.r` files are on disk
-for the tests and the Sprite check page and are never drawn on the hall, as the shelter's and the
-van's are. A line that may one day turn wants its turned views drawn in the game's convention.
-
-**Two new kinds of file.** A work sheet, `<family>.<class>.work.sheet.png`, and a stack overlay,
-`<family>.<class>.stackNN.png`, are neither a class's picture nor a turned one: the game picks every
-picture by its exact name (`pictureFor`, `pickSprite` build `${spriteKey}${tier}${suffix}.png`), and
-no code reads the manifest by pattern, so neither kind is ever taken for a class picture or a turned
-one. The tests that count class pictures and turned pictures say so. The characters' manifest is
-built from `character.*.json` only and is not touched, and the six JSONs of the sheets' figures
-are not served (they are in `docs/art/pack-1110/`): their one set of figures is a constant of the
-game, `MACHINE_WORK_SHEETS`.
-
-How the game uses them (CLAUDE.md T30 2.11, 2.12). A module that works is drawn from its sheet in
-place of its picture: the same box, the same anchor, the same shadow and name, an `<svg>` clipped to
-one cell by its view box over an `<image>` of the whole sheet, as a man's figure is drawn. It works
-only while the clock runs, and then, while the line's contract runs, all six in the minutes the line
-makes windows, and without the contract a module a man is drawn at this minute. The frame comes from
-real time, the same for all six, so the line plays in step, whatever the speed of the clock. The
-art side drew it at 6 frames a second, a loop of two seconds; from v90 the game plays it four times
-slower, 1.5 frames a second and a loop of eight seconds (`LINE_SHEET_SLOWDOWN`) [PIOTR, 11.10: "too
-fast", "four times slower at the least"]; the moment the clock stops every sheet holds, and the next page written
-draws the six from their pictures. Module 6 with one to nine windows on its pallet is drawn with
-the one overlay of that many over it, in the same box and drawable, whether it plays or stands.
-`stack10` is on disk and is not drawn: the tenth window sends the pallet to the gate, and it waits
-for the art side's pallet standing alone and the forklift (L3).
