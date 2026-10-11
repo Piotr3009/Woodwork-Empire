@@ -2205,23 +2205,25 @@ export const TIMBER_RACK_VARIANTS: EquipmentVariant[] = [
   },
 ];
 
-/** The timber shelter's one class: 400 boards out on the apron, under a roof [TUNE: chat]
- *  (CLAUDE.md T29 2.11.1). */
+/** The timber shelter's one class: 400 boards outside behind the hall, under a roof [TUNE: chat]
+ *  (CLAUDE.md T29 2.11.1, T31 2.8). */
 export const TIMBER_SHELTER_VARIANTS: EquipmentVariant[] = [
   {
     id: STANDARD_VARIANT,
     name: 'Timber shelter',
     price: 18000,
-    width: 3,
-    depth: 6,
+    // As the art side drew it, 6 m along the wall by 3 m deep: Turn 29 declared it 3 by 6 only
+    // because the apron is 3 m wide (CLAUDE.md T31 2.8).
+    width: 6,
+    depth: 3,
     height: 3,
-    zoneWidth: 3,
-    zoneDepth: 6,
+    zoneWidth: 6,
+    zoneDepth: 3,
     boardCapacity: 400,
     enduranceFactor: 1,
     powerPerDay: 1,
     description:
-      'A lean to roof over racks of boards, open at the front, standing outside on the apron so ' +
+      'A lean to roof over racks of boards, open at the front, standing outside behind the hall so ' +
       'it takes no floor of the hall.',
   },
 ];
@@ -3977,14 +3979,14 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Timber shelter',
     price: 18000,
     category: 'storage',
-    width: 3,
-    depth: 6,
+    width: 6,
+    depth: 3,
     height: 3,
-    zoneWidth: 3,
-    zoneDepth: 6,
+    zoneWidth: 6,
+    zoneDepth: 3,
     spriteKey: 'timberShelter',
     boardCapacity: 400,
-    effect: 'Holds ten times a rack\u0027s boards outside on the apron, and takes no floor of the hall.',
+    effect: 'Holds ten times a rack\u0027s boards outside behind the hall, and takes no floor of the hall.',
   },
 
   {
@@ -4923,9 +4925,10 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   edgebander: { x: 13, y: 6 },
   forklift: { x: 18, y: 6 },
   van: { x: 0, y: 7, yard: true },
-  // The timber shelter stands outside on the apron as the van does, its first cell x 0, y 1 of it
-  // (CLAUDE.md T29 2.11.1).
-  timberShelter: { x: 0, y: 1, yard: true },
+  // The timber shelter stands outside behind the rear wall with the plant, where it hides nothing
+  // of the hall [PIOTR, 11.10: "it hides our hall; rather where the extractors are, or behind them;
+  // nothing in the hall may be hidden"] (CLAUDE.md T31 2.8). On the apron the van stands alone.
+  timberShelter: { x: 0, y: 1, yard: true, rear: true },
 };
 
 /** Bench slots, in order, along the middle of the hall clear of the rooms and the personnel door.

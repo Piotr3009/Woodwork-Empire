@@ -1346,15 +1346,17 @@ const RACK_COUNT = {
  *  (PIOTR, 17.09; CLAUDE.md T17 2.8). The count used to be glued into the object's name, and
  *  `objectArt` throws the name away whenever a sprite file exists, so in the real game the number
  *  was invisible: the rack draws it itself now, and it moves with the stock. */
+/** How far over the rear wall's top, in metres, a plate hung over it stands [TUNE]. */
+const RACK_COUNT_OVER_WALL = 0.3;
+
 function rackCount(item: Equipment, sheets: number): string {
   const stands = footprintIn(item);
-  const at = centreOf(
-    stands.x,
-    stands.y,
-    stands.width,
-    stands.depth,
-    stands.height * RACK_COUNT.up,
-  );
+  // A store behind the rear wall is hidden by it up to its top, so its plate is hung over the
+  // wall's top above it, where the player can read and click it (CLAUDE.md T31 2.8) [TUNE: chat].
+  const at =
+    item.anchorY < 0
+      ? tileToScreen(stands.x + stands.width / 2, -REAR_WALL.back, REAR_WALL.top + RACK_COUNT_OVER_WALL)
+      : centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height * RACK_COUNT.up);
   const text = String(Math.max(0, Math.round(sheets)));
   const width = RACK_COUNT.pad * 2 + text.length * RACK_COUNT.digit;
   const colour = CLASS_BADGE[item.variantId]?.colour ?? 'var(--kit-stock)';

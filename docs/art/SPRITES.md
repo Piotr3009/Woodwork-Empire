@@ -563,7 +563,7 @@ anchor with no table of pixels.
 | `windowLine4.standard.png` | `windowLine4` | 6 × 3 × 2.5 | 448 × 352 | 296 / 152, 344 | `windowLine.stage4` |
 | `windowLine5.standard.png` | `windowLine5` | 6 × 3 × 2.5 | 448 × 352 | 296 / 152, 344 | `windowLine.stage5` |
 | `timberRack.standard.png` | `timberRack` | 4 × 1 × 2.5 | 256 × 256 | 200 / 56, 248 | `timberStorage.rack` |
-| `timberShelter.standard.png` | `timberShelter` | 3 × 6 × 3 | 448 × 376 | 152 / 296, 368 | `timberStorage.shelter`, its 90 view |
+| `timberShelter.standard.png` | `timberShelter` | 6 × 3 × 3 | 448 × 376 | 296 / 152, 368 | `timberStorage.shelter` (from Turn 31 its 0 view again) |
 
 Why the names changed. A family in this game has the five classes or one class called `standard`
 (the five axis CNC, from tonight, an unbroken run of three of them: `standard`, `pro`,
@@ -571,11 +571,16 @@ Why the names changed. A family in this game has the five classes or one class c
 families of one class each, the way the high capacity rack is a family of its own beside the rack,
 and their files carry `.standard`. Chat renamed them and touched no pixel.
 
-The shelter's two views changed places. The art side drew it 6 m long by 3 m deep. It stands
-outside on the apron, which is 3 m wide, so the game declares it 3 wide by 6 deep: the art side's
-90 view is `timberShelter.standard.png` and its 0 view is the `.r`. Kit outside is never turned,
-so the shelter's `.r` (like the van's) is on disk for the tests and the Sprite check page and is
-never drawn on the hall.
+The shelter's two views changed places in Turn 29 and changed back in Turn 31. The art side drew
+it 6 m long by 3 m deep. Turn 29 stood it outside on the apron, which is 3 m wide, so the game
+declared it 3 wide by 6 deep and drew the art side's 90 view. From Turn 31 it stands behind the rear
+wall with the plant [PIOTR, 11.10: "it hides our hall; rather where the extractors are, or behind
+them"], declared as the art side drew it, 6 m along the wall by 3 m deep, so
+`timberShelter.standard.png` is the art side's 0 view again and its 90 view is the `.r` (the two
+files changed places by `git mv` through a temporary name, nothing edited; CLAUDE.md T31 2.8). Kit
+outside is never turned, so the shelter's `.r` (like the van's) is on disk for the tests and the
+Sprite check page and is never drawn on the hall. Behind the wall it is drawn through the rear
+wall's clip, as the plant is, and its plate is hung over the wall's top above it.
 
 What they are:
 

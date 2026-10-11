@@ -1397,6 +1397,16 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       // Not a whole hall, with no books to pay it back through.
     }
   }
+  // The timber shelter off the apron and behind the rear wall with the plant, where it hides
+  // nothing of the hall, on its footprint of 6 by 3; one the wall has no length left for stays where
+  // it is (v92; CLAUDE.md T31 2.8, section 4). Outside the chain above, which is the plant's own.
+  if (version < 44 && Array.isArray(lifted.equipment) && Array.isArray(lifted.onOrder) && lifted.unit) {
+    try {
+      standThePlantBehindTheWall(lifted, 'timberShelter');
+    } catch {
+      // Not a whole hall: no wall to stand it behind.
+    }
+  }
   // A line on its contract given its first batch of timber and glass (v92).
   if (version < 44 && isRecord(lifted.windowLine) && isRecord(lifted.stock)) {
     try {

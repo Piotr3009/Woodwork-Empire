@@ -33,3 +33,10 @@ cause, and a calendar day's engineers, power and property cover at its open (bes
 `runDayCosts`, weekends among them, while the line stands). The fifth tab of the Accounting page,
 `Production line`, once the line has stood: four columns in the Summary's classes, the month's pace,
 a year at it, paid back, and what the month lost; selectors in `src/engine/lineBooks.ts`.
+
+**T31-C1 The timber shelter behind the rear wall.** `STARTING_LAYOUT.timberShelter` has `rear: true`,
+so `rearYardPlaceFor` stands it with the plant (`No room behind the hall` its refusal) and the van
+stands alone on the apron; declared 6 m along the wall by 3 m deep, its zone its footprint, its words
+`outside behind the hall`; its two files changed places back by `git mv` through a temporary name;
+its plate hung over the wall's top above it; a save's shelter on the apron moved by
+`standThePlantBehindTheWall(state, 'timberShelter')`, gated `version < 44`. SPRITES.md 13 put right.
