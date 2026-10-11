@@ -5269,8 +5269,9 @@ export const LINE_MODULES_KEPT: readonly number[] = [0, 3, 6];
 export const LINE_MODULES: readonly string[] = Object.keys(LINE_MODULE_SHARES);
 /** The first cell the line is asked to stand on at its order: module N stands six cells along x
  *  from the one before, at orientation 0, so the line takes the cells x 2 to 37, y 14 to 16, along
- *  the middle of the front half of the 800 m2 hall. Taken only when the 36 m by 3 m there is clear;
- *  otherwise the first clear run cell by cell (CLAUDE.md T30 2.4) [TUNE: chat: the cells]. */
+ *  the middle of the front half of the 800 m2 hall, its men at y 17 and its lane at y 18 and 19
+ *  and x 0 and 1. Taken only when the 36 m by 3 m there and its lane are clear; otherwise the first
+ *  clear run cell by cell (CLAUDE.md T30 2.4, T31 2.6) [TUNE: chat: the cells]. */
 export const WINDOW_LINE_ORIGIN = { x: 2, y: 14 };
 /** [PIOTR, 04.10: "at each stage output goes up by a percentage"; TUNE: chat: the figures] What
  *  the line gives every stage of a timber job while it runs at a level, by the level: nothing at
@@ -5322,6 +5323,13 @@ export const LINE_PALLET_WINDOWS = 10;
  *  added, along the left wall just past the end of the gate lane, one box a pallet and two at the
  *  most, as the finished goods are drawn (CLAUDE.md T30 2.8) [TUNE: chat]. */
 export const LINE_PALLET_LAYOUT = { x: 0, y: 10, width: 2, depth: 1, height: 1.75 };
+/** [PIOTR, 11.10: "two yellow lines from the end of the production line to the door, for the
+ *  forklift"; "yes" to two metres] The width of the forklift's lane: its front strip along the front
+ *  wall and its left strip up the left wall to the pallets at the gate (CLAUDE.md T31 2.6). */
+export const FORKLIFT_LANE_CELLS = 2;
+/** The metre in front of the line where its men stand, the front side of `STATION_TABLE` for every
+ *  module, which the line's lane never overlaps (CLAUDE.md T31 2.6). */
+export const LINE_FRONT_CELLS = 1;
 /** The line's contract's name: the client has no name (CLAUDE.md T30 2.6) [TUNE: chat]. */
 export const LINE_CONTRACT_NAME = 'Windows off the line';
 /** [PIOTR, 11.10: "yes" to chat's proposal] The boards a window of the line's contract takes off

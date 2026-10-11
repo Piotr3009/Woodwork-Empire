@@ -348,7 +348,8 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10; f
   // refusal (CLAUDE.md T30 2.4).
   placeEquipment(company, 'sheetRack', { variantId: 'standard', x: 7, y: 15, id: 'kit-rack-in-the-way' });
   const withTheRack = canBuy(company, 'windowLine1');
-  let state = act(company, { type: 'MOVE_ITEM', itemId: 'kit-rack-in-the-way', x: 2, y: 17 });
+  // Moved behind the line's place, off its lane (CLAUDE.md T31 2.6).
+  let state = act(company, { type: 'MOVE_ITEM', itemId: 'kit-rack-in-the-way', x: 2, y: 11 });
   const halfShifted = canBuy(state, 'windowLine1');
   state = act(state, { type: 'END_SETUP', speed: 1 });
   const cash = state.cash;

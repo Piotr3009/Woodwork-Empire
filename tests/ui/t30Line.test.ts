@@ -113,11 +113,12 @@ describe('the line dragged in setup mode (CLAUDE.md T30 2.4)', () => {
     };
     required(root.querySelector<HTMLButtonElement>('[data-do="startSetup"]')).click();
     required(root.querySelector('[data-kit="kit-line-3"]')).dispatchEvent(mouse('mousedown', 14, 14));
-    window.dispatchEvent(mouse('mousemove', 14, 17));
+    // Back from the front wall, where its lane lets it stand (CLAUDE.md T31 2.6).
+    window.dispatchEvent(mouse('mousemove', 14, 11));
     const ghost = required(root.querySelector('[data-ghost]'));
     expect(ghost.querySelectorAll('[data-ghost-part]')).toHaveLength(6);
     expect(ghost.textContent).toBe('Drop it here');
-    window.dispatchEvent(mouse('mouseup', 14, 17));
+    window.dispatchEvent(mouse('mouseup', 14, 11));
     // The six went by the same cells, wherever the mouse put module 3.
     const moved = required(currentState()).equipment.filter((item) => LINE_MODULES.includes(item.specId));
     const first = required(moved[0]);

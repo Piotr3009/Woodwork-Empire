@@ -40,3 +40,10 @@ stands alone on the apron; declared 6 m along the wall by 3 m deep, its zone its
 `outside behind the hall`; its two files changed places back by `git mv` through a temporary name;
 its plate hung over the wall's top above it; a save's shelter on the apron moved by
 `standThePlantBehindTheWall(state, 'timberShelter')`, gated `version < 44`. SPRITES.md 13 put right.
+
+**T31-C2 The forklift's lane.** `forkliftLane(state, at)` in `layout.ts` gives the front strip (x 0
+to the line's end, y D - 2 and D - 1) and the left strip (x 0 and 1, y 10 to D - 1), or null where
+the line, its men's metre and its lane would meet; `lineFits` asks the line and its lane at the order
+(`No room in the hall for the line and its lane`) and in setup mode (`... and its lane`);
+`canPlaceSpec` alone refuses everything else on it (`That is the forklift's lane`); `laneBlocked`
+under `boardsAtTheGate`; drawn first in the hall's live part in `--lane-yellow`, the one new token.

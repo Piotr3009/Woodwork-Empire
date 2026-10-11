@@ -271,8 +271,9 @@ describe('the windows (CLAUDE.md T30 2.7)', () => {
     first.absentDaysRemaining = 1;
     expect(lineLevel(one)).toBe(3);
     expect(play(one, 300).windowLine.contract?.windowsMade).toBe(0);
-    // The line itself dragged three cells to the front and the move done: six hours of carrying.
-    let moving = act({ ...state, speed: 0 } as GameState, { type: 'MOVE_ITEM', itemId: 'kit-line-1', x: 2, y: 17 });
+    // The line itself dragged three cells back and the move done: six hours of carrying (from Turn
+    // 31 back, its lane keeping it off the front wall, CLAUDE.md T31 2.6).
+    let moving = act({ ...state, speed: 0 } as GameState, { type: 'MOVE_ITEM', itemId: 'kit-line-1', x: 2, y: 11 });
     moving = act(moving, { type: 'END_SETUP', speed: 1 });
     expect(moving.activeEvent?.kind).toBe('moveConfirm');
     moving = act(moving, { type: 'RESOLVE_EVENT', choiceId: 'do' });

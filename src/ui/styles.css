@@ -59,6 +59,8 @@
   --kit-bench-dark: #3c7671;
   --kit-stock: #c9a23b;
   --kit-stock-dark: #9c7d2d;
+  /* The forklift's lane painted on the floor: the one token Turn 31 adds (CLAUDE.md T31 2.6). */
+  --lane-yellow: #e3b51f;
   --kit-welfare: #9c8f7a;
   --kit-welfare-dark: #7a705f;
   --kit-tools: #8a8f96;

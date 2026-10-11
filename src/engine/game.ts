@@ -83,7 +83,7 @@ import {
   lockerSlots,
   lockersInWords,
   moveItem,
-  lineBox,
+  LINE_NO_ROOM,
   lineGroup,
   lineModuleCell,
   lineSite,
@@ -2772,7 +2772,7 @@ function lineBuyCheck(state: GameState, prepaid: boolean): BuyCheck {
   if (held) return { ok: false, reason: 'The company has its production line' };
   if (!prepaid && !canAfford(state, LINE_PRICE)) return { ok: false, reason: 'Not enough cash' };
   if (state.movedItems.length > 0) return { ok: false, reason: 'The kit is half shifted. Finish the move first' };
-  if (lineSite(state) === null) return { ok: false, reason: `No free ${metresBy(lineBox({ x: 0, y: 0 }))} in the hall` };
+  if (lineSite(state) === null) return { ok: false, reason: LINE_NO_ROOM };
   return OK;
 }
 
@@ -2872,7 +2872,7 @@ export function buyEquipment(
   // once (CLAUDE.md T30 2.3.4).
   if (isLineModule(specId)) {
     const site = lineSite(state);
-    if (site === null) return { ok: false, reason: `No free ${metresBy(lineBox({ x: 0, y: 0 }))} in the hall` };
+    if (site === null) return { ok: false, reason: LINE_NO_ROOM };
     if (!prepaid) pay(state, 'equipment', LINE_NAME, LINE_PRICE);
     for (const id of LINE_MODULES) standItem(state, id, STANDARD_VARIANT, lineModuleCell(site, id), true);
     return OK;
@@ -3035,7 +3035,7 @@ export function placeEquipmentOrder(
  *  no module's order is called off (CLAUDE.md T30 2.3.4) [TUNE: chat: the words]. */
 function placeLineOrder(state: GameState): BuyCheck {
   const site = lineSite(state);
-  if (site === null) return { ok: false, reason: `No free ${metresBy(lineBox({ x: 0, y: 0 }))} in the hall` };
+  if (site === null) return { ok: false, reason: LINE_NO_ROOM };
   pay(state, 'equipment', `${LINE_NAME} ordered`, LINE_PRICE);
   for (const id of LINE_MODULES) {
     const at = lineModuleCell(site, id);

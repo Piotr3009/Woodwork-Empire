@@ -144,6 +144,7 @@ import {
   spriteUrl,
 } from './sprites';
 import { lineMakesWindows, runningLineContract } from '../engine/lineContract';
+import { lineLane } from '../engine/layout';
 import { placeholder } from './placeholder';
 import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
@@ -1615,6 +1616,32 @@ export function rearWallClip(widthCells: number): string {
   );
 }
 
+/** The forklift's lane of the line where it stands or is on order: the outline of its L, from the
+ *  pallets at the gate down the left wall and along the front wall to the line's end, in the one
+ *  token for it. Nothing when the line has no lane (CLAUDE.md T31 2.6) [TUNE: the outline]. */
+function laneArt(state: GameState): string {
+  const lane = lineLane(state);
+  const front = lane?.[0];
+  const left = lane?.[1];
+  if (front === undefined || left === undefined) return '';
+  const depth = front.y + front.depth;
+  const corners = [
+    { x: left.x, y: left.y },
+    { x: left.x + left.width, y: left.y },
+    { x: left.x + left.width, y: front.y },
+    { x: front.x + front.width, y: front.y },
+    { x: front.x + front.width, y: depth },
+    { x: left.x, y: depth },
+  ].map((corner) => tileToScreen(corner.x, corner.y));
+  return (
+    `<polygon data-lane="1" points="${points(corners)}" fill="none" stroke="var(--lane-yellow)" ` +
+    `stroke-width="${LANE_STROKE}" stroke-linejoin="miter" pointer-events="none" />`
+  );
+}
+
+/** The lane's lines, in the scene's pixels at x1 [TUNE]. */
+const LANE_STROKE = 2;
+
 /** The outline of something bought and not here yet, on the cells held for it (T8 3.2). */
 export function reservedOutline(item: OnOrderItem): string {
   const zone = itemZone(item);
@@ -2190,6 +2217,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   placeFigures(drawables);
   // Everything from here on is the live part: it changes with the state, minute by minute.
   const live: string[] = [];
+
+  // The forklift's lane, two yellow lines on the floor along its outer edges with the corners
+  // joined, first of the live drawing so it is under every piece of kit and every man and follows
+  // a purchase and a move (the painted shell is cached) (CLAUDE.md T31 2.6).
+  live.push(laneArt(state));
 
   // The name on the rear wall, lettered into the wall plane so it leans with the blockwork
   // (CLAUDE.md T6 3.2). It is live text and not part of the shell: the company the player typed

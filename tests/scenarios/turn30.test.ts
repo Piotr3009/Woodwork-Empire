@@ -311,7 +311,8 @@ describe('(ddd) the line bought whole, stood, moved and run on the window jobs (
   it('is refused in a 400 m² unit, with too little cash and with no free 36 m by 3 m', () => {
     expect(smallRefusal).toEqual({ ok: false, reason: 'Needs the 800 m² unit' });
     expect(poorRefusal).toEqual({ ok: false, reason: 'Not enough cash' });
-    expect(fullRefusal).toEqual({ ok: false, reason: 'No free 36 m by 3 m in the hall' });
+    // From Turn 31 the line's lane is asked with it (CLAUDE.md T31 2.6).
+    expect(fullRefusal).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
   });
 
   it('is bought in one click, six on order on one due day for 10,000,000 on one ledger line', () => {
@@ -332,9 +333,10 @@ describe('(ddd) the line bought whole, stood, moved and run on the window jobs (
     const setup = { ...structuredClone(landed), speed: 0 } as GameState;
     const third = setup.equipment.find((item) => item.specId === 'windowLine3');
     if (third === undefined) throw new Error('module 3 stands');
-    placeEquipment(setup, 'sheetRack', { variantId: 'standard', x: 20, y: 18, id: 'kit-rack-in-the-way' });
+    // From Turn 31 the rack stands behind the line, off its lane (CLAUDE.md T31 2.6).
+    placeEquipment(setup, 'sheetRack', { variantId: 'standard', x: 20, y: 11, id: 'kit-rack-in-the-way' });
     // Onto the rack: refused, and nothing moves.
-    const ontoRack = act(setup, { type: 'MOVE_ITEM', itemId: third.id, x: third.anchorX, y: 17 });
+    const ontoRack = act(setup, { type: 'MOVE_ITEM', itemId: third.id, x: third.anchorX, y: 10 });
     expect(anchors(ontoRack)).toEqual(anchors(setup));
     expect(ontoRack.movedItems).toEqual([]);
     // Turned: refused, and nothing turns.
