@@ -75,8 +75,8 @@ export function insuredValue(state: GameState): number {
 }
 
 /** What the line's modules standing in the hall cost: in the insured value like everything, and
- *  out of the security firm's price, which a company with a line would otherwise pay for five
- *  million of kit nobody can carry off (CLAUDE.md T29 2.10). */
+ *  out of the security firm's price, which a company with a line would otherwise pay for ten
+ *  million of kit nobody can carry off (CLAUDE.md T29 2.10, T30 2.3.7). */
 export function lineValue(state: GameState): number {
   let value = 0;
   for (const item of state.equipment) {

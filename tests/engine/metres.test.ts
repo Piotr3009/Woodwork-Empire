@@ -132,12 +132,14 @@ describe('footprints in metres', () => {
       cnc5: [5, 3, 2.5],
       // The spraying robot, the art side's metres (CLAUDE.md T29 2.4, 2.7).
       sprayRobot: [2, 1, 2.25],
-      // The line's five modules, the art side's metres (CLAUDE.md T29 2.4, 2.9.1).
-      windowLine1: [6, 3, 2.5],
-      windowLine2: [6, 3, 2.5],
-      windowLine3: [6, 3, 2.5],
-      windowLine4: [6, 3, 2.5],
-      windowLine5: [6, 3, 2.5],
+      // The line's six modules, the art side's metres of Turn 30: 3 m high (CLAUDE.md T30 2.2,
+      // 2.3.1).
+      windowLine1: [6, 3, 3],
+      windowLine2: [6, 3, 3],
+      windowLine3: [6, 3, 3],
+      windowLine4: [6, 3, 3],
+      windowLine5: [6, 3, 3],
+      windowLine6: [6, 3, 3],
       // The two timber stores, the art side's metres; the shelter declared 3 wide by 6 deep
       // (CLAUDE.md T29 2.4, 2.11.1).
       timberRack: [4, 1, 2.5],

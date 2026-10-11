@@ -27,6 +27,7 @@ import {
   freeBoardRoom,
   isSold,
   itemStandsInTheHall,
+  lineContractRuns,
   lineModules,
   sheetCapacityOf,
   sheetsOnCounter,
@@ -46,11 +47,13 @@ export function sheetsForCost(cost: number): number {
  *  a timber job taken while the line is N modules long is counted `LINE_BOARD_SAVING` fewer boards
  *  for each of them: the saving comes off the boards' cost to the penny before they are rounded up,
  *  never below one board, and what is saved is the boards that are not ordered (CLAUDE.md T29
- *  2.9.7) [TUNE: chat]. */
+ *  2.9.7) [TUNE: chat]. None for a job taken while the line works its own contract (CLAUDE.md T30
+ *  2.5, 2.6). */
 export function boardsForJob(state: GameState, materialCost: number, timber: boolean): number {
   const boards = boardsCostOf(materialCost, timber);
   if (!timber) return sheetsForCost(boards);
-  const kept = 1 - LINE_BOARD_SAVING * lineModules(state);
+  const modules = lineContractRuns(state) ? 0 : lineModules(state);
+  const kept = 1 - LINE_BOARD_SAVING * modules;
   return sheetsForCost(Math.round(boards * kept * 100) / 100);
 }
 

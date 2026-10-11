@@ -49,8 +49,9 @@ describe('GameState', () => {
     // v63 is 34: one kind of man on the floor, the draftsman's grades and the agency (CLAUDE.md T26
     // section 4). v81 is 40: the taxman's two years on the books (CLAUDE.md T27 section 4).
     // v83 is 41: the pelletiser behind the wall (CLAUDE.md T28 section 4). v84 is 42: four
-    // joiners to a contract, and the glass a day (CLAUDE.md T29 section 4).
-    expect(STATE_VERSION).toBe(42);
+    // joiners to a contract, and the glass a day (CLAUDE.md T29 section 4). v89 is 43: the line
+    // bought whole, and its own field (CLAUDE.md T30 section 4).
+    expect(STATE_VERSION).toBe(43);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

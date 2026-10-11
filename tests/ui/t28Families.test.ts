@@ -367,11 +367,16 @@ describe('the cutter sets (CLAUDE.md T28 2.5)', () => {
     expect(owned.equipment.filter((item) => item.specId === 'cuttersDoor')).toHaveLength(2);
   });
 
-  it('show the empty picture box and where they are kept, on the card and on the Sprite check page', () => {
+  it('show their picture and where they are kept, on the card and on the Sprite check page (CLAUDE.md T30 2.1)', () => {
+    // The art side's three cases of pack 1 (09.10) are on disk from Turn 30: the card draws the
+    // picture where it drew an empty box, and the Sprite check row names the file.
     const state = newGame({ difficulty: 'veryEasy' });
     const card = document.createElement('div');
     card.innerHTML = renderCatalogue(state, '', catalogueTabFrom('timberMachines'), 'cuttersSash');
-    expect(card.querySelector('.tile-picture[data-sprite="cuttersSash"] .tile-picture-box')).not.toBeNull();
+    expect(card.querySelector('.tile-picture[data-sprite="cuttersSash"] .tile-picture-box')).toBeNull();
+    expect(card.querySelector('.tile-picture[data-sprite="cuttersSash"] img')?.getAttribute('src')).toBe(
+      '/sprites/cuttersSash.standard.png',
+    );
     expect(card.textContent).toContain('Kept at the spindle moulders');
     expect(card.textContent).toContain('£4,000');
     const page = document.createElement('div');
@@ -380,7 +385,8 @@ describe('the cutter sets (CLAUDE.md T28 2.5)', () => {
       const row = page.querySelector(`[data-sprite-target="${id}"]`);
       expect(row, id).not.toBeNull();
       expect(row?.textContent, id).toContain('kept at the spindle moulders');
-      expect(row?.textContent, id).toContain('no file yet');
+      expect(row?.textContent, id).not.toContain('no file yet');
+      expect(row?.textContent, id).toContain(`/sprites/${id}.standard.png`);
     }
   });
 });

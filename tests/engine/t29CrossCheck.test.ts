@@ -54,7 +54,8 @@ function bigUnit(options: { cnc5?: boolean; stores?: boolean } = {}): GameState 
   state = nextDay(act(state, { type: 'EXTEND_UNIT' }));
   state = nextDay(act(state, { type: 'EXTEND_UNIT', stage: 'second' }));
   state = withAir(buyStartingKit(state), 'industrial');
-  state.cash = 9000000;
+  // Enough for the whole line of ten million from v89 (CLAUDE.md T30 2.3.1).
+  state.cash = 12000000;
   state.reputation = 40;
   state.enquiries = [];
   const kit: Array<[string, number, number]> = [
@@ -74,7 +75,7 @@ function bigUnit(options: { cnc5?: boolean; stores?: boolean } = {}): GameState 
 
 function withLine(state: GameState, count: number): GameState {
   for (let n = 1; n <= count; n += 1) {
-    placeEquipment(state, `windowLine${n}`, { x: 5 + 6 * (n - 1), y: 14, id: `kit-line-${n}` });
+    placeEquipment(state, `windowLine${n}`, { x: 2 + 6 * (n - 1), y: 14, id: `kit-line-${n}` });
   }
   return state;
 }
@@ -93,8 +94,9 @@ function windowJob(): ReturnType<typeof stagedJob> {
 describe('the pictures on the Sprite check page (CLAUDE.md T29 2.4, section 7)', () => {
   it('shows a file, a footprint and no red port line for every class of every new family', () => {
     const targets = spriteTargets().filter((target) => NEW_FAMILIES.includes(target.specId));
-    // Three classes of the five axis CNC and one of each of the other eight families.
-    expect(targets).toHaveLength(11);
+    // Three classes of the five axis CNC and one of each of the other nine families: the line has
+    // six modules from v89 (CLAUDE.md T30 2.3.1).
+    expect(targets).toHaveLength(12);
     const page = document.createElement('div');
     page.innerHTML = renderSpriteCheck();
     for (const target of targets) {
@@ -121,15 +123,20 @@ describe('the big kit and the smaller units (CLAUDE.md T29 2.5.1, section 7)', (
     middle.reputation = 40;
     expect(middle.unit.areaM2).toBe(400);
     for (const state of [small, middle]) {
-      for (const id of ['cnc5', ...LINE_MODULES]) {
+      for (const id of ['cnc5', LINE_MODULES[0] ?? '']) {
         expect(canBuy(state, id), `${state.unit.areaM2} ${id}`).toEqual({ ok: false, reason: 'Needs the 800 m² unit' });
+      }
+      // Modules 2 to 6 come with the line and are never bought alone, in any unit (flipped in
+      // v89, CLAUDE.md T30 2.3.4).
+      for (const id of LINE_MODULES.slice(1)) {
+        expect(canBuy(state, id), `${state.unit.areaM2} ${id}`).toEqual({ ok: false, reason: 'It comes with the line' });
       }
       placeEquipment(state, 'sprayBooth', { variantId: 'standard', x: 12, y: 2, id: 'kit-booth' });
       for (const id of STORE_KIT) expect(canBuy(state, id), `${state.unit.areaM2} ${id}`).toEqual({ ok: true, reason: '' });
     }
   });
 
-  it('names a unit for the five axis CNC and the five modules and no other family, so the catalogue tests pass over those six only', () => {
+  it('names a unit for the five axis CNC and the six modules and no other family, so the catalogue tests pass over those seven only', () => {
     const named = EQUIPMENT_SPECS.filter((spec) => spec.minUnitM2 !== undefined).map((spec) => spec.id);
     expect(named.sort()).toEqual(['cnc5', ...LINE_MODULES].sort());
     for (const id of named) expect(findSpec(id)?.minUnitM2, id).toBe(800);
@@ -153,9 +160,9 @@ describe('a sheet job in a hall with all of it (CLAUDE.md T29 2.5.3, section 7)'
     const plain = bigUnit();
     // All of it: the five axis CNC, the robot, the whole line running under two engineers, and
     // both stores.
-    const full = withEngineers(withLine(bigUnit({ cnc5: true, stores: true }), 5), 2);
+    const full = withEngineers(withLine(bigUnit({ cnc5: true, stores: true }), 6), 2);
     placeEquipment(full, 'sprayRobot', { variantId: 'standard', x: 36, y: 6, id: 'kit-robot' });
-    expect(lineLevel(full)).toBe(5);
+    expect(lineLevel(full)).toBe(6);
     for (const finish of ['laminate', 'lacquer'] as const) {
       const job = stagedJob(100, 'sheet', false, finish, true, false);
       const before = stagePlanFor(plain, job);
@@ -169,22 +176,23 @@ describe('a sheet job in a hall with all of it (CLAUDE.md T29 2.5.3, section 7)'
   });
 });
 
-describe('the line s purchase, in its order and on one morning (CLAUDE.md T29 2.9.2, section 7)', () => {
-  it('asks what a module requires before one of each, and one of each before the cash', () => {
-    // Module 2 standing with no module 1 (a save could hold it): its requires is asked first.
+describe('the line s purchase, in its order and on one morning (flipped in v89: CLAUDE.md T30 2.3.4, section 7)', () => {
+  it('asks for nothing beside it, refuses a module alone, and asks one line before the cash', () => {
+    // Module 2 standing with no module 1 (a save could hold it): it comes with the line.
     const gap = withLine(bigUnit({ cnc5: true, stores: true }), 0);
-    placeEquipment(gap, 'windowLine2', { x: 11, y: 14, id: 'kit-line-2' });
-    expect(canBuy(gap, 'windowLine2')).toEqual({ ok: false, reason: 'Needs Window line, module 1 first' });
-    // Module 1 on order and no money left: one of each is asked before the cash.
+    placeEquipment(gap, 'windowLine2', { x: 8, y: 14, id: 'kit-line-2' });
+    expect(canBuy(gap, 'windowLine2')).toEqual({ ok: false, reason: 'It comes with the line' });
+    // The line on order and no money left: one line to a company is asked before the cash.
     const poor = bigUnit({ cnc5: true, stores: true });
     expect(placeEquipmentOrder(poor, 'windowLine1').ok).toBe(true);
     poor.cash = 0;
-    expect(canBuy(poor, 'windowLine1')).toEqual({ ok: false, reason: 'The line has this module' });
+    expect(canBuy(poor, 'windowLine1')).toEqual({ ok: false, reason: 'The company has its production line' });
   });
 
-  it('stands all five on the one morning they are due, ordered in one morning, and none the evening before', () => {
+  it('stands all six on the one morning they are due, ordered in one click, and none the evening before', () => {
     let state = bigUnit({ cnc5: true, stores: true });
-    for (const id of LINE_MODULES) expect(placeEquipmentOrder(state, id).ok, id).toBe(true);
+    expect(placeEquipmentOrder(state, 'windowLine1').ok).toBe(true);
+    expect(state.onOrder.filter((item) => LINE_MODULES.includes(item.specId))).toHaveLength(6);
     const due = state.onOrder.find((item) => item.specId === 'windowLine1')?.dueDay ?? 0;
     let guard = 0;
     while (state.clock.day < due - 1 && guard < 80) {
@@ -194,13 +202,13 @@ describe('the line s purchase, in its order and on one morning (CLAUDE.md T29 2.
     expect(lineModules(state)).toBe(0);
     state = nextDay(state);
     expect(state.clock.day).toBe(due);
-    expect(lineModules(state)).toBe(5);
+    expect(lineModules(state)).toBe(6);
   });
 });
 
 describe('every covered stage at its level (CLAUDE.md T29 2.9.5, 2.9.6, section 7)', () => {
-  it('puts the Planing on module 1 at every level and the Pressing on module 4 at 4 and 5, at the factor times 1.12', () => {
-    for (let level = 1; level <= 5; level += 1) {
+  it('puts the Planing on module 1 at every level and the Pressing on module 4 from 4, at the factor times 1.12', () => {
+    for (let level = 1; level <= 6; level += 1) {
       const state = withEngineers(withLine(bigUnit({ cnc5: true, stores: true }), level), level > 3 ? 2 : 1);
       const plan = stagePlanFor(state, windowJob());
       const factor = LINE_FACTOR[level] ?? 1;
@@ -218,7 +226,7 @@ describe('every covered stage at its level (CLAUDE.md T29 2.9.5, 2.9.6, section 
   });
 
   it('says Too few of no module with thirty three men on timber work and the whole line', () => {
-    const state = withEngineers(withLine(bigUnit({ cnc5: true, stores: true }), 5), 2);
+    const state = withEngineers(withLine(bigUnit({ cnc5: true, stores: true }), 6), 2);
     const enquiry = placeEnquiry(state, {
       templateId: 'sashWindows',
       name: 'Sash windows',
@@ -241,8 +249,10 @@ describe('every covered stage at its level (CLAUDE.md T29 2.9.5, 2.9.6, section 
     expect(MACHINE_CAPACITY.windowLine1?.standard).toBe(33);
     const lines = outputBreakdown(taken).lines.map((line) => line.label);
     expect(lines.filter((label) => label.startsWith('Too few line module'))).toEqual([]);
-    // The booths are what such a hall is short of (CLAUDE.md T29 section 8).
-    expect(lines.some((label) => label.startsWith('Too few booths'))).toBe(true);
+    // The booths were what such a hall was short of (CLAUDE.md T29 section 8); from v89 module 5
+    // does the Finishing of the whole line's windows, and its men are counted at its thirty three
+    // places and not at the booths' (flipped: CLAUDE.md T30 2.5).
+    expect(lines.some((label) => label.startsWith('Too few booths'))).toBe(false);
   });
 });
 

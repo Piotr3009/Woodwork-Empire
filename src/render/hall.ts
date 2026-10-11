@@ -6,6 +6,10 @@ import {
   CNC_TOOL_CHANGER_SPRITE,
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
+  LINE_MODULES,
+  LINE_PALLET_LAYOUT,
+  LINE_PALLET_WINDOWS,
+  MACHINE_WORK_SHEETS,
   GATE_CROWD_LIMIT,
   NO_AIR_LINE,
   GATE_LAYOUT,
@@ -32,6 +36,7 @@ import {
   machineIsOut,
   machinesDueService,
   machinesInService,
+  isLineModule,
   isServiced,
   sawdustPiles,
   serviceIsDue,
@@ -116,6 +121,7 @@ import {
   tileToScreen,
 } from './iso';
 import { formatCalendarDay, formatTime, isBreak } from '../engine/clock';
+import { plural } from '../engine/text';
 import { compressorIsLow, extractionCheck, hallAirCheck } from '../engine/media';
 import {
   sheetRoleFor,
@@ -125,6 +131,7 @@ import {
   characterTop,
 } from './characters';
 import {
+  SPRITE_DIR,
   SPRITE_SCALE,
   contactShadow,
   mirrorNeeded,
@@ -132,9 +139,11 @@ import {
   placeholderKindFor,
   spriteBox,
   spriteFiles,
+  sheetArt,
   spriteImage,
   spriteUrl,
 } from './sprites';
+import { lineMakesWindows, runningLineContract } from '../engine/lineContract';
 import { placeholder } from './placeholder';
 import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
@@ -881,6 +890,55 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
   return NO_FX;
 }
 
+/** True while a module of the line plays its working motion: only while the clock runs (the test
+ *  the hall's sound makes: a speed, no card open, the game not over), and then, while the line's
+ *  contract runs, all six in the minutes the line makes windows, and without it a module the hall
+ *  already reads as in use, a man drawn at it this minute, the one test the blades, the chips and
+ *  the breathing read, so what moves and what is seen are one picture (CLAUDE.md T30 2.11)
+ *  [TUNE: chat]. */
+export function moduleWorks(state: GameState, item: Equipment): boolean {
+  if (!isLineModule(item.specId)) return false;
+  if (!(state.speed > 0 && state.activeEvent === null && state.gameOver === null)) return false;
+  if (runningLineContract(state) !== null) return lineMakesWindows(state);
+  return machineInUse(state, item);
+}
+
+/** The work sheet of this machine's class when the art side has delivered it, or null. */
+function workSheetFile(item: Equipment, files: readonly string[]): string | null {
+  const name = `${item.spriteKey}.${item.variantId}.work.sheet.png`;
+  return MACHINE_WORK_SHEETS[item.specId] !== undefined && files.includes(name) ? name : null;
+}
+
+/** A working module drawn from its sheet, in the box, on the anchor and over the shadow its picture
+ *  has (CLAUDE.md T30 2.11). */
+function workingArt(item: Equipment, stands: { x: number; y: number; width: number; depth: number; height: number }, files: readonly string[]): string {
+  const file = workSheetFile(item, files);
+  const sheet = MACHINE_WORK_SHEETS[item.specId];
+  if (file === null || sheet === undefined) return '';
+  const at = spriteBox(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  return contactShadow(stands.x, stands.y, stands.width, stands.depth) + sheetArt(`${SPRITE_DIR}/${file}`, at, sheet, item.specId);
+}
+
+/** The windows standing on module 6's pallet, one to nine, drawn by the one overlay of that many
+ *  over the module, in its box and on its anchor and in its own drawable, so nothing is painted
+ *  between them; none on an empty pallet. The tenth sends the pallet to the gate, so `stack10` is on
+ *  disk and waits for the art side's forklift (CLAUDE.md T30 2.12). Whether the module plays its
+ *  sheet or stands on its picture. */
+function palletStack(
+  state: GameState,
+  item: Equipment,
+  stands: { x: number; y: number; width: number; depth: number; height: number },
+  files: readonly string[],
+): string {
+  if (item.specId !== LINE_MODULES[LINE_MODULES.length - 1]) return '';
+  const windows = state.windowLine.onPallet;
+  if (windows < 1 || windows >= LINE_PALLET_WINDOWS) return '';
+  const file = `${item.spriteKey}.${item.variantId}.stack${String(windows).padStart(2, '0')}.png`;
+  if (!files.includes(file)) return '';
+  const at = spriteBox(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  return spriteImage(`${SPRITE_DIR}/${file}`, at, `class="pallet-stack" data-stack="${windows}"`);
+}
+
 /** How tall a seat or a locker is drawn on the canteen roof, in metres, and how far its box is
  *  inset in its cell [TUNE]: small enough to read as a plan of what is in there and not as kit
  *  standing on the roof (CLAUDE.md T17 2.2). */
@@ -1589,6 +1647,9 @@ export interface Ghost {
   reason: string;
   /** Which way the next drop will stand it (T10 3.8; CLAUDE.md T22 2.11). */
   orientation?: Orientation;
+  /** The pieces of a thing that is dragged whole: the line's six modules, each drawn in the ghost
+   *  of the 36 m by 3 m (CLAUDE.md T30 2.4). */
+  parts?: ReadonlyArray<{ x: number; y: number; width: number; depth: number }>;
 }
 
 /** A view that is expensive to build. The shell carries the pictures, which are megabytes: a
@@ -1750,11 +1811,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // The one machine of each family too few for the crew that wears the mark: the first of it with
   // places, in the order they are filled (PIOTR, 24.09: "an exclamation at the saw"; v53).
   const markedMachines = new Map<string, string>();
-  // The hall's shortages, reckoned once for the whole picture: every machine's hover below reads
+  // The hall's shortages, reckoned once for the whole picture: every machine's tooltip below reads
   // its family's line off this one list, where each machine asked the whole hall again and a big
   // hall stuttered (PIOTR, 10.10; v87).
   const hallShortages = placeShortages(state);
-  // Who is at which machine, read once for the picture and handed to every machine's hover, as
+  // Who is at which machine, read once for the picture and handed to every machine's tooltip, as
   // the shortages are (v88).
   const atPlaces = menAtPlaces(state);
   // Nothing is marked while the hall is at its dinner, a machine no more than a man (T22 2.5).
@@ -1830,20 +1891,23 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
         `class="clickable${fx.className}">` +
         `<title>${escapeText(tooltip)}</title>` +
-        objectArt({
-          files,
-          spriteKey: artKeyOf(item, headed, files),
-          tier: item.variantId,
-          orientation: item.orientation,
-          x: stands.x,
-          y: stands.y,
-          width: stands.width,
-          depth: stands.depth,
-          height: stands.height,
-          fill,
-          shade,
-          label: name,
-        }) +
+        (isLineModule(item.specId) && moduleWorks(state, item) && workSheetFile(item, files) !== null
+          ? workingArt(item, stands, files)
+          : objectArt({
+              files,
+              spriteKey: artKeyOf(item, headed, files),
+              tier: item.variantId,
+              orientation: item.orientation,
+              x: stands.x,
+              y: stands.y,
+              width: stands.width,
+              depth: stands.depth,
+              height: stands.height,
+              fill,
+              shade,
+              label: name,
+            })) +
+        palletStack(state, item, stands, files) +
         (unconnected ? notConnectedLabel(stands) : '') +
         (sheetCapacityOf(item) > 0 ? rackCount(item, sheetsOnRack(state, item)) : '') +
         (boardCapacityOf(item) > 0 ? rackCount(item, boardsOnStore(state, item)) : '') +
@@ -2089,6 +2153,35 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
+  // The full pallets of the line's windows wait for the client just past the end of the gate lane,
+  // drawn as the finished goods are: one box a pallet in the kit stock colours, two at the most, and
+  // one label hung under the front of their floor so that it does not sit on the finished goods'.
+  // Nothing holds the cells; until the art side's pallet and forklift come, no forklift is drawn
+  // (CLAUDE.md T30 2.8) [TUNE: chat].
+  const pallets = state.windowLine.palletsAtGate;
+  if (pallets > 0) {
+    const gate = LINE_PALLET_LAYOUT;
+    const shown = Math.min(pallets, gate.width);
+    for (let index = 0; index < shown; index += 1) {
+      const x = gate.x + index;
+      const faces = boxPolygons(x, gate.y, 1, gate.depth, gate.height);
+      drawables.push({
+        depth: depthKey(x, gate.y),
+        svg:
+          `<g data-line-pallet="${index}"><title>Windows for collection</title>` +
+          box(faces, 'var(--kit-stock)', 'var(--kit-stock-dark)') +
+          '</g>',
+      });
+    }
+    drawables.push({
+      depth: depthKey(gate.x, gate.y) + 0.3,
+      svg: label(
+        centreOf(gate.x, gate.y, gate.width, gate.depth),
+        `Windows for collection: ${plural(pallets, 'pallet', 'pallets')}`,
+      ),
+    });
+  }
+
   drawables.push(...sawdust(state));
   drawables.sort((left, right) => left.depth - right.depth);
   placeFigures(drawables);
@@ -2136,6 +2229,13 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       `<g data-ghost="1">` +
         `<polygon points="${points(footprintPolygon(ghost.x, ghost.y, ghost.width, ghost.depth))}" ` +
         `fill="none" stroke="${colour}" stroke-width="3" />` +
+        (ghost.parts ?? [])
+          .map(
+            (part) =>
+              `<polygon data-ghost-part="1" points="${points(footprintPolygon(part.x, part.y, part.width, part.depth))}" ` +
+              `fill="none" stroke="${colour}" stroke-width="1" />`,
+          )
+          .join('') +
         `<text x="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).x)}" ` +
         `y="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).y)}" ` +
         `text-anchor="middle" class="iso-label ghost-label" fill="${colour}">` +

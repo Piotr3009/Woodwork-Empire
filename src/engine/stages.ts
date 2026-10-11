@@ -216,14 +216,16 @@ export function stageSpeed(
   // The CNC's own head times the hall's pace at it, like every family (CLAUDE.md T25 2.4).
   if (stage === 'cnc') return { speed: cncFactor(state) * hallPace(state, 'cnc'), byHand: false };
   const family = stageFamilyIn(state, job, stage);
-  // While the line runs every stage of a timber job but the Finishing goes its factor faster, the
-  // stages it does not cover among them: the line is the department's flow, and what it feeds is
-  // fed faster (CLAUDE.md T29 2.9.6) [TUNE: chat].
-  const line = job.timber === true && stage !== 'finishing' ? lineFactor(state) : 1;
+  // While the line runs every stage of a timber job goes its factor faster, the stages it does not
+  // cover among them: the line is the department's flow, and what it feeds is fed faster
+  // (CLAUDE.md T29 2.9.6) [TUNE: chat]. The Finishing too while module 5 does it, and below that
+  // level the Finishing is at the booth with no factor, as on v88 (CLAUDE.md T30 2.5).
+  const onTheLine = family !== null && isLineModule(family);
+  const line = job.timber === true && (stage !== 'finishing' || onTheLine) ? lineFactor(state) : 1;
   // A timber job's Moulding on the five axis CNC, or on the line's own CNC of module 2, goes at
   // four times the hall's pace at it, the class's pace on top, as the CNC's own way with the
   // Cutting of a sheet job (CLAUDE.md T29 2.6, 2.9.5).
-  if (family === 'cnc5' || (stage === 'moulding' && family !== null && isLineModule(family))) {
+  if (family === 'cnc5' || (stage === 'moulding' && onTheLine)) {
     return { speed: CNC5_STAGE_FACTOR * hallPace(state, family) * line, byHand: false };
   }
   if (family === null) return { speed: line, byHand: false };

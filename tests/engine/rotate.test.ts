@@ -247,9 +247,13 @@ describe('what turning does to the picture', () => {
     // Ninety six from v83: the twenty one turns of the timber department's machines, the cross cut
     // saws, the planers, the sanders, the frame presses and the glue table (CLAUDE.md T28 2.11).
     // One hundred and seven from v84: the eleven turns of the three five axis CNCs, the spraying
-    // robot, the line's five modules and the two timber stores (CLAUDE.md T29 2.4).
+    // robot, the line's five modules and the two timber stores (CLAUDE.md T29 2.4). One hundred
+    // and eight from v89: the line's six modules of Turn 30, the sixth new (CLAUDE.md T30 2.2). A
+    // work sheet (`.work.sheet.png`) and a stack overlay (`.stackNN.png`) are neither a class's
+    // picture nor a turned one, and none of them is counted here.
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    expect(turned).toHaveLength(107);
+    expect(turned).toHaveLength(108);
+    expect(turned.some((name) => name.includes('.work.sheet') || /\.stack\d\d/.test(name))).toBe(false);
     for (const family of ['cnc', 'cncToolChanger', 'compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'sprayBooth', 'tableSaw', 'toolCabinet', 'workbench']) {
       for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
         expect(turned, `${family}.${tier}`).toContain(`${family}.${tier}.r.png`);

@@ -11,6 +11,8 @@ import {
   CONTRACT_MAX_JOINERS,
   EQUIPMENT_SPECS,
   HIRING_SPECS,
+  LINE_MODULES,
+  LINE_PRICE,
   LOCKER_SLOT_LAYOUT,
   PRODUCT_TEMPLATES,
   SOUND_VOLUME_DEFAULT,
@@ -21,7 +23,7 @@ import {
   WORKER_RATES,
 } from './constants';
 import { nextWorkingDay } from './clock';
-import { receive } from './economy';
+import { formatMoney, receive } from './economy';
 import { andList, inWords } from './text';
 import { layRunsAgain } from './premises';
 import { standsOutsideTheHall } from './walk';
@@ -34,7 +36,9 @@ import {
   standsBehindTheWall,
   standsOutside,
 } from './layout';
-import { isSold } from './machines';
+import { findSpec, isLineModule, isSold } from './machines';
+import { queueEvent } from './events';
+import { emptyWindowLine } from './lineContract';
 import { planPlaces } from './production';
 import { rolesForTask } from './tasks';
 import type { Equipment, GameState, OnOrderItem, Orientation, TaskKind, WorkerRole, WorkerTier } from './types';
@@ -1184,6 +1188,57 @@ function liftToVersion42(state: Raw): void {
   state.version = 42;
 }
 
+/** Version 42 to 43 (v89, Turn 30). The production line is bought whole from tonight, and its own
+ *  state is one field: written here with every part's default, the parts its contract and its
+ *  upgrades will use among them, so this is the one lift (CLAUDE.md T30 section 4). Turn 29's
+ *  modules, bought one by one, are taken back on the whole state after the lifts, because the money
+ *  goes back through the books (`takeTheLineBack`). Nothing else of a save is touched. */
+function liftToVersion43(state: Raw): void {
+  if (!isRecord(state.windowLine)) state.windowLine = emptyWindowLine();
+  state.version = 43;
+}
+
+/** Turn 29's modules of the line, bought one by one, taken back and their money given back (PIOTR,
+ *  11.10: "one whole"; CLAUDE.md T30 section 4). Every module that stands unsold goes for what it
+ *  cost, every order for what was paid for it, on one line of the books; a module already sold and
+ *  waiting for its van is left for the van, which pays its half the next morning. Whatever points
+ *  at what is taken goes with it. The player is told once, by a card at the first settle, and a save
+ *  with nothing taken back gets none. The engineers stay. */
+function takeTheLineBack(state: GameState): void {
+  const owned = state.equipment.filter((item) => isLineModule(item.specId) && !isSold(item));
+  const ordered = state.onOrder.filter((item) => isLineModule(item.specId));
+  if (owned.length === 0 && ordered.length === 0) return;
+  const gone = new Set([...owned.map((item) => item.id), ...ordered.map((item) => item.id)]);
+  const back =
+    owned.reduce((total, item) => total + item.purchasePrice, 0) +
+    ordered.reduce((total, item) => total + item.pricePaid, 0);
+  // The money first: a fragment of a state with no books to pay it back through stops here, with
+  // nothing of it taken.
+  receive(state, 'equipment', 'Production line refunded: it is sold whole now', back);
+  state.equipment = state.equipment.filter((item) => !gone.has(item.id));
+  state.onOrder = state.onOrder.filter((item) => !gone.has(item.id));
+  if (Array.isArray(state.movedItems)) state.movedItems = state.movedItems.filter((moved) => !gone.has(moved.itemId));
+  if (Array.isArray(state.pipes)) state.pipes = state.pipes.filter((run) => !gone.has(run.equipmentId));
+  if (Array.isArray(state.gates)) state.gates = state.gates.filter((id) => !gone.has(id));
+  // One sentence a thing taken back, in the line's order [TUNE: chat: the words].
+  const name = (specId: string): string => findSpec(specId)?.name ?? specId;
+  const lines = [
+    ...owned.map((item) => ({ specId: item.specId, text: `${name(item.specId)} is taken back and ${formatMoney(item.purchasePrice)} is back in the bank.` })),
+    ...ordered.map((item) => ({ specId: item.specId, text: `Your order for ${name(item.specId)} is cancelled and ${formatMoney(item.pricePaid)} is back in the bank.` })),
+  ].sort((left, right) => left.specId.localeCompare(right.specId));
+  const engineers = state.workers.some((worker) => worker.role === 'lineEngineer');
+  queueEvent(state, {
+    kind: 'lineRefunded',
+    title: 'The production line is sold whole',
+    body: [
+      `The line is bought as one now: ${inWords(LINE_MODULES.length)} modules for ${formatMoney(LINE_PRICE)}.`,
+      ...lines.map((entry) => entry.text),
+      ...(engineers ? ['Your line engineers stay on the books.'] : []),
+    ].join(' '),
+    choices: [{ id: 'ok', label: 'Right' }],
+  });
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -1215,6 +1270,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   39: liftToVersion40,
   40: liftToVersion41,
   41: liftToVersion42,
+  42: liftToVersion43,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -1270,6 +1326,14 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       standThePlantBehindTheWall(lifted, 'pelletiser');
     } catch {
       // Not a whole hall: no wall to stand it behind.
+    }
+  }
+  // Turn 29's modules of the line taken back, and their money given back (v89).
+  if (version < 43 && Array.isArray(lifted.equipment) && Array.isArray(lifted.onOrder)) {
+    try {
+      takeTheLineBack(lifted);
+    } catch {
+      // Not a whole hall, with no books to pay it back through.
     }
   }
   // Who has a place, worked out the moment the save is open rather than left for the first

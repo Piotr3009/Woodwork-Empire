@@ -60,13 +60,14 @@ import {
   crewAtFamily,
   hallPlaces,
   isLineModule,
+  lineSalePrice,
   machineShortWord,
   placeShortages,
   serviceCallCheck,
   serviceDueIn,
   toolSlotsLine,
 } from '../engine/machines';
-import { BY_HAND_DURATION_FACTOR, CAPACITY_FAMILIES, VAN_CLASSES } from '../engine/constants';
+import { BY_HAND_DURATION_FACTOR, CAPACITY_FAMILIES, LINE_MODULES, LINE_PRICE, VAN_CLASSES } from '../engine/constants';
 import { slotsInUseIn } from '../engine/staff';
 import { nextSpriteOrientation } from '../render/sprites';
 import { cancelFields, orderName, orderProgress } from '../engine/orders';
@@ -174,8 +175,11 @@ export function renderCatalogue(
  *  (CLAUDE.md T7 3.7). */
 function renderFolders(state: GameState, filter: string, tab: CatalogueTab): string {
   const needle = filter.trim().toLowerCase();
-  // A family two trades share is a folder under both tabs (CLAUDE.md T13 3.13).
-  const inTab = EQUIPMENT_SPECS.filter((spec) => spec.tab === tab || spec.sharedTab === tab);
+  // A family two trades share is a folder under both tabs (CLAUDE.md T13 3.13). The line is one
+  // folder, module 1's: modules 2 to 6 come with it and have none (CLAUDE.md T30 2.3.3).
+  const inTab = EQUIPMENT_SPECS.filter(
+    (spec) => (spec.tab === tab || spec.sharedTab === tab) && (!isLineModule(spec.id) || spec.id === LINE_MODULES[0]),
+  );
   if (inTab.length === 0) return emptyLine('Nothing here yet.');
   const rows = inTab
     .filter(
@@ -187,10 +191,13 @@ function renderFolders(state: GameState, filter: string, tab: CatalogueTab): str
     .map((spec) => {
       const count = countOf(state, spec.id);
       const owned = count > 0 ? `<span class="badge badge-owned">Owned ${count}</span>` : '';
+      // The line's folder is priced whole, its module 1's own price being only its share
+      // (CLAUDE.md T30 2.3.3).
+      const from = isLineModule(spec.id) ? LINE_PRICE : spec.price;
       return (
         `<div class="card folder" data-folder="${spec.id}">` +
         `<div class="card-main"><h3>${escapeHtml(spec.folder)} ${owned}</h3>` +
-        `<p class="figures"><strong>from ${money(spec.price)}</strong> · ` +
+        `<p class="figures"><strong>from ${money(from)}</strong> · ` +
         `${plural(spec.variants.length, 'class', 'classes')} · ` +
         `${escapeHtml(spec.effect)}</p>` +
         `</div><div class="card-action">` +
@@ -347,6 +354,10 @@ function sellAction(state: GameState, item: Equipment, sellConfirm: string | nul
   if (!check.ok) return `<span class="reason">Cannot sell it: ${escapeHtml(check.reason)}</span>`;
   if (sellConfirm === item.id) {
     return button('sellMachine', 'Confirm sale', `data-id="${item.id}" data-confirm="1"`);
+  }
+  // A module's tile sells the whole line, for the six halves (CLAUDE.md T30 2.3.5).
+  if (isLineModule(item.specId)) {
+    return button('sellMachine', `Sell the line for ${money(lineSalePrice(state))}`, `data-id="${item.id}"`);
   }
   return button('sellMachine', `Sell for ${money(salePriceFor(item))}`, `data-id="${item.id}"`);
 }

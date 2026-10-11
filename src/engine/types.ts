@@ -179,8 +179,8 @@ export type WorkerRole =
   | 'draftsman'
   | 'salesman'
   /** The production line's engineer, one grade: one keeps up to three modules running and two keep
-   *  all five. He builds nothing, takes no job, is never drawn on the hall and is not one of the
-   *  men a manager carries (PIOTR, 05.10; CLAUDE.md T29 2.8). */
+   *  all six. He builds nothing, takes no job, is never drawn on the hall and is not one of the
+   *  men a manager carries (PIOTR, 05.10; CLAUDE.md T29 2.8, T30 2.3.6). */
   | 'lineEngineer';
 
 /** Which shift a man on the floor works. The second one runs after the day shift, at the night
@@ -259,8 +259,8 @@ export type EquipmentTab =
   | 'computers'
   | 'cnc'
   | 'cncCentre'
-  /** The production line's five modules, a twelfth tab beside the eleven Piotr named (CLAUDE.md
-   *  T29 2.9.1) [TUNE: chat]. */
+  /** The production line, a twelfth tab beside the eleven Piotr named (CLAUDE.md T29 2.9.1)
+   *  [TUNE: chat], holding the line's one folder from Turn 30 (CLAUDE.md T30 2.3.3). */
   | 'line'
   | 'handling'
   | 'storage';
@@ -767,6 +767,41 @@ export interface ClientCall {
   retry: boolean;
 }
 
+/** The line's own contract: the windows it makes for a window company, a record of its own and
+ *  never one of `state.contracts` (CLAUDE.md T30 2.6). Offered while its card waits for an answer,
+ *  active from the minute it is taken. */
+export interface LineContract {
+  status: 'offered' | 'active';
+  /** The day it was offered, and from the click the day it was taken. */
+  startDay: number;
+  /** The windows made since the week it runs in began, and the first day of that week. */
+  windowsThisWeek: number;
+  weekStartDay: number;
+  /** Every window made on it, the money it brought in and the timber and glass it cost. */
+  windowsMade: number;
+  revenue: number;
+  materialCost: number;
+}
+
+/** One upgrade of the line, fitted or on its way, and the day it is fitted (CLAUDE.md T30 2.10). */
+export interface LineUpgrade {
+  id: string;
+  fittedOnDay: number;
+}
+
+/** The line's own state, everything of it that is not kit on the floor (CLAUDE.md T30 section 4):
+ *  its contract, the day it may be offered again, the minutes into the window in hand, the windows
+ *  on module 6's pallet, the full pallets waiting at the gate, and the upgrades. */
+export interface WindowLineState {
+  contract: LineContract | null;
+  /** Null until the first offer; a week on whenever an offer is turned down or a contract ends. */
+  nextOfferDay: number | null;
+  minutes: number;
+  onPallet: number;
+  palletsAtGate: number;
+  upgrades: LineUpgrade[];
+}
+
 /** One item the player has dragged, and the tile it stood on before he started. An item put back
  *  exactly where it was is taken off this list: it was never moved (CLAUDE.md T4 3.5). */
 export interface MovedItem {
@@ -915,7 +950,15 @@ export type GameEventKind =
   /** The first settle of a save that had more than four joiners on a standing contract: the men
    *  past the first four were taken off it by the lift, and this says who (CLAUDE.md T29
    *  section 4). */
-  | 'contractsTrimmed';
+  | 'contractsTrimmed'
+  /** The first settle of a save that held Turn 29's modules of the line, bought one by one: they
+   *  were taken back by the lift and their money given back, and this says what (CLAUDE.md T30
+   *  section 4). */
+  | 'lineRefunded'
+  /** The open of a working day with the line standing whole and two engineers on the books: a
+   *  window company offers to take every window it makes (CLAUDE.md T30 2.6). Two choices, so it
+   *  has no cross and Escape does not close it. */
+  | 'lineContractOffered';
 
 export interface GameEventChoice {
   id: string;
@@ -1498,10 +1541,17 @@ export interface GameState {
   /** How often the end of day summary is put in front of the player (CLAUDE.md T4 3.6). */
   summaryCadence: SummaryCadence;
   gameOver: GameOver | null;
+  /** The production line's own state: its contract, its windows and its upgrades (CLAUDE.md T30
+   *  section 4). */
+  windowLine: WindowLineState;
 }
 
 export type GameAction =
   | { type: 'SET_SPEED'; speed: Speed }
+  /** The line's own contract ended at one click, asking nothing (CLAUDE.md T30 2.6). */
+  | { type: 'END_LINE_CONTRACT' }
+  /** An upgrade of the line bought, fitted ten working days on (CLAUDE.md T30 2.10). */
+  | { type: 'BUY_LINE_UPGRADE'; upgradeId: string }
   /** Run the clock at 4x until the task the owner is out on is over (CLAUDE.md T8 3.3). */
   | { type: 'SKIP_AHEAD' }
   | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }
