@@ -94,3 +94,11 @@ comes in over the last piece's last metre, so the join at the end never shows th
 taken, section 10's choices with what was built, what was found and left, the questions for Piotr.
 `docs/art/REQUESTS-T31.md`: nothing new asked tonight; S1 (the outside sheet store) named for the next
 turn, the forklift family's own pictures for Piotr, and what may sit badly for E4 to look at.
+
+**T31-E2 Scenarios.** `tests/scenarios/turn31.test.ts`, (hhh) to (lll), 16 tests: the line's material
+ordered by the player and by the office, the books after a played month with an engineer away a day,
+the lane against a rack and a save's bench, the hall extended three times, and a played year of three
+sheet contracts (seed 20261012 chosen to show a loss and a cut: five losses, two cuts) with the 34
+draws the suite pinned before tonight asserted never to come up. The figures that moved were re-pinned
+in their tasks with one line of reason each (B1: turn30's material and minutes; C2: turn29's and
+turn30's rack moved off the lane, the refusal's words); none moved for D1.
