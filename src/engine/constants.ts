@@ -198,7 +198,7 @@ export const STATE_VERSION = 43;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v89';
+export const APP_VERSION = 'v90';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -5383,13 +5383,21 @@ export interface WorkSheetFigures {
   loop: boolean;
 }
 
+/** The frames a second the art side drew the line's motion at, in its JSON: twelve of them are a
+ *  loop of two seconds (CLAUDE.md T30 2.11). */
+const LINE_SHEET_ART_FPS = 6;
+/** How many times slower than the art side drew it the game plays the line's motion [PIOTR, 11.10:
+ *  "the graphics run too fast, one window every two hours"; "four times slower at the least"]
+ *  (v90): the twelve frames are a loop of eight seconds. */
+export const LINE_SHEET_SLOWDOWN = 4;
+
 /** The art side's one set of figures for the six modules' sheets, written once from its JSON (the
- *  six JSONs are kept in docs/art/pack-1110/ and not served): twelve frames, six a second, a loop
- *  of two seconds, cells of 448 by 376 anchored at 296, 368 (PIOTR, 11.10: "put the animation
- *  pictures into the code"; CLAUDE.md T30 2.11). */
+ *  six JSONs are kept in docs/art/pack-1110/ and not served): twelve frames, cells of 448 by 376
+ *  anchored at 296, 368, played `LINE_SHEET_SLOWDOWN` times slower than drawn (PIOTR, 11.10: "put
+ *  the animation pictures into the code"; CLAUDE.md T30 2.11; v90). */
 const LINE_WORK_SHEET: WorkSheetFigures = {
   frames: 12,
-  fps: 6,
+  fps: LINE_SHEET_ART_FPS / LINE_SHEET_SLOWDOWN,
   frameWidth: 448,
   frameHeight: 376,
   anchorX: 296,

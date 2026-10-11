@@ -73,7 +73,8 @@ describe('the modules at work (CLAUDE.md T30 2.11)', () => {
       const family = node.getAttribute('data-sheet') ?? '';
       expect(node.getAttribute('data-frame'), family).toBe('0');
       expect(node.getAttribute('data-frames'), family).toBe('12');
-      expect(node.getAttribute('data-fps'), family).toBe('6');
+      // Four times slower than the art side drew it from v90 (PIOTR, 11.10).
+      expect(node.getAttribute('data-fps'), family).toBe('1.5');
       expect(node.getAttribute('viewBox'), family).toBe('0 0 448 376');
       expect(node.querySelector('image')?.getAttribute('href'), family).toBe(`/sprites/${family}.standard.work.sheet.png`);
       // In the module's own drawable, in place of its picture.
@@ -82,13 +83,17 @@ describe('the modules at work (CLAUDE.md T30 2.11)', () => {
     }
     expect(MACHINE_WORK_SHEETS.windowLine1).toEqual({
       frames: 12,
-      fps: 6,
+      fps: 1.5,
       frameWidth: 448,
       frameHeight: 376,
       anchorX: 296,
       anchorY: 368,
       loop: true,
     });
+    // The loop is eight seconds: the art side's two, four times slower (PIOTR, 11.10; v90).
+    const sheet = MACHINE_WORK_SHEETS.windowLine1;
+    if (sheet === undefined) throw new Error('module 1 has its sheet');
+    expect(sheet.frames / sheet.fps).toBe(8);
   });
 
   it('draws them from their pictures once the clock stands, a card is open, or the line makes no window', () => {
@@ -193,7 +198,8 @@ describe('a page written mid loop (CLAUDE.md T30 2.11)', () => {
     const state = currentState();
     if (state === null) throw new Error('a game is wanted');
     Object.assign(state, working());
-    vi.spyOn(performance, 'now').mockReturnValue(1500);
+    // Six seconds into the loop: frame 9 at the game's 1.5 frames a second (v90).
+    vi.spyOn(performance, 'now').mockReturnValue(6000);
     render();
     const sheets = Array.from(root.querySelectorAll('[data-sheet]'));
     expect(sheets).toHaveLength(6);
@@ -234,11 +240,11 @@ describe('the frame loop (CLAUDE.md T30 2.11)', () => {
     render();
     const frames = (): Array<string | null> => Array.from(root.querySelectorAll('[data-sheet]')).map((node) => node.getAttribute('data-frame'));
     expect(frames()).toEqual(['0', '0', '0', '0', '0', '0']);
-    // Half a second on at 1x: no game minute is due, so no page is written, and the loop alone
-    // moves the sheets on.
+    // Seven tenths of a second on at 1x: no game minute is due, so no page is written, and the loop
+    // alone moves the sheets on, to frame 1 at the game's 1.5 frames a second (v90).
     const next = loop as FrameRequestCallback | null;
     if (next === null) throw new Error('the loop asked for a frame');
-    next(500);
-    expect(frames()).toEqual(['3', '3', '3', '3', '3', '3']);
+    next(700);
+    expect(frames()).toEqual(['1', '1', '1', '1', '1', '1']);
   });
 });

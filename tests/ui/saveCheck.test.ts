@@ -135,8 +135,9 @@ describe('a fresh game in this build', () => {
     // too: pictures and the logo only (PIOTR, 08.10). v86 is state 42 as well: the start screen only
     // (PIOTR, 08.10). v87 is state 42 too: the same game, counted faster (PIOTR, 10.10). So is
     // v88: the same game, drawn at a steadier pace (PIOTR, 10.10). v89 is Turn 30 and state 43:
-    // the line bought whole, and its own field (CLAUDE.md T30 section 4).
-    expect(APP_VERSION).toBe('v89');
+    // the line bought whole, and its own field (CLAUDE.md T30 section 4). v90 is state 43 too: the
+    // line's motion played slower (PIOTR, 11.10).
+    expect(APP_VERSION).toBe('v90');
     expect(STATE_VERSION).toBe(43);
   });
 

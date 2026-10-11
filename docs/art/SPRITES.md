@@ -698,8 +698,10 @@ place of its picture: the same box, the same anchor, the same shadow and name, a
 one cell by its view box over an `<image>` of the whole sheet, as a man's figure is drawn. It works
 only while the clock runs, and then, while the line's contract runs, all six in the minutes the line
 makes windows, and without the contract a module a man is drawn at this minute. The frame comes from
-real time, the same for all six, so the line plays in step, at its own 6 frames a second whatever
-the speed of the clock; the moment the clock stops every sheet holds, and the next page written
+real time, the same for all six, so the line plays in step, whatever the speed of the clock. The
+art side drew it at 6 frames a second, a loop of two seconds; from v90 the game plays it four times
+slower, 1.5 frames a second and a loop of eight seconds (`LINE_SHEET_SLOWDOWN`) [PIOTR, 11.10: "too
+fast", "four times slower at the least"]; the moment the clock stops every sheet holds, and the next page written
 draws the six from their pictures. Module 6 with one to nine windows on its pallet is drawn with
 the one overlay of that many over it, in the same box and drawable, whether it plays or stands.
 `stack10` is on disk and is not drawn: the tenth window sends the pallet to the gate, and it waits
