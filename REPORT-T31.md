@@ -115,3 +115,11 @@ a new morning in the app, the app's reset beside every `resetWalkers`, and the s
 hall's pieces are the 800 m² picture's own pixels (checked with numpy: every visible pixel equal, max
 difference 0), and no CSS token but `--lane-yellow` is new (`git diff 0d4dd31 --stat --
 src/ui/styles.css`: 3 insertions, the one token and its comment).
+
+**T31-E4 Look and shoot.** Sixteen pictures in `docs/report-t31/`, every one the game's own markup
+from its own render functions over states the engine built and played, shot in headless Chromium,
+each screen beside its nearest existing one (v91's own scene of the same company, built from the A1
+snapshot, for the hall, the forklift and the pallet; the Turn 30 screen or the same screen without
+tonight's part for the rest). The generators are in the session's scratchpad, not in the repo.
+Section "The pictures" below lists them and what each shows; "Seen in the pictures" in section 0 says
+what sits badly.
