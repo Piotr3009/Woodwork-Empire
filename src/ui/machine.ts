@@ -56,6 +56,9 @@ import {
   LINE_NAME,
   LINE_PRICE,
   LINE_ROW_TAIL,
+  LINE_UPGRADE_DAYS,
+  LINE_UPGRADE_MINUTES,
+  LINE_UPGRADES,
   SALE_FRACTION,
   SPRAY_ROBOT,
   SPRAY_ROBOT_FINISH_FACTOR,
@@ -71,9 +74,10 @@ import {
   bagsToM3,
   unitCostFactor,
 } from '../engine/constants';
+import type { LineUpgradeSpec } from '../engine/constants';
 import { boardCapacityOf, findVariant, insuranceForClass, isLineModule } from '../engine/machines';
 import { lineBox } from '../engine/layout';
-import { lineWindowEvery, lineWindowMinutes } from '../engine/lineContract';
+import { lineUpgradeCheck, lineWindowEvery, lineWindowMinutes } from '../engine/lineContract';
 import { andList, inWords } from '../engine/text';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
@@ -386,7 +390,10 @@ function lineLines(state: GameState): Line[] {
     ...rows,
     line(`With ${inWords(engineers)} engineers, timber work goes ${factor} times as fast`),
     line(`It can make windows on a contract of its own: one every ${lineWindowEvery(lineWindowMinutes(state))}`),
-    line(`Sold whole, for ${SALE_FRACTION === 0.5 ? 'half' : `${Math.round(SALE_FRACTION * 100)} per cent of`} its price`),
+    line(
+      `Sold whole, for ${SALE_FRACTION === 0.5 ? 'half' : `${Math.round(SALE_FRACTION * 100)} per cent of`} its ` +
+        'price; the upgrades go with it',
+    ),
   ];
 }
 
@@ -549,8 +556,33 @@ function lineCard(state: GameState, spec: EquipmentSpec, variant: EquipmentVaria
   );
 }
 
-/** The inside of the line's folder: the line's one card (CLAUDE.md T30 2.3.3). Every module's
- *  family opens on it, though only module 1's has a folder. */
+/** One upgrade's card, in the class card's classes, under the line's: its name, its price, its
+ *  sentence, what it takes off a window and when it is fitted, every figure from the constants, and
+ *  Buy, or the locked Buy with its reason under it as for kit (CLAUDE.md T30 2.10). No picture: the
+ *  upgrades are not drawn. */
+function upgradeCard(state: GameState, upgrade: LineUpgradeSpec): string {
+  const check = lineUpgradeCheck(state, upgrade.id);
+  const buy = check.ok
+    ? button('buyLineUpgrade', 'Buy', `data-id="${escapeHtml(upgrade.id)}"`)
+    : lockedButton('Buy', check.reason);
+  const effects = [
+    line(`Takes ${LINE_UPGRADE_MINUTES} minutes off each window of the line's contract`),
+    line(`Fitted ${LINE_UPGRADE_DAYS} working days after the order`),
+  ];
+  return (
+    `<div class="tile${check.ok ? '' : ' is-locked'}" data-upgrade="${escapeHtml(upgrade.id)}">` +
+    `<h3 class="tile-name">${escapeHtml(upgrade.name)}</h3>` +
+    `<div class="card-effects">${figureLines(effects)}</div>` +
+    `<div class="card-costs"><p class="tile-price">${money(upgrade.price)}</p></div>` +
+    `<p class="tile-text card-description">${escapeHtml(upgrade.sentence)}</p>` +
+    (check.ok ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
+    `<div class="tile-action">${buy}</div>` +
+    '</div>'
+  );
+}
+
+/** The inside of the line's folder: the line's one card, and the four upgrades under it (CLAUDE.md
+ *  T30 2.3.3, 2.10). Every module's family opens on it, though only module 1's has a folder. */
 function renderLine(state: GameState, filter: string): string {
   const spec = findSpec(LINE_MODULES[0] ?? '');
   const variant = spec?.variants[0];
@@ -558,7 +590,8 @@ function renderLine(state: GameState, filter: string): string {
   const head = `<p class="hint">${escapeHtml(spec.effect)}</p>`;
   const needle = filter.trim().toLowerCase();
   if (needle !== '' && !LINE_NAME.toLowerCase().includes(needle)) return `${head}<p class="empty">Nothing matches that.</p>`;
-  return `${head}<div class="tile-grid">${lineCard(state, spec, variant)}</div>`;
+  const upgrades = LINE_UPGRADES.map((upgrade) => upgradeCard(state, upgrade)).join('');
+  return `${head}<div class="tile-grid">${lineCard(state, spec, variant)}${upgrades}</div>`;
 }
 
 /** The inside of a folder: one card per class of the family, filtered by whatever is in the

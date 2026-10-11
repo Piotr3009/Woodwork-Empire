@@ -29,13 +29,17 @@ import {
   LINE_MATERIAL_SHARE,
   LINE_MODULES,
   LINE_PALLET_WINDOWS,
+  LINE_UPGRADE_DAYS,
+  LINE_UPGRADE_MINUTES,
+  LINE_UPGRADES,
   LINE_WINDOW_MINUTES,
+  LINE_WINDOW_MINUTES_MIN,
   LINE_WINDOW_PRICE,
   MINUTES_PER_WORKING_DAY,
   WORKING_DAYS_PER_WEEK,
 } from './constants';
-import { isBreak, isWorkingDay, weekOfDay } from './clock';
-import { charge, formatMoney } from './economy';
+import { addWorkingDays, formatCalendarDay, isBreak, isWorkingDay, weekOfDay } from './clock';
+import { canAfford, charge, formatMoney, pay } from './economy';
 import { queueEvent } from './events';
 import { lineLevel, lineStandsWhole } from './machines';
 import { crewHasGoneHome, lineEngineers } from './staff';
@@ -63,10 +67,51 @@ export function lineMaterialPerWindow(): number {
 }
 
 /** The minutes a window takes on the line's contract: the one answer the offer card, the running
- *  block and the line's minute read (CLAUDE.md T30 2.7). */
+ *  block and the line's minute read. Each upgrade fitted takes its fifteen minutes off, and never
+ *  below one window an hour (CLAUDE.md T30 2.7, 2.10). */
 export function lineWindowMinutes(state: GameState): number {
-  void state;
-  return LINE_WINDOW_MINUTES;
+  const fitted = state.windowLine.upgrades.filter((upgrade) => upgradeIsFitted(state, upgrade.fittedOnDay)).length;
+  return Math.max(LINE_WINDOW_MINUTES_MIN, LINE_WINDOW_MINUTES - LINE_UPGRADE_MINUTES * fitted);
+}
+
+/** True from the open of the day an upgrade is fitted on. */
+function upgradeIsFitted(state: GameState, fittedOnDay: number): boolean {
+  return state.clock.day >= fittedOnDay;
+}
+
+/** Whether an upgrade of the line can be bought, in the order its card's locked Buy reads: the
+ *  line first, then the one already on the list (on its way or fitted), then the cash. One of each
+ *  (CLAUDE.md T30 2.10). */
+export function lineUpgradeCheck(state: GameState, upgradeId: string): { ok: boolean; reason: string } {
+  const spec = LINE_UPGRADES.find((entry) => entry.id === upgradeId);
+  if (spec === undefined) return { ok: false, reason: 'Not in the catalogue' };
+  if (!lineStandsWhole(state)) return { ok: false, reason: 'Needs the production line' };
+  const held = state.windowLine.upgrades.find((upgrade) => upgrade.id === upgradeId);
+  if (held !== undefined) {
+    return upgradeIsFitted(state, held.fittedOnDay)
+      ? { ok: false, reason: 'Fitted' }
+      : { ok: false, reason: `Being fitted: ready on ${formatCalendarDay(held.fittedOnDay)}` };
+  }
+  if (!canAfford(state, spec.price)) return { ok: false, reason: 'Not enough cash' };
+  return { ok: true, reason: '' };
+}
+
+/** Buys an upgrade of the line: the cash leaves at the click on one line of its own, and it is
+ *  fitted ten working days on. Never called off and never sold on its own: it goes with the line
+ *  (CLAUDE.md T30 2.10). */
+export function buyLineUpgrade(state: GameState, upgradeId: string): { ok: boolean; reason: string } {
+  const check = lineUpgradeCheck(state, upgradeId);
+  if (!check.ok) return check;
+  const spec = LINE_UPGRADES.find((entry) => entry.id === upgradeId);
+  if (spec === undefined) return check;
+  pay(state, 'equipment', `Line upgrade: ${spec.name}`, spec.price);
+  state.windowLine.upgrades.push({ id: spec.id, fittedOnDay: addWorkingDays(state.clock.day, LINE_UPGRADE_DAYS) });
+  return check;
+}
+
+/** The line sold: its upgrades go with it, for nothing (CLAUDE.md T30 2.3.5, 2.10). */
+export function emptyLineUpgrades(state: GameState): void {
+  state.windowLine.upgrades = [];
 }
 
 /** A window's minutes in the words the card and the running block print: `2 hours`, `1 h 45 min`. */

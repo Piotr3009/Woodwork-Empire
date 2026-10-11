@@ -1780,6 +1780,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // The line's own contract, one click and nothing asked (CLAUDE.md T30 2.6).
       dispatch({ type: 'END_LINE_CONTRACT' });
       return;
+    case 'buyLineUpgrade':
+      // An upgrade of the line, paid at the click and fitted ten working days on (CLAUDE.md T30
+      // 2.10).
+      dispatch({ type: 'BUY_LINE_UPGRADE', upgradeId: id });
+      return;
     case 'setSecondShift':
       dispatch({ type: 'SET_SECOND_SHIFT', on: element.dataset.on === '1' });
       return;

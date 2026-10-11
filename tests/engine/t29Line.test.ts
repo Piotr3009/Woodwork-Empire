@@ -541,7 +541,7 @@ describe('the line s card and the sheets that list machines (CLAUDE.md T30 2.3.3
       'Module 5: the Finishing, sprayed and hung on the overhead rail',
       'Module 6: the Glazing, then wrapped and stacked on a pallet',
       'With two engineers, timber work goes 2.4 times as fast',
-      'Sold whole, for half its price',
+      'Sold whole, for half its price; the upgrades go with it',
       '£10,000,000',
       'Delivered in 30 working days',
       'Power £360 a day',

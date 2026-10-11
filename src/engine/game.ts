@@ -220,7 +220,15 @@ import {
   takeOverJob,
   transportLabel,
 } from './jobs';
-import { answerLineOffer, emptyWindowLine, endLineContract, runLineDay, runLineMinute } from './lineContract';
+import {
+  answerLineOffer,
+  buyLineUpgrade,
+  emptyLineUpgrades,
+  emptyWindowLine,
+  endLineContract,
+  runLineDay,
+  runLineMinute,
+} from './lineContract';
 import {
   arriveDeliveries,
   arriveGlass,
@@ -2465,6 +2473,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       // The line's own contract ends at one click, asking nothing, at any time (CLAUDE.md T30 2.6).
       endLineContract(next);
       break;
+    case 'BUY_LINE_UPGRADE':
+      // The cash leaves at the click; the upgrade is fitted ten working days on (CLAUDE.md T30 2.10).
+      buyLineUpgrade(next, action.upgradeId);
+      break;
     case 'SET_SECOND_SHIFT':
       // No manager, no second shift (CLAUDE.md T13 3.9).
       if (managerOnDuty(next) || !action.on) next.shift.second = action.on;
@@ -3120,8 +3132,12 @@ export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
     // Off the extraction the day it is sold; the buyer's van takes the machine, not the pipe.
     disconnectExtraction(state, sold.id);
   }
-  // A running line contract ends the day the line is sold (CLAUDE.md T30 2.3.5, 2.6).
-  if (isLineModule(item.specId)) endLineContract(state);
+  // A running line contract ends the day the line is sold, and its upgrades go with it for nothing
+  // (CLAUDE.md T30 2.3.5, 2.6, 2.10).
+  if (isLineModule(item.specId)) {
+    endLineContract(state);
+    emptyLineUpgrades(state);
+  }
   return OK;
 }
 

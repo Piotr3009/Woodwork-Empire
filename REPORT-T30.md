@@ -78,3 +78,14 @@ shape of `playCharacters`) writes only the frame and the view box, only when the
 real time at 6 a second, holds while the clock stands, and is called in `runFrame` and at the end
 of `render()`, so a page written mid loop keeps its frame. Module 6 draws the one overlay of the
 windows on its pallet, `stack01` to `stack09`, in its own drawable; none on an empty pallet.
+
+**T30-C5 The four upgrades.** `LINE_UPGRADES` (Diamond tooling 400,000, Line software 300,000,
+Servo press 500,000, Second spraying robot 600,000) is a table of its own and not kit: bought from
+four cards under the line's card in its folder, in the class card's classes with no picture, the
+cash down at the click on `Line upgrade: <name>`, fitted `LINE_UPGRADE_DAYS` (10) working days on
+and kept on `state.windowLine.upgrades`. `lineWindowMinutes` takes `LINE_UPGRADE_MINUTES` (15) off
+for each fitted, never below 60, so the offer card, the running block and the line's minute read
+120, 105, 90, 75 and 60; nothing of the jobs changes. Refused in the card's order (`Needs the
+production line`, `Being fitted: ready on <day>`, `Fitted`, `Not enough cash`); emptied for nothing
+when the line is sold. The line's card now ends `...its price; the upgrades go with it`. New:
+`tests/engine/t30Upgrades.test.ts`.

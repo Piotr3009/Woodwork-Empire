@@ -1550,6 +1550,8 @@ export type GameAction =
   | { type: 'SET_SPEED'; speed: Speed }
   /** The line's own contract ended at one click, asking nothing (CLAUDE.md T30 2.6). */
   | { type: 'END_LINE_CONTRACT' }
+  /** An upgrade of the line bought, fitted ten working days on (CLAUDE.md T30 2.10). */
+  | { type: 'BUY_LINE_UPGRADE'; upgradeId: string }
   /** Run the clock at 4x until the task the owner is out on is over (CLAUDE.md T8 3.3). */
   | { type: 'SKIP_AHEAD' }
   | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }

@@ -5315,6 +5315,62 @@ export const LINE_PALLET_LAYOUT = { x: 0, y: 10, width: 2, depth: 1, height: 1.7
 /** The line's contract's name: the client has no name (CLAUDE.md T30 2.6) [TUNE: chat]. */
 export const LINE_CONTRACT_NAME = 'Windows off the line';
 
+/** [PIOTR, 11.10: "later add ons can be bought, better new knives, better software, so that it
+ *  later speeds up to one window an hour"; TUNE: chat: the fifteen minutes] What each upgrade of the
+ *  line fitted takes off every window of its contract (CLAUDE.md T30 2.10). */
+export const LINE_UPGRADE_MINUTES = 15;
+/** [PIOTR, 11.10: "up to one window an hour"] The line's contract never makes a window faster than
+ *  this, whatever is fitted (CLAUDE.md T30 2.7, 2.10). */
+export const LINE_WINDOW_MINUTES_MIN = 60;
+/** The working days from the order of an upgrade to the day it is fitted (CLAUDE.md T30 2.10)
+ *  [TUNE: chat]. */
+export const LINE_UPGRADE_DAYS = 10;
+
+/** One upgrade of the line: not kit, with no spec, picture, floor, power, insurance or service, a
+ *  line of its own table (CLAUDE.md T30 2.10). */
+export interface LineUpgradeSpec {
+  id: string;
+  name: string;
+  price: number;
+  /** Its card's sentence, in the place of a class's description. */
+  sentence: string;
+}
+
+/** The four upgrades of the line, to one window an hour [TUNE: chat: the four, their prices and
+ *  their sentences] (CLAUDE.md T30 2.10). */
+export const LINE_UPGRADES: readonly LineUpgradeSpec[] = [
+  {
+    id: 'lineTooling',
+    name: 'Diamond tooling',
+    price: 400000,
+    sentence:
+      'Diamond tipped knives and cutters for modules 1 and 2: the timber feeds faster and the tools are ' +
+      'changed less often.',
+  },
+  {
+    id: 'lineSoftware',
+    name: 'Line software',
+    price: 300000,
+    sentence:
+      'One program for the whole line: each window\'s cutting list and profiles go to every module in ' +
+      'turn, with no stop between sizes.',
+  },
+  {
+    id: 'linePress',
+    name: 'Servo press',
+    price: 500000,
+    sentence: 'Servo cramps and a second table in module 4: one frame is squared while the next is loaded.',
+  },
+  {
+    id: 'lineSprayRobot',
+    name: 'Second spraying robot',
+    price: 600000,
+    sentence:
+      'A second robot in module 5 and a warm drying run on the overhead rail: the lacquer is no longer the ' +
+      'slowest step.',
+  },
+];
+
 /** The figures of a machine's working motion: a sheet of frames in one row, each cell the size of
  *  the machine's own picture, anchored where the picture is (docs/art/SPRITES.md 15.2). */
 export interface WorkSheetFigures {

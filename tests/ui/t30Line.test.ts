@@ -178,6 +178,14 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     expect(plan.textContent).not.toContain('Windows off the line');
   });
 
+  it('reads its pace off the upgrades fitted: every 1 h 45 min with one, about 22 a week', () => {
+    const state = running();
+    state.windowLine.upgrades = [{ id: 'lineTooling', fittedOnDay: state.clock.day }];
+    const tab = document.createElement('div');
+    tab.innerHTML = renderContracts(state);
+    expect(tab.querySelector('[data-line-contract]')?.textContent).toContain('One window every 1 h 45 min: about 22 a week');
+  });
+
   it('says it stands still for want of an engineer, and nothing of a gate with no pallet at it', () => {
     const state = running();
     state.workers = state.workers.filter((worker) => worker.id !== 'eng-2');
