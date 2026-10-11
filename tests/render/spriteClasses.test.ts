@@ -212,8 +212,10 @@ describe('the file on disk and the footprint in the engine', () => {
     // the spraying robot (CLAUDE.md T29 2.7), a hundred and five with the line's five modules
     // (CLAUDE.md T29 2.9.1), and a hundred and seven with the two timber stores (CLAUDE.md T29
     // 2.11.1). A hundred and ten from v89: the three cutter cases of pack 1 (09.10), each on the
-    // canvas of the 1 by 1 by 1 its set declares (CLAUDE.md T30 2.1).
-    expect(checked).toBe(110);
+    // canvas of the 1 by 1 by 1 its set declares (CLAUDE.md T30 2.1). A hundred and eleven with
+    // the line's six modules of Turn 30, 3 m high, the sixth new (CLAUDE.md T30 2.2); the loop names
+    // a class's picture exactly, so a work sheet or a stack overlay is never one of them.
+    expect(checked).toBe(111);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }
@@ -252,8 +254,15 @@ describe('the file on disk and the footprint in the engine', () => {
     // forklifts' and the air dryer's. Seventy five from v81: the pallet truck's file is deleted.
     // Ninety six from v83: the twenty one turns of the five timber families (CLAUDE.md T28 2.11).
     // One hundred and seven from v84: the eleven turns of the five axis CNCs, the robot, the
-    // line's five modules and the two timber stores (CLAUDE.md T29 2.4).
-    expect(turnedFiles).toHaveLength(107);
+    // line's five modules and the two timber stores (CLAUDE.md T29 2.4). One hundred and eight
+    // from v89, the line's sixth module (CLAUDE.md T30 2.2); the six work sheets and the ten stack
+    // overlays are on disk and are neither class pictures nor turned ones.
+    expect(turnedFiles).toHaveLength(108);
+    const sheets = spriteFiles().filter((name) => name.endsWith('.work.sheet.png'));
+    const overlays = spriteFiles().filter((name) => /\.stack\d\d\.png$/.test(name));
+    expect(sheets).toHaveLength(6);
+    expect(overlays).toHaveLength(10);
+    for (const name of [...sheets, ...overlays]) expect(turnedFiles, name).not.toContain(name);
   });
 
   it('draws the CNC with its tool changer on the CNC s own canvas, both ways round (v56)', () => {

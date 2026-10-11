@@ -32,3 +32,18 @@ the art side's own mesh through the pack's own matrix and checked by eye (`src/e
 the game's README is back with this turn's lines, and the rest of the pack is in
 `docs/art/pack-0910/` with `EDITED.md` (the five files whose eleven em dashes were replaced, and
 `SHA256SUMS.txt` left as delivered). SPRITES.md section 15.1 carries the thirteen files.
+
+**T30-C1 The line bought whole, STATE_VERSION 43.** Six modules of 6 by 3 by 3 m at their shares
+of `LINE_PRICE`, 10,000,000 written as their sum, with no `requires`; one folder on the line tab
+(module 1's, `from £10,000,000`) and one card, the line's, drawn by `renderLine` in place of a class
+card; one click orders the six on one due day at the first clear 36 by 3 from (2, 14)
+(`lineSite`, `canPlaceBox`, the one placement check `canPlaceSpec` now reads too), the cash down
+once on `Window production line ordered`; sold whole from any module's tile on one line and one
+card; modules 5 and 6 do the Finishing and the Glazing (`LINE_COVERS`), `LINE_FACTOR` to 2.4 on
+the Finishing on module 5, 33 places each, 18 per cent of the boards, the booth still asked, and
+`lineLevelForJobs`. The 28 pictures are in, byte for byte; no code reads the manifest by pattern,
+so the two new kinds of file needed no teaching in `src/`, and the two counts that filter by name
+(`rotate.test.ts`, `spriteClasses.test.ts`) now say so. The lift: `liftToVersion43` writes
+`state.windowLine` whole with its defaults, and `takeTheLineBack` (gated `version < 43`) refunds
+Turn 29's modules on one `Production line refunded: it is sold whole now` line and queues the
+`lineRefunded` card; a module sold and waiting is left for its van, which pays its own half.

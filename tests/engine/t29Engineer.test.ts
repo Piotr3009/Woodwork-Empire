@@ -54,7 +54,7 @@ function lineOnOrder(state: GameState): GameState {
     orderedDay: state.clock.day,
     dueDay: state.clock.day + 30,
     arrived: false,
-    anchorX: 5,
+    anchorX: 2,
     anchorY: 14,
     orientation: 0,
   };
@@ -71,11 +71,12 @@ describe('the line engineer (CLAUDE.md T29 2.8)', () => {
       label: 'Line engineer',
       monthlyWage: 15000,
       minReputation: REPUTATION_MIN,
-      duties: 'Keeps the production line running. One keeps up to three modules, two keep all five.',
+      duties: 'Keeps the production line running. One keeps up to three modules, two keep all six.',
     });
     expect(LINE_ENGINEER_MONTHLY_WAGE).toBe(15000);
-    // The sentence is the table in words: one keeps three, two keep all five.
-    expect(LINE_MODULES_KEPT).toEqual([0, 3, 5]);
+    // The sentence is the table in words: one keeps three, two keep all six (flipped in v89, the
+    // line of six; CLAUDE.md T30 2.3.6).
+    expect(LINE_MODULES_KEPT).toEqual([0, 3, 6]);
     expect(LINE_ENGINEERS_MAX).toBe(2);
     expect(ROLE_WORDS.lineEngineer).toBe('line engineer');
     expect(ROLE_WORDS_MANY.lineEngineer).toBe('line engineers');

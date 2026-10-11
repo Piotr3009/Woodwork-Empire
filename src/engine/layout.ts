@@ -6,12 +6,14 @@ import {
   CANTEEN_LOCKERS_DEEP,
   CANTEEN_LOCKERS_WIDE,
   GATE_LANE,
+  LINE_MODULES,
   LOCKER_SLOT_LAYOUT,
   LOCKER_SLOT_LAYOUT_WIDE,
   M2_PER_PERSON,
   WELFARE_IN_THE_CANTEEN,
   REAR_YARD_GAP_CELLS,
   STARTING_LAYOUT,
+  WINDOW_LINE_ORIGIN,
   YARD_WIDTH_CELLS,
   roomsOf,
   secondExtensionOf,
@@ -230,26 +232,40 @@ export function canPlaceSpec(
     return { ok: false, reason: 'It lives in a tool cabinet' };
   }
   const box = boxOf(specId, x, y, variantId, orientation);
+  // The welfare kit lives inside the canteen and nowhere else: a man's locker belongs out of the
+  // dust, and it takes no hall cell at all (PIOTR, 17.09; CLAUDE.md T17 2.2, T23 2.11).
+  const ignore = new Set(ignoreItemId === null ? [] : [ignoreItemId]);
+  return canPlaceBox(state, box, ignore, WELFARE_IN_THE_CANTEEN.includes(specId));
+}
+
+/** Can this piece of floor take a thing: inside the hall, on no room (the canteen excepted for the
+ *  welfare kit), off the way to the gate, and on nothing standing or held for a delivery but what
+ *  `ignore` names. The checks every placement asks, in one place: a machine's own and the whole
+ *  line's 36 m by 3 m (CLAUDE.md T30 2.4). */
+export function canPlaceBox(
+  state: GameState,
+  box: Box,
+  ignore: ReadonlySet<string>,
+  inTheCanteen = false,
+): PlaceCheck {
   if (
-    x < 0 ||
-    y < 0 ||
-    x + box.width > state.unit.widthCells ||
-    y + box.depth > state.unit.depthCells
+    box.x < 0 ||
+    box.y < 0 ||
+    box.x + box.width > state.unit.widthCells ||
+    box.y + box.depth > state.unit.depthCells
   ) {
     return { ok: false, reason: 'Off the floor' };
   }
   for (const room of roomsOf(state.unit)) {
     if (!overlaps(box, { x: room.x, y: room.y, width: room.width, depth: room.depth })) continue;
-    // The welfare kit lives inside the canteen and nowhere else: a man's locker belongs out of the
-    // dust, and it takes no hall cell at all (PIOTR, 17.09; CLAUDE.md T17 2.2, T23 2.11).
-    if (room.id === 'canteen' && WELFARE_IN_THE_CANTEEN.includes(specId)) continue;
+    if (room.id === 'canteen' && inTheCanteen) continue;
     return { ok: false, reason: `On the ${room.name.toLowerCase()}` };
   }
   if (overlaps(box, gateLane())) {
     return { ok: false, reason: 'Blocking the way to the gate' };
   }
   for (const item of hallItems(state)) {
-    if (item.id === ignoreItemId) continue;
+    if (ignore.has(item.id)) continue;
     const other = findSpec(item.specId);
     if (!other) continue;
     // Zone against zone: two saws whose working room would overlap cannot both stand there, even
@@ -261,7 +277,7 @@ export function canPlaceSpec(
   // The cells held for what is bought and not here yet are taken as surely as the cells a machine
   // stands on: it is coming, and it has to have somewhere to stand (CLAUDE.md T8 3.2).
   for (const item of reservedItems(state)) {
-    if (item.id === ignoreItemId) continue;
+    if (ignore.has(item.id)) continue;
     const other = findSpec(item.specId);
     if (!other) continue;
     if (overlaps(box, boxOfItem(item, item.anchorX, item.anchorY))) {
@@ -269,6 +285,36 @@ export function canPlaceSpec(
     }
   }
   return OK;
+}
+
+/** The 36 m by 3 m the whole line takes with module 1 at this cell: its six modules end to end
+ *  along x, at orientation 0, the line never being turned (CLAUDE.md T30 2.4). */
+export function lineBox(at: { x: number; y: number }): Box {
+  const module = findSpec(LINE_MODULES[0] ?? '');
+  const width = module?.width ?? 0;
+  return { x: at.x, y: at.y, width: width * LINE_MODULES.length, depth: module?.depth ?? 0 };
+}
+
+/** Where module N of a line stands whose module 1 is at this cell: six cells along x from the one
+ *  before (CLAUDE.md T30 2.4). */
+export function lineModuleCell(at: { x: number; y: number }, specId: string): { x: number; y: number } {
+  const width = findSpec(LINE_MODULES[0] ?? '')?.width ?? 0;
+  return { x: at.x + width * Math.max(0, LINE_MODULES.indexOf(specId)), y: at.y };
+}
+
+/** Where the line is put at its order: the first clear 36 m by 3 m, asked at `WINDOW_LINE_ORIGIN`
+ *  and then cell by cell in the order `firstFreeCell` searches a machine's place, clear meaning
+ *  what `canPlaceBox` asks. Null when the hall has none (CLAUDE.md T30 2.4) [TUNE: chat]. */
+export function lineSite(state: GameState): { x: number; y: number } | null {
+  const none = new Set<string>();
+  if (canPlaceBox(state, lineBox(WINDOW_LINE_ORIGIN), none).ok) return { ...WINDOW_LINE_ORIGIN };
+  const size = lineBox({ x: 0, y: 0 });
+  for (let y = 0; y + size.depth <= state.unit.depthCells; y += 1) {
+    for (let x = 0; x + size.width <= state.unit.widthCells; x += 1) {
+      if (canPlaceBox(state, lineBox({ x, y }), none).ok) return { x, y };
+    }
+  }
+  return null;
 }
 
 /** The outline of something on order, which setup mode drags about like a machine. */

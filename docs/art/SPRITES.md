@@ -538,6 +538,9 @@ Turn 30, which put the art side's three cases of pack 1 in (section 15).
 
 ## 13. The five axis CNC, the spraying robot, the line and the timber stores (Turn 29, 05.10.2026)
 
+The five modules of the line below are replaced by the six of Turn 30, 3 m high, with their motion
+(section 15.2); what follows is kept as the history of Turn 29.
+
 Piotr's words of 05.10: "you have it in the zip", "put everything into the next turn". The 22 files
 below came from the art side in three packs (the robot and the five axis CNC; the line's five
 modules; the two timber stores), were renamed by chat as the game names them, and went into
@@ -580,9 +583,6 @@ What they are:
   of Turn 28's pack 1 and not in the look of the September machines; Piotr has seen that and it
   stays for now. The industrial five axis CNC is drawn blue with a grey cabinet where the standard
   and the pro are green.
-- **Module 1 is drawn as an infeed and a planer with no saw** (the art side's own table: feeding,
-  planing and profiling). The game gives it the Cross cutting all the same (CLAUDE.md T29 2.4,
-  [TUNE: chat]), and a saw at module 1's infeed is on `docs/art/REQUESTS-T29.md` for the art side.
 - **The two timber stores are drawn full of timber**, with no empty picture and no layer: a store
   bought this morning shows a full load over a plate of `0 / 40`. Known and left tonight; the
   stores drawn empty are on `docs/art/REQUESTS-T29.md`.
@@ -652,3 +652,42 @@ through feed sanders; the used sander has a vacuum of its own and no port) are m
 these files, one line a file, `.r` among them, in `src/engine/ports.ts` [TUNE until Piotr confirms
 them on the hall].
 
+### 15.2 The line of six modules, its motion and the windows on its pallet
+
+Piotr's words of 11.10: "super" for the six modules, and "put the animation pictures into the code
+and the zip". The art side's L1 (the six modules in two views) and L2 (their working motion and the
+windows stacking on module 6's pallet) came as 28 pictures, which Turn 30 put into `public/sprites/`
+as they were delivered (CLAUDE.md T30 2.2). No agent altered a pixel. Chat renamed the art side's
+90 degree views `.r` and touched nothing else. Their notes, the sheets' figures, the measurements and
+chat's check (`pictures-t30.json`, every file's size, anchor, metres, kind and hash) are kept in
+`docs/art/pack-1110/`.
+
+| Files in public/sprites/ | What they are | File, px | Anchor |
+|---|---|---|---|
+| `windowLine1.standard.png` to `windowLine6.standard.png` | the six modules, view 0, 6 × 3 × 3 m each | 448 × 376 | 296, 368 |
+| `windowLine1.standard.r.png` to `windowLine6.standard.r.png` | the art side's 90 degree views (see below) | 448 × 376 | 152, 368 |
+| `windowLine1.standard.work.sheet.png` to `windowLine6.standard.work.sheet.png` | the working motion: twelve cells of 448 × 376 in one row, 6 frames a second, a loop of two seconds | 5,376 × 376 | 296, 368 in each cell |
+| `windowLine6.standard.stack01.png` to `stack10.png` | one to ten wrapped windows standing on module 6's pallet, view 0 only, the windows alone (no pallet, floor or shadow) | 448 × 376 | 296, 368 |
+
+Every canvas is the contract's for 6 × 3 × 3 m (section 2: `(6 + 3) × 48 + 16` = 448 by
+`(6 + 3) × 24 + 3 × 48 + 16` = 376, the anchor at `8 + 48 × 6` = 296 in view 0 and `8 + 48 × 3` =
+152 in the turned view, at `376 - 8`). The first cell of every sheet is its module's picture pixel
+for pixel. The conveyor runs through every module at 0.9 m, in at (80, 144.8) and out at (368,
+288.8) in view 0, and the overhead rail of modules 5 and 6 at 2.8 m, (80, 53.6) to (368, 197.6). The
+next module stands at (+288, +144) px, six metres along x, so modules six cells apart meet end to
+end: the gap Turn 29's five showed is gone. Module 5's roof is clear so that its robot shows, and
+module 6 has an empty pallet on the floor at the end of its rollers, which the overlays stand on.
+Module 1 is drawn with its saw.
+
+**The 90 degree views are the other turn.** The art side's is `X = 3 - y, Y = x`, the game's `.r` is
+`X = y, Y = w - x`. The line is never turned (CLAUDE.md T30 2.4), so its six `.r` files are on disk
+for the tests and the Sprite check page and are never drawn on the hall, as the shelter's and the
+van's are. A line that may one day turn wants its turned views drawn in the game's convention.
+
+**Two new kinds of file.** A work sheet, `<family>.<class>.work.sheet.png`, and a stack overlay,
+`<family>.<class>.stackNN.png`, are neither a class's picture nor a turned one: the game picks every
+picture by its exact name (`pictureFor`, `pickSprite` build `${spriteKey}${tier}${suffix}.png`), and
+no code reads the manifest by pattern, so neither kind is ever taken for a class picture or a turned
+one. The tests that count class pictures and turned pictures say so. The characters' manifest is
+built from `character.*.json` only and is not touched, and the six JSONs of the sheets' figures
+are not served (they are in `docs/art/pack-1110/`).

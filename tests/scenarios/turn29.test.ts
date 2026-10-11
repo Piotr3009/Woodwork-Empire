@@ -339,20 +339,23 @@ function canHire(state: GameState, role: string): boolean {
   return hiringOptions(state).some((option) => option.role === role && option.blockReason === '');
 }
 
-describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10)', () => {
+describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10; flipped in v89 to the line bought whole, T30 2.3, 2.5)', () => {
   const industrial = 1.12;
   const company = buyAndLand(timberCompany(), 'cnc5', 'standard');
-  // A sheet rack stands on module 1's cells.
+  // The whole line is ten million from v89 (CLAUDE.md T30 2.3.1).
+  company.cash = 12000000;
+  // A sheet rack stands on the cells the line is asked at first: it moves the line on, and is no
+  // refusal (CLAUDE.md T30 2.4).
   placeEquipment(company, 'sheetRack', { variantId: 'standard', x: 7, y: 15, id: 'kit-rack-in-the-way' });
-  const refused = canBuy(company, 'windowLine1');
+  const withTheRack = canBuy(company, 'windowLine1');
   let state = act(company, { type: 'MOVE_ITEM', itemId: 'kit-rack-in-the-way', x: 2, y: 17 });
   const halfShifted = canBuy(state, 'windowLine1');
   state = act(state, { type: 'END_SETUP', speed: 1 });
   const cash = state.cash;
   state = act(state, { type: 'BUY_EQUIPMENT', specId: 'windowLine1' });
-  const order = state.onOrder.find((item) => item.specId === 'windowLine1');
-  const ordered = { cash: cash - state.cash, day: state.clock.day, dueDay: order?.dueDay ?? 0 };
-  // The engineer is hired once the module is on order: the interview is the owner's hour, and he
+  const orders = state.onOrder.filter((item) => LINE_MODULES.includes(item.specId));
+  const ordered = { cash: cash - state.cash, day: state.clock.day, dueDay: orders[0]?.dueDay ?? 0 };
+  // The engineer is hired once the line is on order: the interview is the owner's hour, and he
   // starts on the books after it (CLAUDE.md T7 3.10).
   const hireable = canHire(state, 'lineEngineer');
   state = act(state, { type: 'HIRE', role: 'lineEngineer', tier: null });
@@ -366,49 +369,49 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10)',
   }
   const landed = state;
 
-  it('is refused with the rack on its cells, then half shifted, and ordered once the rack is moved', () => {
-    expect(refused).toEqual({ ok: false, reason: "Move the sheet rack off the line's 6 m by 3 m" });
+  it('is no refusal with the rack on its first cells, is refused half shifted, and is ordered whole once the rack is moved', () => {
+    expect(withTheRack).toEqual({ ok: true, reason: '' });
     expect(halfShifted).toEqual({ ok: false, reason: 'The kit is half shifted. Finish the move first' });
-    expect(ordered.cash).toBe(1500000);
-    expect(order).toMatchObject({ anchorX: 5, anchorY: 14 });
+    expect(ordered.cash).toBe(10000000);
+    expect(orders.map((item) => [item.specId, item.anchorX, item.anchorY])).toEqual(
+      LINE_MODULES.map((id, index) => [id, 2 + 6 * index, 14]),
+    );
+    expect(new Set(orders.map((item) => item.dueDay)).size).toBe(1);
     expect(hireable).toBe(true);
   });
 
-  it('lands by itself on its day, with nobody to unload it, and runs the Cross cutting and the Planing', () => {
+  it('lands by itself on its day, six modules with nobody to unload them, and one engineer runs it as three', () => {
     expect(landed.clock.day).toBe(ordered.dueDay);
     expect(landed.workers.filter((worker) => worker.role === 'lineEngineer')).toHaveLength(1);
-    expect(lineModules(landed)).toBe(1);
+    expect(lineModules(landed)).toBe(6);
     expect(landed.tasks.some((task) => task.kind === 'unload' && !task.done)).toBe(false);
-    expect(lineLevel(landed)).toBe(1);
+    expect(lineLevel(landed)).toBe(3);
     const plan = planOf(landed, windowJob());
-    const factor = LINE_FACTOR[1] ?? 1;
+    const factor = LINE_FACTOR[3] ?? 1;
     expect(plan.crossCutting).toEqual({ family: 'windowLine1', speed: factor * industrial });
     expect(plan.planing).toEqual({ family: 'windowLine1', speed: factor * industrial });
     const pace = sumOf(landed, windowJob(), {
       crossCutting: factor * industrial,
       planing: factor * industrial,
-      moulding: factor * CNC5_STAGE_FACTOR * hallPace(landed, 'cnc5'),
+      moulding: factor * CNC5_STAGE_FACTOR * industrial,
       pressing: factor * hallPace(landed, 'framePress'),
-      sanding: factor * hallPace(landed, 'sander'),
+      sanding: factor * industrial,
       finishing: hallPace(landed, 'sprayBooth'),
       assembly: factor * hallPace(landed, 'workbench'),
     });
     expect(jobPace(landed, windowJob())).toBeCloseTo(pace, 10);
   });
 
-  it('runs all five with two engineers, three with one, stands still with none, and sells only from the end', () => {
-    let state = landed;
-    for (const id of LINE_MODULES.slice(1)) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId: id });
-      const next = state.onOrder.find((item) => item.specId === id);
-      if (next === undefined) throw new Error(`${id} is on order`);
-      next.dueDay = state.clock.day + 1;
-    }
-    state = act(state, { type: 'HIRE', role: 'lineEngineer', tier: null });
+  it('runs all six with two engineers, three with one, stands still with none, and is sold whole', () => {
+    let state = act(landed, { type: 'HIRE', role: 'lineEngineer', tier: null });
     state = playDays(state, 3);
-    expect(lineModules(state)).toBe(5);
-    expect(lineLevel(state)).toBe(5);
+    expect(lineModules(state)).toBe(6);
+    expect(lineLevel(state)).toBe(6);
     expect(warnings(state).some((entry) => entry.key === 'lineNeedsEngineer')).toBe(false);
+    // The whole line sprays and glazes too (CLAUDE.md T30 2.5).
+    const whole = planOf(state, windowJob());
+    expect(whole.finishing?.family).toBe('windowLine5');
+    expect(whole.assembly?.family).toBe('windowLine6');
     // One let go: three modules, and the strip says so.
     const engineers = state.workers.filter((worker) => worker.role === 'lineEngineer');
     const one = untilGone(act(state, { type: 'LET_GO', workerId: engineers[1]?.id ?? '' }), engineers[1]?.id ?? '');
@@ -426,10 +429,10 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10)',
     const still = planOf(none, windowJob());
     expect(still.crossCutting).toEqual({ family: 'crossCut', speed: hallPace(none, 'crossCut') });
     expect(still.moulding).toEqual({ family: 'cnc5', speed: CNC5_STAGE_FACTOR * hallPace(none, 'cnc5') });
-    // Module 3 is not sold while 4 stands; 5 is.
+    // Any module sells the whole line (CLAUDE.md T30 2.3.5).
     const third = none.equipment.find((item) => item.specId === 'windowLine3');
     const fifth = none.equipment.find((item) => item.specId === 'windowLine5');
-    expect(canSell(none, third?.id ?? '')).toEqual({ ok: false, reason: 'Sell the module after it first' });
+    expect(canSell(none, third?.id ?? '')).toEqual({ ok: true, reason: '' });
     expect(canSell(none, fifth?.id ?? '')).toEqual({ ok: true, reason: '' });
   });
 });
@@ -646,11 +649,12 @@ describe('(bbb) windows on a standing contract (CLAUDE.md T29 2.12)', () => {
   const sheets = signed.stock.sheets;
   const deliveries = signed.deliveries.length;
   const without = aWeek(signed, offer?.id ?? '');
-  // The whole line, the five axis CNC its first module asks for, and its two engineers.
+  // The whole line of six (flipped in v89, CLAUDE.md T30 2.3), a five axis CNC beside it as Turn
+  // 29 had it, and its two engineers.
   const lined = without.state;
   placeEquipment(lined, 'cnc5', { variantId: 'standard', x: 20, y: 9, id: 'kit-cnc5' });
-  for (let n = 1; n <= 5; n += 1) {
-    placeEquipment(lined, `windowLine${n}`, { x: 5 + 6 * (n - 1), y: 14, id: `kit-line-${n}` });
+  for (let n = 1; n <= 6; n += 1) {
+    placeEquipment(lined, `windowLine${n}`, { x: 2 + 6 * (n - 1), y: 14, id: `kit-line-${n}` });
   }
   for (const id of ['e-kev', 'e-raj']) {
     lined.workers.push({ ...testJoiner(id, id), role: 'lineEngineer', tier: null, rate: 0, monthlyWage: 15000 });
@@ -677,7 +681,7 @@ describe('(bbb) windows on a standing contract (CLAUDE.md T29 2.12)', () => {
   });
 
   it('makes more of them a week with the line than without', () => {
-    expect(lineLevel(withLine.state)).toBe(5);
+    expect(lineLevel(withLine.state)).toBe(6);
     expect(without.made).toBeGreaterThan(0);
     expect(withLine.made).toBeGreaterThan(without.made);
     console.log(`(bbb) sash windows a week, four men: ${without.made} without the line, ${withLine.made} with it`);

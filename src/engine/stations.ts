@@ -333,8 +333,8 @@ export const STATION_TABLE: Record<string, StationRow> = {
     operator: { side: 'front', along: 0 },
     second: null,
   },
-  // The line's four modules that do a stage: the men of a timber job at the front of each, as at
-  // any machine of its plan (CLAUDE.md T29 2.9.5).
+  // The line's six modules: the men of a timber job at the front of each, as at any machine of
+  // its plan (CLAUDE.md T29 2.9.5; T30 2.5).
   windowLine1: {
     operator: { side: 'front', along: 0 },
     second: null,
@@ -348,6 +348,14 @@ export const STATION_TABLE: Record<string, StationRow> = {
     second: null,
   },
   windowLine4: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  windowLine5: {
+    operator: { side: 'front', along: 0 },
+    second: null,
+  },
+  windowLine6: {
     operator: { side: 'front', along: 0 },
     second: null,
   },
