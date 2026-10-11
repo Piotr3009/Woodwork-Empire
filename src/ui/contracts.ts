@@ -263,6 +263,14 @@ function activeBlock(state: GameState, contract: Contract): string {
 function endedBlock(state: GameState, contract: Contract): string {
   const report = closingReport(state, contract);
   const offered = contract.renegotiatedPrice ?? contract.pricePerPiece;
+  // A client who went elsewhere offers no other term: no offer on the weeks line and no `Renew`,
+  // only `Let it go`, which takes it off the tab (CLAUDE.md T31 2.9).
+  const lost = contract.endedBy === 'lost';
+  const offer = lost
+    ? ''
+    : ` The client offers <strong>${money(offered)} a piece</strong> for another term of ` +
+      `${plural(contract.termWeeks, 'week', 'weeks')}, ${signedMoney(offered - contract.pricePerPiece)} on ` +
+      `${money(contract.pricePerPiece)}.`;
   return (
     `<div class="contract-ended" data-contract="${contract.id}">` +
     `<h3>${escapeHtml(contract.name)}: ${escapeHtml(endedLine(contract))}</h3>` +
@@ -272,12 +280,9 @@ function endedBlock(state: GameState, contract: Contract): string {
     figureRow(`Labour, ${report.labourHours} hours at cost`, -report.labourCost) +
     figureRow('Machine wear over those hours', -report.machineWear) +
     figureRow('Net margin', report.margin) +
-    `<p class="figures">${fullWeeksOf(contract)} full weeks, ${shortWeeksOf(contract)} short. ` +
-    `The client offers <strong>${money(offered)} a piece</strong> for another term of ` +
-    `${plural(contract.termWeeks, 'week', 'weeks')}, ${signedMoney(offered - contract.pricePerPiece)} on ` +
-    `${money(contract.pricePerPiece)}.</p>` +
+    `<p class="figures">${fullWeeksOf(contract)} full weeks, ${shortWeeksOf(contract)} short.${offer}</p>` +
     `<div class="row"><span class="row-main"></span><span class="row-action">` +
-    `${renewButton(state, contract, offered)}` +
+    `${lost ? '' : renewButton(state, contract, offered)}` +
     `${button('renewContract', 'Let it go', `data-id="${contract.id}" data-accept="0"`)}</span></div>` +
     '</div>'
   );

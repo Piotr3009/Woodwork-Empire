@@ -33,6 +33,12 @@ import {
   CONTRACT_QUANTITY_MINUTES,
   CONTRACT_CLIENTS,
   CONTRACT_FREE_END_DAYS,
+  CONTRACT_CLIENT_LEAVES_CHANCE,
+  CONTRACT_QUIET_DAYS_MAX,
+  CONTRACT_QUIET_DAYS_MIN,
+  CONTRACT_RENEWAL_CUT_CHANCE,
+  CONTRACT_RENEWAL_CUT_MAX,
+  CONTRACT_RENEWAL_CUT_MIN,
   ANSWER_MAX,
   ANSWER_MIN,
   CNC_STAGE,
@@ -743,6 +749,40 @@ export function offerCarrier(state: GameState): RngCarrier {
   return { rng: (state.seed ^ Math.imul(state.clock.day + 1, 0x9e3779b1)) | 0 };
 }
 
+/** The side streams of what can happen to a running sheet contract (CLAUDE.md T31 2.9): the client
+ *  going elsewhere at a week's close and the cut at a renewal, each seeded from the game's seed, the
+ *  contract's id and the day, the way `offerCarrier` is seeded from the seed and the day. Nothing is
+ *  drawn off the main stream, so where neither happens no offer, job, event or price of any save
+ *  moves by a step. Each has a salt of its own; the two are seven days apart, so a loss on day d reads
+ *  what a cut on day d - 7 read, which never matters, since a contract cut at its term's end draws no
+ *  loss again. The two salts were chosen so that none of the 34 draws the scenarios and tests pinned before Turn 31 make
+ *  comes up, and every one of them shows what it always showed (2.9's last paragraph: "choose its
+ *  seed") [TUNE]; the chances themselves are Piotr's and chat's. */
+export const CONTRACT_LOSS_SALT = 2;
+export const CONTRACT_CUT_SALT = 9;
+
+export function contractSideCarrier(state: GameState, contract: Contract, salt: number): RngCarrier {
+  let id = 0;
+  for (let index = 0; index < contract.id.length; index += 1) {
+    id = (Math.imul(id, 31) + contract.id.charCodeAt(index)) | 0;
+  }
+  return { rng: (state.seed ^ id ^ Math.imul(state.clock.day + salt, 0xc2b2ae35)) | 0 };
+}
+
+/** A contract for sheet pieces, the only kind a client can go elsewhere from or cut at a renewal:
+ *  never a window or a door (a piece with the `timber` mark), and never the line's contract, which
+ *  is not one of `state.contracts` (CLAUDE.md T31 2.9). */
+export function isSheetContract(contract: Contract): boolean {
+  return contractPiece(contract).timber !== true;
+}
+
+/** True while the quiet weeks after a lost contract last: no standing contract is offered
+ *  (CLAUDE.md T31 2.9). */
+export function contractsQuiet(state: GameState): boolean {
+  const until = state.contractQuietUntilDay;
+  return until !== null && state.clock.day < until;
+}
+
 /** An offer off the seeded stream: the piece, a round quantity a week in the band, a term in
  *  months, and the piece's price (CLAUDE.md T13 3.16). */
 export function drawContract(state: GameState, carrier: RngCarrier = state): Contract {
@@ -827,6 +867,10 @@ export function offerContract(state: GameState): void {
   // Nothing is drawn while the shop runs as many as it may, the weekly offer included
   // (CLAUDE.md T26 2.12).
   if (contractsFull(state)) return;
+  // Nothing is drawn in the quiet weeks after a client went elsewhere, the weekly offer owed among
+  // it; a renewal is not an offer and is not stopped, and the line's own contract is offered by
+  // `offerLineContract` as before (CLAUDE.md T31 2.9).
+  if (contractsQuiet(state)) return;
   const carrier = offerCarrier(state);
   if (!weeklyOfferOwed(state) && !chance(carrier, CONTRACT_OFFER_CHANCE_PER_DAY)) return;
   state.contracts.push(drawContract(state, carrier));
@@ -864,7 +908,11 @@ export function acceptContractCheck(state: GameState, contractId: string): Contr
  *  another term wants the shop to run fewer standing contracts than it may (CLAUDE.md T26 2.12;
  *  v65). The page asks this before it draws the button and the action asks it again. */
 export function renewContractCheck(state: GameState, contractId: string, accept: boolean): ContractCheck {
-  if (!findContract(state, contractId)) return { ok: false, reason: 'No such contract' };
+  const contract = findContract(state, contractId);
+  if (!contract) return { ok: false, reason: 'No such contract' };
+  // A client who went elsewhere offers no other term: the contract can only be let go
+  // (CLAUDE.md T31 2.9) [TUNE: the words].
+  if (accept && contract.endedBy === 'lost') return { ok: false, reason: 'The client has found another supplier' };
   if (accept && contractsFull(state)) return { ok: false, reason: contractsFullLine() };
   return OK;
 }
@@ -1332,10 +1380,27 @@ export function endedLine(contract: Contract): string {
     return `the client has ended it after ${plural(shortWeeksOf(contract), 'short week', 'short weeks')}`;
   }
   if (contract.endedBy === 'player') return 'you ended it';
+  if (contract.endedBy === 'lost') return 'the client went elsewhere';
   return 'the term is over';
 }
 
-function closingBody(state: GameState, contract: Contract): string {
+/** The closing card's last words: the client's offer of another term, the offer with the cut as
+ *  the last sentence when he offers less than the price a piece it had, or no term at all when he
+ *  went elsewhere (CLAUDE.md T31 2.9; the mockup docs/mockups/t31/contract-lost.html). The cut is
+ *  the per cent he drew. */
+function offerSentence(contract: Contract, cut: number | null): string {
+  if (contract.endedBy === 'lost') return 'The client has found another supplier: there is no other term.';
+  const offered = contract.renegotiatedPrice ?? contract.pricePerPiece;
+  if (cut !== null) {
+    return (
+      `The client offers ${formatMoney(offered)} a piece for another term, ${cut}% less than now: ` +
+      'the market has turned.'
+    );
+  }
+  return `The client offers ${formatMoney(offered)} a piece for another term. Renew or let it go on the Contracts tab.`;
+}
+
+function closingBody(state: GameState, contract: Contract, cut: number | null): string {
   const report = closingReport(state, contract);
   const full = fullWeeksOf(contract);
   const short = shortWeeksOf(contract);
@@ -1345,8 +1410,7 @@ function closingBody(state: GameState, contract: Contract): string {
     `${report.labourHours} hours of labour at cost ${formatMoney(report.labourCost)}, ` +
     `${formatMoney(report.machineWear)} of machine wear, ` +
     `net margin ${formatMoney(report.margin)}. ${full} full weeks and ${short} short. ` +
-    `The client offers ${formatMoney(contract.renegotiatedPrice ?? contract.pricePerPiece)} a piece ` +
-    'for another term. Renew or let it go on the Contracts tab.'
+    offerSentence(contract, cut)
   );
 }
 
@@ -1366,7 +1430,12 @@ export function endContract(
   if (contract.weekStartDay !== null && contract.weekStartDay <= (contract.endDay ?? contract.weekStartDay)) {
     closeWeek(state, contract);
   }
-  contract.renegotiatedPrice = renegotiatedPriceFor(contract);
+  // A client who went elsewhere offers no other term; one whose sheet contract's term has run out
+  // may offer less than the price a piece it had, off the contract's own side stream, in place of
+  // what the history gives (CLAUDE.md T31 2.9) [TUNE: the cut only at a term's end].
+  const cut = endedBy === 'term' && isSheetContract(contract) ? renewalCut(state, contract) : null;
+  contract.renegotiatedPrice =
+    endedBy === 'lost' ? null : cut !== null ? cutPrice(contract.pricePerPiece, cut) : renegotiatedPriceFor(contract);
   for (const id of [...contract.assigned]) {
     const worker = state.workers.find((entry) => entry.id === id);
     if (worker) takeOff(contract, worker);
@@ -1379,7 +1448,7 @@ export function endContract(
   queueEvent(state, {
     kind: 'contractEnded',
     title: `${contract.name}: ${endedLine(contract)}`,
-    body: closingBody(state, contract),
+    body: closingBody(state, contract, cut),
     data: {
       contractId: contract.id,
       pieces: report.pieces,
@@ -1392,6 +1461,50 @@ export function endContract(
       offered: contract.renegotiatedPrice,
     },
   });
+}
+
+/** The per cent the client cuts the price a piece by at a renewal, or null when he does not: one in
+ *  `CONTRACT_RENEWAL_CUT_CHANCE`, by a whole per cent from `CONTRACT_RENEWAL_CUT_MIN` to `_MAX`, off
+ *  the contract's side stream (CLAUDE.md T31 2.9). */
+function renewalCut(state: GameState, contract: Contract): number | null {
+  const carrier = contractSideCarrier(state, contract, CONTRACT_CUT_SALT);
+  if (!chance(carrier, CONTRACT_RENEWAL_CUT_CHANCE)) return null;
+  return int(carrier, CONTRACT_RENEWAL_CUT_MIN, CONTRACT_RENEWAL_CUT_MAX);
+}
+
+/** The price a piece the client offers with his cut: the per cent off the price it had, rounded to
+ *  the pound and kept inside the band, so a 5 per cent cut of £90 is £85 and not the £86 the
+ *  rounding gives, which would be 4.4 per cent [TUNE]. */
+function cutPrice(price: number, cut: number): number {
+  const most = Math.floor(price * (1 - CONTRACT_RENEWAL_CUT_MIN / 100));
+  const least = Math.ceil(price * (1 - CONTRACT_RENEWAL_CUT_MAX / 100));
+  return Math.max(least, Math.min(most, Math.round(price * (1 - cut / 100))));
+}
+
+/** At a week's close of a running sheet contract, the client goes elsewhere now and then
+ *  [PIOTR, 11.10: "a client leaves now and then"]: true, off the contract's side stream, one time in
+ *  `CONTRACT_CLIENT_LEAVES_CHANCE`, and the quiet weeks drawn off the same stream at once. Only while
+ *  the term has days to come: a term's last week, closed on the Monday after its last day, ends as
+ *  the term and is offered another [TUNE] (CLAUDE.md T31 2.9). */
+function clientGoesElsewhere(state: GameState, contract: Contract): number | null {
+  if (!isSheetContract(contract)) return null;
+  if (contract.endDay !== null && state.clock.day > contract.endDay) return null;
+  const carrier = contractSideCarrier(state, contract, CONTRACT_LOSS_SALT);
+  if (!chance(carrier, CONTRACT_CLIENT_LEAVES_CHANCE)) return null;
+  return int(carrier, CONTRACT_QUIET_DAYS_MIN, CONTRACT_QUIET_DAYS_MAX);
+}
+
+/** The client has gone elsewhere: the contract ends as `endedByClient` ends one, the week already
+ *  closed by this morning's close and no second one closed, its line `the client went elsewhere`,
+ *  no other term, the men on it free, and no standing contract offered for the quiet days from today
+ *  (CLAUDE.md T31 2.9). A second loss inside them never shortens them: the later end stands
+ *  [TUNE]. */
+function lostToAnother(state: GameState, contract: Contract, quietDays: number): void {
+  contract.endDay = state.clock.day;
+  contract.weekStartDay = null;
+  endContract(state, contract, 'lost');
+  const until = state.clock.day + quietDays;
+  state.contractQuietUntilDay = Math.max(state.contractQuietUntilDay ?? until, until);
 }
 
 /** The second short week of a term and the client ends the contract himself, with the closing
@@ -1416,6 +1529,10 @@ export function runContractDay(state: GameState): void {
     if (contract.weekStartDay !== null && weekOfDay(today) !== weekOfDay(contract.weekStartDay)) {
       closeWeek(state, contract);
       if (shortWeeksOf(contract) >= CONTRACT_SHORT_WEEKS_ALLOWED) endedByClient(state, contract);
+      else {
+        const quietDays = clientGoesElsewhere(state, contract);
+        if (quietDays !== null) lostToAnother(state, contract, quietDays);
+      }
     }
     if (contract.status === 'active' && contract.endDay !== null && today > contract.endDay) {
       endContract(state, contract);
@@ -1462,7 +1579,9 @@ export function endContractNow(state: GameState, contractId: string): ContractCh
 export function renewContract(state: GameState, contractId: string, accept: boolean): ContractCheck {
   const contract = findContract(state, contractId);
   if (!contract) return { ok: false, reason: 'No such contract' };
-  if (contract.status !== 'ended' || contract.renegotiatedPrice === null) {
+  // A lost contract has no price for another term and is still let go (CLAUDE.md T31 2.9): the
+  // missing price refuses only the renewal, which `renewContractCheck` says in its own words.
+  if (contract.status !== 'ended' || (contract.renegotiatedPrice === null && contract.endedBy !== 'lost')) {
     return { ok: false, reason: 'The term is not over' };
   }
   // Another term is another contract running: a shop that runs as many as it may is refused in
@@ -1472,7 +1591,7 @@ export function renewContract(state: GameState, contractId: string, accept: bool
   const check = renewContractCheck(state, contractId, accept);
   if (!check.ok) return check;
   state.contracts = state.contracts.filter((entry) => entry.id !== contractId);
-  if (!accept) return OK;
+  if (!accept || contract.renegotiatedPrice === null) return OK;
   // The same piece, quantity and term at the new price, on the books as a fresh offer that is
   // accepted at once: nothing is drawn, so the seeded stream is untouched.
   const renewed: Contract = {

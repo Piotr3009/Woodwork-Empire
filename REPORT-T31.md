@@ -63,3 +63,16 @@ back` [TUNE]; the shelter's plate hung 0.6 m over the wall's top so that 400 cle
 at both corners [TUNE]; the shelter's lift asserted on raw saves in `tests/cloud/migrate.test.ts`
 (standing, on order, and with no room), and a purchase's search sent past the lane to the first free
 place off it.
+
+**T31-D1 Contracts that can be lost.** At each week's close of a running sheet contract, after the
+short week's rule and while the term has days to come [TUNE], one time in `CONTRACT_CLIENT_LEAVES_CHANCE`
+the client goes elsewhere (`endedBy: 'lost'`, the week already closed, no second, no term offered, the
+men free) and no standing contract is offered for 14 to 21 days (`contractQuietUntilDay`, drawn at
+the loss; a second loss never shortens it [TUNE]); at a sheet term's end, one time in four, the
+client offers 5 to 15 per cent under the price a piece it had (kept inside the band at the pound
+[TUNE]), said as the card's last sentence. Every draw off `contractSideCarrier` (seed, id, day,
+salt); the salts 2 and 9 chosen so that none of the 34 draws the suite made before tonight comes up,
+so no scenario moved (2.9's "choose its seed") [TUNE]. A lost contract's ended block has `Let it go`
+alone, and `renewContract` lets it go and refuses its renewal in words. An offer already on the board
+when a client leaves stays takeable through the quiet days, since the day's offer is drawn before the
+week closes (the order of the day's open is unchanged).

@@ -1259,9 +1259,10 @@ export interface Contract {
   /** The price the client offers at the end of the term, from the delivery history. Null until
    *  the term ends. */
   renegotiatedPrice: number | null;
-  /** Who ended it: the term running out, the player pressing End the contract, or the client
-   *  walking away on a second short week (CLAUDE.md T20 2.1.6). */
-  endedBy: 'term' | 'player' | 'client';
+  /** Who ended it: the term running out, the player pressing End the contract, the client
+   *  walking away on a second short week (CLAUDE.md T20 2.1.6), or the client going elsewhere at a
+   *  week's close, with no other term (`'lost'`, CLAUDE.md T31 2.9). */
+  endedBy: 'term' | 'player' | 'client' | 'lost';
 }
 
 /** One tile of pipe over the floor. It occupies no cell and blocks nothing under it

@@ -5996,6 +5996,19 @@ export const CONTRACT_SHORT_WEEK_REPUTATION = 1;
 export const CONTRACT_SHORT_WEEKS_ALLOWED = 2;
 export const CONTRACT_RENEW_FULL_WEEK = 0.01;
 export const CONTRACT_RENEW_SHORT_WEEK = 0.02;
+/** [PIOTR, 11.10: "yes" to 3 per cent] At each week's close of a running contract for sheet pieces,
+ *  the chance that the client goes elsewhere and ends it, with no other term (CLAUDE.md T31 2.9). */
+export const CONTRACT_CLIENT_LEAVES_CHANCE = 0.03;
+/** [PIOTR, 11.10: "yes"] From the day a contract is lost no standing contract is offered for this
+ *  many days, drawn once at the loss, both ends included (CLAUDE.md T31 2.9). */
+export const CONTRACT_QUIET_DAYS_MIN = 14;
+export const CONTRACT_QUIET_DAYS_MAX = 21;
+/** [TUNE: chat] The chance that a sheet contract's client, offering another term at its end, offers
+ *  less than the price a piece it had: by `CONTRACT_RENEWAL_CUT_MIN` to `_MAX` per cent [PIOTR, 11.10:
+ *  "yes" to 5 to 15], drawn in whole per cent (CLAUDE.md T31 2.9). */
+export const CONTRACT_RENEWAL_CUT_CHANCE = 0.25;
+export const CONTRACT_RENEWAL_CUT_MIN = 5;
+export const CONTRACT_RENEWAL_CUT_MAX = 15;
 
 // ---------------------------------------------------------------------------
 // T13 3.17 Security, five levels
