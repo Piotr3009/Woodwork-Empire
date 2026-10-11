@@ -33,7 +33,7 @@ import { bagStore, boardRoom, findSpec, lineEngineersOnDuty, lineLevel, lineModu
 import { canUnload, isBoards } from './materials';
 import { lineShortOf, runningLineContract } from './lineContract';
 import { andList, inASentence, inWords } from './text';
-import { forkliftLane, linePlace, standingOnTheLane } from './layout';
+import { laneTrouble, linePlace, standingOnTheLane } from './layout';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine, hasOfficeAdmin } from './staff';
@@ -261,8 +261,13 @@ function lineNeedsMaterialWarning(state: GameState): Warning | null {
 function laneBlockedWarning(state: GameState): Warning | null {
   const at = linePlace(state);
   if (at === null) return null;
-  if (forkliftLane(state, at) === null) {
+  const trouble = laneTrouble(state, at);
+  if (trouble === 'frontWall') {
     return { key: 'laneBlocked', text: 'The line stands too near the front wall for its lane: move it back' };
+  }
+  // A line over the left strip has to move along it, not back [TUNE: the words].
+  if (trouble === 'leftWall') {
+    return { key: 'laneBlocked', text: 'The line stands on the way to the gate for its lane: move it along' };
   }
   const on = standingOnTheLane(state);
   if (on.length === 0) return null;

@@ -19,7 +19,9 @@ import { describe, expect, it } from 'vitest';
 import { LINE_MODULES, WINDOW_LINE_ORIGIN } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { canBuy, placeEquipmentOrder } from '../../src/engine/game';
-import { canPlace, canPlaceSpec, firstFreeCell, forkliftLane, lineLane } from '../../src/engine/layout';
+import { canBeMoved, canPlace, canPlaceSpec, firstFreeCell, forkliftLane, lineLane } from '../../src/engine/layout';
+import { findSpec } from '../../src/engine/machines';
+import { ownedTile } from '../../src/ui/catalogue';
 import { isFree } from '../../src/engine/walk';
 import { warnings } from '../../src/engine/warnings';
 import { renderHall } from '../../src/render/hall';
@@ -97,6 +99,17 @@ describe('nothing else stands on it (CLAUDE.md T31 2.6)', () => {
     expect(firstFreeCell(state, 'sheetRack')).not.toBeNull();
   });
 
+  it('sends a purchase s search past the lane to the first free place off it', () => {
+    // Every row down to the front strip filled with racks, so the only floor left is the lane and the
+    // two metres past the line's end, x 38 and 39, y 18 and 19.
+    const state = withLine(bigUnit());
+    state.equipment = state.equipment.filter((item) => LINE_MODULES.includes(item.specId));
+    for (let y = 0; y < 18; y += 2) {
+      for (let x = 0; x < 40; x += 2) placeEquipment(state, 'sheetRack', { variantId: 'standard', x, y, id: `kit-fill-${x}-${y}` });
+    }
+    expect(firstFreeCell(state, 'sheetRack', 'standard')).toEqual({ x: 38, y: 18 });
+  });
+
   it('lets men walk on it', () => {
     const state = withLine(bigUnit());
     expect(isFree(state, { x: 10, y: 19 })).toBe(true);
@@ -137,6 +150,29 @@ describe('what stands on it already (CLAUDE.md T31 2.6)', () => {
     const moved = act(state, { type: 'MOVE_ITEM', itemId: 'kit-bench-on-the-lane', x: 10, y: 10 });
     const off = act(moved, { type: 'MOVE_ITEM', itemId: 'kit-rack-on-the-lane', x: 12, y: 10 });
     expect(warnings(off).some((warning) => warning.key === 'laneBlocked')).toBe(false);
+  });
+
+  it('still offers Move for the kit on the lane and for a line whose lane cannot be, which the strip says to move', () => {
+    const state = bigUnit();
+    placeEquipment(state, 'workbench', { variantId: 'standard', x: 10, y: 18, id: 'kit-bench-on-the-lane' });
+    withLine(state);
+    expect(canPlace(state, 'kit-bench-on-the-lane', 10, 18).ok).toBe(false);
+    expect(canBeMoved(state, 'kit-bench-on-the-lane')).toBe(true);
+    const bench = state.equipment.find((item) => item.id === 'kit-bench-on-the-lane');
+    const benchSpec = findSpec('workbench');
+    if (bench === undefined || benchSpec === null) throw new Error('the bench is wanted');
+    expect(ownedTile(state, bench, benchSpec, null)).toContain('data-do="startSetup"');
+    const near = withLine(bigUnit(), { x: 2, y: 15 });
+    expect(canBeMoved(near, 'kit-line-3')).toBe(true);
+    // A thing that cannot be taken hold of at all is still not offered it.
+    expect(canBeMoved(near, 'no-such-kit')).toBe(false);
+  });
+
+  it('says a line over the left strip is to be moved along it, not back', () => {
+    const state = withLine(bigUnit(), { x: 0, y: 11 });
+    expect(warnings(state).find((warning) => warning.key === 'laneBlocked')?.text).toBe(
+      'The line stands on the way to the gate for its lane: move it along',
+    );
   });
 
   it('keeps a Turn 30 line standing where its lane cannot be, draws no lane, and says to move it back', () => {

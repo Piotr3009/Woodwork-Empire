@@ -55,3 +55,11 @@ new pallet to the gate (`nw`, `ne`) and comes back (`sw`, `se`) at 3 cells a sec
 hiding the pallet on its forks, set again after every page and forgotten at a load, a new morning, a
 move, a sale and from 30x; the pallets at the gate drawn from `windowPallet.standard.png`, two at the
 most. The two new kinds of file taught to the Sprite check page and the counting tests; SPRITES.md 16.
+
+**T31-C1 and C2 review fixes.** A second reader's findings on C1 and C2, put right in one commit after
+C4: kit standing on the lane, and a line whose lane cannot be, still offer `Move` (`canBeMoved`), so
+the strip's `move it` can be done; a line over the left strip is told `move it along`, not `move it
+back` [TUNE]; the shelter's plate hung 0.6 m over the wall's top so that 400 clears the wall's clip
+at both corners [TUNE]; the shelter's lift asserted on raw saves in `tests/cloud/migrate.test.ts`
+(standing, on order, and with no room), and a purchase's search sent past the lane to the first free
+place off it.

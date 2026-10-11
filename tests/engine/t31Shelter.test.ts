@@ -10,17 +10,16 @@
 // @vitest-environment jsdom
 // Turn 31, 2.8: the timber shelter behind the rear wall [PIOTR, 11.10: "it hides our hall; rather
 // where the extractors are, or behind them; nothing in the hall may be hidden"], 6 m along the wall
-// by 3 m deep, its plate hung over the wall's top, and a save's shelter on the apron moved there
-// (CLAUDE.md T31 2.8, section 4, section 7).
+// by 3 m deep, and its plate hung over the wall's top (CLAUDE.md T31 2.8, section 7). A save's
+// shelter on the apron moved there is asserted on raw saves in tests/cloud/migrate.test.ts.
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { EQUIPMENT_SPECS, STATE_VERSION } from '../../src/engine/constants';
+import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { standsBehindTheWall, standsOutside } from '../../src/engine/layout';
 import { itemFootprint } from '../../src/engine/machines';
-import { migrateState } from '../../src/engine/migrate';
 import { tileToScreen } from '../../src/render/iso';
 import { REAR_WALL, REAR_WALL_CLIP, renderHall } from '../../src/render/hall';
 import { act, buyNow, buyStartingKit, newGame, nextDay, placeEquipment } from '../helpers';
@@ -79,6 +78,30 @@ describe('the shelter behind the rear wall (CLAUDE.md T31 2.8)', () => {
     expect(drawn.querySelector('.rack-count')?.textContent).toBe('0');
   });
 
+  it('hangs a plate of three figures clear of the wall s clip at both lower corners', () => {
+    const state = buyNow(bigUnit(), 'timberShelter');
+    const shelter = state.equipment.find((item) => item.specId === 'timberShelter');
+    if (shelter === undefined) throw new Error('the shelter is wanted');
+    // Four hundred boards held for a timber job: the store full, its plate at its widest.
+    state.windowLine.boards = 400;
+    state.stock.sheets += 400;
+    const holder = document.createElement('div');
+    holder.innerHTML = renderHall(state);
+    const plate = holder.querySelector(`[data-kit="${shelter.id}"] .rack-count-plate`);
+    expect(holder.querySelector(`[data-kit="${shelter.id}"] .rack-count`)?.textContent).toBe('400');
+    const x = Number(plate?.getAttribute('x'));
+    const width = Number(plate?.getAttribute('width'));
+    const bottom = Number(plate?.getAttribute('y')) + Number(plate?.getAttribute('height'));
+    // The clip's line is the wall's top seen from the camera: it rises half a pixel for every pixel
+    // to the left, so the plate's lower left corner is the one that has to clear it.
+    const wallAt = (screenX: number): number => {
+      const start = tileToScreen(0, -REAR_WALL.back, REAR_WALL.top);
+      return start.y + (screenX - start.x) / 2;
+    };
+    expect(bottom).toBeLessThan(wallAt(x));
+    expect(bottom).toBeLessThan(wallAt(x + width));
+  });
+
   it('has its two pictures back in their places: the art side s 0 view is the picture, its 90 view the .r', () => {
     // The art side's two files of Turn 29, byte for byte, each where the other stood until tonight:
     // eaef91e8 was the `.r` and is the picture, 7587d989 the picture and is the `.r`.
@@ -88,35 +111,5 @@ describe('the shelter behind the rear wall (CLAUDE.md T31 2.8)', () => {
     // Each 448 by 376, the contract's canvas for 6 by 3 by 3 and for 3 by 6 by 3 alike.
     const picture = readFileSync('public/sprites/timberShelter.standard.png');
     expect([picture.readUInt32BE(16), picture.readUInt32BE(20)]).toEqual([448, 376]);
-  });
-});
-
-describe('a v43 save with its shelter on the apron (CLAUDE.md T31 section 4)', () => {
-  it('opens with the shelter behind the rear wall and the van on the apron', () => {
-    const state = bigUnit();
-    const kerb = state.unit.widthCells;
-    placeEquipment(state, 'timberShelter', { variantId: 'standard', x: kerb, y: 1, id: 'kit-shelter' });
-    const raw = JSON.parse(JSON.stringify(state)) as { version: number };
-    raw.version = 43;
-    const lifted = migrateState(raw, 43);
-    if (lifted === null) throw new Error('the save is wanted');
-    expect(lifted.version).toBe(STATE_VERSION);
-    const shelter = lifted.equipment.find((item) => item.id === 'kit-shelter');
-    expect(shelter?.anchorY).toBe(-4);
-    expect((shelter?.anchorX ?? kerb) + 6).toBeLessThanOrEqual(kerb);
-    const van = lifted.equipment.find((item) => item.specId === 'van');
-    expect(van?.anchorX).toBeGreaterThanOrEqual(kerb);
-  });
-
-  it('leaves a shelter where it stands when the wall has no length left for it', () => {
-    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    const kerb = state.unit.widthCells;
-    // Plant along the whole of the 20 m wall first, then the shelter on the apron.
-    for (let n = 0; n < 5; n += 1) placeEquipment(state, 'flexiSystem', { x: n * 4, y: -3, id: `kit-plant-${n}` });
-    placeEquipment(state, 'timberShelter', { variantId: 'standard', x: kerb, y: 1, id: 'kit-shelter' });
-    const raw = JSON.parse(JSON.stringify(state)) as { version: number };
-    raw.version = 43;
-    const lifted = migrateState(raw, 43);
-    expect(lifted?.equipment.find((item) => item.id === 'kit-shelter')).toMatchObject({ anchorX: kerb, anchorY: 1 });
   });
 });

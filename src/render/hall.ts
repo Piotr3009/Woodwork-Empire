@@ -1346,13 +1346,14 @@ const RACK_COUNT = {
   type: 26 / RACK_COUNT_SHRINK,
 };
 
+/** How far over the rear wall's top, in metres, a plate hung over it stands: high enough that the
+ *  plate of three figures clears the wall's clip at its lower corner too [TUNE]. */
+const RACK_COUNT_OVER_WALL = 0.6;
+
 /** The sheets in the rack, over its own front face, big, in the hand, on the class's colour
  *  (PIOTR, 17.09; CLAUDE.md T17 2.8). The count used to be glued into the object's name, and
  *  `objectArt` throws the name away whenever a sprite file exists, so in the real game the number
  *  was invisible: the rack draws it itself now, and it moves with the stock. */
-/** How far over the rear wall's top, in metres, a plate hung over it stands [TUNE]. */
-const RACK_COUNT_OVER_WALL = 0.3;
-
 function rackCount(item: Equipment, sheets: number): string {
   const stands = footprintIn(item);
   // A store behind the rear wall is hidden by it up to its top, so its plate is hung over the
@@ -2025,7 +2026,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const task = taskId === null ? undefined : state.tasks.find((entry) => entry.id === taskId);
     if (task === undefined || task.kind !== 'unload') return loopEnds(STATION_RACK);
     const far = unloadFarStation(state, task);
-    // Boards with only a shelter: he stays at the gate, and nobody is walked onto the apron.
+    // Boards with only a shelter: he stays at the gate, and nobody is walked out of the hall to it.
     if (far === STATION_GATE) return '';
     return loopEnds(far);
   };

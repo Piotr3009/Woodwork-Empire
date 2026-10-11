@@ -15,6 +15,7 @@ import {
   UNDER_EXTRACTION_OUTPUT_PENALTY,
 } from '../engine/constants';
 import type { EquipmentSpec, EquipmentTab, OnOrderItem } from '../engine/types';
+import { canBeMoved } from '../engine/layout';
 import {
   airBlockFor,
   airCheck,
@@ -647,10 +648,9 @@ export function ownedTile(
   // the button takes him there and he drags it where he wants it (CLAUDE.md T17 2.6). Only what
   // can actually be dragged is offered it, and the engine's own check says which: the office
   // furniture, the welfare kit in the canteen and a tool in a cabinet are not on the floor.
-  const canMove =
-    !isSold(item) &&
-    itemStandsInTheHall(item) &&
-    canPlace(state, item.id, item.anchorX, item.anchorY).ok;
+  // Kit on the forklift's lane, or a line whose lane is blocked, is still offered it: the strip
+  // tells the player to move it (CLAUDE.md T31 2.6).
+  const canMove = !isSold(item) && itemStandsInTheHall(item) && canBeMoved(state, item.id);
   const move = canMove ? button('startSetup', 'Move') : '';
   // The bags are the hall's, and the button that empties them is the one the chip over the floor
   // presses (CLAUDE.md T12 2.3, T17 2.5).

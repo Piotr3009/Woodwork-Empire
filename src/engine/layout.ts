@@ -96,15 +96,15 @@ function boxOfItem(
 }
 
 /** True for the kit that stands outside and not on the hall floor: the two central systems, the
- *  pelletiser and the van (`STARTING_LAYOUT`). */
+ *  pelletiser, the timber shelter and the van (`STARTING_LAYOUT`). */
 export function standsOutside(specId: string): boolean {
   return STARTING_LAYOUT[specId]?.yard === true;
 }
 
-/** True for the kit that stands outside behind the rear wall: the two central systems, and from
- *  v83 the pelletiser beside them. On the apron at the end of the hall they stood in front of the
- *  benches and hid them, and behind the wall they hide nothing (PIOTR, 03.10 and 05.10; v73,
- *  CLAUDE.md T28 2.1). The van stays on the apron. */
+/** True for the kit that stands outside behind the rear wall: the two central systems, from v83
+ *  the pelletiser beside them, and from v92 the timber shelter. On the apron at the end of the hall
+ *  they stood in front of the benches and hid them, and behind the wall they hide nothing (PIOTR,
+ *  03.10, 05.10 and 11.10; v73, CLAUDE.md T28 2.1, T31 2.8). The van stays on the apron alone. */
 export function standsBehindTheWall(specId: string): boolean {
   return STARTING_LAYOUT[specId]?.rear === true;
 }
@@ -253,6 +253,26 @@ export function canPlaceSpec(
 /** What setup mode and every purchase's search say of a cell of the forklift's lane (CLAUDE.md T31
  *  2.6) [TUNE]. */
 export const FORKLIFT_LANE_REFUSAL = 'That is the forklift\'s lane';
+
+/** True for an item the player can take hold of in setup mode: its own place is good, or the only
+ *  thing wrong with it is the forklift's lane, kit that stood there before the line, or a line whose
+ *  lane is blocked or cannot be, which is exactly what the strip tells him to move (CLAUDE.md T31
+ *  2.6). */
+export function canBeMoved(state: GameState, itemId: string): boolean {
+  const item = state.equipment.find((entry) => entry.id === itemId);
+  if (item === undefined) return false;
+  const check = canPlace(state, itemId, item.anchorX, item.anchorY);
+  return check.ok || check.reason === FORKLIFT_LANE_REFUSAL || check.reason === lineNeedsRoom();
+}
+
+/** Why a line standing at this cell has no lane: too near the front wall for its men's metre and
+ *  the front strip, or over the left strip below the pallets at the gate. Null when it has one
+ *  (CLAUDE.md T31 2.6). */
+export function laneTrouble(state: GameState, at: { x: number; y: number }): 'frontWall' | 'leftWall' | null {
+  if (forkliftLane(state, at) !== null) return null;
+  const line = lineBox(at);
+  return line.y + line.depth + LINE_FRONT_CELLS > state.unit.depthCells - FORKLIFT_LANE_CELLS ? 'frontWall' : 'leftWall';
+}
 
 /** Where module 1 of the line stands, not sold, or is held on order: the line's place, from which
  *  its lane is worked out. Null with no line (CLAUDE.md T31 2.6). */

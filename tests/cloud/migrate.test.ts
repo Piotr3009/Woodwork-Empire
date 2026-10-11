@@ -1736,3 +1736,39 @@ describe('a v43 save in this build (CLAUDE.md T31 section 4)', () => {
     expect(opened.cash).toBe(cash);
   });
 });
+
+describe('a v43 save with its timber shelter on the apron (CLAUDE.md T31 2.8, section 4)', () => {
+  it('opens with the shelter behind the rear wall on its 6 by 3, standing or on order, and the van on the apron', () => {
+    const raw = v43Save();
+    const equipment = raw.equipment as Array<Record<string, unknown>>;
+    const onOrder = raw.onOrder as Array<Record<string, unknown>>;
+    const kerb = raw.unit.widthCells as number;
+    const like = JSON.parse(JSON.stringify(equipment[0] ?? {})) as Record<string, unknown>;
+    equipment.push({ ...like, id: 'kit-shelter', specId: 'timberShelter', variantId: 'standard', spriteKey: 'timberShelter', anchorX: kerb, anchorY: 1, orientation: 0, soldOnDay: null });
+    equipment.push({ ...like, id: 'kit-van', specId: 'van', variantId: 'standard', spriteKey: 'van', anchorX: kerb, anchorY: 7, orientation: 0, soldOnDay: null });
+    onOrder.push({ id: 'order-shelter', specId: 'timberShelter', variantId: 'standard', pricePaid: 18000, orderedDay: 630, dueDay: 650, anchorX: kerb, anchorY: 4, arrived: false, orientation: 0 });
+    const opened = migrateState(raw, 43);
+    if (opened === null) throw new Error('the lift refused a whole version 43 state');
+    const shelter = opened.equipment.find((item) => item.id === 'kit-shelter');
+    const ordered = opened.onOrder.find((item) => item.id === 'order-shelter');
+    expect(shelter?.anchorY).toBe(-4);
+    expect(ordered?.anchorY).toBe(-4);
+    expect((shelter?.anchorX ?? kerb) + 6).toBeLessThanOrEqual(kerb);
+    expect(ordered?.anchorX).not.toBe(shelter?.anchorX);
+    expect(opened.equipment.find((item) => item.id === 'kit-van')).toMatchObject({ anchorX: kerb, anchorY: 7 });
+  });
+
+  it('leaves a shelter where it stands when the wall has no length left for it', () => {
+    const raw = v43Save();
+    const equipment = raw.equipment as Array<Record<string, unknown>>;
+    const kerb = raw.unit.widthCells as number;
+    const like = JSON.parse(JSON.stringify(equipment[0] ?? {})) as Record<string, unknown>;
+    // Plant along the whole of the 40 m wall first, then the shelter on the apron.
+    for (let n = 0; n < 10; n += 1) {
+      equipment.push({ ...like, id: `kit-plant-${n}`, specId: 'flexiSystem', variantId: 'standard', spriteKey: 'flexiSystem', anchorX: n * 4, anchorY: -3, orientation: 0, soldOnDay: null });
+    }
+    equipment.push({ ...like, id: 'kit-shelter', specId: 'timberShelter', variantId: 'standard', spriteKey: 'timberShelter', anchorX: kerb, anchorY: 1, orientation: 0, soldOnDay: null });
+    const opened = migrateState(raw, 43);
+    expect(opened?.equipment.find((item) => item.id === 'kit-shelter')).toMatchObject({ anchorX: kerb, anchorY: 1 });
+  });
+});
