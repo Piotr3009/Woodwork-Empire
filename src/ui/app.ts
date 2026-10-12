@@ -1739,7 +1739,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // the second and the long one (CLAUDE.md T31 2.7) on the buttons that name them.
       dispatch({
         type: 'EXTEND_UNIT',
-        stage: element.dataset.stage === 'second' || element.dataset.stage === 'long' ? element.dataset.stage : 'first',
+        // And the wide one, seven metres more along the front (v95).
+        stage:
+          element.dataset.stage === 'second' || element.dataset.stage === 'long' || element.dataset.stage === 'wide'
+            ? element.dataset.stage
+            : 'first',
       });
       return;
     case 'enlargeCanteen':

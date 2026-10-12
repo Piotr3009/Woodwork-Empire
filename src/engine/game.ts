@@ -430,9 +430,11 @@ export function createGame(options: NewGameOptions): GameState {
       // The unit as it was rented: not extended, and the canteen as it was built (v67).
       extension: 'none',
       canteenWide: false,
-      // And never made longer along its rear wall (CLAUDE.md T31 2.7).
+      // And never made longer along its rear wall (CLAUDE.md T31 2.7), nor wider (v95).
       longExtensions: 0,
       longExtension: 'none',
+      wideExtensions: 0,
+      wideExtension: 'none',
     },
     owner: {
       present: true,

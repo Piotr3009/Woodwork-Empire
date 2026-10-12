@@ -504,8 +504,9 @@ export type LongExtension = 'none' | 'building';
 
 /** The times a unit can be extended, in the order they are built: the second 200 m2 along the
  *  rear wall, then 400 m2 along the front of that (v67, v82), and then 200 m2 more along the rear
- *  wall as many times as the player wants, one at a time (`'long'`, CLAUDE.md T31 2.7). */
-export type ExtensionStage = 'first' | 'second' | 'long';
+ *  wall as many times as the player wants, one at a time (`'long'`, CLAUDE.md T31 2.7), and seven
+ *  metres more of depth along the front as many times as he wants (`'wide'`, v95). */
+export type ExtensionStage = 'first' | 'second' | 'long' | 'wide';
 
 export interface UnitState {
   areaM2: number;
@@ -529,6 +530,10 @@ export interface UnitState {
    *  is being built (CLAUDE.md T31 2.7) [TUNE: the names]. */
   longExtensions: number;
   longExtension: LongExtension;
+  /** How many wide extensions are open, each seven metres more of depth along the whole front, and
+   *  whether one is being built (PIOTR, 12.10; v95). */
+  wideExtensions: number;
+  wideExtension: LongExtension;
 }
 
 export interface Worker {

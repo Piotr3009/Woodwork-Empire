@@ -21,6 +21,7 @@ import {
   ROOM_LAYOUT,
   UNIT_DEPTH_CELLS,
   UNIT_LONG_EXTENSION_CELLS,
+  UNIT_WIDE_EXTENSION_CELLS,
   UNIT_WIDTH_CELLS,
   WELFARE_IN_THE_CANTEEN,
   YARD_WIDTH_CELLS,
@@ -501,6 +502,27 @@ export const HALL_CANVAS_END = {
  *  (docs/art/SPRITES.md 9.9). */
 export const HALL_GROUND_TILE = { width: 480 / SPRITE_SCALE, height: 240 / SPRITE_SCALE };
 
+/** The pieces a hall wider than twenty metres is laid of, each on a canvas of its own registered
+ *  where `scripts/hall-wider.py` cut it out of the 800 m2 picture, whose origin is 1080, 288
+ *  (docs/art/SPRITES.md 9.10; v95): seven metres of the hall's depth from the left wall to x 39,
+ *  where its painted floor stops, and its front; the same of a long piece; and the same of the end,
+ *  the kerb under it among them. Each is laid seven metres further towards the camera than the one
+ *  before, and a long piece's and the end's as far along as theirs. */
+function cutAt(width: number, height: number, left: number, top: number): HallCanvas {
+  return {
+    width: width / SPRITE_SCALE,
+    height: height / SPRITE_SCALE,
+    originX: (1080 - left) / SPRITE_SCALE,
+    originY: (288 - top) / SPRITE_SCALE,
+  };
+}
+export const HALL_CANVAS_WIDER = cutAt(2256, 1310, 168, 370);
+export const HALL_CANVAS_WIDER_FRONT = cutAt(1972, 1166, 116, 538);
+export const HALL_CANVAS_LONG_WIDER = cutAt(912, 456, 1512, 1224);
+export const HALL_CANVAS_LONG_WIDER_FRONT = cutAt(626, 312, 1462, 1392);
+export const HALL_CANVAS_END_WIDER = cutAt(482, 242, 1992, 1464);
+export const HALL_CANVAS_END_WIDER_FRONT = cutAt(196, 98, 1942, 1632);
+
 export interface HallLayer {
   /** The sprite key, which is the file name in public/sprites. */
   key: string;
@@ -538,6 +560,18 @@ export const HALL_WIDE_LAYERS: HallLayer[] = [
     room: 'wc',
     canvas: { ...HALL_GROUND_TILE, originX: 0, originY: 0 },
   },
+  // The hall wider than twenty metres, made of the 800 m2 picture (v95).
+  { key: 'hallBackgroundWider', name: 'Hall background, seven metres wider', room: 'wc', canvas: HALL_CANVAS_WIDER },
+  { key: 'hallBackgroundWiderFront', name: 'Hall background, the front', room: 'wc', canvas: HALL_CANVAS_WIDER_FRONT },
+  { key: 'hallBackgroundLongWider', name: 'Hall background, ten metres more, wider', room: 'wc', canvas: HALL_CANVAS_LONG_WIDER },
+  {
+    key: 'hallBackgroundLongWiderFront',
+    name: 'Hall background, ten metres more, the front',
+    room: 'wc',
+    canvas: HALL_CANVAS_LONG_WIDER_FRONT,
+  },
+  { key: 'hallBackgroundEndWider', name: 'Hall background, the end, wider', room: 'wc', canvas: HALL_CANVAS_END_WIDER },
+  { key: 'hallBackgroundEndWiderFront', name: 'Hall background, the end, the front', room: 'wc', canvas: HALL_CANVAS_END_WIDER_FRONT },
 ];
 
 /** How many long extensions this unit's hall has: the ten metres pieces past forty metres of a hall
@@ -547,21 +581,42 @@ export function longPiecesOf(unit: { widthCells: number; depthCells?: number }):
   return Math.max(0, Math.floor((unit.widthCells - 2 * UNIT_WIDTH_CELLS) / UNIT_LONG_EXTENSION_CELLS));
 }
 
-/** A canvas moved this many steps of ten metres along the hall: its origin that much further back
- *  on it, so the picture lands that much further along. */
-function alongTheHall(canvas: HallCanvas, steps: number): HallCanvas {
-  const step = tileToScreen(UNIT_LONG_EXTENSION_CELLS, 0);
-  return { ...canvas, originX: canvas.originX - step.x * steps, originY: canvas.originY - step.y * steps };
+/** How many wide extensions this unit's hall has: the seven metres pieces past twenty metres of
+ *  depth (v95). Read off the hall's own depth, as everything that draws it is. */
+export function widePiecesOf(unit: { depthCells?: number }): number {
+  const depth = unit.depthCells ?? UNIT_DEPTH_CELLS;
+  return Math.max(0, Math.floor((depth - 2 * UNIT_DEPTH_CELLS) / UNIT_WIDE_EXTENSION_CELLS));
 }
 
-/** The frame of the whole painted scene: the background's own canvas, and ten metres more of it
- *  along the hall for every long extension, which is what the scene, the camera's bounds and the
- *  zoom that fits the hall read (CLAUDE.md T31 2.7). */
+/** A canvas moved this many steps of ten metres along the hall and of seven metres towards the
+ *  camera: its origin that much further back on it, so the picture lands that much further along
+ *  and further forward. */
+function alongTheHall(canvas: HallCanvas, steps: number, across = 0): HallCanvas {
+  const step = tileToScreen(UNIT_LONG_EXTENSION_CELLS, 0);
+  const wide = tileToScreen(0, UNIT_WIDE_EXTENSION_CELLS);
+  return {
+    ...canvas,
+    originX: canvas.originX - step.x * steps - wide.x * across,
+    originY: canvas.originY - step.y * steps - wide.y * across,
+  };
+}
+
+/** The frame of the whole painted scene: the background's own canvas, ten metres more of it along
+ *  the hall for every long extension, and seven metres more of it towards the camera, which is down
+ *  and to the left on the screen, for every wide one; what the scene, the camera's bounds and the
+ *  zoom that fits the hall read (CLAUDE.md T31 2.7; v95). */
 export function hallFrameCanvas(unit: { widthCells: number; depthCells?: number; canteenWide?: boolean }): HallCanvas {
   const canvas = hallLayersOf(unit)[0]?.canvas ?? HALL_CANVAS;
   const step = tileToScreen(UNIT_LONG_EXTENSION_CELLS, 0);
+  const wide = tileToScreen(0, UNIT_WIDE_EXTENSION_CELLS);
   const pieces = longPiecesOf(unit);
-  return { ...canvas, width: canvas.width + step.x * pieces, height: canvas.height + step.y * pieces };
+  const wides = widePiecesOf(unit);
+  return {
+    ...canvas,
+    originX: canvas.originX - wide.x * wides,
+    width: canvas.width + step.x * pieces - wide.x * wides,
+    height: canvas.height + step.y * pieces + wide.y * wides,
+  };
 }
 
 /** The picture a grown unit has in place of this layer, or the layer itself. */
@@ -584,16 +639,39 @@ export function hallLayersOf(unit: {
   const extended = unit.widthCells > UNIT_WIDTH_CELLS;
   const background = deep ? 'hallBackgroundDeep' : extended ? 'hallBackgroundWide' : null;
   const pieces = longPiecesOf(unit);
+  const wides = widePiecesOf(unit);
   return HALL_LAYERS.flatMap((layer) => {
     if (layer.room === 'wc') {
-      if (pieces === 0) return [grownLayer(layer, background)];
-      const long = grownLayer(layer, 'hallBackgroundLong');
-      const end = grownLayer(layer, 'hallBackgroundEnd');
-      return [
+      if (pieces === 0 && wides === 0) return [grownLayer(layer, background)];
+      const piece = (key: string, canvas: HallCanvas, along: number, across: number): HallLayer => ({
+        ...grownLayer(layer, key),
+        canvas: alongTheHall(canvas, along, across),
+      });
+      const columns = Array.from({ length: pieces }, (_, index) => index + 1);
+      // The hall as it is twenty metres deep: the picture, its long pieces and its end.
+      const rear = [
         grownLayer(layer, background),
-        ...Array.from({ length: pieces }, (_, index) => ({ ...long, canvas: alongTheHall(HALL_CANVAS_LONG, index + 1) })),
-        { ...end, canvas: alongTheHall(HALL_CANVAS_END, pieces) },
+        ...columns.map((along) => piece('hallBackgroundLong', HALL_CANVAS_LONG, along, 0)),
+        ...(pieces > 0 ? [piece('hallBackgroundEnd', HALL_CANVAS_END, pieces, 0)] : []),
       ];
+      // Then seven metres more at a time along the whole front, a row of pieces each: the hall's
+      // own, every long piece's and the end's, which is laid at the end of the hall whether it is
+      // longer than forty metres or not, each row over the front of the one before (v95).
+      const rows = Array.from({ length: wides }, (_, index) => index + 1).flatMap((across) => [
+        piece('hallBackgroundWider', HALL_CANVAS_WIDER, 0, across),
+        ...columns.map((along) => piece('hallBackgroundLongWider', HALL_CANVAS_LONG_WIDER, along, across)),
+        piece('hallBackgroundEndWider', HALL_CANVAS_END_WIDER, pieces, across),
+      ]);
+      // And the front at the last of them (v95).
+      const front =
+        wides === 0
+          ? []
+          : [
+              piece('hallBackgroundWiderFront', HALL_CANVAS_WIDER_FRONT, 0, wides),
+              ...columns.map((along) => piece('hallBackgroundLongWiderFront', HALL_CANVAS_LONG_WIDER_FRONT, along, wides)),
+              piece('hallBackgroundEndWiderFront', HALL_CANVAS_END_WIDER_FRONT, pieces, wides),
+            ];
+      return [...rear, ...rows, ...front];
     }
     if (layer.room === 'canteen') {
       return [grownLayer(layer, unit.canteenWide === true ? 'hallCanteenWide' : null)];
@@ -1833,7 +1911,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // is painted on is laid edge to edge under all of it first, so whatever the pieces leave is the
     // picture's own ground (CLAUDE.md T31 2.7; docs/art/SPRITES.md 9.9).
     const ground = layerUrl('hallBackgroundGround');
-    if (longPiecesOf(unit) > 0 && ground !== null) {
+    if ((longPiecesOf(unit) > 0 || widePiecesOf(unit) > 0) && ground !== null) {
       const frame = hallLayerBox(hallFrameCanvas(unit));
       parts.push(
         '<defs><pattern id="hall-ground" patternUnits="userSpaceOnUse" ' +

@@ -367,6 +367,48 @@ that fits the hall read, is 9.8's canvas and 480 × 240 px more for each piece: 
 at 1x for 60 m, `-540 -144 3000 1644` for 100 m. If `hallBackgroundDeep.png` is made again, run
 `scripts/hall-long.py` after `scripts/hall-deep.py`, then `npm run sprites:manifest`.
 
+### 9.10 The hall made wider (v95, PIOTR 12.10.2026: "and where is the width?")
+
+From its second extension the hall can also be made 7 m deeper along its whole front, as many
+times as the player wants, one at a time: 40 × 27 m, 40 × 34 m and on, longer as well as wider
+(60 × 34 m). Nothing is painted for it. Six pieces are cut out of `hallBackgroundDeep.png` by
+`scripts/hall-wider.py`, pixel for pixel, none of them scaled:
+
+| File in `public/sprites/` | Format | Contents | Cut from 9.8's canvas at |
+|---|---|---|---|
+| `hallBackgroundWider.png` | RGBA, 2256 × 1310 | a band of the hall from y 11 to 19 (the floor, and on the left wall its face and its top) from the left wall to x 39, the first metre (11 to 12) coming in from nothing | x 168, y 370 |
+| `hallBackgroundWiderFront.png` | RGBA, 1972 × 1166 | the front of the hall, everything of it from y 18 on as far as x 39: the front kerb and the end of the left wall, coming in over the metre 18 to 19 | x 116, y 538 |
+| `hallBackgroundLongWider.png` | RGBA, 912 × 456 | the band of a long piece (9.9), x 28 to 39, its first metre along (28 to 29) coming in too | x 1512, y 1224 |
+| `hallBackgroundLongWiderFront.png` | RGBA, 626 × 312 | the front of a long piece | x 1462, y 1392 |
+| `hallBackgroundEndWider.png` | RGBA, 482 × 242 | the band of the end, from x 38 on: the kerb under the end of the hall | x 1992, y 1464 |
+| `hallBackgroundEndWiderFront.png` | RGBA, 196 × 98 | the front of the end: the corner where the two kerbs meet | x 1942, y 1632 |
+
+On the left wall and above it a piece is cut along the screen's upright, where the wall at y
+stands; on the floor and below it along the floor's own y. The flat ground is left out of all six:
+9.9's ground piece is under them.
+
+**The cut the picture asked for.** The painted floor ends at y 19.06, where the front kerb begins,
+as it ends at x 39.06 along the hall (9.9). So a band is cut from 11 to 19 and laid seven metres
+further towards the camera than the one before: its feathered metre (11 to 12) comes in over floor
+that is there, at 18 to 19, and its first whole metre covers the front kerb of the one before. The
+front comes in over the metre 18 to 19, which is the last band's last metre and the same metre of
+the picture. The hall's own band and front stop at x 39, where its floor stops, and the end's start
+at 38, as the long piece and the end of 9.9 do. The first cut ran the hall's own band and front to
+the end of the picture: where a long piece's band lay over it, the two feathers each let a little
+of what is under them through, and the kerb under the end showed as a dark patch a metre square at
+x 39 of every row.
+
+**How the game lays them.** For a hall `20 + 7m` m deep, after 9.9's composition (the picture, the
+long pieces and the end), `m` rows: the j-th (from 1) is the hall's band, every long piece's band
+and the end's band, each laid `j` steps of 336 × 168 px (2x) towards the camera, which is down and
+to the left on the screen, and a long piece's and the end's as far along as theirs. The end's band
+is laid at the end of the hall whether it is longer than 40 m or not. Then the fronts at the m-th
+row: the hall's own, every long piece's and the end's. The office and the canteen layers sit on top
+unchanged. The frame of the scene grows 168 × 84 at 1x, to the left and down, for every row:
+`-708 -144 1728 1008` for 40 × 27 m, `-876 -144 1896 1092` for 40 × 34 m, `-708 -144 2208 1248`
+for 60 × 27 m. If `hallBackgroundDeep.png` is made again, run `scripts/hall-wider.py` after
+`scripts/hall-long.py`, then `npm run sprites:manifest`.
+
 ---
 
 ## 10. Characters (accepted by Piotr, 13.09.2026): frame sheets from the 3D model

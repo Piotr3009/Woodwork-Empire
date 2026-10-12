@@ -1443,6 +1443,16 @@ function lineNameOf(line: number): string {
   return `Line ${line}`;
 }
 
+/** Version 46 to 47 (v95). The unit's wide extensions: none open and none being built, in every save
+ *  (PIOTR, 12.10). Nothing else of a save is touched. */
+function liftToVersion47(state: Raw): void {
+  if (isRecord(state.unit)) {
+    if (typeof state.unit.wideExtensions !== 'number') state.unit.wideExtensions = 0;
+    if (state.unit.wideExtension !== 'building') state.unit.wideExtension = 'none';
+  }
+  state.version = 47;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -1478,6 +1488,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   43: liftToVersion44,
   44: liftToVersion45,
   45: liftToVersion46,
+  46: liftToVersion47,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

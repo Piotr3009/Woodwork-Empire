@@ -61,8 +61,10 @@ describe('the version in the corner', () => {
     // 11.10). v91 plays it at the speed it was drawn, one loop a game hour a module, one module
     // after another (PIOTR, 11.10). v92 is Turn 31: the line's timber and glass, its books, the
     // forklift's lane and its forklift, the hall that grows, the shelter behind the wall, and
-    // contracts that can be lost (PIOTR, 11.10).
-    expect(APP_VERSION).toBe('v94');
+    // contracts that can be lost (PIOTR, 11.10). v93 is more lines than one (PIOTR, 12.10). v94 is
+    // the engineers in red shirts and the line given its lane (PIOTR, 12.10). v95 is the hall made
+    // wider (PIOTR, 12.10).
+    expect(APP_VERSION).toBe('v95');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -78,7 +80,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v94'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v95'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

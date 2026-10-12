@@ -51,8 +51,9 @@ describe('GameState', () => {
     // v83 is 41: the pelletiser behind the wall (CLAUDE.md T28 section 4). v84 is 42: four
     // joiners to a contract, and the glass a day (CLAUDE.md T29 section 4). v89 is 43: the line
     // bought whole, and its own field (CLAUDE.md T30 section 4). v92 is 44: the line's timber,
-    // glass and day book, the hall made longer and the quiet weeks (CLAUDE.md T31 section 4).
-    expect(STATE_VERSION).toBe(46);
+    // glass and day book, the hall made longer and the quiet weeks (CLAUDE.md T31 section 4). v93
+    // is 45: more lines than one. v94 is 46: a line given its lane. v95 is 47: the hall made wider.
+    expect(STATE_VERSION).toBe(47);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

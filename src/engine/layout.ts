@@ -787,9 +787,11 @@ export function crewLimit(state: GameState): number {
 export function canteenLockers(state: GameState): number {
   if (!state.unit.canteenWide) return CANTEEN_LOCKERS;
   if (secondExtensionOf(state.unit) !== 'open') return CANTEEN_LOCKERS_WIDE;
-  // Eight more for every 200 m2 past 800, for the joiners a longer hall takes (CLAUDE.md T31 2.7).
-  const past = Math.max(0, Math.floor((state.unit.areaM2 - UNIT_SECOND_EXTENSION_M2) / UNIT_AREA_M2));
-  return CANTEEN_LOCKERS_DEEP + CANTEEN_LOCKERS_PER_LONG_EXTENSION * past;
+  // Eight more for every 200 m2 past 800, for the joiners a longer hall takes (CLAUDE.md T31 2.7),
+  // counted to the square metre: a hall made seven metres wider is not a whole 200 m2 more, and its
+  // canteen keeps a locker for every joiner it takes all the same (v95).
+  const past = (state.unit.areaM2 - UNIT_SECOND_EXTENSION_M2) * CANTEEN_LOCKERS_PER_LONG_EXTENSION;
+  return CANTEEN_LOCKERS_DEEP + Math.max(0, Math.floor(past / UNIT_AREA_M2));
 }
 
 /** The figures a canteen can hold, in a word each. */

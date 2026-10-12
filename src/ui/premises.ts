@@ -3,7 +3,8 @@
 // wears. Extend the unit: the builder's price and the landlord's deposit, what it adds and what
 // every running cost becomes, and the one button. Once that extension is open, a second card of
 // the same kind under it for the 400 m2 along the front (PIOTR, 04.10; v82), and once that one is
-// open a third, the hall 200 m2 longer again and again (CLAUDE.md T31 2.7). Enlarge the canteen:
+// open a third, the hall 200 m2 longer again and again (CLAUDE.md T31 2.7), and a fourth, the hall
+// seven metres wider along its front again and again (v95). Enlarge the canteen:
 // no charge, what it is and what it becomes, and the button greyed with the reason beside it
 // until the extension is open and the floor beside the canteen is clear.
 //
@@ -87,7 +88,8 @@ function firstOffer(terms: ExtensionTerms): string {
 }
 
 /** The card of the second, offered: the same figures, the lockers the bigger unit's canteen
- *  holds, and the two costs this extension doubles that the first left alone (v82). */
+ *  holds, and the two costs this extension doubles that the first left alone (v82). A wide
+ *  extension adds along the front as the second does, and its card says the same (v95). */
 function secondOffer(terms: ExtensionTerms): string {
   return (
     `Adds ${terms.addsM2} m² along the front of the hall: ` +
@@ -116,7 +118,12 @@ function longOffer(terms: ExtensionTerms): string {
   );
 }
 
-const EXTEND_CARD_IDS: Record<ExtensionStage, string> = { first: 'extend', second: 'extendSecond', long: 'extendLong' };
+const EXTEND_CARD_IDS: Record<ExtensionStage, string> = {
+  first: 'extend',
+  second: 'extendSecond',
+  long: 'extendLong',
+  wide: 'extendWide',
+};
 
 /** One extension's card: offered with its price, being built, or done. The second names the unit
  *  it makes, so the cards are told apart at a glance. The long one is never done: once one is
@@ -133,7 +140,9 @@ function extendCard(state: GameState, stage: ExtensionStage): string {
       ? 'Extend the unit'
       : stage === 'long'
         ? `Extend the hall: ${squareMetres(extensionTerms(state, stage).addsM2)} more`
-        : `Extend the unit to ${squareMetres(area)}`;
+        : stage === 'wide'
+          ? `Extend the hall wider: ${squareMetres(extensionTerms(state, stage).addsM2)} more`
+          : `Extend the unit to ${squareMetres(area)}`;
   if (status === 'open') {
     // The unit as it stands is said once, on the card of the last extension it has had; the long
     // card is never done, so a hall grown longer says it on the second's.
@@ -162,7 +171,7 @@ function extendCard(state: GameState, stage: ExtensionStage): string {
     title,
     money(terms.price),
     ` · ${deposit}Needs ${money(terms.total)} in the account.`,
-    stage === 'first' ? firstOffer(terms) : stage === 'second' ? secondOffer(terms) : longOffer(terms),
+    stage === 'first' ? firstOffer(terms) : stage === 'long' ? longOffer(terms) : secondOffer(terms),
     check.ok
       ? button('extendUnit', 'Extend', stage === 'first' ? '' : `data-stage="${stage}"`)
       : greyed('Extend', check.reason),
@@ -205,8 +214,8 @@ export function renderPremises(state: GameState): string {
     extendCard(state, 'first') +
     // The second is along the front of an extended unit, so it is offered once the first is open.
     (unit.extension === 'open' ? extendCard(state, 'second') : '') +
-    // The hall grows longer once it is twenty metres deep (CLAUDE.md T31 2.7).
-    (secondExtensionOf(unit) === 'open' ? extendCard(state, 'long') : '') +
+    // The hall grows longer once it is twenty metres deep (CLAUDE.md T31 2.7), and wider (v95).
+    (secondExtensionOf(unit) === 'open' ? extendCard(state, 'long') + extendCard(state, 'wide') : '') +
     '<h3>Canteen</h3>' +
     canteenCard(state)
   );

@@ -208,12 +208,16 @@ import type {
  *
  *  Version 46 is v94 (PIOTR, 12.10: "at the existing line I see no lane and no forklift"). Nothing
  *  of the shape changes: a line standing where it has no lane is moved once to the nearest row where
- *  it has one, when there is room, and the player told by a card. Every v12 to v45 save loads. */
-export const STATE_VERSION = 46;
+ *  it has one, when there is room, and the player told by a card. Every v12 to v45 save loads.
+ *
+ *  Version 47 is v95 (PIOTR, 12.10: "and where is the width?"). The unit gains the count of its
+ *  wide extensions and the one being built, none and none in every save. Every v12 to v46 save
+ *  loads. */
+export const STATE_VERSION = 47;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v94';
+export const APP_VERSION = 'v95';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -504,6 +508,17 @@ export const UNIT_LONG_EXTENSION_CELLS = 10;
 export const UNIT_SECOND_EXTENSION_M2 = 800;
 export const UNIT_LONG_EXTENSION_PRICE = 600000;
 export const UNIT_LONG_EXTENSION_GROWTH = 1.2;
+/** [PIOTR, 12.10: "the extension of the hall I have only along the length, and where is the
+ *  width?"; "3 ok" to seven metres a time] The hall made wider: once the second extension is open
+ *  the front of the hall can be taken out this many metres at a time, again and again, one at a
+ *  time, the depth a production line takes with its lane and its metres (v95). */
+export const UNIT_WIDE_EXTENSION_CELLS = 7;
+/** [PIOTR, 12.10: "3 ok": £3,000 a square metre, and 20 per cent more for every extension after,
+ *  either way] What a builder charges a square metre of a long or a wide extension before the
+ *  growth: the long one's 600,000 for 200 m² of a hall twenty metres deep. The n-th of them, long
+ *  and wide counted together (n from 0), costs its square metres at this times the growth to the n
+ *  (v95). */
+export const UNIT_EXTENSION_PRICE_PER_M2 = UNIT_LONG_EXTENSION_PRICE / 200;
 
 /** Where the second extension of a unit stands. No save from before v82 carries the field, and
  *  that is a unit that has not had one (v82). */
@@ -4899,7 +4914,8 @@ export const CANTEEN_LOCKERS_WIDE = CANTEEN_PLATES_WIDE.length;
  *  it was painted with, so the room shows the thirty two sixteen at a time. */
 export const CANTEEN_LOCKERS_DEEP = CANTEEN_LOCKERS_WIDE * 2;
 /** And this many more in an enlarged canteen for every 200 m2 the hall has grown past 800, so the
- *  lockers keep up with the joiners the longer hall takes (CLAUDE.md T31 2.7) [TUNE: chat]. */
+ *  lockers keep up with the joiners the longer hall takes (CLAUDE.md T31 2.7) [TUNE: chat]; from
+ *  v95 counted to the square metre, for the hall made wider seven metres at a time. */
 export const CANTEEN_LOCKERS_PER_LONG_EXTENSION = 8;
 
 /** The counter over the banks, where the room says how many of the eight are in use [PIOTR]. */

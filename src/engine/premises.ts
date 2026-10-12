@@ -20,10 +20,11 @@
 import {
   UNIT_DEPTH_CELLS,
   UNIT_EXTENSION_PRICE,
+  UNIT_EXTENSION_PRICE_PER_M2,
   UNIT_LONG_EXTENSION_CELLS,
   UNIT_LONG_EXTENSION_GROWTH,
-  UNIT_LONG_EXTENSION_PRICE,
   UNIT_SECOND_EXTENSION_PRICE,
+  UNIT_WIDE_EXTENSION_CELLS,
   UNIT_WIDTH_CELLS,
   canteenGrowthBox,
   roomById,
@@ -90,7 +91,15 @@ export interface ExtensionTerms {
  *  another to be had (CLAUDE.md T31 2.7). */
 export function extensionStatus(unit: UnitState, stage: ExtensionStage): UnitExtension {
   if (stage === 'long') return unit.longExtension;
+  if (stage === 'wide') return unit.wideExtension;
   return stage === 'first' ? unit.extension : secondExtensionOf(unit);
+}
+
+/** The metres a stage adds along the front, in depth: ten for the second, seven for each wide one
+ *  (v82, v95). */
+function addsInDepth(stage: ExtensionStage): number {
+  if (stage === 'second') return UNIT_DEPTH_CELLS;
+  return stage === 'wide' ? UNIT_WIDE_EXTENSION_CELLS : 0;
 }
 
 /** The metres a stage adds along the rear wall. */
@@ -102,15 +111,18 @@ function addsAlongTheWall(stage: ExtensionStage): number {
 /** The floor of the unit the second extension made, 800 m2, whatever long extensions it has had
  *  since: what the second extension's card names it by (CLAUDE.md T31 2.7). */
 export function secondExtensionAreaM2(unit: UnitState): number {
-  return (unit.widthCells - unit.longExtensions * UNIT_LONG_EXTENSION_CELLS) * unit.depthCells;
+  return (
+    (unit.widthCells - unit.longExtensions * UNIT_LONG_EXTENSION_CELLS) *
+    (unit.depthCells - unit.wideExtensions * UNIT_WIDE_EXTENSION_CELLS)
+  );
 }
 
 /** The unit as it is the morning a stage opens: twenty metres more of rear wall for the first,
- *  ten metres more of depth for the second, ten more of rear wall for each long one, and every
- *  figure the floor sets in the same proportion. */
+ *  ten metres more of depth for the second, ten more of rear wall for each long one, seven more of
+ *  depth for each wide one, and every figure the floor sets in the same proportion. */
 function unitWith(unit: UnitState, stage: ExtensionStage): UnitState {
   const widthCells = unit.widthCells + addsAlongTheWall(stage);
-  const depthCells = unit.depthCells + (stage === 'second' ? UNIT_DEPTH_CELLS : 0);
+  const depthCells = unit.depthCells + addsInDepth(stage);
   const areaM2 = widthCells * depthCells;
   const factor = areaM2 / unit.areaM2;
   const grown: UnitState = {
@@ -124,19 +136,28 @@ function unitWith(unit: UnitState, stage: ExtensionStage): UnitState {
   };
   if (stage === 'first') grown.extension = 'open';
   else if (stage === 'second') grown.secondExtension = 'open';
-  else {
+  else if (stage === 'wide') {
+    grown.wideExtensions = unit.wideExtensions + 1;
+    grown.wideExtension = 'none';
+  } else {
     grown.longExtensions = unit.longExtensions + 1;
     grown.longExtension = 'none';
   }
   return grown;
 }
 
-/** The builder's price of a stage: the long one's goes up by the growth with each one already
- *  open, rounded to the pound: 600,000, 720,000, 864,000, 1,036,800 and on (CLAUDE.md T31 2.7). */
+/** The builder's price of a stage: a long or a wide one is its square metres at
+ *  `UNIT_EXTENSION_PRICE_PER_M2`, up by the growth with every long and wide one already open,
+ *  rounded to the pound: 600,000, 720,000, 864,000 and on for the long ones of a hall twenty
+ *  metres deep (CLAUDE.md T31 2.7), and 840,000 for the first seven metres of a hall forty long
+ *  (PIOTR, 12.10: "3 ok"; v95). */
 function extensionPrice(unit: UnitState, stage: ExtensionStage): number {
   if (stage === 'first') return UNIT_EXTENSION_PRICE;
   if (stage === 'second') return UNIT_SECOND_EXTENSION_PRICE;
-  return Math.round(UNIT_LONG_EXTENSION_PRICE * UNIT_LONG_EXTENSION_GROWTH ** unit.longExtensions);
+  const adds =
+    stage === 'wide' ? unit.widthCells * UNIT_WIDE_EXTENSION_CELLS : UNIT_LONG_EXTENSION_CELLS * unit.depthCells;
+  const before = unit.longExtensions + unit.wideExtensions;
+  return Math.round(UNIT_EXTENSION_PRICE_PER_M2 * adds * UNIT_LONG_EXTENSION_GROWTH ** before);
 }
 
 /** The terms of an extension of the unit as it stands this minute: the unit as it will be, and
@@ -184,10 +205,18 @@ export function extendUnitCheck(state: GameState, stage: ExtensionStage = 'first
   if (stage === 'second' && state.unit.extension !== 'open') {
     return { ok: false, reason: 'Extend the unit first' };
   }
-  // The hall grows longer once it is twenty metres deep; the card is not offered before that
-  // (CLAUDE.md T31 2.7) [TUNE: the words].
-  if (stage === 'long' && secondExtensionOf(state.unit) !== 'open') {
+  // The hall grows longer, and wider, once it is twenty metres deep; the cards are not offered
+  // before that (CLAUDE.md T31 2.7; v95) [TUNE: the words].
+  if ((stage === 'long' || stage === 'wide') && secondExtensionOf(state.unit) !== 'open') {
     return { ok: false, reason: 'Extend the unit along the front first' };
+  }
+  // One builder at a time on the hall's growth: the longer and the wider hall are each priced and
+  // measured on the hall as it stands, so the one waits for the morning the other opens (v95).
+  if (
+    (stage === 'long' && state.unit.wideExtension === 'building') ||
+    (stage === 'wide' && state.unit.longExtension === 'building')
+  ) {
+    return { ok: false, reason: 'The builders are in' };
   }
   const terms = extensionTerms(state, stage);
   // The card prints the figure beside the button, so the reason is the short one.
@@ -208,6 +237,7 @@ export function extendUnit(state: GameState, stage: ExtensionStage = 'first'): P
   }
   if (stage === 'first') state.unit.extension = 'building';
   else if (stage === 'second') state.unit.secondExtension = 'building';
+  else if (stage === 'wide') state.unit.wideExtension = 'building';
   else state.unit.longExtension = 'building';
   return OK;
 }
@@ -271,7 +301,11 @@ function secondOpened(state: GameState, terms: ExtensionTerms, stage: ExtensionS
   return {
     kind: 'unitExtended',
     title:
-      stage === 'long' ? `The hall is ${inWords(UNIT_LONG_EXTENSION_CELLS)} metres longer` : 'The second extension is open',
+      stage === 'long'
+        ? `The hall is ${inWords(UNIT_LONG_EXTENSION_CELLS)} metres longer`
+        : stage === 'wide'
+          ? `The hall is ${inWords(UNIT_WIDE_EXTENSION_CELLS)} metres wider`
+          : 'The second extension is open',
     body:
       `The builders are out. The hall is ${terms.widthCells} by ${terms.depthCells} m now, ` +
       `${terms.areaM2.toLocaleString('en-GB')} m², with room for ${terms.joiners} joiners and ${terms.benches} benches. ` +
@@ -283,13 +317,13 @@ function secondOpened(state: GameState, terms: ExtensionTerms, stage: ExtensionS
 
 /** One stage, the morning after its click. The first and every long one take the kerb at the
  *  hall's end out with them; the plant behind the rear wall stays where it stands, and the longer
- *  wall has room for more. The second is along the front, where nothing stands and nothing has to
- *  move: the apron is past the end of the hall and stays there. */
+ *  wall has room for more. The second and every wide one are along the front, where nothing stands
+ *  and nothing has to move: the apron is past the end of the hall and grows with it (v95). */
 function openStage(state: GameState, stage: ExtensionStage): void {
   const unit = state.unit;
   if (extensionStatus(unit, stage) !== 'building') return;
   const terms = extensionTerms(state, stage);
-  if (stage !== 'second') moveTheApron(state, unit.widthCells, terms.widthCells - unit.widthCells);
+  if (stage === 'first' || stage === 'long') moveTheApron(state, unit.widthCells, terms.widthCells - unit.widthCells);
   Object.assign(unit, unitWith(unit, stage));
   queueEvent(state, stage === 'first' ? firstOpened(terms) : secondOpened(state, terms, stage));
 }
@@ -300,6 +334,7 @@ export function openExtension(state: GameState): void {
   openStage(state, 'first');
   openStage(state, 'second');
   openStage(state, 'long');
+  openStage(state, 'wide');
 }
 
 /** What the canteen is and what it becomes, for the card: its floor and its lockers, as built and
