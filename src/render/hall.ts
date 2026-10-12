@@ -153,6 +153,7 @@ import {
 import { lineMakesWindows, palletsAtTheGate, runningLineContract } from '../engine/lineContract';
 import { lineLanes } from '../engine/layout';
 import { forkliftArt, forkliftPoints } from './forklift';
+import { engineersArt } from './engineers';
 import { placeholder } from './placeholder';
 import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
@@ -2300,6 +2301,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       if (forkliftAt !== null) drawables.push(forkliftArt(line, forkliftAt.wait));
     }
   }
+  // And each line's engineers in their red shirts, walking along the metre in front of it while
+  // they are on duty; `src/render/engineers.ts` walks them from frame to frame (PIOTR, 12.10; v94).
+  drawables.push(...engineersArt(state, characterOptions));
 
   // The full pallets of every line's windows wait for the client just past the end of the gate
   // lane, each drawn from the art side's pallet of ten standing alone on its 2 m by 1 m, the second

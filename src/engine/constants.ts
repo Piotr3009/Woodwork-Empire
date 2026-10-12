@@ -204,12 +204,16 @@ import type {
  *  Version 45 is v93 (PIOTR, 12.10: "I want to see the next line"). A company may have more than
  *  one production line: the one record `windowLine` becomes the list `windowLines`, the line that
  *  stood becomes line 1, its modules and its loads of timber carry its number. Every v12 to v44
- *  save loads. */
-export const STATE_VERSION = 45;
+ *  save loads.
+ *
+ *  Version 46 is v94 (PIOTR, 12.10: "at the existing line I see no lane and no forklift"). Nothing
+ *  of the shape changes: a line standing where it has no lane is moved once to the nearest row where
+ *  it has one, when there is room, and the player told by a card. Every v12 to v45 save loads. */
+export const STATE_VERSION = 46;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v93';
+export const APP_VERSION = 'v94';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of

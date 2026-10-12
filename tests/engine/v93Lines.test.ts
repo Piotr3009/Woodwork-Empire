@@ -397,7 +397,7 @@ describe('a v44 save in this build (v93 section 4)', () => {
     for (const delivery of raw.deliveries) if (delivery.line === 1) delivery.line = true;
     const opened = migrateState(raw, 44);
     if (opened === null) throw new Error('the save opens');
-    expect(opened.version).toBe(45);
+    expect(opened.version).toBe(46);
     expect(opened.windowLines.map((record) => record.number)).toEqual([1]);
     expect(opened.windowLines[0]?.contract?.status).toBe('active');
     expect(opened.windowLines[0]?.boards).toBe(40);

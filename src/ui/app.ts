@@ -105,6 +105,7 @@ import { playCharacters, setWalkPace } from '../render/characters';
 import { resetWalkers, stepWalkers, syncWalkers } from '../render/walkers';
 import { resetDoors, stepDoors, syncDoors } from '../render/doors';
 import { resetForklift, stepForklift, syncForklift } from '../render/forklift';
+import { resetEngineers, stepEngineers, syncEngineers } from '../render/engineers';
 import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockSound } from './sound';
 import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
@@ -1104,6 +1105,7 @@ function syncFigures(now: number): void {
       resetDoors();
       // And the line's forklift, back where it waits (CLAUDE.md T31 2.10).
       resetForklift();
+      resetEngineers();
     }
     walkersDay = day;
     // And the picture of the house he goes home to tonight is asked for now, while the day runs,
@@ -1276,6 +1278,8 @@ export function render(): void {
   // And the line's forklift, put back where it had got to, which the fresh markup drew waiting
   // (CLAUDE.md T31 2.10).
   if (state !== null) syncForklift(parts.page, state, nowMs());
+  // And the engineers, put back where their walks had got to (v94).
+  if (state !== null) syncEngineers(parts.page, state, nowMs());
   restoreFocus(memory);
 }
 
@@ -1456,6 +1460,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       resetWalkers();
       resetDoors();
       resetForklift();
+      resetEngineers();
       startedStore();
       noteOrders();
       break;
@@ -1476,6 +1481,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       resetWalkers();
       resetDoors();
       resetForklift();
+      resetEngineers();
       startedStore();
       noteOrders();
       autosaveLocal();
@@ -2097,6 +2103,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           resetWalkers();
           resetDoors();
           resetForklift();
+          resetEngineers();
           startedStore();
           writeStore();
           ui.saved = peekSave();
@@ -2114,6 +2121,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           resetWalkers();
           resetDoors();
           resetForklift();
+          resetEngineers();
         }
         return result.note;
       });
@@ -2252,6 +2260,7 @@ export function onFileChosen(file: File): Promise<void> {
       resetWalkers();
       resetDoors();
       resetForklift();
+      resetEngineers();
       // A file loaded is the game from now on, so the browser's store holds it too (T11 3.2).
       startedStore();
       writeStore();
@@ -2954,6 +2963,8 @@ function runFrame(now: number): void {
     // The line's forklift drives on in real time beside them, whatever page is open and whether
     // the clock runs or stands (CLAUDE.md T31 2.10).
     if (state !== null) stepForklift(root, state, now);
+    // And the engineers walk along their lines beside it, on the same real time (v94).
+    if (state !== null) stepEngineers(root, state, now);
     // The doors swing on the renderer's own clock, beside the figures and for the same reason:
     // the page is written again under them and the swing is not game state (CLAUDE.md T19 2.3).
     stepDoors(root, now);

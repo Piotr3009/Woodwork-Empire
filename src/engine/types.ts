@@ -1040,7 +1040,10 @@ export type GameEventKind =
   /** The open of a working day with the line standing whole and two engineers on the books: a
    *  window company offers to take every window it makes (CLAUDE.md T30 2.6). Two choices, so it
    *  has no cross and Escape does not close it. */
-  | 'lineContractOffered';
+  | 'lineContractOffered'
+  /** The first settle of a save whose line stood where it had no lane: it was moved by the lift to
+   *  where it has one, and this says so (v94). */
+  | 'lineMoved';
 
 export interface GameEventChoice {
   id: string;

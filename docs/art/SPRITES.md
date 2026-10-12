@@ -494,6 +494,22 @@ everything else stays the joiner's. A painted manager delivered under the same f
 replaces them with no change to the code. He has no bench, carry or phone sheet and needs none:
 anything else he is asked to play falls back to idle, as section 10.4 says.
 
+### 10.8 The line engineers' red shirts (v94, PIOTR 12.10.2026: "the same picture, only the shirts red")
+
+| Sheet | Rows | Frames | fps | Cell | Anchor |
+|---|---|---|---|---|---|
+| `character.lineEngineer.idle` | sw, se, nw, ne | 2 | 1 | 112 × 151 | 56, 143 |
+| `character.lineEngineer.walk` | sw, se, nw, ne | 8 | as the joiner's | 112 × 151 | 56, 143 |
+
+The line engineers walk along the metre in front of their line, two at the most a line, as many as
+are on duty for it, on a working day until the crew goes home (`src/render/engineers.ts`). They
+are the renderer's, as the line's forklift is, and are not hall figures of `isSeenOnTheHall`.
+
+The two sheets are not painted. `scripts/engineer-shirt.py` makes them from `character.joiner.idle`
+and `character.joiner.walk`, cell for cell, as `scripts/manager-shirt.py` makes the manager's: the
+green of the shirt goes to a shaded red and everything else stays the joiner's. A painted engineer
+delivered under the same four file names replaces them with no change to the code.
+
 
 ---
 

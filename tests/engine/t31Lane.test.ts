@@ -198,8 +198,9 @@ describe('what stands on it already (CLAUDE.md T31 2.6)', () => {
 
   it('says a line whose lane would cross the way to the gate is to be moved forward', () => {
     const state = withLine(bigUnit(), { x: 2, y: 5 });
+    // From v94 the strip names what stands where the line would have its lane, a row forward.
     expect(warnings(state).find((warning) => warning.key === 'laneBlocked')?.text).toBe(
-      'Line 1 stands too near the rear wall for its lane: move it forward',
+      'Line 1 stands too near the rear wall for its lane: move it forward; in the way: the sheet rack and the workbench',
     );
   });
 

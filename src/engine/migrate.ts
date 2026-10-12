@@ -34,11 +34,18 @@ import {
   boxOf,
   canPlace,
   firstFreeCell,
+  laneTrouble,
+  lineBox,
+  lineFits,
+  lineGroup,
+  linePlace,
+  nearestLanePlace,
   rearYardPlaceFor,
+  shiftLine,
   standsBehindTheWall,
   standsOutside,
 } from './layout';
-import { findSpec, isLineModule, isSold } from './machines';
+import { findSpec, isLineModule, isSold, lineNumbers, standingLines } from './machines';
 import { queueEvent } from './events';
 import { lineTimberBatch } from './lineContract';
 import { planPlaces } from './production';
@@ -1334,6 +1341,108 @@ function liftToVersion45(state: Raw): void {
   state.version = 45;
 }
 
+/** Version 45 to 46 (v94). Nothing of the shape changes: the version moves so that a save of v93 or
+ *  older has its lines given their lanes once on the whole state (`giveTheLinesTheirLanes`). */
+function liftToVersion46(state: Raw): void {
+  state.version = 46;
+}
+
+/** How far the lift moves a standing line for its lane at the most: a line of Turn 30 wants one
+ *  metre, and a line that would have to go further is the player's to place (v94) [TUNE: chat]. */
+const LANE_LIFT_MAX_ROWS = 3;
+
+/** The words of a line's move: `one metre back` towards the rear wall, `two metres forward`. */
+function metresMoved(dy: number): string {
+  const metres = Math.abs(dy);
+  return `${inWords(metres)} ${metres === 1 ? 'metre' : 'metres'} ${dy < 0 ? 'back' : 'forward'}`;
+}
+
+/** The nearest place of its own for a line on order that is in the way of a standing line just
+ *  moved: along its own x first, then the first place in the hall, read row by row (v94). Null when
+ *  it has none. */
+function placeForOrder(state: GameState, line: number, at: { x: number; y: number }): { x: number; y: number } | null {
+  const near = nearestLanePlace(state, line, at);
+  if (near !== null) return near;
+  const ignore = new Set(lineGroup(state, true, line));
+  const size = lineBox({ x: 0, y: 0 });
+  for (let y = 0; y + size.depth <= state.unit.depthCells; y += 1) {
+    for (let x = 0; x + size.width <= state.unit.widthCells; x += 1) {
+      if (lineFits(state, { x, y }, ignore, line)) return { x, y };
+    }
+  }
+  return null;
+}
+
+/** A line standing where it has no lane, as a line of Turn 30 stood at y 15 of the 800 m² hall, is
+ *  moved to the nearest row along its own x where it has its lane and its ground, at no cost and
+ *  with no hours booked, the men at it with it; a line still on order that is in its way is moved
+ *  too, to the nearest place of its own, when it has one. A line with nowhere to go stays where it
+ *  is, and the strip says what is in its way. The player is told by one card at the first settle
+ *  (PIOTR, 12.10: "at the existing line I see no lane and no forklift"; v94) [TUNE: chat]. */
+function giveTheLinesTheirLanes(state: GameState): void {
+  const told: string[] = [];
+  for (const line of standingLines(state)) {
+    const at = linePlace(state, line);
+    if (at === null || laneTrouble(state, at) === null) continue;
+    let to = nearestLanePlace(state, line, at, new Set(), LANE_LIFT_MAX_ROWS);
+    let inTheWay: number[] = [];
+    if (to === null) {
+      // The lines on order are not built yet: out of the way, if each has a place of its own after.
+      const ordered = lineNumbers(state).filter((other) => other !== line && !standingLines(state).includes(other));
+      if (ordered.length > 0) {
+        to = nearestLanePlace(state, line, at, new Set(ordered), LANE_LIFT_MAX_ROWS);
+        inTheWay = ordered;
+      }
+    }
+    if (to === null) continue;
+    // Along its own x: only the row changes.
+    const dy = to.y - at.y;
+    shiftLine(state, false, line, 0, dy);
+    const moves: string[] = [];
+    const shifted: { line: number; dx: number; dy: number }[] = [];
+    let undone = false;
+    for (const other of inTheWay) {
+      const there = linePlace(state, other);
+      if (there === null) continue;
+      const ignore = new Set(lineGroup(state, true, other));
+      if (lineFits(state, there, ignore, other)) continue;
+      const place = placeForOrder(state, other, there);
+      if (place === null) {
+        undone = true;
+        break;
+      }
+      shiftLine(state, true, other, place.x - there.x, place.y - there.y);
+      shifted.push({ line: other, dx: place.x - there.x, dy: place.y - there.y });
+      moves.push(
+        `${lineNameOf(other)}, still on order, is moved ${place.x === there.x ? metresMoved(place.y - there.y) : 'to a place of its own'} to make room.`,
+      );
+    }
+    if (undone) {
+      // A line on order has nowhere to go: everything back where it was.
+      for (const back of shifted) shiftLine(state, true, back.line, -back.dx, -back.dy);
+      shiftLine(state, false, line, 0, -dy);
+      continue;
+    }
+    const why = dy < 0 ? 'stood too near the front wall' : 'stood too near the rear wall';
+    told.push(
+      `${lineNameOf(line)} ${why} for the forklift's lane: it is moved ${metresMoved(dy)}, free, and its forklift drives on its lane now.`,
+      ...moves,
+    );
+  }
+  if (told.length === 0) return;
+  queueEvent(state, {
+    kind: 'lineMoved',
+    title: 'The line has its lane',
+    body: told.join(' '),
+    choices: [{ id: 'ok', label: 'Right' }],
+  });
+}
+
+/** `Line 2`, as every page names it. */
+function lineNameOf(line: number): string {
+  return `Line ${line}`;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -1368,6 +1477,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   42: liftToVersion43,
   43: liftToVersion44,
   44: liftToVersion45,
+  45: liftToVersion46,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -1441,6 +1551,15 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       standThePlantBehindTheWall(lifted, 'timberShelter');
     } catch {
       // Not a whole hall: no wall to stand it behind.
+    }
+  }
+  // Every line given its lane, a line of Turn 30 moved back to where it has one (v94). After the
+  // whole state is there, and before the places are planned.
+  if (version < 46 && Array.isArray(lifted.equipment) && Array.isArray(lifted.onOrder) && Array.isArray(lifted.windowLines) && lifted.unit) {
+    try {
+      giveTheLinesTheirLanes(lifted);
+    } catch {
+      // Not a whole hall: no floor to move a line on.
     }
   }
   // A line on its contract given its first batch of timber and glass (v92).

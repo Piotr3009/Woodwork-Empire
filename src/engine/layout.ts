@@ -390,6 +390,7 @@ export function lineFits(
   at: { x: number; y: number },
   ignore: ReadonlySet<string>,
   line: number | null = null,
+  alsoLeftOut: ReadonlySet<number> = new Set(),
 ): boolean {
   const ground = lineGround(state, at);
   if (ground === null || laneTrouble(state, at) !== null) return false;
@@ -397,12 +398,81 @@ export function lineFits(
   for (const box of [...own, ground.front, ground.left]) {
     if (!canPlaceBox(state, box, ignore).ok) return false;
   }
-  const others = claimedGround(state, new Set(line === null ? [] : [line]));
+  const others = claimedGround(state, new Set([...(line === null ? [] : [line]), ...alsoLeftOut]));
   for (const other of others) {
     if (own.some((box) => overlaps(box, other.box))) return false;
     if (other.kind !== 'lane' && (overlaps(ground.front, other.box) || overlaps(ground.left, other.box))) return false;
   }
   return true;
+}
+
+/** The nearest place along its own x, a row back or forward at a time and the nearer first, no
+ *  further than `maxRows`, where a line can stand with its lane and its ground (`lineFits`), its own
+ *  modules and outlines and those of the lines left out not counted: where a line that has no lane
+ *  is put (v94). Null when no row that near takes it. */
+export function nearestLanePlace(
+  state: GameState,
+  line: number,
+  at: { x: number; y: number },
+  leftOut: ReadonlySet<number> = new Set(),
+  maxRows: number = state.unit.depthCells,
+): { x: number; y: number } | null {
+  const ignore = new Set<string>();
+  for (const number of [line, ...leftOut]) {
+    for (const id of [...lineGroup(state, false, number), ...lineGroup(state, true, number)]) ignore.add(id);
+  }
+  for (let step = 1; step <= maxRows; step += 1) {
+    for (const y of [at.y - step, at.y + step]) {
+      if (y < 0) continue;
+      if (lineFits(state, { x: at.x, y }, ignore, line, leftOut)) return { x: at.x, y };
+    }
+  }
+  return null;
+}
+
+/** What stands in the way of a line at this place, its own modules apart: the catalogue's ids of
+ *  everything standing or on order on its 36 m by 3 m and its ground, each once; what the strip
+ *  names for a line that has no lane (v94). */
+export function inTheWayAt(state: GameState, line: number, at: { x: number; y: number }): string[] {
+  const ground = lineGround(state, at);
+  if (ground === null) return [];
+  const found: string[] = [];
+  for (const box of [ground.line, ground.path, ground.front, ground.left, ...(ground.behind === null ? [] : [ground.behind])]) {
+    for (const specId of standingOn(state, box)) {
+      if (!isLineModule(specId) && !found.includes(specId)) found.push(specId);
+    }
+  }
+  // And the modules of another line, said as the line.
+  for (const other of lineNumbers(state)) {
+    if (other === line) continue;
+    const there = linePlace(state, other);
+    if (there === null) continue;
+    const box = lineBox(there);
+    if ([ground.line, ground.path, ground.front, ground.left].some((part) => overlaps(part, box))) found.push(`line:${other}`);
+  }
+  return found;
+}
+
+/** Where a line that has no lane would have it, the kit apart: along x past the left strip for a
+ *  line over it, and otherwise the nearest row along its own x where its lane fits the hall (v94).
+ *  Null when no row does. */
+export function laneTarget(state: GameState, at: { x: number; y: number }): { x: number; y: number } | null {
+  const trouble = laneTrouble(state, at);
+  if (trouble === null) return at;
+  const x = trouble === 'leftWall' ? Math.max(at.x, FORKLIFT_LANE_CELLS) : at.x;
+  if (laneTrouble(state, { x, y: at.y }) === null) return { x, y: at.y };
+  for (let step = 1; step < state.unit.depthCells; step += 1) {
+    for (const y of [at.y - step, at.y + step]) {
+      if (y >= 0 && laneTrouble(state, { x, y }) === null) return { x, y };
+    }
+  }
+  return null;
+}
+
+/** Moves a whole line by these cells with no question asked, its modules or its outlines on order
+ *  and the men at it: for the save's lift, which has asked `nearestLanePlace` first (v94). */
+export function shiftLine(state: GameState, onOrder: boolean, line: number, dx: number, dy: number): void {
+  moveLine(state, onOrder, line, dx, dy);
 }
 
 /** What stands on a line's ground, standing or on order, every line's modules apart: the

@@ -101,24 +101,21 @@ describe('the helper on the floor', () => {
 });
 
 describe('every role of the game, on the hall or behind the office door (v75)', () => {
-  it('draws the manager from his own sheets, and no figure for the office s own three or the line engineer', () => {
+  it('draws the manager from his own sheets, and no figure for the office s own three; the line engineer walks by his line, never as a hall figure', () => {
     const state = hallWithA('helper');
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper on the books');
-    // The owner and the joiner from the start, the helper since the v28 patch, and the production
-    // manager from v75: the joiner's sheets in a white shirt (PIOTR, 03.10).
-    const sheeted = ['owner', 'joiner', 'helper', 'productionManager'];
+    // The owner and the joiner from the start, the helper since the v28 patch, the production
+    // manager from v75: the joiner's sheets in a white shirt (PIOTR, 03.10); and the line engineer
+    // from v94, the same in a red shirt, who walks by his line (PIOTR, 12.10).
+    const sheeted = ['owner', 'joiner', 'helper', 'productionManager', 'lineEngineer'];
     for (const role of CHARACTER_ROLES) {
       if (sheeted.includes(role)) expect(characterArt(role, 'idle', 'sw'), role).not.toBeNull();
       else expect(characterArt(role, 'idle', 'sw'), role).toBeNull();
     }
-    // From v84 the line engineer has no figure either, and is never drawn (CLAUDE.md T29 2.8).
-    expect(CHARACTER_ROLES.filter((role) => !sheeted.includes(role))).toEqual([
-      'officeAdmin',
-      'salesman',
-      'draftsman',
-      'lineEngineer',
-    ]);
+    // From v84 the line engineer was never drawn on the hall either (CLAUDE.md T29 2.8); from v94 he
+    // has his sheets and walks by his line (`src/render/engineers.ts`), still never a hall figure.
+    expect(CHARACTER_ROLES.filter((role) => !sheeted.includes(role))).toEqual(['officeAdmin', 'salesman', 'draftsman']);
     // One of each of the office's roles with nothing to do, which is when they were seen on the
     // hall: the manager is still there, in his shirt, and the other three are behind the door.
     for (const role of ['officeAdmin', 'salesman', 'draftsman', 'productionManager', 'lineEngineer']) {

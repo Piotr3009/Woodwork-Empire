@@ -34,7 +34,7 @@ import { bagStore, boardRoom, findSpec, lineEngineersOnDuty, lineLevel, lineModu
 import { canUnload, isBoards } from './materials';
 import { lineShortOf, runningLineContract } from './lineContract';
 import { andList, inASentence, inWords } from './text';
-import { laneTrouble, linePlace, standingInTheWay } from './layout';
+import { inTheWayAt, laneTarget, laneTrouble, linePlace, standingInTheWay } from './layout';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine, hasOfficeAdmin } from './staff';
@@ -273,16 +273,23 @@ function laneBlockedWarning(state: GameState): Warning | null {
     const at = linePlace(state, line);
     if (at === null) continue;
     const trouble = laneTrouble(state, at);
-    if (trouble === 'frontWall') {
-      return { key: 'laneBlocked', text: `${lineName(line)} stands too near the front wall for its lane: move it back` };
-    }
-    // A line whose lane would cross the way to the gate has to come forward, and one over the left
-    // strip has to move along it, not back [TUNE: the words].
-    if (trouble === 'rearWall') {
-      return { key: 'laneBlocked', text: `${lineName(line)} stands too near the rear wall for its lane: move it forward` };
-    }
-    if (trouble === 'leftWall') {
-      return { key: 'laneBlocked', text: `${lineName(line)} stands on the way to the gate for its lane: move it along` };
+    if (trouble !== null) {
+      // What stands where it would have its lane, so the player knows what to move first (v94).
+      const target = laneTarget(state, at);
+      const way = target === null ? [] : inTheWayAt(state, line, target);
+      const names = way.map((id) =>
+        id.startsWith('line:') ? lineName(Number(id.slice(5))).toLowerCase() : `the ${inASentence(findSpec(id)?.name ?? id)}`,
+      );
+      const blocked = names.length === 0 ? '' : `; in the way: ${andList(names)}`;
+      // A line whose lane would cross the way to the gate has to come forward, and one over the
+      // left strip has to move along it, not back [TUNE: the words].
+      const text =
+        trouble === 'frontWall'
+          ? `${lineName(line)} stands too near the front wall for its lane: move it back`
+          : trouble === 'rearWall'
+            ? `${lineName(line)} stands too near the rear wall for its lane: move it forward`
+            : `${lineName(line)} stands on the way to the gate for its lane: move it along`;
+      return { key: 'laneBlocked', text: `${text}${blocked}` };
     }
     const on = standingInTheWay(state, line);
     if (on.length === 0) continue;
