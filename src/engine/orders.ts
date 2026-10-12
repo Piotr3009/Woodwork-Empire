@@ -5,7 +5,7 @@
 // class. This module owns the third of them. The queries are pure; the two writes that need the
 // rest of the world, standing the thing in the hall and giving the money back, live in game.ts.
 
-import { BUILT_TO_ORDER, BUILT_TO_ORDER_LINE, DAY_ONE_KIT, DAY_ONE_SOFTWARE, DAY_ONE_STAND_INS } from './constants';
+import { BUILT_TO_ORDER, BUILT_TO_ORDER_LINE, DAY_ONE_KIT, DAY_ONE_SOFTWARE, DAY_ONE_STAND_INS, lineName } from './constants';
 import { addWorkingDays } from './clock';
 import { deliveryDaysFor, findSpec, findVariant, itemStandsInTheHall } from './machines';
 import { loadWords } from './materials';
@@ -27,6 +27,8 @@ export function createOnOrder(
     pricePaid: number;
     anchorX: number;
     anchorY: number;
+    /** A module's line, by its number (v93). */
+    line?: number;
   },
 ): OnOrderItem {
   const item: OnOrderItem = {
@@ -40,6 +42,7 @@ export function createOnOrder(
     anchorY: order.anchorY,
     arrived: false,
     orientation: 0,
+    ...(order.line === undefined ? {} : { line: order.line }),
   };
   state.onOrder.push(item);
   return item;
@@ -225,8 +228,8 @@ export function shoppingList(state: GameState): OrderLine[] {
       // For stock, or for the job it was ordered for by name (CLAUDE.md T13 3.2, 3.3).
       // The line's own load is no stock: its name says whose it is (CLAUDE.md T31 2.2) [TUNE].
       detail:
-        delivery.line === true
-          ? "for the line's contract"
+        delivery.line !== undefined
+          ? `for ${lineName(delivery.line).toLowerCase()}'s contract`
           : delivery.jobId === null
             ? 'for stock'
             : `for ${jobNameFor(state, delivery.jobId)}`,

@@ -23,9 +23,10 @@ import {
 } from '../engine/index';
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
 import { monthlyPremiums, nextInstalmentFor } from '../engine/index';
-import { AGENCY_MONTHLY_FEE } from '../engine/constants';
-import { lineBooks, lineBooksShown, lineMonthPace, linePaidBack } from '../engine/lineBooks';
-import type { LineColumn } from '../engine/lineBooks';
+import { AGENCY_MONTHLY_FEE, lineName } from '../engine/constants';
+import { allLinesBooks, lineBooks, lineBooksShown, lineMonthPace, linePaidBack, linesWithBooks } from '../engine/lineBooks';
+import type { LineBooks, LineColumn } from '../engine/lineBooks';
+import { lineStandsWhole, standingLines } from '../engine/machines';
 import type { LineLostMinutes } from '../engine/index';
 import { renderFinance } from './finance';
 import { button, escapeHtml, money, plural, tabBar, whyLink } from './modal';
@@ -302,14 +303,8 @@ const LOST_WORDS: Record<keyof LineLostMinutes, string> = {
   move: 'while it was moved',
 };
 
-/** The line's own books: four columns off its day book, then the month's pace, a year at it, what
- *  it has paid back, and what the month's efficiency lost, when it lost any (CLAUDE.md T31 2.5). */
-function lineTab(state: GameState): string {
-  const books = lineBooks(state);
-  const pace = lineMonthPace(state);
-  const back = linePaidBack(state);
-  const cost = back.line + back.upgrades;
-  const share = cost > 0 ? Math.round((back.net / cost) * 100) : 0;
+/** The four columns of a set of books, and what the month's efficiency lost, when it lost any. */
+function lineColumns(books: LineBooks): string {
   const lost = (Object.keys(LOST_WORDS) as Array<keyof LineLostMinutes>)
     .filter((cause) => books.month.lost[cause] > 0)
     .map((cause) => `${lostWords(books.month.lost[cause])} ${LOST_WORDS[cause]}`);
@@ -320,6 +315,22 @@ function lineTab(state: GameState): string {
     lineColumn('This month', books.month) +
     lineColumn('This year', books.year) +
     '</div>' +
+    (lost.length === 0 ? '' : `<p class="hint">Lost this month: ${escapeHtml(lost.join(', '))}</p>`)
+  );
+}
+
+/** One line's own books: its four columns off its day book, then the month's pace, a year at it,
+ *  and what it has paid back (CLAUDE.md T31 2.5; v93: one block a line, under its name). */
+function lineBlock(state: GameState, line: number, named: boolean): string {
+  const books = lineBooks(state, line);
+  const pace = lineMonthPace(state, line);
+  const back = linePaidBack(state, line);
+  const cost = back.line + back.upgrades;
+  const share = cost > 0 ? Math.round((back.net / cost) * 100) : 0;
+  return (
+    `<div class="line-books" data-line-books="${line}">` +
+    (named ? `<h3>${escapeHtml(lineName(line))}</h3>` : '') +
+    lineColumns(books) +
     (pace === null
       ? ''
       : `<p class="figures">A working day on average this month: ${plural(Math.round(pace.windowsPerDay), 'window', 'windows')}, ` +
@@ -327,8 +338,21 @@ function lineTab(state: GameState): string {
         `<p class="figures">A year at this month's pace: ${money(pace.yearNet)} net</p>`) +
     `<p class="figures">Paid back: ${money(back.net)} of ${money(back.line)}` +
     `${back.upgrades > 0 ? ` and the upgrades' ${money(back.upgrades)}` : ''}, ${share}%</p>` +
-    (lost.length === 0 ? '' : `<p class="hint">Lost this month: ${escapeHtml(lost.join(', '))}</p>`)
+    '</div>'
   );
+}
+
+/** The Production line tab: each line's books under its name, and with more lines than one, all
+ *  the lines added up under them (CLAUDE.md T31 2.5; v93, PIOTR 12.10). A line that stands and has
+ *  not run a day yet is on the tab with noughts. */
+function lineTab(state: GameState): string {
+  const lines = Array.from(new Set([...linesWithBooks(state), ...standingLines(state).filter((line) => lineStandsWhole(state, line))])).sort(
+    (left, right) => left - right,
+  );
+  const named = lines.length > 1;
+  const blocks = lines.map((line) => lineBlock(state, line, named)).join('');
+  if (!named) return blocks;
+  return blocks + '<div class="line-books" data-line-books="all"><h3>All lines</h3>' + lineColumns(allLinesBooks(state)) + '</div>';
 }
 
 /** What the workshop earns for an hour of somebody's time, machines and all (CLAUDE.md T6 3.8). */

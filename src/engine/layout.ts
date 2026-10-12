@@ -8,6 +8,7 @@ import {
   CANTEEN_LOCKERS_WIDE,
   FORKLIFT_LANE_CELLS,
   GATE_LANE,
+  LINE_BEHIND_CELLS,
   LINE_FRONT_CELLS,
   LINE_MODULES,
   LINE_PALLET_LAYOUT,
@@ -25,7 +26,7 @@ import {
   secondExtensionOf,
 } from './constants';
 import type { LayoutSlot } from './constants';
-import { findSpec, isLineModule, isSold, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
+import { findSpec, isLineModule, isSold, itemStandsInTheHall, lineNumbers, lineOf, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
 import { metresBy } from './text';
 import { standsOutsideTheHall } from './walk';
@@ -244,11 +245,12 @@ export function canPlaceSpec(
   const ignore = new Set(ignoreItemId === null ? [] : [ignoreItemId]);
   const check = canPlaceBox(state, box, ignore, WELFARE_IN_THE_CANTEEN.includes(specId));
   if (!check.ok) return check;
-  // Nothing but the line stands on the forklift's lane while the line stands or is on order. It is
-  // asked here and only here, so the line's own lane never refuses the line's move (CLAUDE.md T31
-  // 2.6).
-  if (!isLineModule(specId) && (lineLane(state) ?? []).some((strip) => overlaps(box, strip))) {
-    return { ok: false, reason: FORKLIFT_LANE_REFUSAL };
+  // Nothing but a line's modules stands on a line's ground, its lane, its engineers' metre and the
+  // metre behind it, while the line stands or is on order. It is asked here and only here, so a
+  // line's own ground never refuses the line's move (CLAUDE.md T31 2.6; v93).
+  if (!isLineModule(specId)) {
+    const taken = claimedGround(state).find((ground) => overlaps(box, ground.box));
+    if (taken !== undefined) return { ok: false, reason: GROUND_REFUSALS[taken.kind] };
   }
   return OK;
 }
@@ -257,76 +259,159 @@ export function canPlaceSpec(
  *  2.6) [TUNE]. */
 export const FORKLIFT_LANE_REFUSAL = 'That is the forklift\'s lane';
 
+/** The three kinds of ground a line claims beside its own 36 m by 3 m (v93): the forklift's lane,
+ *  the metre in front where its engineers walk, and the metre behind it (PIOTR, 12.10). */
+export type GroundKind = 'lane' | 'path' | 'behind';
+
+/** What setup mode and every purchase's search say of a cell of each kind [TUNE: the words]. */
+export const GROUND_REFUSALS: Readonly<Record<GroundKind, string>> = {
+  lane: FORKLIFT_LANE_REFUSAL,
+  path: 'That is the engineers\' path',
+  behind: 'That is the metre behind the line',
+};
+
+/** One box of a line's ground, by its line and its kind. */
+export interface GroundBox {
+  line: number;
+  kind: GroundKind;
+  box: Box;
+}
+
+/** The ground a line claims with module 1 at this cell (PIOTR, 12.10: "1 metre for the engineers,
+ *  2 for the forklift, and add one more metre of free space"): the metre behind it, towards the
+ *  rear wall, where nothing stands (none for a line at the rear wall); its 36 m by 3 m; the metre in
+ *  front where its engineers walk; and the forklift's lane, two metres in front of that from x 0 to
+ *  the line's end, with the left strip up the left wall between the lane and the pallets at the
+ *  gate, two metres wide [TUNE: chat: no strip round the line's end]. Seven metres in depth, so two
+ *  lines stand one behind the other in the 800 m2 hall, or side by side along a longer one. Null
+ *  where the lane cannot be: off the floor, or on the way to the gate (CLAUDE.md T31 2.6; v93). */
+export function lineGround(
+  state: GameState,
+  at: { x: number; y: number },
+): { behind: Box | null; line: Box; path: Box; front: Box; left: Box } | null {
+  const depth = state.unit.depthCells;
+  const line = lineBox(at);
+  const behind: Box | null =
+    line.y >= LINE_BEHIND_CELLS ? { x: line.x, y: line.y - LINE_BEHIND_CELLS, width: line.width, depth: LINE_BEHIND_CELLS } : null;
+  const path: Box = { x: line.x, y: line.y + line.depth, width: line.width, depth: LINE_FRONT_CELLS };
+  const front: Box = { x: 0, y: path.y + path.depth, width: line.x + line.width, depth: FORKLIFT_LANE_CELLS };
+  const pallets = LINE_PALLET_LAYOUT;
+  const top = Math.min(pallets.y, front.y);
+  const bottom = Math.max(pallets.y + pallets.depth, front.y + front.depth);
+  const left: Box = { x: 0, y: top, width: FORKLIFT_LANE_CELLS, depth: bottom - top };
+  if (front.y + front.depth > depth || front.x + front.width > state.unit.widthCells || line.x < 0 || line.y < 0) return null;
+  return { behind, line, path, front, left };
+}
+
+/** Why a line standing at this cell has no lane: too near the front wall for its engineers' metre
+ *  and the front strip; too near the rear wall, its lane on the way to the gate; or over the left
+ *  strip, the lane crossing the line itself. Null when it has one (CLAUDE.md T31 2.6; v93). */
+export function laneTrouble(state: GameState, at: { x: number; y: number }): 'frontWall' | 'rearWall' | 'leftWall' | null {
+  const ground = lineGround(state, at);
+  if (ground === null) return 'frontWall';
+  const strips = [ground.front, ground.left];
+  // The lane never crosses the way to the gate [TUNE].
+  if (strips.some((strip) => overlaps(strip, gateLane()))) return 'rearWall';
+  if (strips.some((strip) => overlaps(strip, ground.line) || overlaps(strip, ground.path))) return 'leftWall';
+  return null;
+}
+
+/** The forklift's lane of a line whose module 1 is at this cell: its front strip and its left strip,
+ *  or null where the line can have none (CLAUDE.md T31 2.6; v93). */
+export function forkliftLane(state: GameState, at: { x: number; y: number }): Box[] | null {
+  const ground = lineGround(state, at);
+  if (ground === null || laneTrouble(state, at) !== null) return null;
+  return [ground.front, ground.left];
+}
+
 /** True for an item the player can take hold of in setup mode: its own place is good, or the only
- *  thing wrong with it is the forklift's lane, kit that stood there before the line, or a line whose
- *  lane is blocked or cannot be, which is exactly what the strip tells him to move (CLAUDE.md T31
+ *  thing wrong with it is a line's ground, kit that stood there before the line, or a line whose
+ *  ground is blocked or cannot be, which is exactly what the strip tells him to move (CLAUDE.md T31
  *  2.6). */
 export function canBeMoved(state: GameState, itemId: string): boolean {
   const item = state.equipment.find((entry) => entry.id === itemId);
   if (item === undefined) return false;
   const check = canPlace(state, itemId, item.anchorX, item.anchorY);
-  return check.ok || check.reason === FORKLIFT_LANE_REFUSAL || check.reason === lineNeedsRoom();
+  return (
+    check.ok ||
+    Object.values(GROUND_REFUSALS).includes(check.reason) ||
+    check.reason === lineNeedsRoom() ||
+    check.reason === LINE_IN_THE_WAY
+  );
 }
 
-/** Why a line standing at this cell has no lane: too near the front wall for its men's metre and
- *  the front strip, or over the left strip below the pallets at the gate. Null when it has one
- *  (CLAUDE.md T31 2.6). */
-export function laneTrouble(state: GameState, at: { x: number; y: number }): 'frontWall' | 'leftWall' | null {
-  if (forkliftLane(state, at) !== null) return null;
-  const line = lineBox(at);
-  return line.y + line.depth + LINE_FRONT_CELLS > state.unit.depthCells - FORKLIFT_LANE_CELLS ? 'frontWall' : 'leftWall';
-}
-
-/** Where module 1 of the line stands, not sold, or is held on order: the line's place, from which
- *  its lane is worked out. Null with no line (CLAUDE.md T31 2.6). */
-export function linePlace(state: GameState): { x: number; y: number } | null {
+/** Where module 1 of a line stands, not sold, or is held on order: the line's place, from which
+ *  its ground is worked out. Null with no such line (CLAUDE.md T31 2.6; v93). */
+export function linePlace(state: GameState, line: number): { x: number; y: number } | null {
   const first = LINE_MODULES[0];
-  const standing = hallItems(state).find((item) => item.specId === first && !isSold(item));
+  const standing = hallItems(state).find((item) => item.specId === first && lineOf(item) === line && !isSold(item));
   if (standing !== undefined) return { x: standing.anchorX, y: standing.anchorY };
-  const ordered = reservedItems(state).find((item) => item.specId === first);
+  const ordered = reservedItems(state).find((item) => item.specId === first && lineOf(item) === line);
   return ordered === undefined ? null : { x: ordered.anchorX, y: ordered.anchorY };
 }
 
-/** The forklift's lane of a line whose module 1 is at this cell, two metres wide, from the line's
- *  end to the gate: the front strip along the front wall from x 0 to the line's end, and the left
- *  strip up the left wall from the pallets at the gate to the front wall [TUNE: chat: no strip round
- *  the line's end]. The lane follows the line, not the hall's length. Null where the lane cannot be:
- *  the line, the metre in front of it where its men stand and its lane overlapping, or the lane off
- *  the floor (CLAUDE.md T31 2.6). */
-export function forkliftLane(state: GameState, at: { x: number; y: number }): Box[] | null {
-  const depth = state.unit.depthCells;
-  const line = lineBox(at);
-  const front: Box = { x: 0, y: depth - FORKLIFT_LANE_CELLS, width: line.x + line.width, depth: FORKLIFT_LANE_CELLS };
-  const left: Box = { x: 0, y: LINE_PALLET_LAYOUT.y, width: FORKLIFT_LANE_CELLS, depth: depth - LINE_PALLET_LAYOUT.y };
-  const men: Box = { x: line.x, y: line.y + line.depth, width: line.width, depth: LINE_FRONT_CELLS };
-  if (men.y + men.depth > depth || front.x + front.width > state.unit.widthCells || left.depth <= 0) return null;
-  for (const strip of [front, left]) {
-    if (overlaps(strip, line) || overlaps(strip, men)) return null;
+/** The lanes of every line that stands or is on order and has one, by line: for the hall's yellow
+ *  lines and the forklifts (v93). */
+export function lineLanes(state: GameState): { line: number; front: Box; left: Box }[] {
+  const lanes: { line: number; front: Box; left: Box }[] = [];
+  for (const line of lineNumbers(state)) {
+    const at = linePlace(state, line);
+    const ground = at === null || laneTrouble(state, at) !== null ? null : lineGround(state, at);
+    if (ground !== null) lanes.push({ line, front: ground.front, left: ground.left });
   }
-  return [front, left];
+  return lanes;
 }
 
-/** The lane of the line where it stands or is on order, or null with no line or no room for one. */
-export function lineLane(state: GameState): Box[] | null {
-  const at = linePlace(state);
-  return at === null ? null : forkliftLane(state, at);
+/** Every box of ground every line that stands or is on order claims beside its own modules, by
+ *  line and kind: what refuses other kit, and what the strip names kit standing on (v93). The
+ *  lines named by `except` are left out. */
+export function claimedGround(state: GameState, except: ReadonlySet<number> = new Set()): GroundBox[] {
+  const boxes: GroundBox[] = [];
+  for (const line of lineNumbers(state)) {
+    if (except.has(line)) continue;
+    const at = linePlace(state, line);
+    const ground = at === null || laneTrouble(state, at) !== null ? null : lineGround(state, at);
+    if (ground === null) continue;
+    boxes.push({ line, kind: 'lane', box: ground.front }, { line, kind: 'lane', box: ground.left }, { line, kind: 'path', box: ground.path });
+    if (ground.behind !== null) boxes.push({ line, kind: 'behind', box: ground.behind });
+  }
+  return boxes;
 }
 
-/** Can the line stand with module 1 at this cell: its 36 m by 3 m clear as `canPlaceBox` asks, and
- *  every box of the lane that place would have clear of everything standing or held for a delivery
- *  but what `ignore` names. The one question the order and the move ask (CLAUDE.md T31 2.6). */
-export function lineFits(state: GameState, at: { x: number; y: number }, ignore: ReadonlySet<string>): boolean {
-  if (!canPlaceBox(state, lineBox(at), ignore).ok) return false;
-  const lane = forkliftLane(state, at);
-  return lane !== null && lane.every((strip) => canPlaceBox(state, strip, ignore).ok);
+/** Can a line stand with module 1 at this cell: its 36 m by 3 m, its engineers' metre, the metre
+ *  behind it and its lane all clear as `canPlaceBox` asks, of everything standing or held for a
+ *  delivery but what `ignore` names; and out of every other line's way: its own modules, its
+ *  engineers' metre and the metre behind it off every other line's ground, and its lane off every
+ *  other line's modules, metres and ground but the lanes, which two lines may share (v93). The one
+ *  question the order and the move ask (CLAUDE.md T31 2.6). `line` is the line asking, left out of
+ *  the others. */
+export function lineFits(
+  state: GameState,
+  at: { x: number; y: number },
+  ignore: ReadonlySet<string>,
+  line: number | null = null,
+): boolean {
+  const ground = lineGround(state, at);
+  if (ground === null || laneTrouble(state, at) !== null) return false;
+  const own = [ground.line, ground.path, ...(ground.behind === null ? [] : [ground.behind])];
+  for (const box of [...own, ground.front, ground.left]) {
+    if (!canPlaceBox(state, box, ignore).ok) return false;
+  }
+  const others = claimedGround(state, new Set(line === null ? [] : [line]));
+  for (const other of others) {
+    if (own.some((box) => overlaps(box, other.box))) return false;
+    if (other.kind !== 'lane' && (overlaps(ground.front, other.box) || overlaps(ground.left, other.box))) return false;
+  }
+  return true;
 }
 
-/** What stands on the line's lane, standing or on order, the line's own modules apart: the
- *  catalogue's ids, each once, for the strip (CLAUDE.md T31 2.6). */
-export function standingOnTheLane(state: GameState): string[] {
+/** What stands on a line's ground, standing or on order, every line's modules apart: the
+ *  catalogue's ids, each once, for the strip (CLAUDE.md T31 2.6; v93). */
+export function standingInTheWay(state: GameState, line: number): string[] {
   const found: string[] = [];
-  for (const strip of lineLane(state) ?? []) {
-    for (const specId of standingOn(state, strip)) {
+  for (const ground of claimedGround(state)) {
+    if (ground.line !== line) continue;
+    for (const specId of standingOn(state, ground.box)) {
       if (!isLineModule(specId) && !found.includes(specId)) found.push(specId);
     }
   }
@@ -397,13 +482,30 @@ export function lineModuleCell(at: { x: number; y: number }, specId: string): { 
   return { x: at.x + width * Math.max(0, LINE_MODULES.indexOf(specId)), y: at.y };
 }
 
-/** Where the line is put at its order: the first clear 36 m by 3 m, asked at `WINDOW_LINE_ORIGIN`
- *  and then cell by cell in the order `firstFreeCell` searches a machine's place, clear meaning
- *  what `canPlaceBox` asks. Null when the hall has none (CLAUDE.md T30 2.4) [TUNE: chat]. */
+/** The depth a line takes with its ground: the metre behind it, its three, its engineers' metre and
+ *  the lane's two, seven (v93). */
+export function lineDepthCells(): number {
+  const module = findSpec(LINE_MODULES[0] ?? '');
+  return LINE_BEHIND_CELLS + (module?.depth ?? 0) + LINE_FRONT_CELLS + FORKLIFT_LANE_CELLS;
+}
+
+/** Where a new line is put at its order: `WINDOW_LINE_ORIGIN` when the line and its ground are
+ *  clear there; then the row seven metres behind each line that stands or is on order, and the row
+ *  seven metres in front of it, at its x, so the next line stands behind the first (PIOTR, 12.10);
+ *  then cell by cell in the order `firstFreeCell` searches a machine's place, which finds a place
+ *  beside a line along a longer hall. Null when the hall has none (CLAUDE.md T30 2.4, T31 2.6; v93)
+ *  [TUNE: chat]. */
 export function lineSite(state: GameState): { x: number; y: number } | null {
   const none = new Set<string>();
-  // From Turn 31 a place is taken only where the line's lane is clear too (CLAUDE.md T31 2.6).
   if (lineFits(state, WINDOW_LINE_ORIGIN, none)) return { ...WINDOW_LINE_ORIGIN };
+  const step = lineDepthCells();
+  for (const line of lineNumbers(state)) {
+    const at = linePlace(state, line);
+    if (at === null) continue;
+    for (const y of [at.y - step, at.y + step]) {
+      if (lineFits(state, { x: at.x, y }, none)) return { x: at.x, y };
+    }
+  }
   const size = lineBox({ x: 0, y: 0 });
   for (let y = 0; y + size.depth <= state.unit.depthCells; y += 1) {
     for (let x = 0; x + size.width <= state.unit.widthCells; x += 1) {
@@ -423,35 +525,48 @@ export function reservationById(state: GameState, itemId: string): OnOrderItem |
  *  clear 36 m by 3 m (CLAUDE.md T30 2.4). */
 export const LINE_NEVER_TURNED = 'The line is never turned';
 export function lineNeedsRoom(): string {
-  return `The line needs a clear ${metresBy(lineBox({ x: 0, y: 0 }))} and its lane`;
+  return `The line needs a clear ${metresBy(lineBox({ x: 0, y: 0 }))}, its lane and a metre each side`;
 }
+/** The move's refusal where another line's ground is: two lines never stand in one another's way
+ *  (v93) [TUNE]. */
+export const LINE_IN_THE_WAY = 'That is in another line\'s way';
 
-/** The order's refusal for want of floor: the line and its lane (CLAUDE.md T31 2.6) [TUNE]. */
+/** The order's refusal for want of floor: the line and its ground (CLAUDE.md T31 2.6) [TUNE]. */
 export const LINE_NO_ROOM = 'No room in the hall for the line and its lane';
 
-/** The ids of the whole line as it stands this minute: its modules on the floor, or its outlines on
- *  order. They move together and never stand in one another's way (CLAUDE.md T30 2.4). */
-export function lineGroup(state: GameState, onOrder: boolean): string[] {
+/** The ids of a whole line as it stands this minute: its modules on the floor, or its outlines on
+ *  order. They move together and never stand in one another's way (CLAUDE.md T30 2.4; v93: the
+ *  line by its number). */
+export function lineGroup(state: GameState, onOrder: boolean, line: number): string[] {
   const items = onOrder ? reservedItems(state) : hallItems(state);
-  return items.filter((item) => isLineModule(item.specId)).map((item) => item.id);
+  return items.filter((item) => isLineModule(item.specId) && lineOf(item) === line).map((item) => item.id);
 }
 
 /** Can the whole line stand with this module at this cell: never turned, and a clear 36 m by 3 m
- *  for the six, clear of everything but the line itself, asked as `canPlaceBox` asks one machine
- *  (CLAUDE.md T30 2.4). */
+ *  for the six with its ground, clear of everything but the line itself, asked as `canPlaceBox` asks
+ *  one machine, and out of every other line's way (CLAUDE.md T30 2.4; v93). */
 function canPlaceLine(
   state: GameState,
-  specId: string,
+  module: { specId: string; line?: number },
   x: number,
   y: number,
   orientation: Orientation | undefined,
   onOrder: boolean,
 ): PlaceCheck {
   if (orientation !== undefined && orientation !== 0) return { ok: false, reason: LINE_NEVER_TURNED };
-  const offset = lineModuleCell({ x: 0, y: 0 }, specId);
+  const line = lineOf(module);
+  const offset = lineModuleCell({ x: 0, y: 0 }, module.specId);
   const box = lineBox({ x: x - offset.x, y: y - offset.y });
-  if (!lineFits(state, box, new Set(lineGroup(state, onOrder)))) return { ok: false, reason: lineNeedsRoom() };
-  return OK;
+  const ignore = new Set(lineGroup(state, onOrder, line));
+  if (lineFits(state, box, ignore, line)) return OK;
+  // Its own ground clear and only another line's in the way: said so [TUNE].
+  const ground = lineGround(state, box);
+  const ownClear =
+    ground !== null &&
+    [ground.line, ground.path, ground.front, ground.left, ...(ground.behind === null ? [] : [ground.behind])].every(
+      (part) => canPlaceBox(state, part, ignore).ok,
+    );
+  return { ok: false, reason: ownClear ? LINE_IN_THE_WAY : lineNeedsRoom() };
 }
 
 /** Can this item stand here? An outline held for a delivery answers exactly as the machine it is
@@ -467,7 +582,7 @@ export function canPlace(
   const reserved = reservationById(state, itemId);
   if (reserved !== null) {
     // The outline of the line on order moves as the line does (CLAUDE.md T30 2.4).
-    if (isLineModule(reserved.specId)) return canPlaceLine(state, reserved.specId, x, y, orientation, true);
+    if (isLineModule(reserved.specId)) return canPlaceLine(state, reserved, x, y, orientation, true);
     // And the outline of kit on order that stands outside is refused as the kit itself is: a
     // shelter or a van on order is never dragged into the hall (CLAUDE.md T29 2.11.1).
     if (standsOutsideTheHall(state, reserved)) return { ok: false, reason: 'It stands in the yard' };
@@ -491,8 +606,8 @@ export function canPlace(
     return { ok: false, reason: 'It stands in the canteen' };
   }
   if (standsOutsideTheHall(state, item)) return { ok: false, reason: 'It stands in the yard' };
-  // A module of the line answers for the whole line: moved as one, never turned (CLAUDE.md T30 2.4).
-  if (isLineModule(item.specId)) return canPlaceLine(state, item.specId, x, y, orientation, false);
+  // A module of a line answers for the whole line: moved as one, never turned (CLAUDE.md T30 2.4).
+  if (isLineModule(item.specId)) return canPlaceLine(state, item, x, y, orientation, false);
   return canPlaceSpec(
     state,
     item.specId,
@@ -519,7 +634,7 @@ export function moveItem(
   // The line goes as one: every module, or every outline of one on order, by the same cells
   // (CLAUDE.md T30 2.4).
   if (taken !== null && isLineModule(taken.specId)) {
-    moveLine(state, reserved !== null, x - taken.anchorX, y - taken.anchorY);
+    moveLine(state, reserved !== null, lineOf(taken), x - taken.anchorX, y - taken.anchorY);
     return OK;
   }
   if (reserved !== null) {
@@ -545,10 +660,10 @@ export function moveItem(
   return OK;
 }
 
-/** The whole line moved by these cells, its six modules or its six outlines, and a man at a module
- *  with it, as a man goes with his bench (CLAUDE.md T30 2.4). */
-function moveLine(state: GameState, onOrder: boolean, dx: number, dy: number): void {
-  const ids = new Set(lineGroup(state, onOrder));
+/** A whole line moved by these cells, its six modules or its six outlines, and a man at a module
+ *  with it, as a man goes with his bench (CLAUDE.md T30 2.4; v93: the line by its number). */
+function moveLine(state: GameState, onOrder: boolean, line: number, dx: number, dy: number): void {
+  const ids = new Set(lineGroup(state, onOrder, line));
   const items = onOrder ? state.onOrder : state.equipment;
   const stood = new Set<string>();
   for (const item of items) {

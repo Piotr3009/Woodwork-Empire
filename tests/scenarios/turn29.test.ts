@@ -84,6 +84,7 @@ import {
   withAir,
   withExtraction,
 } from '../helpers';
+import { lineState } from '../../src/engine/lineContract';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -344,8 +345,9 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10; f
   const company = buyAndLand(timberCompany(), 'cnc5', 'standard');
   // The whole line is ten million from v89 (CLAUDE.md T30 2.3.1).
   company.cash = 12000000;
-  // A sheet rack stands on the cells the line is asked at first: it moves the line on, and is no
-  // refusal (CLAUDE.md T30 2.4).
+  // A sheet rack stands on the cells the line is asked at first: until v93 it moved the line on;
+  // from v93 a line wants seven clear metres in depth, and this hall has them nowhere else, so it
+  // is a refusal until the rack is moved (CLAUDE.md T30 2.4; v93).
   placeEquipment(company, 'sheetRack', { variantId: 'standard', x: 7, y: 15, id: 'kit-rack-in-the-way' });
   const withTheRack = canBuy(company, 'windowLine1');
   // Moved behind the line's place, off its lane (CLAUDE.md T31 2.6).
@@ -370,8 +372,8 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10; f
   }
   const landed = state;
 
-  it('is no refusal with the rack on its first cells, is refused half shifted, and is ordered whole once the rack is moved', () => {
-    expect(withTheRack).toEqual({ ok: true, reason: '' });
+  it('is refused with the rack on its first cells and no seven metres elsewhere, refused half shifted, and ordered whole once the rack is moved', () => {
+    expect(withTheRack).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
     expect(halfShifted).toEqual({ ok: false, reason: 'The kit is half shifted. Finish the move first' });
     expect(ordered.cash).toBe(10000000);
     expect(orders.map((item) => [item.specId, item.anchorX, item.anchorY])).toEqual(
@@ -384,9 +386,9 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10; f
   it('lands by itself on its day, six modules with nobody to unload them, and one engineer runs it as three', () => {
     expect(landed.clock.day).toBe(ordered.dueDay);
     expect(landed.workers.filter((worker) => worker.role === 'lineEngineer')).toHaveLength(1);
-    expect(lineModules(landed)).toBe(6);
+    expect(lineModules(landed, 1)).toBe(6);
     expect(landed.tasks.some((task) => task.kind === 'unload' && !task.done)).toBe(false);
-    expect(lineLevel(landed)).toBe(3);
+    expect(lineLevel(landed, 1)).toBe(3);
     const plan = planOf(landed, windowJob());
     const factor = LINE_FACTOR[3] ?? 1;
     expect(plan.crossCutting).toEqual({ family: 'windowLine1', speed: factor * industrial });
@@ -409,10 +411,10 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10; f
     // With two engineers on the books the line is offered its own contract, and the days played
     // take it; (zz) is about the window jobs, so it is ended, and the jobs have the line again
     // (CLAUDE.md T30 2.6).
-    expect(state.windowLine.contract?.status).toBe('active');
-    state = act(state, { type: 'END_LINE_CONTRACT' });
-    expect(lineModules(state)).toBe(6);
-    expect(lineLevel(state)).toBe(6);
+    expect(lineState(state, 1).contract?.status).toBe('active');
+    state = act(state, { type: 'END_LINE_CONTRACT', line: 1 });
+    expect(lineModules(state, 1)).toBe(6);
+    expect(lineLevel(state, 1)).toBe(6);
     expect(warnings(state).some((entry) => entry.key === 'lineNeedsEngineer')).toBe(false);
     // The whole line sprays and glazes too (CLAUDE.md T30 2.5).
     const whole = planOf(state, windowJob());
@@ -421,16 +423,16 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10; f
     // One let go: three modules, and the strip says so.
     const engineers = state.workers.filter((worker) => worker.role === 'lineEngineer');
     const one = untilGone(act(state, { type: 'LET_GO', workerId: engineers[1]?.id ?? '' }), engineers[1]?.id ?? '');
-    expect(lineLevel(one)).toBe(3);
+    expect(lineLevel(one, 1)).toBe(3);
     expect(warnings(one).find((entry) => entry.key === 'lineNeedsEngineer')?.text).toBe(
-      'The line runs as three modules: one engineer on duty',
+      'Line 1 runs as three modules: one engineer on duty',
     );
     expect(planOf(one, windowJob()).pressing?.family).toBe('framePress');
     // None: the line stands still and the old machines do what they did, at their own pace.
     const none = untilGone(act(one, { type: 'LET_GO', workerId: engineers[0]?.id ?? '' }), engineers[0]?.id ?? '');
-    expect(lineLevel(none)).toBe(0);
+    expect(lineLevel(none, 1)).toBe(0);
     expect(warnings(none).find((entry) => entry.key === 'lineNeedsEngineer')?.text).toBe(
-      'The line stands still: no engineer on duty',
+      'Line 1 stands still: no engineer on duty',
     );
     const still = planOf(none, windowJob());
     expect(still.crossCutting).toEqual({ family: 'crossCut', speed: hallPace(none, 'crossCut') });
@@ -667,7 +669,7 @@ describe('(bbb) windows on a standing contract (CLAUDE.md T29 2.12)', () => {
   }
   // The line's own contract of Turn 30 turned down for the year, so the week measures what the line
   // does for the joiners' contract and nothing else (CLAUDE.md T30 2.6).
-  lined.windowLine.nextOfferDay = lined.clock.day + 365;
+  lineState(lined, 1).nextOfferDay = lined.clock.day + 365;
   const withLine = aWeek(connectAll(lined), offer?.id ?? '');
 
   it('is offered sash windows in the 800 m² unit, named in the plural, and takes it with four men', () => {
@@ -690,7 +692,7 @@ describe('(bbb) windows on a standing contract (CLAUDE.md T29 2.12)', () => {
   });
 
   it('makes more of them a week with the line than without', () => {
-    expect(lineLevel(withLine.state)).toBe(6);
+    expect(lineLevel(withLine.state, 1)).toBe(6);
     expect(without.made).toBeGreaterThan(0);
     expect(withLine.made).toBeGreaterThan(without.made);
     console.log(`(bbb) sash windows a week, four men: ${without.made} without the line, ${withLine.made} with it`);

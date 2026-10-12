@@ -52,7 +52,7 @@ describe('GameState', () => {
     // joiners to a contract, and the glass a day (CLAUDE.md T29 section 4). v89 is 43: the line
     // bought whole, and its own field (CLAUDE.md T30 section 4). v92 is 44: the line's timber,
     // glass and day book, the hall made longer and the quiet weeks (CLAUDE.md T31 section 4).
-    expect(STATE_VERSION).toBe(44);
+    expect(STATE_VERSION).toBe(45);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

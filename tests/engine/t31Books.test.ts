@@ -36,6 +36,7 @@ import { lineMaterialPerWindow } from '../../src/engine/lineContract';
 import { lineValue } from '../../src/engine/insurance';
 import { renderAccounting } from '../../src/ui/accounting';
 import { act, buyStartingKit, newGame, nextDay, placeEquipment, testJoiner, withAir } from '../helpers';
+import { lineState } from '../../src/engine/lineContract';
 
 function bigUnit(): GameState {
   let state = newGame({ difficulty: 'veryEasy' });
@@ -61,7 +62,7 @@ function running(): GameState {
   state.workers.push(worker('adm-1', 'Anna', 'officeAdmin', 2000));
   placeEquipment(state, 'timberShelter', { variantId: 'standard', x: 30, y: 2, id: 'kit-store' });
   state.insurance.property = true;
-  state.windowLine.contract = {
+  lineState(state, 1).contract = {
     status: 'active',
     startDay: state.clock.day,
     windowsThisWeek: 0,
@@ -70,9 +71,9 @@ function running(): GameState {
     revenue: 0,
     materialCost: 0,
   };
-  state.windowLine.boards = 40;
+  lineState(state, 1).boards = 40;
   state.stock.sheets += 40;
-  state.windowLine.glass = 20;
+  lineState(state, 1).glass = 20;
   return state;
 }
 
@@ -112,12 +113,12 @@ describe('the day book (CLAUDE.md T31 2.5)', () => {
   }
   // The last day of the month played to five: the books of the whole month.
   played = toFive(played);
-  const days = played.windowLine.days.filter((record) => monthOfDay(record.day) === month);
-  const books = lineBooks(played);
+  const days = lineState(played, 1).days.filter((record) => monthOfDay(record.day) === month);
+  const books = lineBooks(played, 1);
 
   it('writes one record a calendar day the line stands, weekends among them, and keeps 400 days', () => {
     expect(LINE_DAYS_KEPT).toBe(400);
-    const inMonth = [...days, ...(monthOfDay(played.windowLine.today.day) === month ? [played.windowLine.today] : [])];
+    const inMonth = [...days, ...(monthOfDay(lineState(played, 1).today.day) === month ? [lineState(played, 1).today] : [])];
     const numbers = new Set(inMonth.map((record) => record.day));
     expect(numbers.size).toBe(inMonth.length);
     expect(inMonth.some((record) => !isWorkingDay(record.day))).toBe(true);
@@ -126,12 +127,12 @@ describe('the day book (CLAUDE.md T31 2.5)', () => {
 
   it('reckons each row of the month as 2.5 says, and the turnover to the pound as the ledger has it', () => {
     const column = books.month;
-    const inMonth = [...days, played.windowLine.today].filter((record) => monthOfDay(record.day) === month);
+    const inMonth = [...days, lineState(played, 1).today].filter((record) => monthOfDay(record.day) === month);
     const calendarDays = inMonth.length;
     expect(column.windows).toBeGreaterThan(60);
     expect(column.turnover).toBe(column.windows * LINE_WINDOW_PRICE);
     const ledger = played.ledger
-      .filter((entry) => entry.label === 'Windows off the line: windows' && monthOfDay(entry.day) === month)
+      .filter((entry) => entry.label === 'Windows off line 1: windows' && monthOfDay(entry.day) === month)
       .reduce((total, entry) => total + entry.amount, 0);
     expect(column.turnover).toBe(ledger);
     expect(column.material).toBe(column.windows * lineMaterialPerWindow());
@@ -153,7 +154,7 @@ describe('the day book (CLAUDE.md T31 2.5)', () => {
     expect(books.month.windows).toBeGreaterThanOrEqual(books.week.windows);
     expect(books.year.windows).toBeGreaterThanOrEqual(books.month.windows);
     // Today, This week and This year reckoned as the month is, from the records of their own days.
-    const all = [...played.windowLine.days, played.windowLine.today];
+    const all = [...lineState(played, 1).days, lineState(played, 1).today];
     const spans: Array<[keyof typeof books, (day: number) => boolean]> = [
       ['today', (day) => day === played.clock.day],
       ['week', (day) => weekOfDay(day) === weekOfDay(played.clock.day)],
@@ -171,19 +172,19 @@ describe('the day book (CLAUDE.md T31 2.5)', () => {
       expect(books[column].cover, column).toBeCloseTo(sum('cover'), 6);
       expect(books[column].net, column).toBeCloseTo(sum('turnover') - sum('material') - sum('engineers') - sum('power') - sum('cover'), 6);
     }
-    expect(books.year.windows).toBe(played.windowLine.since.windows);
+    expect(books.year.windows).toBe(lineState(played, 1).since.windows);
   });
 
   it('gives the month s pace, a year at it, and the paid back since the line first stood', () => {
-    const pace = lineMonthPace(played);
+    const pace = lineMonthPace(played, 1);
     if (pace === null) throw new Error('the month has days of the line');
-    const inMonth = [...days, played.windowLine.today].filter((record) => monthOfDay(record.day) === month);
+    const inMonth = [...days, lineState(played, 1).today].filter((record) => monthOfDay(record.day) === month);
     const working = inMonth.filter((record) => isWorkingDay(record.day)).length;
     expect(pace.windowsPerDay).toBeCloseTo(books.month.windows / working, 6);
     expect(pace.netPerDay).toBeCloseTo(books.month.net / working, 6);
     expect(pace.yearNet).toBeCloseTo((books.month.net / inMonth.length) * DAYS_PER_YEAR, 6);
-    const back = linePaidBack(played);
-    const all = [...played.windowLine.days, played.windowLine.today];
+    const back = linePaidBack(played, 1);
+    const all = [...lineState(played, 1).days, lineState(played, 1).today];
     const net = all.reduce((total, record) => total + record.turnover - record.material - record.engineers - record.power - record.cover, 0);
     expect(back.net).toBeCloseTo(net, 4);
     expect(back.line).toBe(LINE_PRICE);
@@ -200,7 +201,7 @@ describe('the efficiency (CLAUDE.md T31 2.5)', () => {
     away.absentDaysRemaining = 1;
     const day = state.clock.day;
     const evening = nextDay(state);
-    const record = evening.windowLine.days.find((entry) => entry.day === day);
+    const record = lineState(evening, 1).days.find((entry) => entry.day === day);
     expect(record?.possibleMinutes).toBe(MINUTES_PER_WORKING_DAY);
     expect(record?.lost.engineer).toBe(MINUTES_PER_WORKING_DAY);
     expect(record?.windows).toBe(0);
@@ -252,10 +253,10 @@ describe('the Production line tab (CLAUDE.md T31 2.5)', () => {
 
   it('says what the month lost, and the efficiency as made of could have', () => {
     const state = nextDay(running());
-    state.windowLine.today.possibleMinutes = 480;
-    state.windowLine.today.possibleWindows = 4;
-    state.windowLine.today.windows = 3;
-    state.windowLine.today.lost = { engineer: 120, timber: 0, glass: 60, timberAndGlass: 0, move: 0 };
+    lineState(state, 1).today.possibleMinutes = 480;
+    lineState(state, 1).today.possibleWindows = 4;
+    lineState(state, 1).today.windows = 3;
+    lineState(state, 1).today.lost = { engineer: 120, timber: 0, glass: 60, timberAndGlass: 0, move: 0 };
     const page = document.createElement('div');
     page.innerHTML = renderAccounting(state, 'line');
     expect(page.textContent).toContain('Lost this month: 2 h for want of an engineer, 1 h for want of glass');

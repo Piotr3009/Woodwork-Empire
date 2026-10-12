@@ -10,16 +10,18 @@
 // @vitest-environment jsdom
 // Turn 31, 2.6: the forklift's lane [PIOTR, 11.10: "two yellow lines from the end of the production
 // line to the door, for the forklift that will drive with the pallet"; "yes" to chat's route], two
-// metres wide along the front wall and up the left wall to the gate, nothing standing on it, the
-// line placed only where it has one, and what stood there before named on the strip (CLAUDE.md T31
-// 2.6, section 7).
+// metres wide in front of the line's engineers' metre and up the left wall to the gate, nothing
+// standing on it, the line placed only where it has one, and what stood there before named on the
+// strip (CLAUDE.md T31 2.6, section 7). From v93 the lane is a line's own, two metres in front of
+// its engineers' metre wherever the line stands, with a metre behind the line kept free, so lines
+// stand one behind the other (PIOTR, 12.10).
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { LINE_MODULES, WINDOW_LINE_ORIGIN } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { canBuy, placeEquipmentOrder } from '../../src/engine/game';
-import { canBeMoved, canPlace, canPlaceSpec, firstFreeCell, forkliftLane, lineLane } from '../../src/engine/layout';
+import { canBeMoved, canPlace, canPlaceSpec, firstFreeCell, forkliftLane, lineLanes } from '../../src/engine/layout';
 import { findSpec } from '../../src/engine/machines';
 import { ownedTile } from '../../src/ui/catalogue';
 import { isFree } from '../../src/engine/walk';
@@ -61,23 +63,33 @@ describe('where the lane is (CLAUDE.md T31 2.6)', () => {
       { x: 0, y: 18, width: 38, depth: 2 },
       { x: 0, y: 10, width: 2, depth: 10 },
     ]);
-    expect(lineLane(state)).toEqual(forkliftLane(state, { x: 2, y: 14 }));
-    // The lane follows the line, not the hall's length.
-    expect(forkliftLane(state, { x: 4, y: 12 })?.[0]).toEqual({ x: 0, y: 18, width: 40, depth: 2 });
+    expect(lineLanes(state)).toEqual([{ line: 1, front: { x: 0, y: 18, width: 38, depth: 2 }, left: { x: 0, y: 10, width: 2, depth: 10 } }]);
+    // The lane follows the line: two metres in front of its engineers' metre, wherever it stands
+    // (v93), the left strip reaching the pallets' row.
+    expect(forkliftLane(state, { x: 4, y: 12 })).toEqual([
+      { x: 0, y: 16, width: 40, depth: 2 },
+      { x: 0, y: 10, width: 2, depth: 8 },
+    ]);
+    // A line behind the pallets' row: its left strip runs down from its front strip to them.
+    expect(forkliftLane(state, { x: 2, y: 7 })).toEqual([
+      { x: 0, y: 11, width: 38, depth: 2 },
+      { x: 0, y: 10, width: 2, depth: 3 },
+    ]);
   });
 
-  it('cannot be for a line nearer the front wall than y 14, or over the left strip below y 10', () => {
+  it('cannot be for a line nearer the front wall than y 14, over the left strip, or so near the rear wall that its lane crosses the way to the gate', () => {
     const state = bigUnit();
     expect(forkliftLane(state, { x: 2, y: 15 })).toBeNull();
     expect(forkliftLane(state, { x: 0, y: 12 })).toBeNull();
-    expect(forkliftLane(state, { x: 0, y: 5 })).not.toBeNull();
+    expect(forkliftLane(state, { x: 2, y: 5 })).toBeNull();
+    expect(forkliftLane(state, { x: 2, y: 6 })).not.toBeNull();
   });
 
   it('is there while the line is on order, and none without a line', () => {
     const state = bigUnit();
-    expect(lineLane(state)).toBeNull();
+    expect(lineLanes(state)).toEqual([]);
     expect(placeEquipmentOrder(state, 'windowLine1').ok).toBe(true);
-    expect(lineLane(state)).not.toBeNull();
+    expect(lineLanes(state)).toHaveLength(1);
   });
 });
 
@@ -90,7 +102,7 @@ describe('nothing else stands on it (CLAUDE.md T31 2.6)', () => {
     if (rack === undefined) throw new Error('the rack is wanted');
     expect(canPlace(state, rack.id, 20, 18)).toEqual({ ok: false, reason: "That is the forklift's lane" });
     // Every free place a purchase finds is off the lane.
-    const strips = lineLane(state) ?? [];
+    const strips = lineLanes(state).flatMap((lane) => [lane.front, lane.left]);
     let bought = state;
     for (let n = 0; n < 6; n += 1) bought = buyNow(bought, 'workbench');
     for (const item of bought.equipment.filter((entry) => entry.specId === 'workbench')) {
@@ -119,21 +131,29 @@ describe('nothing else stands on it (CLAUDE.md T31 2.6)', () => {
 });
 
 describe('the line s place asks for it (CLAUDE.md T31 2.6)', () => {
-  it('is refused at the order where its lane is not clear', () => {
+  it('goes elsewhere at the order where its first place s lane is not clear, and is refused with no place at all', () => {
     const state = bigUnit();
     placeEquipment(state, 'sheetRack', { variantId: 'standard', x: 20, y: 18, id: 'kit-rack-on-the-lane' });
-    expect(canBuy(state, 'windowLine1')).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
+    // Its first place's lane blocked, the line takes the next place with seven clear metres (v93).
+    expect(canBuy(state, 'windowLine1')).toEqual({ ok: true, reason: '' });
+    expect(placeEquipmentOrder(state, 'windowLine1').ok).toBe(true);
+    const first = state.onOrder.find((item) => item.specId === 'windowLine1');
+    expect(first?.anchorY).not.toBe(14);
+    // A rack in every row the line could stand in: nowhere at all.
+    const full = bigUnit();
+    for (let y = 5; y < 18; y += 2) placeEquipment(full, 'sheetRack', { variantId: 'standard', x: 20, y, id: `kit-rack-${y}` });
+    expect(canBuy(full, 'windowLine1')).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
   });
 
   it('is refused in setup mode onto a place whose lane is blocked or cannot be, and moves where it is clear', () => {
     const state = withLine(bigUnit());
-    expect(canPlace(state, 'kit-line-1', 2, 15)).toEqual({ ok: false, reason: 'The line needs a clear 36 m by 3 m and its lane' });
+    expect(canPlace(state, 'kit-line-1', 2, 15)).toEqual({ ok: false, reason: 'The line needs a clear 36 m by 3 m, its lane and a metre each side' });
     expect(canPlace(state, 'kit-line-1', 2, 11)).toEqual({ ok: true, reason: '' });
-    // A rack stood on the lane by a save: the line may not move to a place whose lane it is on, and
-    // every place's lane holds the front strip.
-    placeEquipment(state, 'sheetRack', { variantId: 'standard', x: 20, y: 18, id: 'kit-rack-on-the-lane' });
-    expect(canPlace(state, 'kit-line-1', 2, 11)).toEqual({ ok: false, reason: 'The line needs a clear 36 m by 3 m and its lane' });
-    const refused = act(state, { type: 'MOVE_ITEM', itemId: 'kit-line-1', x: 2, y: 11 });
+    // A rack stood by a save where the lane of another place would be: the line may not move to a
+    // place whose lane it is on.
+    placeEquipment(state, 'sheetRack', { variantId: 'standard', x: 20, y: 11, id: 'kit-rack-on-the-lane' });
+    expect(canPlace(state, 'kit-line-1', 2, 8)).toEqual({ ok: false, reason: 'The line needs a clear 36 m by 3 m, its lane and a metre each side' });
+    const refused = act(state, { type: 'MOVE_ITEM', itemId: 'kit-line-1', x: 2, y: 8 });
     expect(refused.equipment.find((item) => item.id === 'kit-line-1')?.anchorY).toBe(14);
   });
 });
@@ -145,7 +165,7 @@ describe('what stands on it already (CLAUDE.md T31 2.6)', () => {
     placeEquipment(state, 'sheetRack', { variantId: 'standard', x: 0, y: 12, id: 'kit-rack-on-the-lane' });
     withLine(state);
     const line = warnings(state).find((warning) => warning.key === 'laneBlocked');
-    expect(line?.text).toBe("Kit stands on the forklift's lane: the workbench and the sheet rack");
+    expect(line?.text).toBe("Kit stands in line 1's way: the workbench and the sheet rack");
     expect(state.equipment.find((item) => item.id === 'kit-bench-on-the-lane')).toMatchObject({ anchorX: 10, anchorY: 18 });
     // Moved off it, the line goes.
     const moved = act(state, { type: 'MOVE_ITEM', itemId: 'kit-bench-on-the-lane', x: 10, y: 10 });
@@ -172,15 +192,22 @@ describe('what stands on it already (CLAUDE.md T31 2.6)', () => {
   it('says a line over the left strip is to be moved along it, not back', () => {
     const state = withLine(bigUnit(), { x: 0, y: 11 });
     expect(warnings(state).find((warning) => warning.key === 'laneBlocked')?.text).toBe(
-      'The line stands on the way to the gate for its lane: move it along',
+      'Line 1 stands on the way to the gate for its lane: move it along',
+    );
+  });
+
+  it('says a line whose lane would cross the way to the gate is to be moved forward', () => {
+    const state = withLine(bigUnit(), { x: 2, y: 5 });
+    expect(warnings(state).find((warning) => warning.key === 'laneBlocked')?.text).toBe(
+      'Line 1 stands too near the rear wall for its lane: move it forward',
     );
   });
 
   it('keeps a Turn 30 line standing where its lane cannot be, draws no lane, and says to move it back', () => {
     const state = withLine(bigUnit(), { x: 2, y: 15 });
-    expect(lineLane(state)).toBeNull();
+    expect(lineLanes(state)).toEqual([]);
     expect(warnings(state).find((warning) => warning.key === 'laneBlocked')?.text).toBe(
-      'The line stands too near the front wall for its lane: move it back',
+      'Line 1 stands too near the front wall for its lane: move it back',
     );
     expect(lane(state)).toBeNull();
     expect(state.equipment.find((item) => item.id === 'kit-line-1')?.anchorY).toBe(15);

@@ -1293,10 +1293,45 @@ function liftToVersion44(state: Raw): void {
  *  over the stores' room until they are used, as any load may (CLAUDE.md T31 section 4) [TUNE:
  *  chat]. */
 function giveTheLineItsFirstBatch(state: GameState): void {
-  if (state.windowLine.contract?.status !== 'active') return;
-  state.windowLine.boards += lineTimberBatch();
-  state.stock.sheets += lineTimberBatch();
-  state.windowLine.glass += LINE_ORDER_WINDOWS * LINE_GLASS_PER_WINDOW;
+  for (const line of state.windowLines) {
+    if (line.contract?.status !== 'active') continue;
+    line.boards += lineTimberBatch();
+    state.stock.sheets += lineTimberBatch();
+    line.glass += LINE_ORDER_WINDOWS * LINE_GLASS_PER_WINDOW;
+  }
+}
+
+/** Version 44 to 45 (v93). A company may have more than one production line (PIOTR, 12.10): the
+ *  one record `windowLine` becomes the list `windowLines`, with the line that stood as line 1, its
+ *  number written on the record; every module standing, sold and waiting, or on order carries the
+ *  number 1; a load of the line's timber marked `true` is marked 1. A save with neither a module
+ *  nor anything in its record opens with no line record at all. Nothing else of a save is touched. */
+function liftToVersion45(state: Raw): void {
+  const old = isRecord(state.windowLine) ? state.windowLine : null;
+  const modules = (list: unknown): Raw[] =>
+    Array.isArray(list) ? list.filter((item): item is Raw => isRecord(item) && typeof item.specId === 'string' && isLineModule(item.specId)) : [];
+  const kit = [...modules(state.equipment), ...modules(state.onOrder)];
+  for (const item of kit) if (typeof item.line !== 'number') item.line = 1;
+  if (Array.isArray(state.deliveries)) {
+    for (const delivery of state.deliveries) {
+      if (isRecord(delivery) && delivery.line === true) delivery.line = 1;
+    }
+  }
+  if (old !== null) {
+    const since = isRecord(old.since) ? old.since : null;
+    const stood =
+      kit.length > 0 ||
+      old.contract !== null ||
+      (Array.isArray(old.upgrades) && old.upgrades.length > 0) ||
+      (typeof old.boards === 'number' && old.boards > 0) ||
+      (typeof old.glass === 'number' && old.glass > 0) ||
+      (since !== null && since.firstDay !== null);
+    state.windowLines = stood ? [{ number: 1, ...old }] : [];
+  } else if (!Array.isArray(state.windowLines)) {
+    state.windowLines = [];
+  }
+  delete state.windowLine;
+  state.version = 45;
 }
 
 const LIFTS: Record<number, (state: Raw) => void> = {
@@ -1332,6 +1367,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   41: liftToVersion42,
   42: liftToVersion43,
   43: liftToVersion44,
+  44: liftToVersion45,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -1408,7 +1444,7 @@ export function migrateState(raw: unknown, version: number): GameState | null {
     }
   }
   // A line on its contract given its first batch of timber and glass (v92).
-  if (version < 44 && isRecord(lifted.windowLine) && isRecord(lifted.stock)) {
+  if (version < 44 && Array.isArray(lifted.windowLines) && isRecord(lifted.stock)) {
     try {
       giveTheLineItsFirstBatch(lifted);
     } catch {

@@ -17,6 +17,7 @@ import {
   STOCK_LINE_KINDS,
   WAITING_FOR_GLASS,
   LINE_BOARD_SAVING,
+  lineName,
 } from './constants';
 import { addWorkingDays } from './clock';
 import { canAfford, pay } from './economy';
@@ -27,8 +28,9 @@ import {
   freeBoardRoom,
   isSold,
   itemStandsInTheHall,
-  lineContractRuns,
+  jobsLine,
   lineModules,
+  lineState,
   sheetCapacityOf,
   sheetsOnCounter,
 } from './machines';
@@ -52,7 +54,8 @@ export function sheetsForCost(cost: number): number {
 export function boardsForJob(state: GameState, materialCost: number, timber: boolean): number {
   const boards = boardsCostOf(materialCost, timber);
   if (!timber) return sheetsForCost(boards);
-  const modules = lineContractRuns(state) ? 0 : lineModules(state);
+  const line = jobsLine(state);
+  const modules = line === null ? 0 : lineModules(state, line);
   const kept = 1 - LINE_BOARD_SAVING * modules;
   return sheetsForCost(Math.round(boards * kept * 100) / 100);
 }
@@ -135,9 +138,9 @@ export function reservedSheets(state: GameState): number {
     if (contract.status !== 'active') continue;
     reserved += contract.sheetsReserved;
   }
-  // The line's boards are held as a timber job's are, so no sheet job can ever take one (CLAUDE.md
-  // T31 2.1).
-  reserved += state.windowLine.boards;
+  // Every line's boards are held as a timber job's are, so no sheet job can ever take one
+  // (CLAUDE.md T31 2.1).
+  for (const line of state.windowLines) reserved += line.boards;
   return reserved;
 }
 
@@ -238,7 +241,7 @@ export function pendingStockSheets(state: GameState): number {
   let pending = 0;
   for (const delivery of state.deliveries) {
     // A load of the line's timber is never stock (CLAUDE.md T31 2.2).
-    if (delivery.jobId === null && delivery.line !== true && !delivery.unloaded) pending += delivery.sheets;
+    if (delivery.jobId === null && delivery.line === undefined && !delivery.unloaded) pending += delivery.sheets;
   }
   return pending;
 }
@@ -376,7 +379,7 @@ export function createDelivery(
   bespoke: boolean,
   pricePaid = 0,
   boards = false,
-  line = false,
+  line: number | null = null,
 ): Delivery {
   const delivery: Delivery = {
     id: makeId(state, 'del'),
@@ -391,8 +394,8 @@ export function createDelivery(
     overflowSheets: 0,
     // A load of boards for a timber job says so (CLAUDE.md T29 2.11.2).
     ...(boards ? { boards: true as const } : {}),
-    // And a load of the line's timber says so too (CLAUDE.md T31 2.2).
-    ...(line ? { line: true as const } : {}),
+    // And a load of a line's timber says which line's (CLAUDE.md T31 2.2; v93).
+    ...(line === null ? {} : { line }),
   };
   state.deliveries.push(delivery);
   return delivery;
@@ -493,8 +496,8 @@ export function arriveDeliveries(state: GameState): Delivery[] {
       // The line's timber in its own words: `Unload timber for the line: 40 boards` (CLAUDE.md T31
       // 2.2) [TUNE].
       label:
-        delivery.line === true
-          ? `Unload timber for the line: ${plural(delivery.sheets, 'board', 'boards')}`
+        delivery.line !== undefined
+          ? `Unload timber for ${lineName(delivery.line).toLowerCase()}: ${plural(delivery.sheets, 'board', 'boards')}`
           : `Unload ${loadWords(state, delivery)}`,
       // By the size of the load: the first hundred sheets and every hundred past them (v75).
       minutes: unloadMinutes(state, delivery.sheets),
@@ -509,13 +512,13 @@ export function arriveDeliveries(state: GameState): Delivery[] {
  *  rest (CLAUDE.md T29 2.11.2), and the line's in its own, `Timber for the line: 40 boards`
  *  (CLAUDE.md T31 2.2). */
 export function loadWords(state: GameState, delivery: Delivery): string {
-  if (delivery.line === true) return `Timber for the line: ${plural(delivery.sheets, 'board', 'boards')}`;
+  if (delivery.line !== undefined) return `Timber for ${lineName(delivery.line).toLowerCase()}: ${plural(delivery.sheets, 'board', 'boards')}`;
   return isBoards(state, delivery) ? plural(delivery.sheets, 'board', 'boards') : plural(delivery.sheets, 'sheet', 'sheets');
 }
 
-/** The line's load inside a sentence: `40 boards for the line` (CLAUDE.md T31 2.2) [TUNE]. */
-export function lineLoadInWords(boards: number): string {
-  return `${plural(boards, 'board', 'boards')} for the line`;
+/** A line's load inside a sentence: `40 boards for line 1` (CLAUDE.md T31 2.2; v93) [TUNE]. */
+export function lineLoadInWords(boards: number, line: number): string {
+  return `${plural(boards, 'board', 'boards')} for ${lineName(line).toLowerCase()}`;
 }
 
 /** Room left on the sheet rack, counted without the boards (CLAUDE.md T29 2.11.2). */
@@ -537,12 +540,12 @@ export function buyStock(state: GameState, sheets: number): boolean {
  *  A load for one job is held for that job first; whatever else lands is free for every job with
  *  a shortfall, in the order they were accepted (CLAUDE.md T13 3.3). */
 export function unloadIntoStock(state: GameState, delivery: Delivery): void {
-  if (delivery.line === true) {
-    // The line's timber comes off the lorry whole onto the timber stores, as a timber job's boards
+  if (delivery.line !== undefined) {
+    // A line's timber comes off the lorry whole onto the timber stores, as a timber job's boards
     // do, and is the line's from the unloading: on the counter and held (CLAUDE.md T31 2.2).
     state.stock.sheets += delivery.sheets;
     delivery.overflowSheets = 0;
-    state.windowLine.boards += delivery.sheets;
+    lineState(state, delivery.line).boards += delivery.sheets;
     return;
   }
   const timberJob = isBoards(state, delivery)

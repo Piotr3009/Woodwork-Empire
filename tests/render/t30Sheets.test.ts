@@ -23,6 +23,7 @@ import { currentState, mount, render } from '../../src/ui/app';
 import { machineInUse } from '../../src/engine/game';
 import { drawnInUse } from '../../src/engine/drawn';
 import { act, buyStartingKit, newGame, nextDay, placeEquipment, testJoiner, withAir } from '../helpers';
+import { lineState } from '../../src/engine/lineContract';
 
 // The men drawn at the machines are the hall's own reading of the day plan; the one test of a man
 // drawn at a module stands one there through it (CLAUDE.md T30 2.11).
@@ -43,7 +44,7 @@ function working(): GameState {
   for (const id of ['eng-1', 'eng-2']) {
     state.workers.push({ ...testJoiner(id, id), role: 'lineEngineer', tier: null, rate: 0, monthlyWage: 15000 });
   }
-  state.windowLine.contract = {
+  lineState(state, 1).contract = {
     status: 'active',
     startDay: state.clock.day,
     windowsThisWeek: 0,
@@ -54,9 +55,9 @@ function working(): GameState {
   };
   // And its timber and glass: from Turn 31 the line makes windows only with a window's worth of
   // each (CLAUDE.md T31 2.1).
-  state.windowLine.boards = 40;
+  lineState(state, 1).boards = 40;
   state.stock.sheets += 40;
-  state.windowLine.glass = 20;
+  lineState(state, 1).glass = 20;
   state.clock.minute = 60;
   state.speed = 1;
   state.activeEvent = null;
@@ -132,7 +133,7 @@ describe('the modules at work (CLAUDE.md T30 2.11)', () => {
 
   it('without the contract, plays a module only while the hall reads it in use', () => {
     const state = working();
-    state.windowLine.contract = null;
+    lineState(state, 1).contract = null;
     const page = hall(state);
     // Nobody is drawn at any module here, so none plays.
     expect(page.querySelector('[data-sheet]')).toBeNull();
@@ -238,14 +239,14 @@ describe('the windows on module 6 s pallet (CLAUDE.md T30 2.12)', () => {
     for (const playing of [true, false]) {
       const state = working();
       if (!playing) state.speed = 0;
-      state.windowLine.onPallet = 7;
+      lineState(state, 1).onPallet = 7;
       const page = hall(state);
       const stacks = Array.from(page.querySelectorAll('[data-stack]'));
       expect(stacks.map((node) => node.getAttribute('href')), String(playing)).toEqual(['/sprites/windowLine6.standard.stack07.png']);
       expect(stacks[0]?.closest('[data-kit]')?.getAttribute('data-kit'), String(playing)).toBe('kit-line-6');
     }
     const empty = working();
-    empty.windowLine.onPallet = 0;
+    lineState(empty, 1).onPallet = 0;
     expect(hall(empty).querySelector('[data-stack]')).toBeNull();
   });
 });

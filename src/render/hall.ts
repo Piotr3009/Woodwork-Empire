@@ -40,6 +40,10 @@ import {
   machinesDueService,
   machinesInService,
   isLineModule,
+  itemName,
+  lineOf,
+  lineRecord,
+  standingLines,
   isServiced,
   sawdustPiles,
   serviceIsDue,
@@ -146,8 +150,8 @@ import {
   spriteImage,
   spriteUrl,
 } from './sprites';
-import { lineMakesWindows, runningLineContract } from '../engine/lineContract';
-import { lineLane } from '../engine/layout';
+import { lineMakesWindows, palletsAtTheGate, runningLineContract } from '../engine/lineContract';
+import { lineLanes } from '../engine/layout';
 import { forkliftArt, forkliftPoints } from './forklift';
 import { placeholder } from './placeholder';
 import { jobStage } from '../engine/jobs';
@@ -973,7 +977,8 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
 export function moduleWorks(state: GameState, item: Equipment): boolean {
   if (!isLineModule(item.specId)) return false;
   if (!(state.speed > 0 && state.activeEvent === null && state.gameOver === null)) return false;
-  if (runningLineContract(state) !== null) return lineMakesWindows(state);
+  const line = lineOf(item);
+  if (runningLineContract(state, line) !== null) return lineMakesWindows(state, line);
   return machineInUse(state, item);
 }
 
@@ -1005,7 +1010,7 @@ function palletStack(
   files: readonly string[],
 ): string {
   if (item.specId !== LINE_MODULES[LINE_MODULES.length - 1]) return '';
-  const windows = state.windowLine.onPallet;
+  const windows = lineRecord(state, lineOf(item))?.onPallet ?? 0;
   if (windows < 1 || windows >= LINE_PALLET_WINDOWS) return '';
   const file = `${item.spriteKey}.${item.variantId}.stack${String(windows).padStart(2, '0')}.png`;
   if (!files.includes(file)) return '';
@@ -1690,27 +1695,42 @@ export function rearWallClip(widthCells: number): string {
   );
 }
 
-/** The forklift's lane of the line where it stands or is on order: the outline of its L, from the
- *  pallets at the gate down the left wall and along the front wall to the line's end, in the one
- *  token for it. Nothing when the line has no lane (CLAUDE.md T31 2.6) [TUNE: the outline]. */
+/** The forklift's lane of every line that stands or is on order and has one: the outline of each
+ *  L, from the pallets at the gate along the left wall and along the front strip to the line's end,
+ *  in the one token for it, marked with its line's number. Nothing for a line with no lane
+ *  (CLAUDE.md T31 2.6; v93) [TUNE: the outline]. */
 function laneArt(state: GameState): string {
-  const lane = lineLane(state);
-  const front = lane?.[0];
-  const left = lane?.[1];
-  if (front === undefined || left === undefined) return '';
-  const depth = front.y + front.depth;
-  const corners = [
-    { x: left.x, y: left.y },
-    { x: left.x + left.width, y: left.y },
-    { x: left.x + left.width, y: front.y },
-    { x: front.x + front.width, y: front.y },
-    { x: front.x + front.width, y: depth },
-    { x: left.x, y: depth },
-  ].map((corner) => tileToScreen(corner.x, corner.y));
-  return (
-    `<polygon data-lane="1" points="${points(corners)}" fill="none" stroke="var(--lane-yellow)" ` +
-    `stroke-width="${LANE_STROKE}" stroke-linejoin="miter" pointer-events="none" />`
-  );
+  return lineLanes(state)
+    .map(({ line, front, left }) => {
+      const top = Math.min(left.y, front.y);
+      const bottom = Math.max(left.y + left.depth, front.y + front.depth);
+      // The left strip spans the front strip's rows and the pallets' row: the outline goes round
+      // the two strips, the strip above or below the front one included.
+      const corners =
+        left.y < front.y
+          ? [
+              { x: left.x, y: top },
+              { x: left.x + left.width, y: top },
+              { x: left.x + left.width, y: front.y },
+              { x: front.x + front.width, y: front.y },
+              { x: front.x + front.width, y: bottom },
+              { x: left.x, y: bottom },
+            ]
+          : [
+              { x: left.x, y: top },
+              { x: front.x + front.width, y: top },
+              { x: front.x + front.width, y: front.y + front.depth },
+              { x: left.x + left.width, y: front.y + front.depth },
+              { x: left.x + left.width, y: bottom },
+              { x: left.x, y: bottom },
+            ];
+      const screen = corners.map((corner) => tileToScreen(corner.x, corner.y));
+      return (
+        `<polygon data-lane="${line}" points="${points(screen)}" fill="none" stroke="var(--lane-yellow)" ` +
+        `stroke-width="${LANE_STROKE}" stroke-linejoin="miter" pointer-events="none" />`
+      );
+    })
+    .join('');
 }
 
 /** The lane's lines, in the scene's pixels at x1 [TUNE]. */
@@ -1983,7 +2003,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // A machine that wants a pipe and has none is not served: the hall says so under its name, in
     // the game's red, and never writes "connected" anywhere (CLAUDE.md T16 2.3).
     const unconnected = wantsExtraction(item) && !isConnected(state, item);
-    const name = `${spec.name}${bagLine}${serviceLine}${rackLine}`;
+    const name = `${itemName(item)}${bagLine}${serviceLine}${rackLine}`;
     // Pointing at the extractor reads the hall's store (CLAUDE.md T12 3.3).
     // Its places and who is in them, off the day plan the figures stand by (CLAUDE.md T25 2.5),
     // and the family too few for the crew when it is (v53).
@@ -2234,7 +2254,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<g data-van="${waiting.id}" data-sprite="${PALLET_SPRITE}" class="clickable pallet">` +
         '<title>Click the pallet to decide who unloads it</title>' +
         // The line's timber in its own words (CLAUDE.md T31 2.2).
-        palletArt(files, waiting.line === true ? loadWords(state, waiting) : `Delivery: ${loadWords(state, waiting)}`) +
+        palletArt(files, waiting.line !== undefined ? loadWords(state, waiting) : `Delivery: ${loadWords(state, waiting)}`) +
         '</g>',
     });
   }
@@ -2272,19 +2292,21 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
-  // The line's own forklift, waiting at the line's end on its lane while the six stand and it has
-  // one; `src/render/forklift.ts` drives it from frame to frame (CLAUDE.md T31 2.10).
-  const forkliftAt = forkliftPoints(state);
-  if (forkliftAt !== null && files.includes(FORKLIFT_SHEETS.empty.file)) {
-    drawables.push(forkliftArt(forkliftAt.wait));
+  // Each line's own forklift, waiting at its line's end on its lane while the six stand and it has
+  // one; `src/render/forklift.ts` drives them from frame to frame (CLAUDE.md T31 2.10; v93).
+  if (files.includes(FORKLIFT_SHEETS.empty.file)) {
+    for (const line of standingLines(state)) {
+      const forkliftAt = forkliftPoints(state, line);
+      if (forkliftAt !== null) drawables.push(forkliftArt(line, forkliftAt.wait));
+    }
   }
 
-  // The full pallets of the line's windows wait for the client just past the end of the gate lane,
-  // each drawn from the art side's pallet of ten standing alone on its 2 m by 1 m, the second beside
-  // the first along x and two at the most, a part pallet drawn as a full one, and one label hung
-  // under the front of their floor so that it does not sit on the finished goods' (CLAUDE.md T30
-  // 2.8, T31 2.10) [TUNE: chat]. The line's forklift hides the newest while it is on its forks.
-  const pallets = state.windowLine.palletsAtGate;
+  // The full pallets of every line's windows wait for the client just past the end of the gate
+  // lane, each drawn from the art side's pallet of ten standing alone on its 2 m by 1 m, the second
+  // beside the first along x and two at the most, a part pallet drawn as a full one, and one label
+  // hung under the front of their floor so that it does not sit on the finished goods' (CLAUDE.md
+  // T30 2.8, T31 2.10; v93) [TUNE: chat]. A line's forklift hides the newest while it is on its forks.
+  const pallets = palletsAtTheGate(state);
   if (pallets > 0) {
     const gate = LINE_PALLET_LAYOUT;
     const shown = Math.min(pallets, LINE_PALLETS_DRAWN);

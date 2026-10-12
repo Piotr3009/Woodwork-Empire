@@ -51,6 +51,7 @@ import type { Contract, GameEvent, GameState, Worker } from '../../src/engine/in
 import { renderContracts } from '../../src/ui/contracts';
 import { money, signedMoney } from '../../src/ui/modal';
 import { act, buyStartingKit, fillRack, newGame, nextDay, placeEquipment, testJoiner, withAir, withExtraction } from '../helpers';
+import { lineState } from '../../src/engine/lineContract';
 
 function joinerHall(): GameState {
   const state = withAir(withExtraction(fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 60)));
@@ -179,7 +180,7 @@ describe('a client goes elsewhere (CLAUDE.md T31 2.9)', () => {
   it('never touches the line s own contract: a loss beside it, and the quiet after it, leave it as it was', () => {
     const state = joinerHall();
     const contract = running(state, idThat(joinerHall(), 8, CONTRACT_LOSS_SALT, CONTRACT_CLIENT_LEAVES_CHANCE, true));
-    state.windowLine.contract = {
+    lineState(state, 1).contract = {
       status: 'active',
       startDay: 1,
       windowsThisWeek: 3,
@@ -188,13 +189,13 @@ describe('a client goes elsewhere (CLAUDE.md T31 2.9)', () => {
       revenue: 18000,
       materialCost: 0,
     };
-    const line = structuredClone(state.windowLine.contract);
+    const line = structuredClone(lineState(state, 1).contract);
     state.clock.day = 8;
     runContractDay(state);
     expect(contract.endedBy).toBe('lost');
     expect(contractsQuiet(state)).toBe(true);
-    expect(state.windowLine.contract).toEqual(line);
-    expect(state.contracts.some((entry) => entry.name === 'Windows off the line')).toBe(false);
+    expect(lineState(state, 1).contract).toEqual(line);
+    expect(state.contracts.some((entry) => entry.name === 'Windows off line 1')).toBe(false);
   });
 
   it('is let go off the tab with one button, and offers no term to renew', () => {

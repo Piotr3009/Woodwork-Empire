@@ -62,7 +62,7 @@ describe('the version in the corner', () => {
     // after another (PIOTR, 11.10). v92 is Turn 31: the line's timber and glass, its books, the
     // forklift's lane and its forklift, the hall that grows, the shelter behind the wall, and
     // contracts that can be lost (PIOTR, 11.10).
-    expect(APP_VERSION).toBe('v92');
+    expect(APP_VERSION).toBe('v93');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -78,7 +78,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v92'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v93'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

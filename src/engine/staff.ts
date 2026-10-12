@@ -53,7 +53,7 @@ import { addToJob, assignJob, findJob, takeOffJob } from './jobs';
 // have carried since Turn 13: neither touches the other while it is being loaded.
 import { workPlan } from './plan';
 import { canteenLockers, crewLimit, lockersInWords } from './layout';
-import { plural } from './text';
+import { inWords, plural } from './text';
 import {
   benchPlaceOf,
   accidentRisk,
@@ -65,6 +65,7 @@ import {
   BENCH,
   benchAtPlace,
   benchPlacesOwnedOrOnOrder,
+  lineNumbers,
   toolSlotsOf,
 } from './machines';
 import { countOwnedOrOnOrder, onOrderCount } from './orders';
@@ -566,8 +567,8 @@ export function hiringOptions(state: GameState): HiringOption[] {
       // He keeps the production line, so he is hired once a module stands or is on order, and not
       // before (CLAUDE.md T29 2.8).
       blockReason = 'The company has no production line';
-    } else if (spec.role === 'lineEngineer' && lineEngineers(state).length >= LINE_ENGINEERS_MAX) {
-      blockReason = 'Two engineers keep the whole line';
+    } else if (spec.role === 'lineEngineer' && lineEngineers(state).length >= lineEngineersWanted(state)) {
+      blockReason = engineersKeepLine(state);
     } else if (state.cash < spec.monthlyWage) {
       // Last of the refusals, because it is the only one that changes by the minute: who answers
       // the advert, what the office wants first, the bench and the kit are all standing facts,
@@ -748,13 +749,28 @@ export function lineEngineers(state: GameState): Worker[] {
   return state.workers.filter((worker) => worker.role === 'lineEngineer');
 }
 
-/** True while the production line stands or is on order: the line an engineer can be hired for.
- *  The line is bought and sold whole, so module 1 is asked for all six (CLAUDE.md T29 2.8, T30
+/** True while a production line stands or is on order: a line an engineer can be hired for.
+ *  A line is bought and sold whole, so module 1 is asked for all six (CLAUDE.md T29 2.8, T30
  *  2.3). An order counts, since the interview is checked again against the hall as it stands when
  *  it is over. */
 export function hasALine(state: GameState): boolean {
   const first = LINE_MODULES[0] ?? '';
   return state.equipment.some((item) => item.specId === first && !isSold(item)) || onOrderCount(state, first) > 0;
+}
+
+/** The line engineers the company can have on the books: two for every line it has, standing or
+ *  on order (PIOTR, 12.10: "its own two engineers"; v93). */
+export function lineEngineersWanted(state: GameState): number {
+  return LINE_ENGINEERS_MAX * lineNumbers(state).length;
+}
+
+/** The hiring card's reason when the lines have their engineers: `Two engineers keep the whole
+ *  line`, and with more lines `Four engineers keep the two lines` (v93) [TUNE: the words]. */
+export function engineersKeepLine(state: GameState): string {
+  const lines = lineNumbers(state).length;
+  const engineers = inWords(lineEngineersWanted(state));
+  const capital = `${engineers.charAt(0).toUpperCase()}${engineers.slice(1)}`;
+  return lines <= 1 ? `${capital} engineers keep the whole line` : `${capital} engineers keep the ${inWords(lines)} lines`;
 }
 
 /** True while this man has a manager over him: he is one of the men his grade carries. */

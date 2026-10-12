@@ -7,19 +7,20 @@
  * prohibited without prior written permission from Skylon Development Ltd.
  */
 
-// The line's own forklift [PIOTR, 10.10: "when the pallet of windows is stacked, ten of them, the
+// A line's own forklift [PIOTR, 10.10: "when the pallet of windows is stacked, ten of them, the
 // forklift takes it to the door"; 11.10: "and the forklift driving"; that evening "won't we add it
 // to this turn?"] (CLAUDE.md T31 2.10). It is the renderer's, as the walkers and the doors are: no
 // game state, no lift, no minute booked and no money. In the engine a pallet is at the gate the
 // moment it leaves module 6, as in Turn 30; this module only draws the trip that takes it there.
 //
-// The forklift comes with the line and goes with it. It waits on the lane's front strip in front of
-// module 6's pallet, facing `nw`, and whenever the count of pallets at the gate goes up on the same
-// day it drives the newest one along the front strip (`nw`) and up the left strip (`ne`) until the
-// pallet on its forks is over its place at the gate, sets it down, and drives back empty (`sw`,
-// then `se`). Its memory is module level and is set again after every page written, so a page
-// written mid trip never puts it back where it waits; it is forgotten wherever a view is built from
-// nothing, when the line is moved or sold, and from `WALK_SKIPPED_FROM_SPEED` on.
+// A forklift comes with its line and goes with it, one a line from v93 (PIOTR, 12.10). It waits on
+// its lane's front strip in front of module 6's pallet, facing `nw`, and whenever the count of its
+// line's pallets at the gate goes up on the same day it drives the newest one along the front strip
+// (`nw`) and up or down the left strip to the pallets until the pallet on its forks is over its
+// place at the gate, sets it down, and drives back empty. Its memory is module level and is set
+// again after every page written, so a page written mid trip never puts it back where it waits; it
+// is forgotten wherever a view is built from nothing, when its line is moved or sold, and from
+// `WALK_SKIPPED_FROM_SPEED` on.
 
 import {
   FIGURE_DEPTH_OFFSET,
@@ -31,7 +32,8 @@ import {
 } from '../engine/constants';
 import type { VehicleSheetFigures } from '../engine/constants';
 import { forkliftLane, linePlace } from '../engine/layout';
-import { lineStandsWhole } from '../engine/machines';
+import { palletsAtTheGate } from '../engine/lineContract';
+import { lineRecord, lineStandsWhole, standingLines } from '../engine/machines';
 import { facingTowards } from '../engine/stations';
 import type { GameState } from '../engine/types';
 import { type Facing, cellBox, frameAt, walksAreSkipped } from './characters';
@@ -51,7 +53,7 @@ interface Forklift {
   /** The line's place and the hall's depth it was worked out for: a move forgets the trip. */
   key: string;
   day: number;
-  /** The pallets at the gate it last saw. */
+  /** The line's pallets at the gate it last saw. */
   pallets: number;
   leg: Leg;
   at: Point;
@@ -64,16 +66,18 @@ interface Forklift {
   lastMs: number | null;
 }
 
-let forklift: Forklift | null = null;
+/** One forklift a line, by the line's number (v93). */
+const forklifts = new Map<number, Forklift>();
 
-/** Forgets the forklift: back where it waits, with no trip. */
+/** Forgets every forklift: each back where it waits, with no trip. */
 export function resetForklift(): void {
-  forklift = null;
+  forklifts.clear();
 }
 
-/** The forklift as it stands this frame, for the tests and nobody else. */
-export function forkliftNow(): Readonly<Forklift> | null {
-  return forklift;
+/** A line's forklift as it stands this frame, for the tests and nobody else; line 1's unless
+ *  asked for another. */
+export function forkliftNow(line = 1): Readonly<Forklift> | null {
+  return forklifts.get(line) ?? null;
 }
 
 /** How far short of the front strip's end the forklift's anchor waits, in metres: in front of
@@ -84,12 +88,14 @@ const WAIT_SHORT_OF_THE_END = 1;
  *  across the hall [TUNE]. */
 const MAX_STEP_SECONDS = 1;
 
-/** The three points of the trip for the line where it stands: where it waits, the lane's corner,
- *  and where it stops with the pallet on its forks over its place at the gate. Null while the six do
- *  not stand whole or the line has no lane: then there is no forklift (CLAUDE.md T31 2.10). */
-export function forkliftPoints(state: GameState): { wait: Point; corner: Point; drop: Point; key: string } | null {
-  if (!lineStandsWhole(state)) return null;
-  const at = linePlace(state);
+/** The three points of a line's trip for the line where it stands: where it waits, the lane's
+ *  corner, and where it stops with the pallet on its forks over its place at the gate, which is up
+ *  the left strip for a line in front of the pallets and down it for a line behind them. Null while
+ *  the six do not stand whole or the line has no lane: then there is no forklift (CLAUDE.md T31
+ *  2.10; v93). */
+export function forkliftPoints(state: GameState, line: number): { wait: Point; corner: Point; drop: Point; key: string } | null {
+  if (!lineStandsWhole(state, line)) return null;
+  const at = linePlace(state, line);
   if (at === null) return null;
   const lane = forkliftLane(state, at);
   const front = lane?.[0];
@@ -97,11 +103,15 @@ export function forkliftPoints(state: GameState): { wait: Point; corner: Point; 
   if (front === undefined || left === undefined) return null;
   const frontMiddle = front.y + front.depth / 2;
   const leftMiddle = left.x + left.width / 2;
+  const palletMiddle = LINE_PALLET_LAYOUT.y + LINE_PALLET_LAYOUT.depth / 2;
+  // The pallet is ahead of the forklift along the way it drives: the stop is short of the pallets'
+  // row on the side it comes from.
+  const drop = frontMiddle >= palletMiddle ? palletMiddle + FORKLIFT_LOAD_AHEAD : palletMiddle - FORKLIFT_LOAD_AHEAD;
   return {
     wait: { x: front.x + front.width - WAIT_SHORT_OF_THE_END, y: frontMiddle },
     corner: { x: leftMiddle, y: frontMiddle },
-    drop: { x: leftMiddle, y: LINE_PALLET_LAYOUT.y + LINE_PALLET_LAYOUT.depth / 2 + FORKLIFT_LOAD_AHEAD },
-    key: `${at.x},${at.y},${state.unit.depthCells}`,
+    drop: { x: leftMiddle, y: drop },
+    key: `${line}:${at.x},${at.y},${state.unit.depthCells}`,
   };
 }
 
@@ -121,11 +131,11 @@ function depthAt(at: Point): number {
   return depthKey(Math.floor(at.x), Math.floor(at.y)) + FIGURE_DEPTH_OFFSET;
 }
 
-/** The forklift as the hall draws it waiting, one drawable: an svg clipped to one cell by its view
- *  box over the whole sheet, halved like every sprite, its anchor on the point it stands on, marked
- *  `data-forklift` with its leg, and taking no click (CLAUDE.md T31 2.10). This module moves it
- *  from frame to frame. */
-export function forkliftArt(at: Point): { svg: string; depth: number; feet: Point } {
+/** A line's forklift as the hall draws it waiting, one drawable: an svg clipped to one cell by its
+ *  view box over the whole sheet, halved like every sprite, its anchor on the point it stands on,
+ *  marked `data-forklift` with its leg and `data-forklift-line` with its line, and taking no click
+ *  (CLAUDE.md T31 2.10; v93). This module moves it from frame to frame. */
+export function forkliftArt(line: number, at: Point): { svg: string; depth: number; feet: Point } {
   const sheet = FORKLIFT_SHEETS.empty;
   const row = sheet.rows.nw;
   const round = (value: number): number => Math.round(value * 100) / 100;
@@ -133,7 +143,7 @@ export function forkliftArt(at: Point): { svg: string; depth: number; feet: Poin
     depth: depthAt(at),
     feet: at,
     svg:
-      `<g data-forklift="wait" transform="${screenAt(at)}" pointer-events="none">` +
+      `<g data-forklift="wait" data-forklift-line="${line}" transform="${screenAt(at)}" pointer-events="none">` +
       `<svg data-forklift-art="1" data-frame="0" data-row="${row}" ` +
       `x="${round(-sheet.anchorX / SPRITE_SCALE)}" y="${round(-sheet.anchorY / SPRITE_SCALE)}" ` +
       `width="${round(sheet.cellWidth / SPRITE_SCALE)}" height="${round(sheet.cellHeight / SPRITE_SCALE)}" ` +
@@ -142,12 +152,17 @@ export function forkliftArt(at: Point): { svg: string; depth: number; feet: Poin
   };
 }
 
-/** A forklift waiting, with no trip, having seen the pallets at the gate as they are. */
-function waiting(key: string, state: GameState, wait: Point): Forklift {
+/** A line's pallets at the gate as the engine has them. */
+function linePallets(state: GameState, line: number): number {
+  return lineRecord(state, line)?.palletsAtGate ?? 0;
+}
+
+/** A forklift waiting, with no trip, having seen its line's pallets at the gate as they are. */
+function waiting(key: string, state: GameState, line: number, wait: Point): Forklift {
   return {
     key,
     day: state.clock.day,
-    pallets: state.windowLine.palletsAtGate,
+    pallets: linePallets(state, line),
     leg: 'wait',
     at: { ...wait },
     path: [],
@@ -157,18 +172,21 @@ function waiting(key: string, state: GameState, wait: Point): Forklift {
   };
 }
 
-/** Reads the state for this frame: forgets the forklift when it has to, starts a trip when a pallet
- *  has left module 6 on the same day while it waits, and drives it on by the real time since its
- *  last step when `drive` is set. A pallet sent while it is out is at the gate at once. */
-function follow(state: GameState, nowMs: number, drive: boolean): void {
-  const points = forkliftPoints(state);
+/** Reads the state for this frame for one line: forgets its forklift when it has to, starts a trip
+ *  when a pallet has left its module 6 on the same day while it waits, and drives it on by the real
+ *  time since its last step when `drive` is set. A pallet sent while it is out is at the gate at
+ *  once. */
+function followLine(state: GameState, line: number, nowMs: number, drive: boolean): void {
+  const points = forkliftPoints(state, line);
   if (points === null) {
-    forklift = null;
+    forklifts.delete(line);
     return;
   }
-  const pallets = state.windowLine.palletsAtGate;
+  const pallets = linePallets(state, line);
+  let forklift = forklifts.get(line) ?? null;
   if (forklift === null || forklift.key !== points.key || walksAreSkipped()) {
-    forklift = waiting(points.key, state, points.wait);
+    forklift = waiting(points.key, state, line, points.wait);
+    forklifts.set(line, forklift);
   } else if (forklift.day !== state.clock.day) {
     forklift.day = state.clock.day;
     forklift.pallets = pallets;
@@ -176,7 +194,8 @@ function follow(state: GameState, nowMs: number, drive: boolean): void {
     if (forklift.leg === 'wait') {
       forklift.leg = 'out';
       forklift.path = [points.corner, points.drop];
-      forklift.onTheForks = Math.min(pallets, LINE_PALLETS_DRAWN) - 1;
+      // The newest pallet the hall draws at the gate, every line's counted (CLAUDE.md T31 2.10).
+      forklift.onTheForks = Math.min(palletsAtTheGate(state), LINE_PALLETS_DRAWN) - 1;
       forklift.lastMs = nowMs;
     }
     forklift.pallets = pallets;
@@ -190,6 +209,15 @@ function follow(state: GameState, nowMs: number, drive: boolean): void {
   forklift.lastMs = nowMs;
   const next = forklift.path[0];
   if (next !== undefined) forklift.facing = facingTowards(forklift.at, next);
+}
+
+/** Every line's forklift read for this frame, and the forklift of a line that is gone forgotten. */
+function follow(state: GameState, nowMs: number, drive: boolean): void {
+  const lines = standingLines(state);
+  for (const line of Array.from(forklifts.keys())) {
+    if (!lines.includes(line)) forklifts.delete(line);
+  }
+  for (const line of lines) followLine(state, line, nowMs, drive);
 }
 
 /** Drives this far along the points ahead, turning on the spot at a corner, and ends a leg at its
@@ -224,44 +252,49 @@ function driveOn(truck: Forklift, cells: number, points: { wait: Point; corner: 
   }
 }
 
-/** Writes the forklift where it has got to onto the page: its leg, its place, its row and frame, its
- *  sheet, its depth among the drawables, and the pallet on its forks left out of the gate. Nothing
- *  it set before survives a page written, so all of it is written each time. */
+/** Writes every forklift where it has got to onto the page: its leg, its place, its row and frame,
+ *  its sheet, its depth among the drawables, and the pallet on its forks left out of the gate.
+ *  Nothing it set before survives a page written, so all of it is written each time. */
 function draw(root: ParentNode, nowMs: number): void {
+  const onForks = new Set<number>();
+  for (const forklift of forklifts.values()) {
+    if (forklift.onTheForks !== null) onForks.add(forklift.onTheForks);
+  }
   const pallets = Array.from(root.querySelectorAll('[data-line-pallet]'));
   for (const pallet of pallets) {
-    const onTheForks = forklift !== null && forklift.onTheForks === Number(pallet.getAttribute('data-line-pallet'));
-    if (onTheForks) pallet.setAttribute('visibility', 'hidden');
+    if (onForks.has(Number(pallet.getAttribute('data-line-pallet')))) pallet.setAttribute('visibility', 'hidden');
     else pallet.removeAttribute('visibility');
   }
-  const node = root.querySelector('[data-forklift]');
-  if (node === null || forklift === null) return;
-  const sheet = sheetOf(forklift.leg);
-  const moving = forklift.path.length > 0;
-  const row = sheet.rows[forklift.facing];
-  const frame = moving ? frameAt(sheet, nowMs) : 0;
-  node.setAttribute('data-forklift', forklift.leg);
-  node.setAttribute('transform', screenAt(forklift.at));
-  const art = node.querySelector('[data-forklift-art]');
-  if (art !== null) {
-    art.setAttribute('data-row', String(row));
-    art.setAttribute('data-frame', String(frame));
-    art.setAttribute('viewBox', cellBox(sheet, row, frame));
-    art.querySelector('image')?.setAttribute('href', `${SPRITE_DIR}/${sheet.file}`);
+  for (const node of Array.from(root.querySelectorAll('[data-forklift]'))) {
+    const forklift = forklifts.get(Number(node.getAttribute('data-forklift-line'))) ?? null;
+    if (forklift === null) continue;
+    const sheet = sheetOf(forklift.leg);
+    const moving = forklift.path.length > 0;
+    const row = sheet.rows[forklift.facing];
+    const frame = moving ? frameAt(sheet, nowMs) : 0;
+    node.setAttribute('data-forklift', forklift.leg);
+    node.setAttribute('transform', screenAt(forklift.at));
+    const art = node.querySelector('[data-forklift-art]');
+    if (art !== null) {
+      art.setAttribute('data-row', String(row));
+      art.setAttribute('data-frame', String(frame));
+      art.setAttribute('viewBox', cellBox(sheet, row, frame));
+      art.querySelector('image')?.setAttribute('href', `${SPRITE_DIR}/${sheet.file}`);
+    }
+    placeAmongDrawables(node, depthAt(forklift.at), forklift.at);
   }
-  placeAmongDrawables(node, depthAt(forklift.at), forklift.at);
 }
 
 /** The frame's step: in every frame with the state, whatever page is open and whether the clock runs
- *  or stands, the forklift drives on in real time and is drawn where it has got to (CLAUDE.md T31
+ *  or stands, every forklift drives on in real time and is drawn where it has got to (CLAUDE.md T31
  *  2.10). */
 export function stepForklift(root: ParentNode, state: GameState, nowMs: number): void {
   follow(state, nowMs, true);
   draw(root, nowMs);
 }
 
-/** After every page written: the forklift is put back where it had got to, and a pallet that has
- *  just left module 6 is never painted at the gate for a frame (CLAUDE.md T31 2.10). */
+/** After every page written: every forklift is put back where it had got to, and a pallet that has
+ *  just left a module 6 is never painted at the gate for a frame (CLAUDE.md T31 2.10). */
 export function syncForklift(root: ParentNode, state: GameState, nowMs: number): void {
   follow(state, nowMs, false);
   draw(root, nowMs);

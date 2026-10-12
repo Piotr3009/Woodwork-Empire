@@ -61,6 +61,8 @@ import {
   crewAtFamily,
   hallPlaces,
   isLineModule,
+  itemName,
+  lineOf,
   lineSalePrice,
   machineShortWord,
   placeShortages,
@@ -68,7 +70,7 @@ import {
   serviceDueIn,
   toolSlotsLine,
 } from '../engine/machines';
-import { BY_HAND_DURATION_FACTOR, CAPACITY_FAMILIES, LINE_MODULES, LINE_PRICE, VAN_CLASSES } from '../engine/constants';
+import { BY_HAND_DURATION_FACTOR, CAPACITY_FAMILIES, LINE_MODULES, LINE_PRICE, VAN_CLASSES, lineName } from '../engine/constants';
 import { slotsInUseIn } from '../engine/staff';
 import { nextSpriteOrientation } from '../render/sprites';
 import { cancelFields, orderName, orderProgress } from '../engine/orders';
@@ -295,7 +297,7 @@ function orderedTile(state: GameState, item: OnOrderItem, spec: EquipmentSpec): 
     .join('');
   return (
     `<div class="tile is-ordered" data-order="${item.id}">` +
-    `<h3 class="tile-name">${escapeHtml(spec.name)} ` +
+    `<h3 class="tile-name">${escapeHtml(itemName(item))} ` +
     '<span class="badge badge-ordered">On order</span></h3>' +
     pictureSlot(pictureKeyOf(spec), item.variantId) +
     lines +
@@ -356,9 +358,11 @@ function sellAction(state: GameState, item: Equipment, sellConfirm: string | nul
   if (sellConfirm === item.id) {
     return button('sellMachine', 'Confirm sale', `data-id="${item.id}" data-confirm="1"`);
   }
-  // A module's tile sells the whole line, for the six halves (CLAUDE.md T30 2.3.5).
+  // A module's tile sells its whole line, for the six halves (CLAUDE.md T30 2.3.5; v93: `Sell line
+  // 2 for ...`, PIOTR 12.10).
   if (isLineModule(item.specId)) {
-    return button('sellMachine', `Sell the line for ${money(lineSalePrice(state))}`, `data-id="${item.id}"`);
+    const line = lineOf(item);
+    return button('sellMachine', `Sell ${lineName(line).toLowerCase()} for ${money(lineSalePrice(state, line))}`, `data-id="${item.id}"`);
   }
   return button('sellMachine', `Sell for ${money(salePriceFor(item))}`, `data-id="${item.id}"`);
 }
@@ -678,7 +682,7 @@ export function ownedTile(
   const badge = ladder ? classBadge(item.variantId) : '';
   return (
     `<div class="tile is-owned${frame.className}"${frame.style} data-owned="${item.id}">` +
-    `<h3 class="tile-name">${escapeHtml(spec.name)} ${badge}` +
+    `<h3 class="tile-name">${escapeHtml(itemName(item))} ${badge}` +
     '<span class="badge badge-owned">Owned</span></h3>' +
     pictureSlot(pictureKeyOf(spec), item.variantId) +
     lines +

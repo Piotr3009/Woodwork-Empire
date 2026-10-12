@@ -32,6 +32,7 @@ import { tileToScreen } from '../../src/render/iso';
 import { spriteFiles } from '../../src/render/sprites';
 import { currentState, mount, render } from '../../src/ui/app';
 import { act, buyStartingKit, newGame, nextDay, placeEquipment, testJoiner, withAir } from '../helpers';
+import { lineState } from '../../src/engine/lineContract';
 
 function bigUnit(): GameState {
   let state = newGame({ difficulty: 'veryEasy' });
@@ -50,7 +51,7 @@ function withLine(at = { x: 2, y: 14 }): GameState {
   for (const id of ['eng-1', 'eng-2']) {
     state.workers.push({ ...testJoiner(id, id), role: 'lineEngineer', tier: null, rate: 0, monthlyWage: 15000 });
   }
-  state.windowLine.contract = {
+  lineState(state, 1).contract = {
     status: 'active',
     startDay: state.clock.day,
     windowsThisWeek: 0,
@@ -94,7 +95,7 @@ describe('where it waits (CLAUDE.md T31 2.10)', () => {
     expect(art?.getAttribute('data-row')).toBe(String(FORKLIFT_SHEETS.empty.rows.nw));
     expect(art?.getAttribute('data-frame')).toBe('0');
     expect(art?.querySelector('image')?.getAttribute('href')).toBe(`/sprites/${FORKLIFT_SHEETS.empty.file}`);
-    expect(forkliftPoints(state)?.wait).toEqual({ x: 37, y: 19 });
+    expect(forkliftPoints(state, 1)?.wait).toEqual({ x: 37, y: 19 });
     // Not a figure, not a machine's sheet, and drawn among the drawables by depth.
     expect(node?.hasAttribute('data-figure')).toBe(false);
     expect(node?.querySelector('[data-character], [data-sheet]')).toBeNull();
@@ -116,13 +117,13 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
   it('takes the newest pallet loaded nw then ne at three cells a second, sets it down, and comes back empty sw then se', () => {
     const state = withLine();
     const holder = page(state, 0);
-    state.windowLine.palletsAtGate = 1;
+    lineState(state, 1).palletsAtGate = 1;
     stepForklift(holder, state, 100);
     expect(forkliftNow()?.leg).toBe('out');
     // The pallet is on the forks, so not drawn at the gate.
     const written = page(state, 100);
     expect(written.querySelector('[data-line-pallet="0"]')?.getAttribute('visibility')).toBe('hidden');
-    const points = forkliftPoints(state);
+    const points = forkliftPoints(state, 1);
     if (points === null) throw new Error('the forklift is wanted');
     const along = points.wait.x - points.corner.x;
     const up = points.corner.y - points.drop.y;
@@ -174,14 +175,14 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
     state.speed = 0;
     setWalkPace(0);
     const holder = page(state, 0);
-    state.windowLine.palletsAtGate = 1;
+    lineState(state, 1).palletsAtGate = 1;
     drive(holder, state, 0, 3000);
     const there = forkliftNow()?.at;
     const again = page(state, 3000);
     const node = again.querySelector('[data-forklift]');
     expect(node?.getAttribute('data-forklift')).toBe('out');
     expect(forkliftNow()?.at).toEqual(there);
-    const wait = forkliftPoints(state)?.wait ?? { x: 0, y: 0 };
+    const wait = forkliftPoints(state, 1)?.wait ?? { x: 0, y: 0 };
     const waiting = tileToScreen(wait.x, wait.y);
     expect(node?.getAttribute('transform')).not.toBe(`translate(${waiting.x.toFixed(2)},${waiting.y.toFixed(2)})`);
   });
@@ -189,9 +190,9 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
   it('draws a pallet sent while it is out at the gate at once, and starts no second trip', () => {
     const state = withLine();
     const holder = page(state, 0);
-    state.windowLine.palletsAtGate = 1;
+    lineState(state, 1).palletsAtGate = 1;
     drive(holder, state, 0, 1000);
-    state.windowLine.palletsAtGate = 2;
+    lineState(state, 1).palletsAtGate = 2;
     const written = page(state, 1000);
     expect(written.querySelector('[data-line-pallet="0"]')?.getAttribute('visibility')).toBe('hidden');
     expect(written.querySelector('[data-line-pallet="1"]')?.hasAttribute('visibility')).toBe(false);
@@ -202,7 +203,7 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
     const fast = withLine();
     const holder = page(fast, 0);
     setWalkPace(WALK_SKIPPED_FROM_SPEED);
-    fast.windowLine.palletsAtGate = 1;
+    lineState(fast, 1).palletsAtGate = 1;
     stepForklift(holder, fast, 100);
     expect(forkliftNow()?.leg).toBe('wait');
     expect(page(fast, 100).querySelector('[data-line-pallet="0"]')?.hasAttribute('visibility')).toBe(false);
@@ -211,7 +212,7 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
     resetForklift();
     const racing = withLine();
     const raced = page(racing, 0);
-    racing.windowLine.palletsAtGate = 1;
+    lineState(racing, 1).palletsAtGate = 1;
     drive(raced, racing, 0, 1000);
     expect(forkliftNow()?.leg).toBe('out');
     setWalkPace(WALK_SKIPPED_FROM_SPEED);
@@ -222,7 +223,7 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
     // A move: the line elsewhere, the trip forgotten.
     const state = withLine();
     const moving = page(state, 0);
-    state.windowLine.palletsAtGate = 1;
+    lineState(state, 1).palletsAtGate = 1;
     drive(moving, state, 0, 1000);
     expect(forkliftNow()?.leg).toBe('out');
     for (const item of state.equipment) if (LINE_MODULES.includes(item.specId)) item.anchorY = 11;
@@ -256,7 +257,7 @@ describe('the trip (CLAUDE.md T31 2.10)', () => {
 describe('the pallet at the gate (CLAUDE.md T31 2.10)', () => {
   it('is drawn from its picture, two at the most, the second beside the first along x, with its label', () => {
     const state = withLine();
-    state.windowLine.palletsAtGate = 3;
+    lineState(state, 1).palletsAtGate = 3;
     const holder = page(state, 0);
     const pallets = Array.from(holder.querySelectorAll('[data-line-pallet]'));
     expect(pallets).toHaveLength(2);
@@ -333,7 +334,7 @@ describe('in the app (CLAUDE.md T31 2.10)', () => {
     Object.assign(state, withLine());
     render();
     expect(root.querySelector('[data-forklift]')?.getAttribute('data-forklift')).toBe('wait');
-    state.windowLine.palletsAtGate = 1;
+    lineState(state, 1).palletsAtGate = 1;
     render();
     expect(root.querySelector('[data-line-pallet="0"]')?.getAttribute('visibility')).toBe('hidden');
     expect(root.querySelector('[data-forklift]')?.getAttribute('data-forklift')).toBe('out');

@@ -59,6 +59,7 @@ import {
   LINE_UPGRADE_DAYS,
   LINE_UPGRADE_MINUTES,
   LINE_UPGRADES,
+  LINE_WINDOW_MINUTES,
   SALE_FRACTION,
   SPRAY_ROBOT,
   SPRAY_ROBOT_FINISH_FACTOR,
@@ -72,12 +73,13 @@ import {
   UNLOAD_SHEETS_PER_STEP,
   VAN_CLASSES,
   bagsToM3,
+  lineName,
   unitCostFactor,
 } from '../engine/constants';
 import type { LineUpgradeSpec } from '../engine/constants';
-import { boardCapacityOf, findVariant, insuranceForClass, isLineModule } from '../engine/machines';
+import { boardCapacityOf, findVariant, insuranceForClass, isLineModule, lineNumbers } from '../engine/machines';
 import { lineBox } from '../engine/layout';
-import { lineUpgradeCheck, lineWindowEvery, lineWindowMinutes } from '../engine/lineContract';
+import { lineUpgradeCheck, lineWindowEvery } from '../engine/lineContract';
 import { andList, inWords } from '../engine/text';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
@@ -372,8 +374,8 @@ function figureLines(lines: Line[]): string {
 
 /** The line's own lines on its card, from the constants and never in written figures: a row a
  *  module with the stages it does (`LINE_COVERS`), what the line gives the window jobs with its two
- *  engineers, and how it is sold (CLAUDE.md T30 2.3.3). */
-function lineLines(state: GameState): Line[] {
+ *  engineers, what a new line makes a window in, and how it is sold (CLAUDE.md T30 2.3.3). */
+function lineLines(): Line[] {
   const rows = LINE_MODULES.map((_, index) => {
     const place = index + 1;
     const stages = TIMBER_STAGES.filter((stage) => LINE_COVERS[stage.id] === place);
@@ -389,7 +391,7 @@ function lineLines(state: GameState): Line[] {
   return [
     ...rows,
     line(`With ${inWords(engineers)} engineers, timber work goes ${factor} times as fast`),
-    line(`It can make windows on a contract of its own: one every ${lineWindowEvery(lineWindowMinutes(state))}`),
+    line(`It can make windows on a contract of its own: one every ${lineWindowEvery(LINE_WINDOW_MINUTES)}`),
     line(
       `Sold whole, for ${SALE_FRACTION === 0.5 ? 'half' : `${Math.round(SALE_FRACTION * 100)} per cent of`} its ` +
         'price; the upgrades go with it',
@@ -529,54 +531,68 @@ export function recommendedVariant(state: GameState, spec: EquipmentSpec): strin
 }
 
 /** The line's one card, in the class card's classes and in its layout, in place of module 1's
- *  class card: the line is bought whole and one Buy orders the six (CLAUDE.md T30 2.3.3). */
+ *  class card: a line is bought whole and one Buy orders the six; the next line for the same price
+ *  while the hall has room, `Buy another` once one is owned (CLAUDE.md T30 2.3.3; v93, PIOTR
+ *  12.10). A line on its way is said on the card, and does not stop the next. */
 function lineCard(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): string {
   const check = orderEquipmentCheck(state, spec.id, variant.id);
   const onTheList = state.onOrder.find((order) => isLineModule(order.specId) && !order.arrived);
-  const owned = state.equipment.some((item) => isLineModule(item.specId))
-    ? '<span class="badge badge-owned">Owned</span>'
-    : '';
-  const buy = onTheList
+  const lines = lineNumbers(state).length;
+  const owned = lines > 0 ? `<span class="badge badge-owned">Owned${lines > 1 ? ` ${lines}` : ''}</span>` : '';
+  const label = lines > 0 ? 'Buy another' : 'Buy';
+  const waiting = onTheList
     ? `<span class="tile-waiting">On order, due ${formatCalendarDay(onTheList.dueDay)}</span>`
-    : check.ok
-      ? primaryButton('buyEquipment', 'Buy', `data-id="${spec.id}" data-variant="${variant.id}"`)
-      : lockedButton('Buy', check.reason);
+    : '';
+  const buy = check.ok
+    ? primaryButton('buyEquipment', label, `data-id="${spec.id}" data-variant="${variant.id}"`)
+    : lockedButton(label, check.reason);
   return (
-    `<div class="tile${check.ok || onTheList ? '' : ' is-locked'}${owned === '' ? '' : ' is-owned'}` +
+    `<div class="tile${check.ok ? '' : ' is-locked'}${owned === '' ? '' : ' is-owned'}` +
     `${onTheList ? ' is-ordered' : ''}" data-variant="${variant.id}" data-line="1">` +
     `<h3 class="tile-name">${escapeHtml(LINE_NAME)} ${owned}</h3>` +
     pictureSlot(pictureKeyOf(spec), variant.id) +
-    `<div class="card-effects">${figureLines(lineLines(state))}</div>` +
+    `<div class="card-effects">${figureLines(lineLines())}</div>` +
     `<div class="card-costs"><p class="tile-price">${money(LINE_PRICE)}</p>` +
     `${figureLines(lineCostLines(state, spec, variant))}</div>` +
     `<p class="tile-text card-description">${escapeHtml(LINE_DESCRIPTION)}</p>` +
-    (check.ok || onTheList ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
-    `<div class="tile-action">${buy}</div>` +
+    (check.ok ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
+    `<div class="tile-action">${waiting}${buy}</div>` +
     '</div>'
   );
 }
 
 /** One upgrade's card, in the class card's classes, under the line's: its name, its price, its
  *  sentence, what it takes off a window and when it is fitted, every figure from the constants, and
- *  Buy, or the locked Buy with its reason under it as for kit (CLAUDE.md T30 2.10). No picture: the
- *  upgrades are not drawn. */
+ *  one Buy a line the company has, `Buy for line 2`, or the locked Buy with its reason under it as
+ *  for kit (CLAUDE.md T30 2.10; v93). With no line, one locked Buy. No picture: the upgrades are
+ *  not drawn. */
 function upgradeCard(state: GameState, upgrade: LineUpgradeSpec): string {
-  const check = lineUpgradeCheck(state, upgrade.id);
-  const buy = check.ok
-    ? button('buyLineUpgrade', 'Buy', `data-id="${escapeHtml(upgrade.id)}"`)
-    : lockedButton('Buy', check.reason);
+  const lines = lineNumbers(state);
+  const checks = (lines.length === 0 ? [1] : lines).map((number) => ({ number, check: lineUpgradeCheck(state, number, upgrade.id) }));
+  const any = checks.some((entry) => entry.check.ok);
+  const buttons = checks
+    .map(({ number, check }) => {
+      const label = lines.length <= 1 ? 'Buy' : `Buy for ${lineName(number).toLowerCase()}`;
+      return check.ok
+        ? button('buyLineUpgrade', label, `data-id="${escapeHtml(upgrade.id)}" data-line="${number}"`)
+        : lockedButton(label, check.reason);
+    })
+    .join('');
+  const reasons = checks
+    .filter(({ check }) => !check.ok)
+    .map(({ number, check }) => (lines.length <= 1 ? check.reason : `${lineName(number)}: ${check.reason}`));
   const effects = [
     line(`Takes ${LINE_UPGRADE_MINUTES} minutes off each window of the line's contract`),
     line(`Fitted ${LINE_UPGRADE_DAYS} working days after the order`),
   ];
   return (
-    `<div class="tile${check.ok ? '' : ' is-locked'}" data-upgrade="${escapeHtml(upgrade.id)}">` +
+    `<div class="tile${any ? '' : ' is-locked'}" data-upgrade="${escapeHtml(upgrade.id)}">` +
     `<h3 class="tile-name">${escapeHtml(upgrade.name)}</h3>` +
     `<div class="card-effects">${figureLines(effects)}</div>` +
     `<div class="card-costs"><p class="tile-price">${money(upgrade.price)}</p></div>` +
     `<p class="tile-text card-description">${escapeHtml(upgrade.sentence)}</p>` +
-    (check.ok ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
-    `<div class="tile-action">${buy}</div>` +
+    reasons.map((reason) => `<p class="lock">${escapeHtml(reason)}</p>`).join('') +
+    `<div class="tile-action">${buttons}</div>` +
     '</div>'
   );
 }

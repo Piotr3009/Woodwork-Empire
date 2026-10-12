@@ -68,7 +68,8 @@ function bigUnit(options: { cnc5?: boolean; stores?: boolean } = {}): GameState 
     ['cuttersSash', 0, 0],
   ];
   if (options.cnc5 === true) kit.push(['cnc5', 20, 9]);
-  if (options.stores === true) kit.push(['timberShelter', 40, 1], ['timberRack', 36, 12]);
+  // The rack off the metre behind the line at (2, 14), which v93 keeps clear (CLAUDE.md v93).
+  if (options.stores === true) kit.push(['timberShelter', 40, 1], ['timberRack', 38, 10]);
   for (const [id, x, y] of kit) placeEquipment(state, id, { variantId: 'standard', x, y, id: `kit-${id}` });
   return state;
 }
@@ -162,7 +163,7 @@ describe('a sheet job in a hall with all of it (CLAUDE.md T29 2.5.3, section 7)'
     // both stores.
     const full = withEngineers(withLine(bigUnit({ cnc5: true, stores: true }), 6), 2);
     placeEquipment(full, 'sprayRobot', { variantId: 'standard', x: 36, y: 6, id: 'kit-robot' });
-    expect(lineLevel(full)).toBe(6);
+    expect(lineLevel(full, 1)).toBe(6);
     for (const finish of ['laminate', 'lacquer'] as const) {
       const job = stagedJob(100, 'sheet', false, finish, true, false);
       const before = stagePlanFor(plain, job);
@@ -177,16 +178,17 @@ describe('a sheet job in a hall with all of it (CLAUDE.md T29 2.5.3, section 7)'
 });
 
 describe('the line s purchase, in its order and on one morning (flipped in v89: CLAUDE.md T30 2.3.4, section 7)', () => {
-  it('asks for nothing beside it, refuses a module alone, and asks one line before the cash', () => {
+  it('asks for nothing beside it, refuses a module alone, and asks the cash of the next line as of the first', () => {
     // Module 2 standing with no module 1 (a save could hold it): it comes with the line.
     const gap = withLine(bigUnit({ cnc5: true, stores: true }), 0);
     placeEquipment(gap, 'windowLine2', { x: 8, y: 14, id: 'kit-line-2' });
     expect(canBuy(gap, 'windowLine2')).toEqual({ ok: false, reason: 'It comes with the line' });
-    // The line on order and no money left: one line to a company is asked before the cash.
+    // The line on order and no money left: the next line is refused for the cash, as the first
+    // was, and never for the line the company has (PIOTR, 12.10; v93).
     const poor = bigUnit({ cnc5: true, stores: true });
     expect(placeEquipmentOrder(poor, 'windowLine1').ok).toBe(true);
     poor.cash = 0;
-    expect(canBuy(poor, 'windowLine1')).toEqual({ ok: false, reason: 'The company has its production line' });
+    expect(canBuy(poor, 'windowLine1')).toEqual({ ok: false, reason: 'Not enough cash' });
   });
 
   it('stands all six on the one morning they are due, ordered in one click, and none the evening before', () => {
@@ -199,10 +201,10 @@ describe('the line s purchase, in its order and on one morning (flipped in v89: 
       guard += 1;
       state = nextDay(state);
     }
-    expect(lineModules(state)).toBe(0);
+    expect(lineModules(state, 1)).toBe(0);
     state = nextDay(state);
     expect(state.clock.day).toBe(due);
-    expect(lineModules(state)).toBe(6);
+    expect(lineModules(state, 1)).toBe(6);
   });
 });
 
@@ -263,7 +265,7 @@ describe('the engineer s full week (CLAUDE.md T29 2.8, section 7)', () => {
     const tile = tradeUsage(state).find((entry) => entry.trade === 'lineEngineer');
     expect(tile?.percent).not.toBeNull();
     expect(tile?.percent ?? 0).toBeGreaterThanOrEqual(90);
-    expect(tile?.words).toBe('The line runs as 2 of its 2 modules.');
+    expect(tile?.words).toBe('Line 1 runs as 2 of its 2 modules.');
     expect(tile?.words).not.toContain('Near full');
     const page = renderTeam(state, 'ourTeam', 'lineEngineer');
     expect(page).not.toContain('standing most of the week');

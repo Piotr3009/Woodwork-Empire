@@ -12,10 +12,10 @@
 //
 // Every word the page prints about a trade is written here, so the page computes nothing.
 
-import { PRODUCTION_MANAGER_CARRIES, USAGE_LOW_PERCENT, USAGE_NEAR_FULL_PERCENT } from './constants';
+import { PRODUCTION_MANAGER_CARRIES, USAGE_LOW_PERCENT, USAGE_NEAR_FULL_PERCENT, lineName } from './constants';
 import { weekOfDay } from './clock';
 import { crewLimit } from './layout';
-import { OWNER, lineLevel, lineModules } from './machines';
+import { OWNER, lineLevel, lineModules, standingLines } from './machines';
 import { ROLE_WORDS, ROLE_WORDS_MANY, carriedByAManager, crewCount, weekBeforeOf, weekNowOf, weekWorkedMinutes } from './staff';
 import { plural } from './text';
 import type { GameState, Worker, WorkerRole } from './types';
@@ -183,10 +183,11 @@ function wordsOf(state: GameState, trade: UsageTrade, men: readonly ManUsage[], 
   if (trade === 'lineEngineer') {
     // His tile's own sentence, as the manager's has: how much of the line runs (CLAUDE.md T29 2.8)
     // [TUNE: the words while no module stands].
-    const standing = lineModules(state);
-    return standing === 0
-      ? 'The line is not built yet.'
-      : `The line runs as ${lineLevel(state)} of its ${standing} modules.`;
+    const lines = standingLines(state);
+    if (lines.length === 0) return 'The line is not built yet.';
+    return lines
+      .map((line) => `${lineName(line)} runs as ${lineLevel(state, line)} of its ${lineModules(state, line)} modules.`)
+      .join(' ');
   }
   if (trade === 'productionManager') {
     const first = men[0];

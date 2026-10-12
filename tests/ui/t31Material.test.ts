@@ -18,6 +18,7 @@ import { renderContracts } from '../../src/ui/contracts';
 import { renderMaterials } from '../../src/ui/materials';
 import { currentState, mount, render } from '../../src/ui/app';
 import { act, buyStartingKit, newGame, nextDay, placeEquipment, testJoiner, withAir } from '../helpers';
+import { lineState } from '../../src/engine/lineContract';
 
 function bigUnit(): GameState {
   let state = newGame({ difficulty: 'veryEasy' });
@@ -38,7 +39,7 @@ function running(boards: number, glass: number): GameState {
     state.workers.push({ ...testJoiner(id, id), role: 'lineEngineer', tier: null, rate: 0, monthlyWage: 15000 });
   }
   placeEquipment(state, 'timberShelter', { variantId: 'standard', x: 30, y: 2, id: 'kit-store' });
-  state.windowLine.contract = {
+  lineState(state, 1).contract = {
     status: 'active',
     startDay: state.clock.day,
     windowsThisWeek: 3,
@@ -47,9 +48,9 @@ function running(boards: number, glass: number): GameState {
     revenue: 30000,
     materialCost: 12000,
   };
-  state.windowLine.boards = boards;
+  lineState(state, 1).boards = boards;
   state.stock.sheets += boards;
-  state.windowLine.glass = glass;
+  lineState(state, 1).glass = glass;
   return state;
 }
 
@@ -76,9 +77,9 @@ describe('the line s running block (CLAUDE.md T31 2.2, 2.4)', () => {
       bespoke: false,
       overflowSheets: 0,
       boards: true,
-      line: true,
+      line: 1,
     });
-    state.windowLine.glassOnTheWay = [{ windows: 20, day: state.clock.day + 1 }];
+    lineState(state, 1).glassOnTheWay = [{ windows: 20, day: state.clock.day + 1 }];
     const text = block(state).textContent ?? '';
     expect(text).toContain('£1,500 a window; the timber and the glass £600 a window, ordered ahead');
     expect(text).toContain('Timber on the stores');
@@ -89,7 +90,7 @@ describe('the line s running block (CLAUDE.md T31 2.2, 2.4)', () => {
     // With 28 at module 6 and on its way, and a batch more past module 6's 40, the glass is locked; with none coming it
     // is offered.
     expect(block(state).querySelector('[data-do="orderLineGlass"]')).toBeNull();
-    state.windowLine.glassOnTheWay = [];
+    lineState(state, 1).glassOnTheWay = [];
     const timber = block(state).querySelector<HTMLButtonElement>('[data-do="orderLineTimber"]');
     const glass = block(state).querySelector<HTMLButtonElement>('[data-do="orderLineGlass"]');
     expect(timber?.textContent).toBe('Order timber: 40 boards, £8,000');
@@ -148,8 +149,8 @@ describe('the line s running block (CLAUDE.md T31 2.2, 2.4)', () => {
     root.querySelector<HTMLButtonElement>('[data-do="orderLineGlass"]')?.click();
     const after = currentState();
     expect(after?.cash).toBe(cash - 12000);
-    expect(after?.deliveries.filter((delivery) => delivery.line === true)).toHaveLength(1);
-    expect(after?.windowLine.glassOnTheWay).toHaveLength(1);
+    expect(after?.deliveries.filter((delivery) => delivery.line === 1)).toHaveLength(1);
+    expect(after?.windowLines[0]?.glassOnTheWay).toHaveLength(1);
   });
 });
 
@@ -160,7 +161,7 @@ describe('the Materials page (CLAUDE.md T31 2.4)', () => {
     page.innerHTML = renderMaterials(state, '');
     expect(page.querySelector('[data-stock="boards"]')?.textContent).toContain('Held 24');
     const glass = page.querySelector('[data-stock="lineGlass"]')?.textContent ?? '';
-    expect(glass).toContain('Glass at the line');
+    expect(glass).toContain('Glass at line 1');
     expect(glass).toContain('For 8 windows');
     expect(glass).toContain('Total 8 of 40');
     const gone = running(0, 0);

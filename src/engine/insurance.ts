@@ -18,7 +18,7 @@ import {
 import { dayOfMonth } from './clock';
 import { canAfford, charge, formatMoney } from './economy';
 import { queueEvent } from './events';
-import { isLineModule, variantFor } from './machines';
+import { isLineModule, lineOf, variantFor } from './machines';
 import { int } from './rng';
 import type { GameState } from './types';
 
@@ -81,6 +81,17 @@ export function lineValue(state: GameState): number {
   let value = 0;
   for (const item of state.equipment) {
     if (item.soldOnDay !== null || !isLineModule(item.specId)) continue;
+    value += item.purchasePrice;
+  }
+  return Math.round(value);
+}
+
+/** What one line's modules standing in the hall cost, by the line's number: its own books' share
+ *  of the property cover (CLAUDE.md T31 2.5; v93). */
+export function lineValueOf(state: GameState, line: number): number {
+  let value = 0;
+  for (const item of state.equipment) {
+    if (item.soldOnDay !== null || !isLineModule(item.specId) || lineOf(item) !== line) continue;
     value += item.purchasePrice;
   }
   return Math.round(value);

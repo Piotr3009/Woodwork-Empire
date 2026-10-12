@@ -12,8 +12,8 @@ import { deliveriesInYard, deliveriesOnTheWay, formatCalendarDay, openJobs } fro
 import { restockCheck, sheetPriceFor, stockLines } from '../engine/index';
 // Straight off its own module: the public API does not carry it (REPORT-T13 10).
 import { boardsLine, loadWords, restockSheets, restockSplit } from '../engine/materials';
-import { lineStandsWhole } from '../engine/machines';
-import { LINE_GLASS_WINDOWS_MAX } from '../engine/constants';
+import { lineStandsWhole, standingLines } from '../engine/machines';
+import { LINE_GLASS_WINDOWS_MAX, lineName } from '../engine/constants';
 import { lineGlassWindows } from '../engine/lineContract';
 import type { Delivery, GameState, Job, StockLine } from '../engine/index';
 import { placeholderSvg } from '../render/placeholder';
@@ -71,21 +71,26 @@ function boardsRow(state: GameState): string {
   );
 }
 
-/** The line's glass, in the stock line's own markup: the windows it has glass for at module 6 and
- *  the windows module 6 holds glass for. Shown only while the line stands (CLAUDE.md T31 2.4). */
+/** Each line's glass, in the stock line's own markup: the windows it has glass for at its module
+ *  6 and the windows module 6 holds glass for, one row a line that stands whole (CLAUDE.md T31 2.4;
+ *  v93). */
 function lineGlassRow(state: GameState): string {
-  if (!lineStandsWhole(state)) return '';
-  const windows = lineGlassWindows(state);
-  return (
-    '<div class="stock-line" data-stock="lineGlass">' +
-    '<span class="stock-thumb">' +
-    placeholderSvg('thumb.glass', THUMB_SIZE, { label: 'Glass' }) +
-    '</span>' +
-    '<span class="row-main"><span class="stock-name">Glass at the line</span></span>' +
-    `<span class="row-figure stock-free">For ${plural(windows, 'window', 'windows')}</span>` +
-    `<span class="row-figure stock-total">Total ${windows} of ${LINE_GLASS_WINDOWS_MAX}</span>` +
-    '</div>'
-  );
+  return standingLines(state)
+    .filter((line) => lineStandsWhole(state, line))
+    .map((line) => {
+      const windows = lineGlassWindows(state, line);
+      return (
+        `<div class="stock-line" data-stock="lineGlass" data-line="${line}">` +
+        '<span class="stock-thumb">' +
+        placeholderSvg('thumb.glass', THUMB_SIZE, { label: 'Glass' }) +
+        '</span>' +
+        `<span class="row-main"><span class="stock-name">Glass at ${escapeHtml(lineName(line).toLowerCase())}</span></span>` +
+        `<span class="row-figure stock-free">For ${plural(windows, 'window', 'windows')}</span>` +
+        `<span class="row-figure stock-total">Total ${windows} of ${LINE_GLASS_WINDOWS_MAX}</span>` +
+        '</div>'
+      );
+    })
+    .join('');
 }
 
 /** The number the player typed, or nothing when the field is empty and he wants what fills the

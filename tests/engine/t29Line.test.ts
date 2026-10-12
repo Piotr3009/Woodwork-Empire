@@ -77,6 +77,7 @@ import {
   testJoiner,
   withAir,
 } from '../helpers';
+import { lineState } from '../../src/engine/lineContract';
 
 const PRICES = [2000000, 2500000, 1250000, 1250000, 1500000, 1500000];
 
@@ -182,7 +183,7 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     expect(findSpec('windowLine1')?.variants[0]?.description).toContain('cross cut saw');
   });
 
-  it('is refused in its order: the unit, one line, the cash, the half shifted kit, then a clear 36 m by 3 m', () => {
+  it('is refused in its order: the unit, the cash, the half shifted kit, then a clear 36 m by 3 m with its ground', () => {
     const small = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     small.cash = 12000000;
     expect(canBuy(small, 'windowLine1')).toEqual({ ok: false, reason: 'Needs the 800 m² unit' });
@@ -192,7 +193,10 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     const state = bigUnit();
     for (const id of LINE_MODULES.slice(1)) expect(canBuy(state, id), id).toEqual({ ok: false, reason: 'It comes with the line' });
     expect(placeEquipmentOrder(state, 'windowLine1').ok).toBe(true);
-    expect(canBuy(state, 'windowLine1')).toEqual({ ok: false, reason: 'The company has its production line' });
+    // A second line is bought as the first was, for the same price, wherever the hall has seven
+    // metres for it (PIOTR, 12.10; v93): this hall has none behind the first, its kit in the way.
+    state.cash = 12000000;
+    expect(canBuy(state, 'windowLine1')).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
     const poor = bigUnit();
     poor.cash = 1000;
     expect(canBuy(poor, 'windowLine1')).toEqual({ ok: false, reason: 'Not enough cash' });
@@ -213,7 +217,7 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     const heldAndPoor = bigUnit();
     expect(placeEquipmentOrder(heldAndPoor, 'windowLine1').ok).toBe(true);
     heldAndPoor.cash = 1000;
-    expect(canBuy(heldAndPoor, 'windowLine1')).toEqual({ ok: false, reason: 'The company has its production line' });
+    expect(canBuy(heldAndPoor, 'windowLine1')).toEqual({ ok: false, reason: 'Not enough cash' });
     const poorAndShifted = bigUnit();
     poorAndShifted.cash = 1000;
     poorAndShifted.movedItems = [{ itemId: 'kit-planer', fromX: 26, fromY: 2, fromOrientation: 0 }];
@@ -223,10 +227,11 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
   });
 
   it('takes the first clear 36 m by 3 m from x 2, y 14, and names nothing that stands on its first place', () => {
-    // From Turn 31 a place wants its lane clear too, so this hall leaves the five axis CNC out to
-    // have a second place for the line (CLAUDE.md T31 2.6).
-    const state = bigUnit(['cnc5']);
-    placeEquipment(state, 'planer', { variantId: 'standard', x: 5, y: 14, id: 'kit-planer-2' });
+    // From Turn 31 a place wants its lane clear too, and from v93 the seven metres of its ground,
+    // so this hall leaves the five axis CNC and the booth out to have a second place for the line
+    // (CLAUDE.md T31 2.6).
+    const state = bigUnit(['cnc5', 'sprayBooth']);
+    placeEquipment(state, 'planer', { variantId: 'standard', x: 5, y: 16, id: 'kit-planer-2' });
     expect(canBuy(state, 'windowLine1')).toEqual({ ok: true, reason: '' });
     // The first clear run in the order a machine's place is found: row by row from the top, cell by
     // cell along each row, asked of the whole 36 m by 3 m and its lane.
@@ -254,7 +259,7 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     expect(placeEquipmentOrder(state, 'windowLine1').ok).toBe(true);
     expect(state.cash).toBe(cash - LINE_PRICE);
     const booked = state.ledger.slice(ledger);
-    expect(booked.map((entry) => [entry.label, entry.amount])).toEqual([['Window production line ordered', -LINE_PRICE]]);
+    expect(booked.map((entry) => [entry.label, entry.amount])).toEqual([['Window production line, line 1, ordered', -LINE_PRICE]]);
     const orders = state.onOrder.filter((item) => LINE_MODULES.includes(item.specId));
     expect(orders.map((item) => item.specId)).toEqual([...LINE_MODULES]);
     expect(new Set(orders.map((item) => item.dueDay)).size).toBe(1);
@@ -281,7 +286,7 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     for (const order of orders) order.dueDay = state.clock.day + 1;
     let next = state;
     while (next.onOrder.some((item) => LINE_MODULES.includes(item.specId))) next = nextDay(next);
-    expect(lineModules(next)).toBe(6);
+    expect(lineModules(next, 1)).toBe(6);
     expect(next.tasks.some((task) => task.kind === 'unload' && !task.done)).toBe(false);
     const module = next.equipment.find((item) => item.specId === 'windowLine3');
     expect(module).toMatchObject({ anchorX: 14, anchorY: 14, orientation: 0, purchasePrice: 1250000 });
@@ -299,7 +304,7 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     expect(modules.map((item) => [item.specId, item.anchorX, item.anchorY])).toEqual(
       LINE_MODULES.map((id, index) => [id, 2 + 6 * index, 14]),
     );
-    expect(lineModules(state)).toBe(6);
+    expect(lineModules(state, 1)).toBe(6);
     expect(buyEquipment(state, 'windowLine2')).toEqual({ ok: false, reason: 'It comes with the line' });
   });
 
@@ -309,7 +314,7 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     const third = state.equipment.find((item) => item.id === 'kit-line-3');
     if (third === undefined) throw new Error('module 3 stands');
     expect(salePriceFor(third)).toBe(625000);
-    expect(lineSalePrice(state)).toBe(5000000);
+    expect(lineSalePrice(state, 1)).toBe(5000000);
     expect(sellMachine(state, 'kit-line-2').ok).toBe(true);
     const sold = state.equipment.filter((item) => LINE_MODULES.includes(item.specId));
     expect(sold).toHaveLength(6);
@@ -320,12 +325,12 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     const next = nextDay(state, events);
     expect(next.equipment.some((item) => LINE_MODULES.includes(item.specId))).toBe(false);
     const lines = next.ledger.filter((entry) => entry.label.startsWith('Sold: '));
-    expect(lines.map((entry) => [entry.label, entry.amount])).toEqual([['Sold: Window production line', 5000000]]);
+    expect(lines.map((entry) => [entry.label, entry.amount])).toEqual([['Sold: Window production line, line 1', 5000000]]);
     expect(next.cash).toBeGreaterThan(cash);
     const cards = [...events, ...(next.activeEvent === null ? [] : [next.activeEvent]), ...next.eventQueue].filter(
       (event) => event.kind === 'machineCollected',
     );
-    expect(cards.map((event) => event.title)).toEqual(['Window production line collected']);
+    expect(cards.map((event) => event.title)).toEqual(['Window production line, line 1 collected']);
   });
 
   it('is refused for sale while a man stands at any of the six', () => {
@@ -338,19 +343,19 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
 
 describe('how much of the line runs (CLAUDE.md T29 2.9.4, T30 2.3.6)', () => {
   it('is the unbroken run from module 1, kept by its engineers on duty', () => {
-    expect(lineModules(withLine(bigUnit(), 4, [3]))).toBe(2);
+    expect(lineModules(withLine(bigUnit(), 4, [3]), 1)).toBe(2);
     const six = withLine(bigUnit(), 6);
-    expect(lineModules(six)).toBe(6);
-    expect(lineLevel(six)).toBe(0);
-    expect(lineLevel(withEngineers(withLine(bigUnit(), 6), 1))).toBe(3);
-    expect(lineLevel(withEngineers(withLine(bigUnit(), 6), 2))).toBe(6);
-    expect(lineLevel(withEngineers(withLine(bigUnit(), 2), 1))).toBe(2);
+    expect(lineModules(six, 1)).toBe(6);
+    expect(lineLevel(six, 1)).toBe(0);
+    expect(lineLevel(withEngineers(withLine(bigUnit(), 6), 1), 1)).toBe(3);
+    expect(lineLevel(withEngineers(withLine(bigUnit(), 6), 2), 1)).toBe(6);
+    expect(lineLevel(withEngineers(withLine(bigUnit(), 2), 1), 1)).toBe(2);
     // A man off is not on duty; one who starts tomorrow is not either.
     const off = withEngineers(withLine(bigUnit(), 6), 2);
     const first = off.workers.find((worker) => worker.id === 'eng-1');
     if (first === undefined) throw new Error('the engineer is wanted');
     first.absentDaysRemaining = 2;
-    expect(lineLevel(off)).toBe(3);
+    expect(lineLevel(off, 1)).toBe(3);
   });
 
   it('says on the strip, directly under nobodyAssigned, when modules stand that no engineer keeps', () => {
@@ -358,8 +363,8 @@ describe('how much of the line runs (CLAUDE.md T29 2.9.4, T30 2.3.6)', () => {
     const line = (state: GameState): string | undefined =>
       warnings(state).find((entry) => entry.key === 'lineNeedsEngineer')?.text;
     expect(line(bigUnit())).toBeUndefined();
-    expect(line(withLine(bigUnit(), 6))).toBe('The line stands still: no engineer on duty');
-    expect(line(withEngineers(withLine(bigUnit(), 6), 1))).toBe('The line runs as three modules: one engineer on duty');
+    expect(line(withLine(bigUnit(), 6))).toBe('Line 1 stands still: no engineer on duty');
+    expect(line(withEngineers(withLine(bigUnit(), 6), 1))).toBe('Line 1 runs as three modules: one engineer on duty');
     expect(line(withEngineers(withLine(bigUnit(), 3), 1))).toBeUndefined();
     expect(line(withEngineers(withLine(bigUnit(), 6), 2))).toBeUndefined();
   });
@@ -370,7 +375,7 @@ describe('what the line does to a window (CLAUDE.md T29 2.9.5, 2.9.6; T30 2.5)',
     const industrial = 1.12;
     for (let level = 1; level <= 6; level += 1) {
       const state = withEngineers(withLine(bigUnit(), level), level > 3 ? 2 : 1);
-      expect(lineLevel(state), String(level)).toBe(level);
+      expect(lineLevel(state, 1), String(level)).toBe(level);
       const plan = planOf(state);
       const factor = LINE_FACTOR[level] ?? 1;
       expect(plan.crossCutting, `${level}`).toEqual({ family: 'windowLine1', speed: factor * industrial });
@@ -432,7 +437,7 @@ describe('what the line does to a window (CLAUDE.md T29 2.9.5, 2.9.6; T30 2.5)',
     // A window is lacquered, and the booth is always asked, whatever module 5 does (CLAUDE.md T30
     // 2.5).
     const noBooth = withEngineers(withLine(bigUnit(['sprayBooth']), 6), 2);
-    expect(lineLevel(noBooth)).toBe(6);
+    expect(lineLevel(noBooth, 1)).toBe(6);
     expect(lockReasonFor(noBooth, sash)).toBe('Needs spray booth');
   });
 });
@@ -440,7 +445,7 @@ describe('what the line does to a window (CLAUDE.md T29 2.9.5, 2.9.6; T30 2.5)',
 describe('the line on its own contract gives the jobs nothing (CLAUDE.md T30 2.5, 2.6)', () => {
   it('does no stage of a window, gives no factor, stands in for nothing and saves no boards while its contract runs', () => {
     const working = withEngineers(withLine(bigUnit(['crossCut', 'planer']), 6), 2);
-    working.windowLine.contract = {
+    lineState(working, 1).contract = {
       status: 'active',
       startDay: working.clock.day,
       windowsThisWeek: 0,
@@ -449,7 +454,7 @@ describe('the line on its own contract gives the jobs nothing (CLAUDE.md T30 2.5
       revenue: 0,
       materialCost: 0,
     };
-    expect(lineLevel(working)).toBe(6);
+    expect(lineLevel(working, 1)).toBe(6);
     const plan = planOf(working);
     for (const [id, stage] of Object.entries(plan)) {
       expect(stage.family ?? '', id).not.toMatch(/^windowLine/);
@@ -459,8 +464,8 @@ describe('the line on its own contract gives the jobs nothing (CLAUDE.md T30 2.5
     // The board wants the company's own machines again.
     expect(lockReasonFor(working, template('sashWindows'))).not.toBeNull();
     expect(boardsForJob(working, 5600, true)).toBe(19);
-    expect(outputBreakdown(working).lines.find((line) => line.label.startsWith('Production line'))).toEqual({
-      label: 'Production line, on its contract',
+    expect(outputBreakdown(working).lines.find((line) => line.label.startsWith('Line 1'))).toEqual({
+      label: 'Line 1, on its contract',
       points: 0,
       hall: false,
       where: 'timber work, the Finishing excepted',
@@ -576,7 +581,8 @@ describe('the line s card and the sheets that list machines (CLAUDE.md T30 2.3.3
     expect(card(ordered).querySelector('.tile-waiting')?.textContent).toBe(`On order, due ${formatCalendarDay(due)}`);
     expect(card(ordered).querySelector('[data-do="buyEquipment"]')).toBeNull();
     const standing = withLine(bigUnit(), 6);
-    expect(card(standing).querySelector('.lock')?.textContent).toBe('The company has its production line');
+    // The next line is offered as the first was, and this hall has no room for it (v93).
+    expect(card(standing).querySelector('.lock')?.textContent).toBe('No room in the hall for the line and its lane');
     expect(card(standing).querySelector('.badge-owned')).not.toBeNull();
   });
 
@@ -584,30 +590,30 @@ describe('the line s card and the sheets that list machines (CLAUDE.md T30 2.3.3
     const state = withEngineers(withLine(bigUnit(), 6), 1);
     const lines = outputBreakdown(state).lines;
     expect(lines.filter((line) => line.label.startsWith('Window line'))).toEqual([]);
-    expect(lines.find((line) => line.label.startsWith('Production line'))).toEqual({
-      label: 'Production line, 3 modules',
+    expect(lines.find((line) => line.label.startsWith('Line 1'))).toEqual({
+      label: 'Line 1, 3 modules',
       points: 0.8,
       hall: false,
       where: 'timber work, the Finishing excepted',
     });
     const plate = paceLines(state);
     expect(plate.filter((line) => line.label.startsWith('Line module'))).toEqual([]);
-    expect(plate.find((line) => line.family === 'line')).toEqual({ family: 'line', label: 'Production line, 3 modules', percent: 80 });
+    expect(plate.find((line) => line.family === 'line')).toEqual({ family: 'line', label: 'Line 1, 3 modules', percent: 80 });
     expect(machinesInTheHall(state).some((item) => LINE_MODULES.includes(item.specId))).toBe(false);
     expect(machineSavings(state, 'week').rows.some((row) => row.id.startsWith('kit-line'))).toBe(false);
     expect(paceLines(bigUnit()).some((line) => line.family === 'line')).toBe(false);
     // The whole line with two engineers sprays too, so its line acts on all timber work.
     const whole = withEngineers(withLine(bigUnit(), 6), 2);
-    expect(outputBreakdown(whole).lines.find((line) => line.label.startsWith('Production line'))).toEqual({
-      label: 'Production line, 6 modules',
+    expect(outputBreakdown(whole).lines.find((line) => line.label.startsWith('Line 1'))).toEqual({
+      label: 'Line 1, 6 modules',
       points: 1.4,
       hall: false,
       where: 'timber work',
     });
     // A line that stands still says so on the Output sheet at nought, and has no line on the plate.
     const still = withLine(bigUnit(), 6);
-    expect(outputBreakdown(still).lines.find((line) => line.label.startsWith('Production line'))).toEqual({
-      label: 'Production line, standing still',
+    expect(outputBreakdown(still).lines.find((line) => line.label.startsWith('Line 1'))).toEqual({
+      label: 'Line 1, standing still',
       points: 0,
       hall: false,
       where: 'timber work, the Finishing excepted',
@@ -665,7 +671,7 @@ describe('the engineer at the line (CLAUDE.md T29 2.8)', () => {
     if (kev === undefined) throw new Error('the engineer is wanted');
     expect(workerDoing(state, kev)).toBe('at the line');
     const tile = tradeUsage(state).find((entry) => entry.trade === 'lineEngineer');
-    expect(tile?.words).toBe('The line runs as 3 of its 6 modules.');
+    expect(tile?.words).toBe('Line 1 runs as 3 of its 6 modules.');
     expect(tile?.words).not.toContain('Near full');
     // With no module standing he waits for it, and is never called free.
     const waiting = withEngineers(bigUnit(), 1);

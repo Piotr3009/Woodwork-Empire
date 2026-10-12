@@ -67,9 +67,11 @@ import {
   bagsToM3,
   SPRAY_ROBOT,
   LINE_COVERS,
+  LINE_ENGINEERS_MAX,
   LINE_FACTOR,
   LINE_MODULES,
   LINE_MODULES_KEPT,
+  lineName,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
@@ -109,7 +111,10 @@ import type {
   EquipmentVariant,
   GameState,
   Orientation,
+  LineDay,
+  LineSince,
   StageId,
+  WindowLineState,
   Worker,
   WorkerTier,
 } from './types';
@@ -297,8 +302,8 @@ export function boardsHeld(state: GameState): number {
     if (job.timber !== true || job.stage === 'completed') continue;
     held += job.sheetsReserved;
   }
-  // And the line's own, held for its windows as a job's are for its pieces (CLAUDE.md T31 2.1).
-  return held + state.windowLine.boards;
+  // And every line's own, held for its windows as a job's are for its pieces (CLAUDE.md T31 2.1).
+  return held + state.windowLines.reduce((total, line) => total + line.boards, 0);
 }
 
 /** The sheets on the one counter: everything on it but the timber jobs' and the line's boards,
@@ -382,24 +387,97 @@ export function lineModuleIndex(specId: string): number {
   return LINE_MODULES.indexOf(specId) + 1;
 }
 
-/** How long the line is: the unbroken run from module 1 of the modules that stand, so 1, 2 and 4
- *  standing are 2. What the engineers keep today does not shorten it (CLAUDE.md T29 2.9.4). */
-export function lineModules(state: GameState): number {
-  let run = 0;
-  for (const id of LINE_MODULES) {
-    if (floorMachines(state, id).length === 0) break;
-    run += 1;
+// ---------------------------------------------------------------------------
+// More lines than one (PIOTR, 12.10: "I want to see the next line, and that is all"; v93). Every
+// question of the line is asked of one line by its number: the six modules of a line carry it, its
+// own record in `state.windowLines` carries it, and the lines are told apart by nothing else.
+// ---------------------------------------------------------------------------
+
+/** The line a module belongs to, by its number: what it carries, and 1 for a module with none
+ *  written, as every module was before v93 (the lift writes it). Nought for anything that is not a
+ *  module. */
+export function lineOf(item: { specId: string; line?: number }): number {
+  if (!isLineModule(item.specId)) return 0;
+  return item.line ?? 1;
+}
+
+/** The lines the company has kit of, by number in order: a module standing, sold and waiting for
+ *  the van, or on order. The one list of the lines there are; a line's record outlives its kit for
+ *  its books, and is not one of them. */
+export function lineNumbers(state: GameState): number[] {
+  const numbers = new Set<number>();
+  for (const item of state.equipment) if (isLineModule(item.specId)) numbers.add(lineOf(item));
+  for (const item of state.onOrder) if (isLineModule(item.specId)) numbers.add(lineOf(item));
+  return Array.from(numbers).sort((left, right) => left - right);
+}
+
+/** The modules of every line that stand on the floor, not sold, by line, as a mask of their places
+ *  along it: one pass over the kit, which every question of how long a line is and which lines
+ *  stand reads, so a minute of a big hall with two lines asks the kit no more than one line did
+ *  (v93). */
+function standingModuleMasks(state: GameState): Map<number, number> {
+  const masks = new Map<number, number>();
+  for (const item of state.equipment) {
+    const index = LINE_MODULES.indexOf(item.specId);
+    if (index < 0 || isSold(item) || !itemStandsInTheHall(item)) continue;
+    const line = item.line ?? 1;
+    masks.set(line, (masks.get(line) ?? 0) | (1 << index));
   }
+  return masks;
+}
+
+/** The unbroken run from module 1 of the places a mask holds. */
+function runOf(mask: number): number {
+  let run = 0;
+  while (run < LINE_MODULES.length && (mask & (1 << run)) !== 0) run += 1;
   return run;
 }
 
-/** The line engineers on duty today: on the books, started and not absent. It holds for the second
- *  shift too, since the line runs at night under the engineers of the day (CLAUDE.md T29 2.8). */
-export function lineEngineersOnDuty(state: GameState): number {
+/** The lines with module 1 on the floor, not sold, by number in order: the lines the engineers
+ *  are shared out along (v93). */
+export function standingLines(state: GameState): number[] {
+  const lines: number[] = [];
+  for (const [line, mask] of standingModuleMasks(state)) {
+    if (runOf(mask) > 0) lines.push(line);
+  }
+  return lines.sort((left, right) => left - right);
+}
+
+/** The number the next line bought takes: one more than the highest a line has had, so no number
+ *  is ever given twice; a record that never stood and has no kit does not count (v93). */
+export function nextLineNumber(state: GameState): number {
+  let highest = 0;
+  for (const line of lineNumbers(state)) highest = Math.max(highest, line);
+  for (const record of state.windowLines) {
+    if (record.since.firstDay !== null || record.contract !== null) highest = Math.max(highest, record.number);
+  }
+  return highest + 1;
+}
+
+/** How long a line is: the unbroken run from module 1 of the modules that stand, so 1, 2 and 4
+ *  standing are 2. What the engineers keep today does not shorten it (CLAUDE.md T29 2.9.4). */
+export function lineModules(state: GameState, line: number): number {
+  return runOf(standingModuleMasks(state).get(line) ?? 0);
+}
+
+/** The line engineers on duty today, in the order they were taken on: on the books, started and
+ *  not absent. It holds for the second shift too, since the line runs at night under the engineers
+ *  of the day (CLAUDE.md T29 2.8). */
+function engineersOnDuty(state: GameState): Worker[] {
   return state.workers.filter(
     (worker) =>
       worker.role === 'lineEngineer' && worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0,
-  ).length;
+  );
+}
+
+/** How many of the engineers on duty keep this line: they are shared out along the lines that
+ *  stand in their order, two to a line, line 1 first (PIOTR, 12.10: "hired engineers staff the
+ *  lines in order"), so a line that stands behind another runs only once the first has its two. A
+ *  line that does not stand has none (v93). */
+export function lineEngineersOnDuty(state: GameState, line: number): number {
+  const before = standingLines(state).indexOf(line);
+  if (before < 0) return 0;
+  return Math.max(0, Math.min(LINE_ENGINEERS_MAX, engineersOnDuty(state).length - before * LINE_ENGINEERS_MAX));
 }
 
 /** True for a line engineer on duty in a company with a module that stands: he is at the line,
@@ -409,29 +487,107 @@ export function engineerAtTheLine(state: GameState, worker: Worker): boolean {
     worker.role === 'lineEngineer' &&
     worker.startDay <= state.clock.day &&
     worker.absentDaysRemaining === 0 &&
-    lineModules(state) > 0
+    standingLines(state).length > 0
   );
 }
 
-/** How much of the line runs today: what of its unbroken run its engineers on duty keep, nothing
+/** How much of a line runs today: what of its unbroken run its engineers on duty keep, nothing
  *  with none, three modules at the most with one and all six with two. A line with none stands
  *  still, and its stages go back to the machines that did them before (CLAUDE.md T29 2.9.4, T30
  *  2.3.6). What the engineers' tile, the strip, `familyRuns` and the line's contract read. */
-export function lineLevel(state: GameState): number {
-  const kept = LINE_MODULES_KEPT[Math.min(LINE_MODULES_KEPT.length - 1, lineEngineersOnDuty(state))] ?? 0;
-  return Math.min(lineModules(state), kept);
+export function lineLevel(state: GameState, line: number): number {
+  const kept = LINE_MODULES_KEPT[Math.min(LINE_MODULES_KEPT.length - 1, lineEngineersOnDuty(state, line))] ?? 0;
+  return Math.min(lineModules(state, line), kept);
 }
 
-/** True while the line works its own contract, from the minute it is taken to the minute it ends:
+/** A day of a line's day book with nothing in it yet (CLAUDE.md T31 2.5). */
+export function emptyLineDay(day: number): LineDay {
+  return {
+    day,
+    windows: 0,
+    turnover: 0,
+    material: 0,
+    engineers: 0,
+    power: 0,
+    cover: 0,
+    possibleMinutes: 0,
+    possibleWindows: 0,
+    lost: { engineer: 0, timber: 0, glass: 0, timberAndGlass: 0, move: 0 },
+  };
+}
+
+/** The totals of a line that has never stood (CLAUDE.md T31 2.5). */
+export function emptyLineSince(): LineSince {
+  return { firstDay: null, windows: 0, turnover: 0, material: 0, engineers: 0, power: 0, cover: 0 };
+}
+
+/** The record of a line that has never run: no contract, no offer yet, no window in hand, an empty
+ *  pallet, nothing at the gate and no upgrade (CLAUDE.md T30 section 4); no timber, no glass and an
+ *  empty day book (CLAUDE.md T31 section 4). The day in hand is the day given, the save's own when
+ *  a save is lifted. */
+export function emptyWindowLine(number: number, day = 0): WindowLineState {
+  return {
+    number,
+    contract: null,
+    nextOfferDay: null,
+    minutes: 0,
+    onPallet: 0,
+    palletsAtGate: 0,
+    upgrades: [],
+    boards: 0,
+    glass: 0,
+    glassOnTheWay: [],
+    today: emptyLineDay(day),
+    days: [],
+    since: emptyLineSince(),
+  };
+}
+
+/** A line's record while it has one, and null for a line never asked for: what reads a record and
+ *  must not write one asks this; `lineState` writes one (v93). */
+export function lineRecord(state: GameState, line: number): WindowLineState | null {
+  return state.windowLines.find((record) => record.number === line) ?? null;
+}
+
+/** A new line's record, the moment it is bought: written fresh, in the place of an unused record
+ *  of the same number a line bought and sold before it ever ran left behind (`nextLineNumber` gives
+ *  a number again only then) (v93). */
+export function newLineRecord(state: GameState, line: number): WindowLineState {
+  state.windowLines = state.windowLines.filter((record) => record.number !== line);
+  return lineState(state, line);
+}
+
+/** A line's own record, written whole with every part's default the first time the line is asked
+ *  for, and the same record from then on, kept in the lines' order (CLAUDE.md T30 section 4; v93:
+ *  one a line). What writes to a line reads this; what only reads asks `lineRecord`. */
+export function lineState(state: GameState, line: number): WindowLineState {
+  const found = lineRecord(state, line);
+  if (found !== null) return found;
+  const record = emptyWindowLine(line, state.clock.day);
+  state.windowLines.push(record);
+  state.windowLines.sort((left, right) => left.number - right.number);
+  return record;
+}
+
+/** True while a line works its own contract, from the minute it is taken to the minute it ends:
  *  it then makes only its windows (PIOTR, 11.10: "1: yes"; CLAUDE.md T30 2.6). */
-export function lineContractRuns(state: GameState): boolean {
-  return state.windowLine.contract?.status === 'active';
+export function lineContractRuns(state: GameState, line: number): boolean {
+  return lineRecord(state, line)?.contract?.status === 'active';
 }
 
-/** What of the line the jobs get: nothing while its contract runs, and the level it runs at
- *  otherwise. The one answer `lineModuleFor` and `lineFactor` read (CLAUDE.md T30 2.5). */
+/** The line the jobs get: the first that stands and is not on its contract, or null with none
+ *  (v93) [TUNE: chat: the first by number]. The one answer `lineLevelForJobs`, `lineModuleFor`
+ *  and the places at a module read. */
+export function jobsLine(state: GameState): number | null {
+  return standingLines(state).find((line) => !lineContractRuns(state, line)) ?? null;
+}
+
+/** What of the line the jobs get: nothing while every line that stands runs its contract, and the
+ *  level the jobs' line runs at otherwise. The one answer `lineModuleFor` and `lineFactor` read
+ *  (CLAUDE.md T30 2.5). */
 export function lineLevelForJobs(state: GameState): number {
-  return lineContractRuns(state) ? 0 : lineLevel(state);
+  const line = jobsLine(state);
+  return line === null ? 0 : lineLevel(state, line);
 }
 
 /** What the line gives every stage of a timber job at the level the jobs get today, 1 with no
@@ -440,33 +596,46 @@ export function lineFactor(state: GameState): number {
   return LINE_FACTOR[lineLevelForJobs(state)] ?? 1;
 }
 
-/** The module that does this stage of a timber job while the line runs that far for the jobs, or
- *  null: the Cross cutting and the Planing on module 1, the Moulding on 2, the Sanding on 3, the
- *  Pressing on 4, the Finishing on 5 and the Glazing on 6 (CLAUDE.md T29 2.9.5, T30 2.5). */
+/** The module that does this stage of a timber job while the jobs' line runs that far, or null:
+ *  the Cross cutting and the Planing on module 1, the Moulding on 2, the Sanding on 3, the Pressing
+ *  on 4, the Finishing on 5 and the Glazing on 6 (CLAUDE.md T29 2.9.5, T30 2.5). */
 export function lineModuleFor(state: GameState, stage: StageId): string | null {
   const index = LINE_COVERS[stage];
   if (index === undefined || index > lineLevelForJobs(state)) return null;
   return LINE_MODULES[index - 1] ?? null;
 }
 
-/** True while the whole line of six stands, not sold: what the board's stand ins and the boards it
- *  saves ask, whatever the engineers keep today (CLAUDE.md T30 2.5). */
-export function lineStandsWhole(state: GameState): boolean {
-  return lineModules(state) === LINE_MODULES.length;
+/** True while the whole line of six stands, not sold, whatever the engineers keep today (CLAUDE.md
+ *  T30 2.5). */
+export function lineStandsWhole(state: GameState, line: number): boolean {
+  return lineModules(state, line) === LINE_MODULES.length;
 }
 
-/** The modules of the line the company holds, standing or sold and waiting for the van, in their
+/** True while any line stands whole: what the board's stand ins ask, and the Materials page
+ *  (CLAUDE.md T30 2.5; v93). */
+export function anyLineStandsWhole(state: GameState): boolean {
+  return standingLines(state).some((line) => lineStandsWhole(state, line));
+}
+
+/** The modules of a line the company holds, standing or sold and waiting for the van, in their
  *  order along it (CLAUDE.md T30 2.3.5). */
-export function lineItems(state: GameState): Equipment[] {
-  return LINE_MODULES.flatMap((id) => state.equipment.filter((item) => item.specId === id));
+export function lineItems(state: GameState, line: number): Equipment[] {
+  return LINE_MODULES.flatMap((id) => state.equipment.filter((item) => item.specId === id && lineOf(item) === line));
 }
 
-/** What the buyer pays for the whole line: half of what its six cost, each module's half summed
+/** What the buyer pays for a whole line: half of what its six cost, each module's half summed
  *  (CLAUDE.md T30 2.3.5). */
-export function lineSalePrice(state: GameState): number {
-  return lineItems(state)
+export function lineSalePrice(state: GameState, line: number): number {
+  return lineItems(state, line)
     .filter((item) => !isSold(item))
     .reduce((total, item) => total + salePriceFor(item), 0);
+}
+
+/** What a piece of kit is called on its tile and in the hall: a module by its line and its place,
+ *  `Line 2, module 3` (PIOTR, 12.10), and everything else by its family's name (v93). */
+export function itemName(item: { specId: string; line?: number }): string {
+  if (isLineModule(item.specId)) return `${lineName(lineOf(item))}, module ${lineModuleIndex(item.specId)}`;
+  return findSpec(item.specId)?.name ?? item.specId;
 }
 
 /** Sold, and standing until the van comes to the gate. */
@@ -562,8 +731,9 @@ export function placesOf(item: { specId: string; variantId: string }): number {
  *  a job goes at the by hand pace; nobody waits for it to run again (PIOTR, 24.09: "they never
  *  wait for the saw"; v53). */
 export function familyRuns(state: GameState, family: string): boolean {
-  // A module of the line runs only within the level its engineers keep (CLAUDE.md T29 2.9.4).
-  if (isLineModule(family) && lineModuleIndex(family) > lineLevel(state)) return false;
+  // A module of the line runs for the jobs only within the level the jobs' line's engineers keep
+  // (CLAUDE.md T29 2.9.4; v93: the jobs' line).
+  if (isLineModule(family) && lineModuleIndex(family) > lineLevelForJobs(state)) return false;
   if (bestMachineOf(state, family) === null) return false;
   if (dustOutputOf(family) > 0 && bagsFull(state)) return false;
   return familyAirBlock(state, family) === '';
@@ -578,8 +748,12 @@ export function familyRuns(state: GameState, family: string): boolean {
  *  what a breakdown costs beside its repair (CLAUDE.md T20 2.9.3, T25 2.1; v53). */
 export function placedMachines(state: GameState, family: string): Equipment[] {
   if (!familyRuns(state, family)) return [];
+  // A module's places are the jobs' line's: another line's modules are on their contract or stand
+  // still, and no man is put at them (v93). Asked only of a module's family.
+  const line = isLineModule(family) ? jobsLine(state) : null;
   const placed = floorMachines(state, family).filter(
-    (item) => !item.broken && !machineIsOut(item, state.clock.day),
+    (item) =>
+      !item.broken && !machineIsOut(item, state.clock.day) && (line === null || lineOf(item) === line),
   );
   // The benches stay in the order they were bought: a bench is a man's own place and not a
   // machine the shop chooses between (`benches`).
@@ -1308,10 +1482,9 @@ export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'
       where: 'the stage it does',
     });
   }
-  // The line, one line for the six modules, worth its factor less one at the level it runs at
-  // today (CLAUDE.md T29 2.9.8).
-  const line = productionLineLine(state);
-  if (line !== null) {
+  // Each line, one line for its six modules, worth its factor less one at the level it runs at
+  // today (CLAUDE.md T29 2.9.8; v93).
+  for (const line of productionLineLines(state)) {
     lines.push({ label: line.label, points: line.points, hall: false, where: productionLineWhere(state) });
   }
   return { base: 1, lines, plus: roundPoints(plus), minus: roundPoints(minus), total };
@@ -1720,29 +1893,33 @@ export function paceLines(state: GameState): PaceLine[] {
     const word = machineShortWord(family);
     lines.push({ family, label: `${word.charAt(0).toUpperCase()}${word.slice(1)}, ${best.variantId}`, percent });
   }
-  // The line as one line, and none while it stands still, as a machine that moves nothing has none.
-  const line = productionLineLine(state);
-  const linePercent = line === null ? 0 : Math.round(line.points * 100);
-  if (line !== null && linePercent !== 0) lines.push({ family: 'line', label: line.label, percent: linePercent });
+  // Each line as one line, and none while it stands still or gives the jobs nothing, as a machine
+  // that moves nothing has none.
+  for (const line of productionLineLines(state)) {
+    const linePercent = Math.round(line.points * 100);
+    if (linePercent !== 0) lines.push({ family: 'line', label: line.label, percent: linePercent });
+  }
   return lines;
 }
 
-/** The line as one thing on the sheets that list machines: `Production line, 6 modules` and what
- *  it gives the jobs at the level it runs at today, or null while no module stands (CLAUDE.md T29
- *  2.9.8, T30 2.5). */
-export function productionLineLine(state: GameState): { label: string; points: number } | null {
-  if (lineModules(state) === 0) return null;
-  const level = lineLevel(state);
-  return {
-    // With no engineer on duty the line stands still, and says so in place of `0 modules` [TUNE];
-    // on its contract it says that, and gives the jobs nothing [TUNE] (CLAUDE.md T30 2.5).
-    label: lineContractRuns(state)
-      ? 'Production line, on its contract'
-      : level === 0
-        ? 'Production line, standing still'
-        : `Production line, ${plural(level, 'module', 'modules')}`,
-    points: roundPoints(lineFactor(state) - 1),
-  };
+/** Each line that stands as one thing on the sheets that list machines: `Line 1, 6 modules` and
+ *  what it gives the jobs at the level it runs at today, which is the jobs' line's factor and
+ *  nothing for every other line; none while no module stands (CLAUDE.md T29 2.9.8, T30 2.5; v93). */
+export function productionLineLines(state: GameState): { label: string; points: number }[] {
+  const jobs = jobsLine(state);
+  return standingLines(state).map((line) => {
+    const level = lineLevel(state, line);
+    return {
+      // With no engineer on duty the line stands still, and says so in place of `0 modules` [TUNE];
+      // on its contract it says that, and gives the jobs nothing [TUNE] (CLAUDE.md T30 2.5).
+      label: lineContractRuns(state, line)
+        ? `${lineName(line)}, on its contract`
+        : level === 0
+          ? `${lineName(line)}, standing still`
+          : `${lineName(line)}, ${plural(level, 'module', 'modules')}`,
+      points: line === jobs ? roundPoints(lineFactor(state) - 1) : 0,
+    };
+  });
 }
 
 /** What the line's line on the Output sheet acts on: every stage of a timber job, and below the

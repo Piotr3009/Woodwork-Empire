@@ -25,15 +25,16 @@ import {
   RATE_WEEK_DAYS,
   SPEND_WARNING_CATEGORIES,
   SPEND_WARNING_FROM_CLOSED_DAYS,
+  lineName,
 } from './constants';
 import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
 import { paperworkDone, takeOffOutstanding } from './jobs';
-import { bagStore, boardRoom, findSpec, lineEngineersOnDuty, lineLevel, lineModules } from './machines';
+import { bagStore, boardRoom, findSpec, lineEngineersOnDuty, lineLevel, lineModules, lineNumbers, standingLines } from './machines';
 import { canUnload, isBoards } from './materials';
 import { lineShortOf, runningLineContract } from './lineContract';
 import { andList, inASentence, inWords } from './text';
-import { laneTrouble, linePlace, standingOnTheLane } from './layout';
+import { laneTrouble, linePlace, standingInTheWay } from './layout';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine, hasOfficeAdmin } from './staff';
@@ -158,17 +159,21 @@ function pastTheLimitWarning(state: GameState): Warning | null {
   };
 }
 
-/** Said only while modules stand that no engineer on duty keeps: the line stands still with none,
- *  and runs as three modules with one (CLAUDE.md T29 2.9.4). */
+/** Said only while modules stand that no engineer on duty keeps, of the first line by number that
+ *  wants one: the line stands still with none, and runs as three modules with one (CLAUDE.md T29
+ *  2.9.4; v93: the line by its number). */
 function lineNeedsEngineerWarning(state: GameState): Warning | null {
-  const standing = lineModules(state);
-  const level = lineLevel(state);
-  if (standing === 0 || level >= standing) return null;
-  if (level === 0) return { key: 'lineNeedsEngineer', text: 'The line stands still: no engineer on duty' };
-  return {
-    key: 'lineNeedsEngineer',
-    text: `The line runs as ${inWords(level)} modules: ${inWords(lineEngineersOnDuty(state))} engineer on duty`,
-  };
+  for (const line of standingLines(state)) {
+    const standing = lineModules(state, line);
+    const level = lineLevel(state, line);
+    if (level >= standing) continue;
+    if (level === 0) return { key: 'lineNeedsEngineer', text: `${lineName(line)} stands still: no engineer on duty` };
+    return {
+      key: 'lineNeedsEngineer',
+      text: `${lineName(line)} runs as ${inWords(level)} modules: ${inWords(lineEngineersOnDuty(state, line))} engineer on duty`,
+    };
+  }
+  return null;
 }
 
 function nobodyAssignedWarning(state: GameState): Warning | null {
@@ -236,43 +241,55 @@ function boardsAtTheGateWarning(state: GameState): Warning | null {
   );
   if (waiting === undefined) return null;
   const job = state.jobs.find((entry) => entry.id === waiting.jobId);
-  // The line's own load names the line where a job's names the job (CLAUDE.md T31 2.2).
-  const name = waiting.line === true ? "the line's timber" : (job?.name ?? 'a job');
+  // A line's own load names the line where a job's names the job (CLAUDE.md T31 2.2; v93).
+  const name = waiting.line !== undefined ? `${lineName(waiting.line).toLowerCase()}'s timber` : (job?.name ?? 'a job');
   return boardRoom(state) <= 0
     ? { key: 'boardsAtTheGate', text: `Boards at the gate, no timber store: ${name}` }
     : { key: 'boardsAtTheGate', text: `Boards at the gate, no room on the stores: ${name}` };
 }
 
-/** The line stands on its contract with both engineers on duty, for want of a window's timber or
- *  glass: said only while the material is what stops it (CLAUDE.md T31 2.4). */
+/** A line stands on its contract with both engineers on duty, for want of a window's timber or
+ *  glass: said only while the material is what stops it, of the first such line by number
+ *  (CLAUDE.md T31 2.4; v93). */
 function lineNeedsMaterialWarning(state: GameState): Warning | null {
-  if (runningLineContract(state) === null) return null;
-  if (lineLevel(state) < lineModules(state) || lineModules(state) === 0) return null;
-  // While the line is being moved it is the move that stops it.
+  // While the lines are being moved it is the move that stops them.
   if (movingMachines(state) !== null) return null;
-  const short = lineShortOf(state);
-  if (short === null) return null;
-  return { key: 'lineNeedsMaterial', text: `The line stands: no ${short} for its next window` };
+  for (const line of standingLines(state)) {
+    if (runningLineContract(state, line) === null) continue;
+    if (lineLevel(state, line) < lineModules(state, line)) continue;
+    const short = lineShortOf(state, line);
+    if (short === null) continue;
+    return { key: 'lineNeedsMaterial', text: `${lineName(line)} stands: no ${short} for its next window` };
+  }
+  return null;
 }
 
-/** The line's lane blocked by kit that stood there before it, named as the catalogue names it, kit
- *  on order among it, until it is moved; or a line of Turn 30 standing where its lane cannot be,
- *  which keeps its place with no lane (CLAUDE.md T31 2.6) [TUNE: the words]. */
+/** A line's ground blocked by kit that stood there before it, named as the catalogue names it, kit
+ *  on order among it, until it is moved; or a line standing where its lane cannot be, which keeps
+ *  its place with no lane: the first such line by number (CLAUDE.md T31 2.6; v93) [TUNE: the
+ *  words]. */
 function laneBlockedWarning(state: GameState): Warning | null {
-  const at = linePlace(state);
-  if (at === null) return null;
-  const trouble = laneTrouble(state, at);
-  if (trouble === 'frontWall') {
-    return { key: 'laneBlocked', text: 'The line stands too near the front wall for its lane: move it back' };
+  for (const line of lineNumbers(state)) {
+    const at = linePlace(state, line);
+    if (at === null) continue;
+    const trouble = laneTrouble(state, at);
+    if (trouble === 'frontWall') {
+      return { key: 'laneBlocked', text: `${lineName(line)} stands too near the front wall for its lane: move it back` };
+    }
+    // A line whose lane would cross the way to the gate has to come forward, and one over the left
+    // strip has to move along it, not back [TUNE: the words].
+    if (trouble === 'rearWall') {
+      return { key: 'laneBlocked', text: `${lineName(line)} stands too near the rear wall for its lane: move it forward` };
+    }
+    if (trouble === 'leftWall') {
+      return { key: 'laneBlocked', text: `${lineName(line)} stands on the way to the gate for its lane: move it along` };
+    }
+    const on = standingInTheWay(state, line);
+    if (on.length === 0) continue;
+    const names = on.map((specId) => `the ${inASentence(findSpec(specId)?.name ?? specId)}`);
+    return { key: 'laneBlocked', text: `Kit stands in ${lineName(line).toLowerCase()}'s way: ${andList(names)}` };
   }
-  // A line over the left strip has to move along it, not back [TUNE: the words].
-  if (trouble === 'leftWall') {
-    return { key: 'laneBlocked', text: 'The line stands on the way to the gate for its lane: move it along' };
-  }
-  const on = standingOnTheLane(state);
-  if (on.length === 0) return null;
-  const names = on.map((specId) => `the ${inASentence(findSpec(specId)?.name ?? specId)}`);
-  return { key: 'laneBlocked', text: `Kit stands on the forklift's lane: ${andList(names)}` };
+  return null;
 }
 
 function noInsuranceWarning(state: GameState): Warning | null {

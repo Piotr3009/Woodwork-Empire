@@ -55,14 +55,14 @@ describe('the line moved as one (CLAUDE.md T30 2.4)', () => {
     expect(anchors(moved)).toEqual(LINE_MODULES.map((_, index) => [2 + 6 * index, 11]));
     // A move of one cell along it is a move onto itself, and allowed.
     expect(canPlace(moved, 'kit-line-6', 33, 11)).toEqual({ ok: true, reason: '' });
-    expect(lineModules(moved)).toBe(6);
+    expect(lineModules(moved, 1)).toBe(6);
   });
 
   it('is refused onto anything but itself, off the floor and on the gate lane, and moves none', () => {
     const state = withLine(bigUnit());
     placeEquipment(state, 'sheetRack', { variantId: 'standard', x: 20, y: 11, id: 'kit-rack-in-the-way' });
     // From Turn 31 the line asks for its lane too, and says so (CLAUDE.md T31 2.6).
-    const refusal = { ok: false, reason: 'The line needs a clear 36 m by 3 m and its lane' };
+    const refusal = { ok: false, reason: 'The line needs a clear 36 m by 3 m, its lane and a metre each side' };
     expect(canPlace(state, 'kit-line-1', 2, 10)).toEqual(refusal);
     expect(canPlace(state, 'kit-line-6', 33, 11)).toEqual(refusal);
     // Too near the front wall for its men's metre and its lane.

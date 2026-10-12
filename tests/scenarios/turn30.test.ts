@@ -64,6 +64,7 @@ import {
   withAir,
   withExtraction,
 } from '../helpers';
+import { lineState } from '../../src/engine/lineContract';
 
 // ---------------------------------------------------------------------------------------------
 // The plays
@@ -162,9 +163,9 @@ function anchors(state: GameState): Array<[number, number]> {
  *  Turn 31, which pays the timber and the glass at their order (CLAUDE.md T31 2.1). */
 function windowsBooked(state: GameState, on: number): { windows: number[]; material: number[] } {
   return {
-    windows: state.ledger.filter((entry) => entry.label === 'Windows off the line: windows' && entry.day === on).map((entry) => entry.amount),
+    windows: state.ledger.filter((entry) => entry.label === 'Windows off line 1: windows' && entry.day === on).map((entry) => entry.amount),
     material: state.ledger
-      .filter((entry) => entry.label === 'Windows off the line: timber and glass' && entry.day === on)
+      .filter((entry) => entry.label === 'Windows off line 1: timber and glass' && entry.day === on)
       .map((entry) => entry.amount),
   };
 }
@@ -173,7 +174,7 @@ function windowsBooked(state: GameState, on: number): { windows: number[]; mater
  *  is in, which is the morning after the order (CLAUDE.md T31 2.2). */
 function untilTheMaterialIsIn(state: GameState): GameState {
   let next = state;
-  for (let guard = 0; (next.windowLine.boards < 40 || next.windowLine.glass < 20) && guard < 200; guard += 1) {
+  for (let guard = 0; (lineState(next, 1).boards < 40 || lineState(next, 1).glass < 20) && guard < 200; guard += 1) {
     next = minutes(next, 30);
   }
   return next;
@@ -184,10 +185,10 @@ function untilTheMaterialIsIn(state: GameState): GameState {
  *  window (CLAUDE.md T31 2.2). */
 function keepInMaterial(state: GameState): GameState {
   let next = state;
-  const boardsComing = next.deliveries.filter((delivery) => delivery.line === true && !delivery.unloaded).reduce((total, delivery) => total + delivery.sheets, 0);
-  const glassComing = next.windowLine.glassOnTheWay.reduce((total, entry) => total + entry.windows, 0);
-  if (next.windowLine.boards + boardsComing < 32) next = act(next, { type: 'ORDER_LINE_TIMBER' });
-  if (next.windowLine.glass + glassComing < 16) next = act(next, { type: 'ORDER_LINE_GLASS' });
+  const boardsComing = next.deliveries.filter((delivery) => delivery.line === 1 && !delivery.unloaded).reduce((total, delivery) => total + delivery.sheets, 0);
+  const glassComing = lineState(next, 1).glassOnTheWay.reduce((total, entry) => total + entry.windows, 0);
+  if (lineState(next, 1).boards + boardsComing < 32) next = act(next, { type: 'ORDER_LINE_TIMBER', line: 1 });
+  if (lineState(next, 1).glass + glassComing < 16) next = act(next, { type: 'ORDER_LINE_GLASS', line: 1 });
   return next;
 }
 
@@ -302,7 +303,7 @@ const cashBefore = company.cash;
 let flow = act(company, { type: 'BUY_EQUIPMENT', specId: 'windowLine1' });
 const orders = flow.onOrder.filter((item) => LINE_MODULES.includes(item.specId));
 const order = { cash: cashBefore - flow.cash, dueDays: new Set(orders.map((item) => item.dueDay)), dueDay: orders[0]?.dueDay ?? 0 };
-const orderLedger = flow.ledger.filter((entry) => entry.label === 'Window production line ordered').map((entry) => entry.amount);
+const orderLedger = flow.ledger.filter((entry) => entry.label === 'Window production line, line 1, ordered').map((entry) => entry.amount);
 // Played to the morning it is due.
 for (let guard = 0; flow.clock.day < order.dueDay && guard < 60; guard += 1) flow = day(flow);
 const landed = flow;
@@ -324,7 +325,7 @@ describe('(ddd) the line bought whole, stood, moved and run on the window jobs (
 
   it('stands the six on one morning at cells x 2 to 37, y 14 to 16, with nobody to unload them', () => {
     expect(landed.clock.day).toBe(order.dueDay);
-    expect(lineModules(landed)).toBe(6);
+    expect(lineModules(landed, 1)).toBe(6);
     expect(anchors(landed)).toEqual(LINE_MODULES.map((_, index) => [2 + 6 * index, 14]));
     expect(landed.tasks.some((task) => task.kind === 'unload' && !task.done)).toBe(false);
   });
@@ -333,8 +334,9 @@ describe('(ddd) the line bought whole, stood, moved and run on the window jobs (
     const setup = { ...structuredClone(landed), speed: 0 } as GameState;
     const third = setup.equipment.find((item) => item.specId === 'windowLine3');
     if (third === undefined) throw new Error('module 3 stands');
-    // From Turn 31 the rack stands behind the line, off its lane (CLAUDE.md T31 2.6).
-    placeEquipment(setup, 'sheetRack', { variantId: 'standard', x: 20, y: 11, id: 'kit-rack-in-the-way' });
+    // From Turn 31 the rack stands behind the line, off its lane (CLAUDE.md T31 2.6), and from v93
+    // off the metre behind the line's next place too.
+    placeEquipment(setup, 'sheetRack', { variantId: 'standard', x: 20, y: 10, id: 'kit-rack-in-the-way' });
     // Onto the rack: refused, and nothing moves.
     const ontoRack = act(setup, { type: 'MOVE_ITEM', itemId: third.id, x: third.anchorX, y: 10 });
     expect(anchors(ontoRack)).toEqual(anchors(setup));
@@ -368,8 +370,9 @@ const offered: GameState = atOffer ?? hiring;
 // Taken at the card, and from Turn 31 its timber and glass ordered at the same minute from the
 // Contracts tab, in the next working morning: the windows start once the boards are off the lorry
 // (CLAUDE.md T31 2.2).
-const ordered = act(act(act(offered, { type: 'RESOLVE_EVENT', choiceId: 'take' }), { type: 'ORDER_LINE_TIMBER' }), {
+const ordered = act(act(act(offered, { type: 'RESOLVE_EVENT', choiceId: 'take' }), { type: 'ORDER_LINE_TIMBER', line: 1 }), {
   type: 'ORDER_LINE_GLASS',
+  line: 1,
 });
 let reachedMorning = day(ordered);
 while (!isWorkingDay(reachedMorning.clock.day)) reachedMorning = day(reachedMorning);
@@ -378,7 +381,7 @@ const taken = untilTheMaterialIsIn(reachedMorning);
 describe('(ddd) with two engineers, before the contract (CLAUDE.md T30 2.5)', () => {
   it('does the window s Cross cutting on module 1, its Finishing on module 5 and its Glazing on module 6, at the engine s own pace', () => {
     expect(offered.workers.filter((worker) => worker.role === 'lineEngineer')).toHaveLength(2);
-    expect(lineLevel(offered)).toBe(6);
+    expect(lineLevel(offered, 1)).toBe(6);
     const plan = planOf(offered);
     const factor = LINE_FACTOR[6] ?? 1;
     expect(plan.crossCutting).toEqual({ family: 'windowLine1', speed: factor * industrial });
@@ -400,19 +403,19 @@ describe('(ddd) with two engineers, before the contract (CLAUDE.md T30 2.5)', ()
 describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () => {
   it('is offered by the card at the first working morning with the six standing and two engineers on the books, and taken', () => {
     const card = offerSeen.find((event) => event.kind === 'lineContractOffered');
-    expect(card?.title).toBe('Windows off the line');
+    expect(card?.title).toBe('Windows off line 1');
     expect(offered.clock.minute).toBe(0);
     expect(isWorkingDay(offered.clock.day)).toBe(true);
     expect(offered.workers.filter((worker) => worker.role === 'lineEngineer' && worker.startDay <= offered.clock.day)).toHaveLength(2);
-    expect(taken.windowLine.contract?.status).toBe('active');
+    expect(lineState(taken, 1).contract?.status).toBe('active');
     // Not one of the standing contracts (played a day further from Turn 31, so a standing offer of
     // the card's morning may have lapsed by then, and the count is not the check).
-    expect(taken.contracts.some((contract) => contract.name === 'Windows off the line')).toBe(false);
+    expect(taken.contracts.some((contract) => contract.name === 'Windows off line 1')).toBe(false);
     // Its timber and glass were paid at the click on the material line (CLAUDE.md T31 2.2).
-    const orders = taken.ledger.filter((entry) => entry.day === offered.clock.day && /for the line/.test(entry.label));
+    const orders = taken.ledger.filter((entry) => entry.day === offered.clock.day && /for line 1/.test(entry.label));
     expect(orders.map((entry) => [entry.label, entry.amount])).toEqual([
-      ['Timber for the line: 40 boards', -8000],
-      ['Glass for the line: 20 windows', -4000],
+      ['Timber for line 1: 40 boards', -8000],
+      ['Glass for line 1: 20 windows', -4000],
     ]);
   });
 
@@ -421,12 +424,12 @@ describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () 
     // and none of their material is booked as they are made (CLAUDE.md T31 2.1, 2.2).
     const running = taken;
     expect(windowsBooked(day(offered), offered.clock.day).windows).toEqual([]);
-    expect(lineWindowMinutes(running)).toBe(120);
+    expect(lineWindowMinutes(running, 1)).toBe(120);
     // Counted from the minutes the window in hand already has: the half hour the material came in.
-    const from = running.windowLine.minutes;
-    expect(running.windowLine.contract?.windowsMade).toBe(0);
-    expect(minutes(running, 119 - from).windowLine.contract?.windowsMade).toBe(0);
-    expect(minutes(running, 120 - from).windowLine.contract?.windowsMade).toBe(1);
+    const from = lineState(running, 1).minutes;
+    expect(lineState(running, 1).contract?.windowsMade).toBe(0);
+    expect(lineState(minutes(running, 119 - from), 1).contract?.windowsMade).toBe(0);
+    expect(lineState(minutes(running, 120 - from), 1).contract?.windowsMade).toBe(1);
     let whole = day(running);
     while (!isWorkingDay(whole.clock.day)) whole = day(whole);
     const morning = whole.clock.day;
@@ -439,29 +442,29 @@ describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () 
     const toNoon = minutes(running, BREAK_START_MINUTE - running.clock.minute);
     const through = minutes(toNoon, BREAK_MINUTES, (event) => (event.kind === 'breakTime' ? 'skip' : undefined));
     expect(through.clock.minute).toBeGreaterThanOrEqual(BREAK_START_MINUTE + BREAK_MINUTES);
-    expect(through.windowLine.contract?.windowsMade).toBe(toNoon.windowLine.contract?.windowsMade);
-    expect(through.windowLine.minutes).toBe(toNoon.windowLine.minutes);
+    expect(lineState(through, 1).contract?.windowsMade).toBe(lineState(toNoon, 1).contract?.windowsMade);
+    expect(lineState(through, 1).minutes).toBe(lineState(toNoon, 1).minutes);
   });
 
   it('sends the tenth to the gate, and the client takes it at the next working open', () => {
     let state = taken;
     let guard = 0;
-    while ((state.windowLine.contract?.windowsMade ?? 0) < LINE_PALLET_WINDOWS && guard < 6) {
+    while ((lineState(state, 1).contract?.windowsMade ?? 0) < LINE_PALLET_WINDOWS && guard < 6) {
       guard += 1;
       // Played to five, so the pallet is seen at the gate before the morning takes it.
       state = minutes(state, 540 - state.clock.minute);
-      if ((state.windowLine.contract?.windowsMade ?? 0) < LINE_PALLET_WINDOWS) state = day(state);
+      if ((lineState(state, 1).contract?.windowsMade ?? 0) < LINE_PALLET_WINDOWS) state = day(state);
     }
     // From Turn 31 the first day starts once the timber is unloaded, so the count at the tenth's
     // evening moves with the hour it was in (CLAUDE.md T31 2.2).
-    const made = state.windowLine.contract?.windowsMade ?? 0;
+    const made = lineState(state, 1).contract?.windowsMade ?? 0;
     expect(made).toBeGreaterThanOrEqual(LINE_PALLET_WINDOWS);
-    expect(state.windowLine.palletsAtGate).toBe(1);
-    expect(state.windowLine.onPallet).toBe(made - LINE_PALLET_WINDOWS);
+    expect(lineState(state, 1).palletsAtGate).toBe(1);
+    expect(lineState(state, 1).onPallet).toBe(made - LINE_PALLET_WINDOWS);
     const ledger = state.ledger.length;
     let next = day(state);
     while (!isWorkingDay(next.clock.day)) next = day(next);
-    expect(next.windowLine.palletsAtGate).toBe(0);
+    expect(lineState(next, 1).palletsAtGate).toBe(0);
     // No line in the ledger for the collection: its windows were paid as they were made.
     expect(next.ledger.slice(ledger).some((entry) => /pallet|collect/i.test(entry.label))).toBe(false);
   });
@@ -471,9 +474,9 @@ describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () 
     const engineer = state.workers.find((worker) => worker.role === 'lineEngineer');
     if (engineer === undefined) throw new Error('an engineer is wanted');
     engineer.absentDaysRemaining = 1;
-    expect(lineLevel(state)).toBe(3);
-    const made = state.windowLine.contract?.windowsMade ?? 0;
-    expect(minutes(state, 540).windowLine.contract?.windowsMade).toBe(made);
+    expect(lineLevel(state, 1)).toBe(3);
+    const made = lineState(state, 1).contract?.windowsMade ?? 0;
+    expect(lineState(minutes(state, 540), 1).contract?.windowsMade).toBe(made);
   });
 
   it('gives a window job taken while it runs no line and no boards saved, and gives the jobs the line back once ended', () => {
@@ -490,17 +493,17 @@ describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () 
     // The same window in a company with no line at all.
     const without = structuredClone(taken);
     without.equipment = without.equipment.filter((item) => !LINE_MODULES.includes(item.specId));
-    without.windowLine.contract = null;
+    lineState(without, 1).contract = null;
     expect(jobOf(running).sheets).toBe(jobOf(without).sheets);
     expect(Object.values(planOf(running)).some((stage) => LINE_MODULES.includes(stage.family ?? ''))).toBe(false);
     // Ended: the line is the jobs' again, and its boards are saved again.
-    const ended = act(taken, { type: 'END_LINE_CONTRACT' });
+    const ended = act(taken, { type: 'END_LINE_CONTRACT', line: 1 });
     expect(planOf(ended).crossCutting?.family).toBe('windowLine1');
     expect(jobOf(structuredClone(ended)).sheets).toBeLessThan(jobOf(without).sheets);
   });
 
   it('comes back by its card a week after it is ended, and not before', () => {
-    let state = act(taken, { type: 'END_LINE_CONTRACT' });
+    let state = act(taken, { type: 'END_LINE_CONTRACT', line: 1 });
     const again = state.clock.day + 7;
     const seen: Array<{ day: number; kind: string }> = [];
     for (let guard = 0; state.clock.day < again + 3 && guard < 14; guard += 1) {
@@ -519,19 +522,19 @@ describe('(fff) the four upgrades, and the line sold (CLAUDE.md T30 2.10, 2.3.5)
   // The money for the four, on top of what the company has.
   let state = structuredClone(taken);
   state.cash += 2000000;
-  for (const upgrade of LINE_UPGRADES) state = act(state, { type: 'BUY_LINE_UPGRADE', upgradeId: upgrade.id });
+  for (const upgrade of LINE_UPGRADES) state = act(state, { type: 'BUY_LINE_UPGRADE', line: 1, upgradeId: upgrade.id });
   const bought = state;
-  const ready = Math.max(...bought.windowLine.upgrades.map((upgrade) => upgrade.fittedOnDay));
+  const ready = Math.max(...lineState(bought, 1).upgrades.map((upgrade) => upgrade.fittedOnDay));
   // The player keeps the line in timber and glass through the ten working days (CLAUDE.md T31 2.2).
   for (let guard = 0; state.clock.day < ready && guard < 30; guard += 1) state = day(keepInMaterial(state));
   const fitted = keepInMaterial(state);
 
   it('brings the window to 60 minutes and eight a working day', () => {
-    expect(bought.ledger.filter((entry) => entry.label.startsWith('Line upgrade: ')).map((entry) => entry.amount)).toEqual(
+    expect(bought.ledger.filter((entry) => entry.label.startsWith('Line 1 upgrade: ')).map((entry) => entry.amount)).toEqual(
       LINE_UPGRADES.map((upgrade) => -upgrade.price),
     );
-    expect(lineWindowMinutes(fitted)).toBe(60);
-    expect(fitted.windowLine.contract?.status).toBe('active');
+    expect(lineWindowMinutes(fitted, 1)).toBe(60);
+    expect(lineState(fitted, 1).contract?.status).toBe('active');
     // The second working day at 60 minutes: from Turn 31 the line stood now and then for its
     // material in the ten days before, so the first day's count carries the minutes of a slower
     // window in hand (CLAUDE.md T31 2.1).
@@ -546,14 +549,14 @@ describe('(fff) the four upgrades, and the line sold (CLAUDE.md T30 2.10, 2.3.5)
     const fifth = fitted.equipment.find((item) => item.specId === 'windowLine5');
     let sold = act(fitted, { type: 'SELL_MACHINE', equipmentId: fifth?.id ?? '' });
     expect(sold.equipment.filter((item) => LINE_MODULES.includes(item.specId)).every((item) => item.soldOnDay !== null)).toBe(true);
-    expect(sold.windowLine.upgrades).toEqual([]);
-    expect(sold.windowLine.contract).toBeNull();
+    expect(lineState(sold, 1).upgrades).toEqual([]);
+    expect(lineState(sold, 1).contract).toBeNull();
     const seen: GameEvent[] = [];
     sold = day(sold, () => undefined, seen);
     while (!isWorkingDay(sold.clock.day)) sold = day(sold, () => undefined, seen);
     expect(sold.equipment.some((item) => LINE_MODULES.includes(item.specId))).toBe(false);
-    expect(sold.ledger.filter((entry) => entry.label === 'Sold: Window production line').map((entry) => entry.amount)).toEqual([5000000]);
-    expect(seen.filter((event) => event.kind === 'machineCollected').map((event) => event.title)).toEqual(['Window production line collected']);
+    expect(sold.ledger.filter((entry) => entry.label === 'Sold: Window production line, line 1').map((entry) => entry.amount)).toEqual([5000000]);
+    expect(seen.filter((event) => event.kind === 'machineCollected').map((event) => event.title)).toEqual(['Window production line, line 1 collected']);
   });
 });
 
@@ -582,11 +585,11 @@ describe('(ggg) the line on the hall, played (CLAUDE.md T30 2.11, 2.12)', () => 
 
   it('shows the windows on module 6 s pallet, and none when it is empty', () => {
     const seven = structuredClone(running);
-    seven.windowLine.onPallet = 7;
+    lineState(seven, 1).onPallet = 7;
     const stacks = Array.from(hall(seven).querySelectorAll('[data-stack]')).map((node) => node.getAttribute('href'));
     expect(stacks).toEqual(['/sprites/windowLine6.standard.stack07.png']);
     const empty = structuredClone(running);
-    empty.windowLine.onPallet = 0;
+    lineState(empty, 1).onPallet = 0;
     expect(hall(empty).querySelector('[data-stack]')).toBeNull();
   });
 });

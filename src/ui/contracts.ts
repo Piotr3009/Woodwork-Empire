@@ -50,14 +50,14 @@ import {
   sheetsForPieces,
   weekPace,
 } from '../engine/contracts';
-import { OWNER, lineEngineersOnDuty, lineLevel } from '../engine/machines';
+import { OWNER, lineEngineersOnDuty, lineLevel, lineRecord } from '../engine/machines';
 import {
   LINE_BOARDS_PER_WINDOW,
-  LINE_CONTRACT_NAME,
   LINE_MODULES,
   LINE_ORDER_WINDOWS,
   LINE_PALLET_WINDOWS,
   LINE_WINDOW_PRICE,
+  lineContractName,
 } from '../engine/constants';
 import {
   lineBoardsOnTheWay,
@@ -73,6 +73,7 @@ import {
   lineWindowEvery,
   lineWindowMinutes,
   lineWindowsAWeek,
+  linesOnContract,
   runningLineContract,
 } from '../engine/lineContract';
 import { inWords } from '../engine/text';
@@ -288,21 +289,21 @@ function endedBlock(state: GameState, contract: Contract): string {
   );
 }
 
-/** The line's own contract while it runs, first on the tab, in the classes a running contract's
- *  block has and through the rows the tab already writes: what a window brings and costs, the
- *  line's pace, the week's windows and all of them, the pallet, the gate, and why it stands still
- *  when it does; `End it` at one click (CLAUDE.md T30 2.9). Nobody is put on it, so the Work Plan's
- *  Contracts tab does not show it. */
-function lineContractBlock(state: GameState): string {
-  const contract = runningLineContract(state);
-  if (contract === null) return '';
-  const line = state.windowLine;
-  const minutesEach = lineWindowMinutes(state);
-  const level = lineLevel(state);
-  const onDuty = lineEngineersOnDuty(state);
+/** A line's own contract while it runs, first on the tab, one block a line, in the classes a
+ *  running contract's block has and through the rows the tab already writes: what a window brings
+ *  and costs, the line's pace, the week's windows and all of them, the pallet, the gate, and why it
+ *  stands still when it does; `End it` at one click (CLAUDE.md T30 2.9; v93). Nobody is put on it,
+ *  so the Work Plan's Contracts tab does not show it. */
+function lineContractBlock(state: GameState, line: number): string {
+  const contract = runningLineContract(state, line);
+  const record = lineRecord(state, line);
+  if (contract === null || record === null) return '';
+  const minutesEach = lineWindowMinutes(state, line);
+  const level = lineLevel(state, line);
+  const onDuty = lineEngineersOnDuty(state, line);
   // Short of the two that keep it whole there is one engineer on duty, or none; with both on duty
   // it is the timber or the glass that stops it (CLAUDE.md T31 2.4). The engineer is said first.
-  const short = lineShortOf(state);
+  const short = lineShortOf(state, line);
   const still =
     level < LINE_MODULES.length
       ? countRow('Standing still', `${onDuty === 0 ? 'no' : inWords(onDuty)} engineer on duty`, 'bad')
@@ -310,40 +311,40 @@ function lineContractBlock(state: GameState): string {
         ? countRow('Standing still', `no ${short}`, 'bad')
         : '';
   return (
-    '<div class="contract-active" data-line-contract="1">' +
-    `<div class="row"><span class="row-main"><h3>${escapeHtml(LINE_CONTRACT_NAME)}</h3></span>` +
-    `<span class="row-action">${button('endLineContract', 'End it')}</span></div>` +
+    `<div class="contract-active" data-line-contract="${line}">` +
+    `<div class="row"><span class="row-main"><h3>${escapeHtml(lineContractName(line))}</h3></span>` +
+    `<span class="row-action">${button('endLineContract', 'End it', `data-line="${line}"`)}</span></div>` +
     `<p class="figures"><strong class="contract-count">This week: ${plural(contract.windowsThisWeek, 'window', 'windows')}. ` +
     `In all: ${contract.windowsMade}</strong> · ${money(LINE_WINDOW_PRICE)} a window; the timber and the glass ` +
     `${money(lineMaterialPerWindow())} a window, ordered ahead</p>` +
-    `<p class="hint">One window every ${escapeHtml(lineWindowEvery(minutesEach))}: about ${lineWindowsAWeek(state)} a week</p>` +
-    countRow('On the pallet', `${line.onPallet} of ${LINE_PALLET_WINDOWS}`) +
-    (line.palletsAtGate > 0 ? countRow('At the gate for collection', plural(line.palletsAtGate, 'pallet', 'pallets')) : '') +
+    `<p class="hint">One window every ${escapeHtml(lineWindowEvery(minutesEach))}: about ${lineWindowsAWeek(state, line)} a week</p>` +
+    countRow('On the pallet', `${record.onPallet} of ${LINE_PALLET_WINDOWS}`) +
+    (record.palletsAtGate > 0 ? countRow('At the gate for collection', plural(record.palletsAtGate, 'pallet', 'pallets')) : '') +
     still +
-    lineMaterialRows(state) +
+    lineMaterialRows(state, line) +
     '</div>'
   );
 }
 
-/** The line's timber and glass under the running block's rows, and the row of its two order
+/** A line's timber and glass under its running block's rows, and the row of its two order
  *  buttons, each locked with its reason under the row, a reason said once (CLAUDE.md T31 2.2, 2.4)
  *  [TUNE: the reasons under the row]. */
-function lineMaterialRows(state: GameState): string {
-  const line = state.windowLine;
-  const boardsComing = lineBoardsOnTheWay(state);
-  const glassComing = lineGlassOnTheWay(state);
+function lineMaterialRows(state: GameState, line: number): string {
+  const boards = lineRecord(state, line)?.boards ?? 0;
+  const boardsComing = lineBoardsOnTheWay(state, line);
+  const glassComing = lineGlassOnTheWay(state, line);
   const timber =
-    `${plural(line.boards, 'board', 'boards')}, for ${plural(Math.floor(line.boards / LINE_BOARDS_PER_WINDOW), 'window', 'windows')}` +
+    `${plural(boards, 'board', 'boards')}, for ${plural(Math.floor(boards / LINE_BOARDS_PER_WINDOW), 'window', 'windows')}` +
     (boardsComing > 0 ? `, ${boardsComing} more on the way` : '');
   const glass =
-    `for ${plural(lineGlassWindows(state), 'window', 'windows')}` +
+    `for ${plural(lineGlassWindows(state, line), 'window', 'windows')}` +
     (glassComing > 0 ? `, ${glassComing} more on the way` : '');
-  const timberCheck = lineTimberCheck(state);
-  const glassCheck = lineGlassCheck(state);
+  const timberCheck = lineTimberCheck(state, line);
+  const glassCheck = lineGlassCheck(state, line);
   const timberLabel = `Order timber: ${plural(lineTimberBatch(), 'board', 'boards')}, ${money(lineTimberBatchCost())}`;
   const glassLabel = `Order glass: ${plural(LINE_ORDER_WINDOWS, 'window', 'windows')}, ${money(lineGlassBatchCost())}`;
   const control = (check: { ok: boolean; reason: string }, action: string, label: string): string =>
-    check.ok ? button(action, label) : lockedButton(label, check.reason);
+    check.ok ? button(action, label, `data-line="${line}"`) : lockedButton(label, check.reason);
   const reasons = [timberCheck, glassCheck]
     .filter((check) => !check.ok)
     .map((check) => check.reason)
@@ -367,9 +368,11 @@ export function renderContracts(state: GameState): string {
   const offer = offeredContract(state);
   const active = activeContracts(state);
   const ended = endedContracts(state);
-  // The line's own contract stands first while it runs, whatever else is on the tab (CLAUDE.md T30
-  // 2.9).
-  const line = lineContractBlock(state);
+  // Each line's own contract stands first while it runs, line 1's first, whatever else is on the
+  // tab (CLAUDE.md T30 2.9; v93).
+  const line = linesOnContract(state)
+    .map((number) => lineContractBlock(state, number))
+    .join('');
   if (!offer && active.length === 0 && ended.length === 0) {
     const why = contractsAllowed(state)
       ? `No contract on offer. A shop rings now and then, and an offer stands for ${plural(CONTRACT_OFFER_DAYS, 'day', 'days')}.`

@@ -69,6 +69,7 @@ import {
   withExtraction,
 } from '../helpers';
 import { type Policy, playDay } from './autopilot';
+import { lineState } from '../../src/engine/lineContract';
 
 // ---------------------------------------------------------------------------------------------
 // The plays
@@ -148,8 +149,8 @@ function lineCompany(withAdmin: boolean): GameState {
 /** Played to the morning the line's offer is taken, at its card. */
 function taken(state: GameState): GameState {
   let next = state;
-  for (let guard = 0; next.windowLine.contract?.status !== 'active' && guard < 10; guard += 1) next = day(next);
-  if (next.windowLine.contract?.status !== 'active') throw new Error('the line s offer never came');
+  for (let guard = 0; lineState(next, 1).contract?.status !== 'active' && guard < 10; guard += 1) next = day(next);
+  if (lineState(next, 1).contract?.status !== 'active') throw new Error('the line s offer never came');
   return next;
 }
 
@@ -171,20 +172,20 @@ describe('(hhh) the line s timber and glass, ordered by the player and by the of
   const take = taken(lineCompany(false));
   const takeDay = take.clock.day;
   // The player's clicks, at the minute the contract was taken.
-  let ordered = act(take, { type: 'ORDER_LINE_TIMBER' });
-  ordered = act(ordered, { type: 'ORDER_LINE_GLASS' });
-  ordered = act(ordered, { type: 'ORDER_LINE_GLASS' });
-  const third = act(ordered, { type: 'ORDER_LINE_GLASS' });
+  let ordered = act(take, { type: 'ORDER_LINE_TIMBER', line: 1 });
+  ordered = act(ordered, { type: 'ORDER_LINE_GLASS', line: 1 });
+  ordered = act(ordered, { type: 'ORDER_LINE_GLASS', line: 1 });
+  const third = act(ordered, { type: 'ORDER_LINE_GLASS', line: 1 });
   // Played on until the timber is on the stores and the glass at module 6.
   let stocked = ordered;
-  for (let guard = 0; (stocked.windowLine.boards < 40 || stocked.windowLine.glass < 40) && guard < 60; guard += 1) stocked = minutes(stocked, 30);
+  for (let guard = 0; (lineState(stocked, 1).boards < 40 || lineState(stocked, 1).glass < 40) && guard < 60; guard += 1) stocked = minutes(stocked, 30);
   // A whole working day of windows, and then on until the timber runs out.
-  const before = { windows: stocked.windowLine.contract?.windowsMade ?? 0, boards: stocked.windowLine.boards, glass: stocked.windowLine.glass, sheets: stocked.stock.sheets };
+  const before = { windows: lineState(stocked, 1).contract?.windowsMade ?? 0, boards: lineState(stocked, 1).boards, glass: lineState(stocked, 1).glass, sheets: stocked.stock.sheets };
   let after = day(stocked);
   while (!isWorkingDay(after.clock.day)) after = day(after);
   after = minutes(after, 300);
   let dry = after;
-  for (let guard = 0; lineShortOf(dry) === null && guard < 30; guard += 1) dry = minutes(dry, 120);
+  for (let guard = 0; lineShortOf(dry, 1) === null && guard < 30; guard += 1) dry = minutes(dry, 120);
   dry = minutes(dry, 30);
   // On to a working hour with both engineers on duty, which is when the strip says it.
   let onDuty = dry;
@@ -193,50 +194,50 @@ describe('(hhh) the line s timber and glass, ordered by the player and by the of
   }
 
   it('orders nothing by itself with no admin: the line stands for both from the take', () => {
-    expect(take.windowLine.boards).toBe(0);
-    expect(take.windowLine.glass).toBe(0);
-    expect(take.windowLine.glassOnTheWay).toEqual([]);
-    expect(take.deliveries.some((delivery) => delivery.line === true)).toBe(false);
-    expect(lineShortOf(take)).toBe('timber or glass');
+    expect(lineState(take, 1).boards).toBe(0);
+    expect(lineState(take, 1).glass).toBe(0);
+    expect(lineState(take, 1).glassOnTheWay).toEqual([]);
+    expect(take.deliveries.some((delivery) => delivery.line === 1)).toBe(false);
+    expect(lineShortOf(take, 1)).toBe('timber or glass');
   });
 
   it('pays for the player s orders at the click, on the material line, and refuses a third glass over 40', () => {
-    expect(line(ordered, 'Timber for the line: 40 boards')).toEqual([-8000]);
-    expect(line(ordered, 'Glass for the line: 20 windows')).toEqual([-4000, -4000]);
-    expect(ordered.windowLine.glassOnTheWay.reduce((total, entry) => total + entry.windows, 0)).toBe(LINE_GLASS_WINDOWS_MAX);
-    expect(lineGlassCheck(ordered)).toEqual({ ok: false, reason: 'Module 6 holds glass for 40 windows' });
+    expect(line(ordered, 'Timber for line 1: 40 boards')).toEqual([-8000]);
+    expect(line(ordered, 'Glass for line 1: 20 windows')).toEqual([-4000, -4000]);
+    expect(lineState(ordered, 1).glassOnTheWay.reduce((total, entry) => total + entry.windows, 0)).toBe(LINE_GLASS_WINDOWS_MAX);
+    expect(lineGlassCheck(ordered, 1)).toEqual({ ok: false, reason: 'Module 6 holds glass for 40 windows' });
     expect(third.cash).toBe(ordered.cash);
   });
 
   it('brings the timber on the next working day s lorry, onto the stores, and the glass to module 6', () => {
-    const load = ordered.deliveries.find((delivery) => delivery.line === true);
+    const load = ordered.deliveries.find((delivery) => delivery.line === 1);
     expect(load?.boards).toBe(true);
     expect(load?.sheets).toBe(40);
     let next = takeDay + 1;
     while (!isWorkingDay(next)) next += 1;
     expect(load?.arriveDay).toBe(next);
-    expect(stocked.windowLine.boards).toBe(40);
-    expect(stocked.windowLine.glass).toBe(40);
+    expect(lineState(stocked, 1).boards).toBe(40);
+    expect(lineState(stocked, 1).glass).toBe(40);
     expect(boardsOnStore(stocked, { id: shelterOf(stocked) })).toBeGreaterThanOrEqual(40);
   });
 
   it('makes windows that take two boards and one glass each, off the counter and module 6', () => {
-    const made = (after.windowLine.contract?.windowsMade ?? 0) - before.windows;
+    const made = (lineState(after, 1).contract?.windowsMade ?? 0) - before.windows;
     expect(made).toBeGreaterThan(0);
-    expect(after.windowLine.boards).toBe(before.boards - 2 * made);
-    expect(after.windowLine.glass).toBe(before.glass - made);
+    expect(lineState(after, 1).boards).toBe(before.boards - 2 * made);
+    expect(lineState(after, 1).glass).toBe(before.glass - made);
     expect(after.stock.sheets).toBe(before.sheets - 2 * made);
     // No material booked a window: it was paid at its order.
-    expect(after.ledger.some((entry) => entry.label === 'Windows off the line: timber and glass')).toBe(false);
+    expect(after.ledger.some((entry) => entry.label === 'Windows off line 1: timber and glass')).toBe(false);
   });
 
   it('stands with no timber when it runs out, and says so on the strip and the tab', () => {
-    expect(lineShortOf(dry)).toBe('timber');
-    expect(dry.windowLine.boards).toBe(0);
-    expect(dry.windowLine.glass).toBe(20);
-    expect((dry.windowLine.contract?.windowsMade ?? 0) - before.windows).toBe(20);
-    expect(lineShortOf(onDuty)).toBe('timber');
-    expect(warnings(onDuty).find((warning) => warning.key === 'lineNeedsMaterial')?.text).toBe('The line stands: no timber for its next window');
+    expect(lineShortOf(dry, 1)).toBe('timber');
+    expect(lineState(dry, 1).boards).toBe(0);
+    expect(lineState(dry, 1).glass).toBe(20);
+    expect((lineState(dry, 1).contract?.windowsMade ?? 0) - before.windows).toBe(20);
+    expect(lineShortOf(onDuty, 1)).toBe('timber');
+    expect(warnings(onDuty).find((warning) => warning.key === 'lineNeedsMaterial')?.text).toBe('Line 1 stands: no timber for its next window');
     const holder = document.createElement('div');
     holder.innerHTML = renderContracts(onDuty);
     // The row's label and its figure, in the two cells every figure row has.
@@ -253,7 +254,7 @@ describe('(hhh) the line s timber and glass, ordered by the player and by the of
 const office = taken(lineCompany(true));
 const officeTakeDay = office.clock.day;
 let firstIn = office;
-for (let guard = 0; (firstIn.windowLine.boards === 0 || firstIn.windowLine.glass === 0) && guard < 40; guard += 1) firstIn = minutes(firstIn, 30);
+for (let guard = 0; (lineState(firstIn, 1).boards === 0 || lineState(firstIn, 1).glass === 0) && guard < 40; guard += 1) firstIn = minutes(firstIn, 30);
 const inFrom = firstIn.clock.day;
 let month = firstIn;
 let awayDay = -1;
@@ -269,32 +270,32 @@ month = minutes(month, 300);
 
 describe('(hhh) with an office admin the line never stands for material (CLAUDE.md T31 2.3)', () => {
   it('orders both at the take and in time ever after, in his name: from the day after the first batches are in, no minute stands for material', () => {
-    expect(office.deliveries.some((delivery) => delivery.line === true)).toBe(true);
-    expect(office.windowLine.glassOnTheWay.length).toBeGreaterThan(0);
-    expect(office.ledger.some((entry) => entry.label === 'Timber for the line: 40 boards, ordered by Anna')).toBe(true);
+    expect(office.deliveries.some((delivery) => delivery.line === 1)).toBe(true);
+    expect(lineState(office, 1).glassOnTheWay.length).toBeGreaterThan(0);
+    expect(office.ledger.some((entry) => entry.label === 'Timber for line 1: 40 boards, ordered by Anna')).toBe(true);
     expect(inFrom).toBeGreaterThan(officeTakeDay);
     // The first batches come on the next working morning's lorry and are unloaded in the first
     // hour of it, which is the one wait for material the line has.
-    const material = month.windowLine.days.filter((record) => record.day > inFrom);
+    const material = lineState(month, 1).days.filter((record) => record.day > inFrom);
     expect(material.length).toBeGreaterThan(25);
     for (const record of material) {
       expect(record.lost.timber + record.lost.glass + record.lost.timberAndGlass, `day ${record.day}`).toBe(0);
     }
-    expect(month.windowLine.today.lost.timber + month.windowLine.today.lost.glass + month.windowLine.today.lost.timberAndGlass).toBe(0);
+    expect(lineState(month, 1).today.lost.timber + lineState(month, 1).today.lost.glass + lineState(month, 1).today.lost.timberAndGlass).toBe(0);
   });
 });
 
 describe('(iii) the Production line tab after a played month (CLAUDE.md T31 2.5)', () => {
-  const books = lineBooks(month);
+  const books = lineBooks(month, 1);
   const thisMonth = monthOfDay(month.clock.day);
-  const records = [...month.windowLine.days, month.windowLine.today].filter((record) => monthOfDay(record.day) === thisMonth);
+  const records = [...lineState(month, 1).days, lineState(month, 1).today].filter((record) => monthOfDay(record.day) === thisMonth);
 
   it('reads each row of this month as 2.5 reckons it, and the turnover as the ledger has it', () => {
     const column = books.month;
     expect(column.windows).toBe(records.reduce((total, record) => total + record.windows, 0));
     expect(column.turnover).toBe(column.windows * LINE_WINDOW_PRICE);
     const ledger = month.ledger
-      .filter((entry) => entry.label === 'Windows off the line: windows' && monthOfDay(entry.day) === thisMonth)
+      .filter((entry) => entry.label === 'Windows off line 1: windows' && monthOfDay(entry.day) === thisMonth)
       .reduce((total, entry) => total + entry.amount, 0);
     expect(column.turnover).toBe(ledger);
     expect(column.material).toBe(column.windows * lineMaterialPerWindow());
@@ -310,11 +311,11 @@ describe('(iii) the Production line tab after a played month (CLAUDE.md T31 2.5)
   });
 
   it('has the efficiency under 100 per cent on the day an engineer was away, and says what it lost', () => {
-    const away = [...month.windowLine.days, month.windowLine.today].find((record) => record.day === awayDay);
+    const away = [...lineState(month, 1).days, lineState(month, 1).today].find((record) => record.day === awayDay);
     expect(away).toBeDefined();
     expect(away?.lost.engineer).toBeGreaterThan(0);
     expect(away?.windows ?? 0).toBeLessThan(away?.possibleWindows ?? 0);
-    const others = month.windowLine.days.filter((record) => record.day >= inFrom && record.day !== awayDay && record.possibleWindows > 0);
+    const others = lineState(month, 1).days.filter((record) => record.day >= inFrom && record.day !== awayDay && record.possibleWindows > 0);
     expect(others.length).toBeGreaterThan(10);
     if (monthOfDay(awayDay) === thisMonth) {
       const holder = document.createElement('div');
@@ -341,8 +342,19 @@ describe('(jjj) the line s lane (CLAUDE.md T31 2.6)', () => {
   it('opens a save with a bench on the lane, names it on the strip, refuses the line a place whose lane it blocks, and lets it go once the bench is moved', () => {
     const company = lineCompany(false);
     placeEquipment(company, 'workbench', { variantId: 'standard', x: 10, y: 18, id: 'kit-bench-on-the-lane' });
-    const raw = JSON.parse(JSON.stringify(company)) as Record<string, unknown> & { windowLine: Record<string, unknown>; unit: Record<string, unknown> };
+    const raw = JSON.parse(JSON.stringify(company)) as Record<string, unknown> & {
+      windowLine: Record<string, unknown>;
+      windowLines: Record<string, unknown>[];
+      unit: Record<string, unknown>;
+      equipment: Record<string, unknown>[];
+    };
     raw.version = 43;
+    // A v43 save holds the one record `windowLine`, with no number, and its modules carry no line
+    // (v93).
+    raw.windowLine = { ...(raw.windowLines[0] ?? {}) };
+    delete raw.windowLine.number;
+    delete (raw as { windowLines?: unknown }).windowLines;
+    for (const item of raw.equipment) delete item.line;
     for (const key of ['boards', 'glass', 'glassOnTheWay', 'today', 'days', 'since']) delete raw.windowLine[key];
     delete raw.unit.longExtensions;
     delete raw.unit.longExtension;
@@ -350,14 +362,16 @@ describe('(jjj) the line s lane (CLAUDE.md T31 2.6)', () => {
     const opened = migrateState(raw, 43);
     if (opened === null) throw new Error('the save opens');
     expect(opened.equipment.find((item) => item.id === 'kit-bench-on-the-lane')).toMatchObject({ anchorX: 10, anchorY: 18 });
-    expect(warnings(opened).find((warning) => warning.key === 'laneBlocked')?.text).toBe("Kit stands on the forklift's lane: the workbench");
-    expect(canPlace(opened, 'kit-line-1', 2, 11)).toEqual({ ok: false, reason: 'The line needs a clear 36 m by 3 m and its lane' });
-    const refused = act(opened, { type: 'MOVE_ITEM', itemId: 'kit-line-1', x: 2, y: 11 });
+    expect(warnings(opened).find((warning) => warning.key === 'laneBlocked')?.text).toBe("Kit stands in line 1's way: the workbench");
+    // From v93 a line's lane is its own, two metres in front of its engineers' metre: the bench at
+    // y 18 is on the lane of the line's place at y 14 and of its place at y 13, not of y 11's.
+    expect(canPlace(opened, 'kit-line-1', 2, 13)).toEqual({ ok: false, reason: 'The line needs a clear 36 m by 3 m, its lane and a metre each side' });
+    const refused = act(opened, { type: 'MOVE_ITEM', itemId: 'kit-line-1', x: 2, y: 13 });
     expect(refused.equipment.find((item) => item.id === 'kit-line-1')?.anchorY).toBe(14);
     const cleared = act(opened, { type: 'MOVE_ITEM', itemId: 'kit-bench-on-the-lane', x: 24, y: 6 });
     expect(cleared.equipment.find((item) => item.id === 'kit-bench-on-the-lane')).toMatchObject({ anchorX: 24, anchorY: 6 });
     expect(warnings(cleared).some((warning) => warning.key === 'laneBlocked')).toBe(false);
-    expect(canPlace(cleared, 'kit-line-1', 2, 11)).toEqual({ ok: true, reason: '' });
+    expect(canPlace(cleared, 'kit-line-1', 2, 13)).toEqual({ ok: true, reason: '' });
   });
 });
 

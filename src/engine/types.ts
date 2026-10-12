@@ -377,6 +377,11 @@ export interface Equipment {
    *  one it is the base file mirrored, which is what the game did when this was a boolean
    *  (PIOTR, 19.09: "I need two more turns, we have four walls"; CLAUDE.md T10 3.8). */
   orientation: Orientation;
+  /** The production line this module belongs to, by its number, on a module and on nothing else:
+   *  a company may have more than one line from v93, each bought whole, and the six modules of one
+   *  line carry its number (PIOTR, 12.10). A module with no number written is line 1's, as every
+   *  module was before v93; the lift writes it. */
+  line?: number;
 }
 
 /** Something bought and paid for that is not here yet: the cash left at the click, the item is
@@ -398,6 +403,8 @@ export interface OnOrderItem {
   /** The outline is dragged and turned like the machine it holds the floor for, through the same
    *  four orientations (T10 3.8; CLAUDE.md T22 2.11). */
   orientation: Orientation;
+  /** The line a module on order belongs to, as `Equipment.line` (v93). */
+  line?: number;
 }
 
 export interface ProductTemplate {
@@ -844,11 +851,15 @@ export interface LineSince {
   cover: number;
 }
 
-/** The line's own state, everything of it that is not kit on the floor (CLAUDE.md T30 section 4):
+/** One line's own state, everything of it that is not kit on the floor (CLAUDE.md T30 section 4):
  *  its contract, the day it may be offered again, the minutes into the window in hand, the windows
  *  on module 6's pallet, the full pallets waiting at the gate, and the upgrades. From Turn 31 its
- *  timber and glass, the glass on its way, and its own day book (CLAUDE.md T31 2.1, 2.5). */
+ *  timber and glass, the glass on its way, and its own day book (CLAUDE.md T31 2.1, 2.5). From v93
+ *  one record a line, by the line's number, in `GameState.windowLines` (PIOTR, 12.10). */
 export interface WindowLineState {
+  /** The line's number, 1 for the first bought and one more for each after it: what its modules
+   *  carry, what every tile, card, strip line and ledger line names it by, never given twice. */
+  number: number;
   contract: LineContract | null;
   /** Null until the first offer; a week on whenever an offer is turned down or a contract ends. */
   nextOfferDay: number | null;
@@ -898,9 +909,10 @@ export interface Delivery {
    *  and never on a sheet rack. A delivery without the mark is read from its job, so a save's
    *  deliveries need no lift (CLAUDE.md T29 2.11.2). */
   boards?: true;
-  /** A load of boards for the line's contract, no job's and never stock: unloaded whole onto the
-   *  timber stores and the line's from then on (CLAUDE.md T31 2.2). No save carries it before v92. */
-  line?: true;
+  /** A load of boards for a line's contract, by the line's number: no job's and never stock,
+   *  unloaded whole onto the timber stores and that line's from then on (CLAUDE.md T31 2.2). No
+   *  save carries it before v92; v92's `true` is lifted to 1 (v93). */
+  line?: number;
 }
 
 export type TaskKind =
@@ -1612,9 +1624,11 @@ export interface GameState {
   /** How often the end of day summary is put in front of the player (CLAUDE.md T4 3.6). */
   summaryCadence: SummaryCadence;
   gameOver: GameOver | null;
-  /** The production line's own state: its contract, its windows and its upgrades (CLAUDE.md T30
-   *  section 4). */
-  windowLine: WindowLineState;
+  /** The production lines' own state, one record a line by its number, in the order they were
+   *  bought: each line's contract, its windows, its material, its upgrades and its books (CLAUDE.md
+   *  T30 section 4; v93: more lines than one, PIOTR 12.10). A record is written whole the first
+   *  time its line is asked for, and stays after the line is sold for its books. */
+  windowLines: WindowLineState[];
   /** No standing contract is offered before this day: the quiet weeks after a client went
    *  elsewhere (CLAUDE.md T31 2.9). Null when there are none. */
   contractQuietUntilDay: number | null;
@@ -1622,13 +1636,15 @@ export interface GameState {
 
 export type GameAction =
   | { type: 'SET_SPEED'; speed: Speed }
-  /** The line's own contract ended at one click, asking nothing (CLAUDE.md T30 2.6). */
-  | { type: 'END_LINE_CONTRACT' }
-  /** An upgrade of the line bought, fitted ten working days on (CLAUDE.md T30 2.10). */
-  | { type: 'BUY_LINE_UPGRADE'; upgradeId: string }
-  /** The line's timber and its glass ordered for twenty windows, at one click (CLAUDE.md T31 2.2). */
-  | { type: 'ORDER_LINE_TIMBER' }
-  | { type: 'ORDER_LINE_GLASS' }
+  /** A line's own contract ended at one click, asking nothing, the line by its number (CLAUDE.md
+   *  T30 2.6; v93). */
+  | { type: 'END_LINE_CONTRACT'; line: number }
+  /** An upgrade of a line bought, fitted ten working days on (CLAUDE.md T30 2.10; v93). */
+  | { type: 'BUY_LINE_UPGRADE'; line: number; upgradeId: string }
+  /** A line's timber and its glass ordered for twenty windows, at one click (CLAUDE.md T31 2.2;
+   *  v93). */
+  | { type: 'ORDER_LINE_TIMBER'; line: number }
+  | { type: 'ORDER_LINE_GLASS'; line: number }
   /** Run the clock at 4x until the task the owner is out on is over (CLAUDE.md T8 3.3). */
   | { type: 'SKIP_AHEAD' }
   | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }

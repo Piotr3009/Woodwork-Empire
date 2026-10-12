@@ -604,7 +604,7 @@ function ghostFor(current: GameState): Ghost | null {
   const kit = kitOf(current, drag.itemId);
   if (kit === null) return null;
   const check = canPlace(current, drag.itemId, drag.x, drag.y, ui.rotate);
-  // The line is taken by any of its modules and the six go together: its ghost is the whole 36 m
+  // A line is taken by any of its modules and its six go together: its ghost is the whole 36 m
   // by 3 m, each module's 6 m by 3 m drawn in it (CLAUDE.md T30 2.4).
   if (isLineModule(kit.specId)) {
     const offset = lineModuleCell({ x: 0, y: 0 }, kit.specId);
@@ -1410,6 +1410,12 @@ function dataElement(node: Element | null): DataElement | null {
 /** One click, one writing of the page. The handler changes the world as many times as the click
  *  asks for and the page is written when it is done, never in the middle of it
  *  (CLAUDE.md T9 3.8). */
+/** The line a button is for, off its `data-line`, and line 1 for a button with none (v93). */
+function lineOfElement(element: DataElement): number {
+  const line = Number(element.dataset.line ?? '1');
+  return Number.isInteger(line) && line > 0 ? line : 1;
+}
+
 function handleAction(element: DataElement, point: { x: number; y: number }): void {
   batched(() => runAction(element, point));
 }
@@ -1789,21 +1795,22 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       dispatch({ type: 'END_CONTRACT', contractId: id });
       return;
     case 'endLineContract':
-      // The line's own contract, one click and nothing asked (CLAUDE.md T30 2.6).
-      dispatch({ type: 'END_LINE_CONTRACT' });
+      // A line's own contract, one click and nothing asked; the button carries its line (CLAUDE.md
+      // T30 2.6; v93).
+      dispatch({ type: 'END_LINE_CONTRACT', line: lineOfElement(element) });
       return;
     case 'orderLineTimber':
-      // Forty boards for the line, one click (CLAUDE.md T31 2.2).
-      dispatch({ type: 'ORDER_LINE_TIMBER' });
+      // Forty boards for a line, one click (CLAUDE.md T31 2.2).
+      dispatch({ type: 'ORDER_LINE_TIMBER', line: lineOfElement(element) });
       return;
     case 'orderLineGlass':
       // Glass for twenty windows, one click (CLAUDE.md T31 2.2).
-      dispatch({ type: 'ORDER_LINE_GLASS' });
+      dispatch({ type: 'ORDER_LINE_GLASS', line: lineOfElement(element) });
       return;
     case 'buyLineUpgrade':
-      // An upgrade of the line, paid at the click and fitted ten working days on (CLAUDE.md T30
-      // 2.10).
-      dispatch({ type: 'BUY_LINE_UPGRADE', upgradeId: id });
+      // An upgrade of a line, paid at the click and fitted ten working days on (CLAUDE.md T30
+      // 2.10; v93: the button carries its line).
+      dispatch({ type: 'BUY_LINE_UPGRADE', line: lineOfElement(element), upgradeId: id });
       return;
     case 'setSecondShift':
       dispatch({ type: 'SET_SECOND_SHIFT', on: element.dataset.on === '1' });

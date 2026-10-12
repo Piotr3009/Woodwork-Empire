@@ -199,12 +199,17 @@ import type {
  *  its own day book; the hall made longer along its rear wall; the quiet weeks of the contracts.
  *  Every new field of the turn is written with its default by the one lift, and a line whose
  *  contract runs is given one batch of timber and glass, free (CLAUDE.md T31 section 4). Every v12
- *  to v43 save loads. */
-export const STATE_VERSION = 44;
+ *  to v43 save loads.
+ *
+ *  Version 45 is v93 (PIOTR, 12.10: "I want to see the next line"). A company may have more than
+ *  one production line: the one record `windowLine` becomes the list `windowLines`, the line that
+ *  stood becomes line 1, its modules and its loads of timber carry its number. Every v12 to v44
+ *  save loads. */
+export const STATE_VERSION = 45;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v92';
+export const APP_VERSION = 'v93';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -5285,12 +5290,18 @@ export const LINE_ENGINEERS_MAX = 2;
 export const LINE_MODULES_KEPT: readonly number[] = [0, 3, 6];
 /** The six modules of the production line, in their order along it (CLAUDE.md T30 2.3.1). */
 export const LINE_MODULES: readonly string[] = Object.keys(LINE_MODULE_SHARES);
-/** The first cell the line is asked to stand on at its order: module N stands six cells along x
- *  from the one before, at orientation 0, so the line takes the cells x 2 to 37, y 14 to 16, along
- *  the middle of the front half of the 800 m2 hall, its men at y 17 and its lane at y 18 and 19
- *  and x 0 and 1. Taken only when the 36 m by 3 m there and its lane are clear; otherwise the first
- *  clear run cell by cell (CLAUDE.md T30 2.4, T31 2.6) [TUNE: chat: the cells]. */
+/** The first cell the first line is asked to stand on at its order: module N stands six cells
+ *  along x from the one before, at orientation 0, so the line takes the cells x 2 to 37, y 14 to
+ *  16, along the middle of the front half of the 800 m2 hall, its men at y 17 and its lane at y 18
+ *  and 19 and x 0 and 1. Taken only when the 36 m by 3 m there and its ground are clear; otherwise
+ *  the row seven metres behind or in front of a line that stands, and then the first clear run cell
+ *  by cell (CLAUDE.md T30 2.4, T31 2.6; v93) [TUNE: chat: the cells]. */
 export const WINDOW_LINE_ORIGIN = { x: 2, y: 14 };
+/** [PIOTR, 12.10: "1 metre for the engineers, 2 for the forklift, and add one more metre of free
+ *  space"] The metre behind a line, towards the rear wall, where nothing stands: with the line's
+ *  three, its engineers' metre and the lane's two it is the seven metres a line takes in depth, so
+ *  two lines stand one behind the other in the 800 m2 hall (v93). None for a line at the rear wall. */
+export const LINE_BEHIND_CELLS = 1;
 /** [PIOTR, 04.10: "at each stage output goes up by a percentage"; TUNE: chat: the figures] What
  *  the line gives every stage of a timber job while it runs at a level, by the level: nothing at
  *  nought, 1.4 with one module, up to 2.4 with five, and the whole line of six what Turn 29's five
@@ -5351,8 +5362,18 @@ export const FORKLIFT_LANE_CELLS = 2;
 /** The metre in front of the line where its men stand, the front side of `STATION_TABLE` for every
  *  module, which the line's lane never overlaps (CLAUDE.md T31 2.6). */
 export const LINE_FRONT_CELLS = 1;
-/** The line's contract's name: the client has no name (CLAUDE.md T30 2.6) [TUNE: chat]. */
-export const LINE_CONTRACT_NAME = 'Windows off the line';
+/** A line's contract's name, before the line's number: `Windows off line 2` (PIOTR, 12.10); the
+ *  client has no name (CLAUDE.md T30 2.6) [TUNE: chat]. */
+export const LINE_CONTRACT_NAME = 'Windows off line';
+/** What a line's contract, its offer card, its block and its ledger lines are called: the name and
+ *  the line's number (v93). */
+export function lineContractName(line: number): string {
+  return `${LINE_CONTRACT_NAME} ${line}`;
+}
+/** What a line is called wherever it is named by itself: the strip, a tile, a button (v93). */
+export function lineName(line: number): string {
+  return `Line ${line}`;
+}
 /** [PIOTR, 11.10: "yes" to chat's proposal] The boards a window of the line's contract takes off
  *  the timber stores as it is made; at `SHEET_VALUE` each they are 400 of its 600 (CLAUDE.md T31
  *  2.1) [TUNE: chat: the split]. */

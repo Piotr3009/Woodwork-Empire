@@ -23,6 +23,7 @@ import { testJoiner } from '../helpers';
 import { currentState, mount, render } from '../../src/ui/app';
 import { tileToScreen } from '../../src/render/iso';
 import { act, buyStartingKit, newGame, nextDay, placeEquipment, withAir } from '../helpers';
+import { lineState } from '../../src/engine/lineContract';
 
 /** A company in the 800 m² unit with the day one kit, air enough for a CNC, and the money for the
  *  line. */
@@ -51,9 +52,10 @@ describe('the line on the Owned tab (CLAUDE.md T30 2.3.3, 2.3.5)', () => {
     for (let n = 1; n <= 6; n += 1) {
       const tile = page.querySelector(`[data-owned="kit-line-${n}"]`);
       expect(tile, `module ${n}`).not.toBeNull();
-      expect(tile?.querySelector('.tile-name')?.textContent, `module ${n}`).toContain(`Window line, module ${n}`);
+      // Named by its line and its place from v93: `Line 1, module 3` (PIOTR, 12.10).
+      expect(tile?.querySelector('.tile-name')?.textContent, `module ${n}`).toContain(`Line 1, module ${n}`);
       const sell = tile?.querySelector('[data-card-row="sell"] [data-do="sellMachine"]');
-      expect(sell?.textContent, `module ${n}`).toBe('Sell the line for £5,000,000');
+      expect(sell?.textContent, `module ${n}`).toBe('Sell line 1 for £5,000,000');
       // A module has no Turn row: the line is never turned.
       expect(tile?.querySelector('[data-card-row="turn"]'), `module ${n}`).toBeNull();
     }
@@ -138,7 +140,7 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     for (const id of ['eng-1', 'eng-2']) {
       state.workers.push({ ...testJoiner(id, id), role: 'lineEngineer', tier: null, rate: 0, monthlyWage: 15000 });
     }
-    state.windowLine.contract = {
+    lineState(state, 1).contract = {
       status: 'active',
       startDay: state.clock.day,
       windowsThisWeek: 7,
@@ -147,12 +149,12 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
       revenue: 168000,
       materialCost: 67200,
     };
-    state.windowLine.onPallet = 7;
-    state.windowLine.palletsAtGate = 1;
+    lineState(state, 1).onPallet = 7;
+    lineState(state, 1).palletsAtGate = 1;
     // Its timber and glass, from Turn 31 (CLAUDE.md T31 2.1).
-    state.windowLine.boards = 40;
+    lineState(state, 1).boards = 40;
     state.stock.sheets += 40;
-    state.windowLine.glass = 20;
+    lineState(state, 1).glass = 20;
     return state;
   }
 
@@ -164,7 +166,7 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     expect(tab.querySelector('.contract-active')).toBe(block);
     const text = block?.textContent ?? '';
     for (const words of [
-      'Windows off the line',
+      'Windows off line 1',
       '£1,500 a window; the timber and the glass £600 a window, ordered ahead',
       'One window every 2 hours: about 20 a week',
       'This week: 7 windows. In all: 112',
@@ -180,12 +182,12 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     // Nobody is put on it, so the Work Plan's Contracts tab has none of it.
     const plan = document.createElement('div');
     plan.innerHTML = renderContractsTab(running(), null, null);
-    expect(plan.textContent).not.toContain('Windows off the line');
+    expect(plan.textContent).not.toContain('Windows off line 1');
   });
 
   it('reads its pace off the upgrades fitted: every 1 h 45 min with one, about 22 a week', () => {
     const state = running();
-    state.windowLine.upgrades = [{ id: 'lineTooling', fittedOnDay: state.clock.day }];
+    lineState(state, 1).upgrades = [{ id: 'lineTooling', fittedOnDay: state.clock.day }];
     const tab = document.createElement('div');
     tab.innerHTML = renderContracts(state);
     expect(tab.querySelector('[data-line-contract]')?.textContent).toContain('One window every 1 h 45 min: about 22 a week');
@@ -194,7 +196,7 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
   it('says it stands still for want of an engineer, and nothing of a gate with no pallet at it', () => {
     const state = running();
     state.workers = state.workers.filter((worker) => worker.id !== 'eng-2');
-    state.windowLine.palletsAtGate = 0;
+    lineState(state, 1).palletsAtGate = 0;
     const tab = document.createElement('div');
     tab.innerHTML = renderContracts(state);
     const text = tab.querySelector('[data-line-contract]')?.textContent ?? '';
@@ -212,7 +214,7 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     hall.innerHTML = renderHall(state);
     expect(hall.querySelectorAll('[data-line-pallet]')).toHaveLength(1);
     expect(hall.textContent).toContain('Windows for collection: 1 pallet');
-    state.windowLine.palletsAtGate = 3;
+    lineState(state, 1).palletsAtGate = 3;
     hall.innerHTML = renderHall(state);
     expect(hall.querySelectorAll('[data-line-pallet]')).toHaveLength(2);
     // From Turn 31 each is the art side's pallet standing alone, not a box (CLAUDE.md T31 2.10).
@@ -220,7 +222,7 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
       expect(pallet.querySelector('image')?.getAttribute('href')).toBe('/sprites/windowPallet.standard.png');
     }
     expect(hall.textContent).toContain('Windows for collection: 3 pallets');
-    state.windowLine.palletsAtGate = 0;
+    lineState(state, 1).palletsAtGate = 0;
     hall.innerHTML = renderHall(state);
     expect(hall.querySelector('[data-line-pallet]')).toBeNull();
     expect(hall.textContent).not.toContain('Windows for collection');

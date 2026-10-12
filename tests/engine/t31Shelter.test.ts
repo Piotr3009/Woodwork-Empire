@@ -23,6 +23,7 @@ import { itemFootprint } from '../../src/engine/machines';
 import { tileToScreen } from '../../src/render/iso';
 import { REAR_WALL, REAR_WALL_CLIP, renderHall } from '../../src/render/hall';
 import { act, buyNow, buyStartingKit, newGame, nextDay, placeEquipment } from '../helpers';
+import { lineState } from '../../src/engine/lineContract';
 
 /** A company in the 800 m² unit with the day one kit and its van. */
 function bigUnit(): GameState {
@@ -83,7 +84,7 @@ describe('the shelter behind the rear wall (CLAUDE.md T31 2.8)', () => {
     const shelter = state.equipment.find((item) => item.specId === 'timberShelter');
     if (shelter === undefined) throw new Error('the shelter is wanted');
     // Four hundred boards held for a timber job: the store full, its plate at its widest.
-    state.windowLine.boards = 400;
+    lineState(state, 1).boards = 400;
     state.stock.sheets += 400;
     const holder = document.createElement('div');
     holder.innerHTML = renderHall(state);
