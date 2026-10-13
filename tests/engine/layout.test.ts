@@ -197,8 +197,13 @@ describe('the whole workshop fits on the painted floor', () => {
     // spraying robot beside the booth it asks for (CLAUDE.md T29 2.7); the five axis CNC is passed
     // over, refused in the 200 m2 unit (2.5.1). Twenty five with the timber rack, which finds its 4 m
     // by 2 m; the timber shelter stands on the apron and holds no cell of the hall (CLAUDE.md T29
-    // 2.11.1).
-    expect(hallItems(state).length).toBe(25);
+    // 2.11.1). Twenty six from Turn 32: the two glass racks find their 2 m by 2 and 4 m by 3, bought
+    // before the CNC in the catalogue's order, and the 200 m2 unit then has no 5 m by 4 m left for
+    // the CNC (CLAUDE.md T32 2.1).
+    expect(hallItems(state).length).toBe(26);
+    expect(hallItems(state).some((item) => item.specId === 'glassRack')).toBe(true);
+    expect(hallItems(state).some((item) => item.specId === 'glassRackLarge')).toBe(true);
+    expect(hallItems(state).some((item) => item.specId === 'cnc')).toBe(false);
     expect(hallItems(state).some((item) => item.specId === 'cncHead')).toBe(false);
   });
 

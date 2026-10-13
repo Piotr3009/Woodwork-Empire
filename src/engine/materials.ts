@@ -22,17 +22,19 @@ import {
 import { addWorkingDays } from './clock';
 import { canAfford, pay } from './economy';
 import {
-  boardCapacityOf,
   boardRoom,
   boardsHeld,
+  capacityOf,
   freeBoardRoom,
   isSold,
   itemStandsInTheHall,
   jobsLine,
   lineModules,
   lineState,
-  sheetCapacityOf,
+  roomFor,
   sheetsOnCounter,
+  stockKindOf,
+  stockOnCounter,
 } from './machines';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
@@ -61,47 +63,30 @@ export function boardsForJob(state: GameState, materialCost: number, timber: boo
 }
 
 /** What the shelving in the hall can hold: every rack in it, by its class. Two racks hold what
- *  the two of them hold (PIOTR, CLAUDE.md T7 3.6). */
+ *  the two of them hold (PIOTR, CLAUDE.md T7 3.6). A rack that is sold stands in the hall until the
+ *  van comes, and it is no room: nothing is unloaded onto a rack that leaves in the morning
+ *  (CLAUDE.md T20 2.10). The sheets' room, of the one sum (CLAUDE.md T32 2.2). */
 export function rackCapacity(state: GameState): number {
-  let capacity = 0;
-  // A rack that is sold stands in the hall until the van comes, and it is no room: nothing is
-  // unloaded onto a rack that leaves in the morning (CLAUDE.md T20 2.10).
-  for (const item of state.equipment) {
-    if (isSold(item) || !itemStandsInTheHall(item)) continue;
-    capacity += sheetCapacityOf(item);
-  }
-  return capacity;
+  return roomFor(state, 'sheets');
 }
 
-/** The sheets standing on this one rack: the hall's stock put on its racks in the order they were
- *  bought, each filled to what it holds, and anything past the last one's room on the last rack.
- *  A sold rack holds nothing. Every rack used to print the whole stock, so two racks showed it
- *  twice [PIOTR, 24.09: "28 and 28"] (v54). */
-export function sheetsOnRack(state: GameState, item: { id: string }): number {
-  const racks = state.equipment.filter(
-    (entry) => sheetCapacityOf(entry) > 0 && !isSold(entry) && itemStandsInTheHall(entry),
+/** What stands on this one rack, timber store or glass rack: its kind's stock put on that kind's
+ *  kit in the order it was bought, each filled to what it holds, and anything past the last one's
+ *  room on the last. A sold rack holds nothing. Every rack used to print the whole stock, so two
+ *  racks showed it twice [PIOTR, 24.09: "28 and 28"] (v54). The one spread for the sheets, the
+ *  boards and the glass (CLAUDE.md T29 2.11.2, T31 2.1, T32 2.1); nought on anything that keeps
+ *  none. */
+export function stockOnItem(state: GameState, item: { id: string }): number {
+  const found = state.equipment.find((entry) => entry.id === item.id);
+  const kind = found === undefined ? null : stockKindOf(found);
+  if (kind === null) return 0;
+  const kit = state.equipment.filter(
+    (entry) => capacityOf(entry, kind) > 0 && !isSold(entry) && itemStandsInTheHall(entry),
   );
-  // The sheets only: the timber jobs' boards are on the timber stores (CLAUDE.md T29 2.11.2).
-  let left = sheetsOnCounter(state);
-  for (const [index, rack] of racks.entries()) {
-    const here = index === racks.length - 1 ? left : Math.min(left, sheetCapacityOf(rack));
+  let left = stockOnCounter(state, kind);
+  for (const [index, rack] of kit.entries()) {
+    const here = index === kit.length - 1 ? left : Math.min(left, capacityOf(rack, kind));
     if (rack.id === item.id) return here;
-    left -= here;
-  }
-  return 0;
-}
-
-/** The boards on this one timber store: the boards the timber jobs and the line hold, spread over
- *  the stores in the order they were bought as `sheetsOnRack` spreads the sheets, anything past the
- *  last one's room on the last (CLAUDE.md T29 2.11.2, T31 2.1). */
-export function boardsOnStore(state: GameState, item: { id: string }): number {
-  const stores = state.equipment.filter(
-    (entry) => boardCapacityOf(entry) > 0 && !isSold(entry) && itemStandsInTheHall(entry),
-  );
-  let left = boardsHeld(state);
-  for (const [index, store] of stores.entries()) {
-    const here = index === stores.length - 1 ? left : Math.min(left, boardCapacityOf(store));
-    if (store.id === item.id) return here;
     left -= here;
   }
   return 0;

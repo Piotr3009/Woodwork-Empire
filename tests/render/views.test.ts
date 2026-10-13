@@ -6,7 +6,7 @@ import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
 import { CLASS_BADGE, FINISHED_GOODS_LAYOUT } from '../../src/engine/constants';
 import { placesOf, sheetCapacityOf } from '../../src/engine/machines';
-import { sheetsOnRack } from '../../src/engine/materials';
+import { stockOnItem } from '../../src/engine/materials';
 import { machineStation } from '../../src/engine/stations';
 import { centreOf } from '../../src/render/iso';
 import type { GameState } from '../../src/engine/index';
@@ -64,7 +64,7 @@ describe('the hall on day 1', () => {
     state.stock.sheets = 60;
     const racks = state.equipment.filter((item) => item.specId === 'sheetRack');
     expect(racks).toHaveLength(2);
-    expect(racks.map((rack) => sheetsOnRack(state, rack))).toEqual([50, 10]);
+    expect(racks.map((rack) => stockOnItem(state, rack))).toEqual([50, 10]);
     const svg = renderHall(state);
     const page = document.createElement('div');
     page.innerHTML = svg;

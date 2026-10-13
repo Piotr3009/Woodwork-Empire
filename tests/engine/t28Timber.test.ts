@@ -89,6 +89,7 @@ import {
   placeEquipment,
   testJoiner,
   day53Hall,
+  placeGlassRack,
 } from '../helpers';
 
 const FIVE: Array<[string, string, number, string, number, number[]]> = [
@@ -123,6 +124,8 @@ function timberHall(without: string[] = []): GameState {
     if (without.includes(id)) continue;
     placeEquipment(state, id, { variantId, x, y, id: `kit-${id}` });
   }
+  // And a glass rack, which a window asks for from Turn 32 (CLAUDE.md T32 2.1).
+  if (!without.includes('glassRack')) placeGlassRack(state);
   return state;
 }
 
@@ -671,6 +674,8 @@ function bigHall(without: string[] = []): GameState {
     if (without.includes(id)) continue;
     placeEquipment(state, id, { variantId: 'standard', x, y, id: `kit-${id}` });
   }
+  // And a glass rack, which a window asks for from Turn 32 (CLAUDE.md T32 2.1).
+  if (!without.includes('glassRack')) placeGlassRack(state);
   return state;
 }
 
@@ -758,9 +763,10 @@ describe('timber on the board of the 800 m2 hall (CLAUDE.md T28 2.3)', () => {
     state.enquiries = [enquiry];
     const html = renderBoard(state, '');
     // Flipped in v84: the timber store is the last name of the list, and the count says boards
-    // (CLAUDE.md T29 2.11.2, 2.11.3).
+    // (CLAUDE.md T29 2.11.2, 2.11.3). Flipped in v96: the glass rack is last, after the store
+    // (CLAUDE.md T32 2.1).
     expect(html).toContain(
-      'Needs cross cut saw, four sided planer, spindle moulder, sander, frame press, spray booth, sash window cutter set, timber store',
+      'Needs cross cut saw, four sided planer, spindle moulder, sander, frame press, spray booth, sash window cutter set, timber store, glass rack</p>',
     );
     const job = firstJob(acceptNow(state, enquiry.id));
     const figure = html.match(/(\d+) boards? of material/);

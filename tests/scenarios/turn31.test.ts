@@ -48,7 +48,7 @@ import { monthlyPremiums } from '../../src/engine/insurance';
 import { canPlace, canPlaceSpec, canteenLockers, crewLimit } from '../../src/engine/layout';
 import { lineBooks } from '../../src/engine/lineBooks';
 import { lineGlassCheck, lineMaterialPerWindow, lineShortOf } from '../../src/engine/lineContract';
-import { boardsOnStore } from '../../src/engine/materials';
+import { stockOnItem } from '../../src/engine/materials';
 import { migrateState } from '../../src/engine/migrate';
 import { next } from '../../src/engine/rng';
 import { securitySubscriptionMonthly, securitySubscriptionParts } from '../../src/engine/security';
@@ -218,7 +218,7 @@ describe('(hhh) the line s timber and glass, ordered by the player and by the of
     expect(load?.arriveDay).toBe(next);
     expect(lineState(stocked, 1).boards).toBe(40);
     expect(lineState(stocked, 1).glass).toBe(40);
-    expect(boardsOnStore(stocked, { id: shelterOf(stocked) })).toBeGreaterThanOrEqual(40);
+    expect(stockOnItem(stocked, { id: shelterOf(stocked) })).toBeGreaterThanOrEqual(40);
   });
 
   it('makes windows that take two boards and one glass each, off the counter and module 6', () => {

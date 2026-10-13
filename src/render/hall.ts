@@ -64,13 +64,14 @@ import {
   placeShortages,
   placedMachines,
   placesLine,
-  boardCapacityOf,
+  capacityOf,
   sheetCapacityOf,
   shortageLine,
+  stockKindOf,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
 import { drawnPlaces } from '../engine/drawn';
-import { boardsOnStore, canUnload, loadWords, sheetsOnRack } from '../engine/materials';
+import { canUnload, loadWords, stockOnItem } from '../engine/materials';
 import {
   STATION_BENCH,
   STATION_CLEANING,
@@ -83,7 +84,7 @@ import {
   STATION_PHONE,
   STATION_RACK,
   STATION_TIMBER_RACK,
-  firstTimberRack,
+  firstStoreOf,
   unloadFarStation,
   type Facing as StationFacing,
   boothPlaces,
@@ -1236,7 +1237,7 @@ function stationAnchor(
   }
   // The man unloading boards walks to the first timber rack on the floor (CLAUDE.md T29 2.11.2).
   if (station === STATION_TIMBER_RACK) {
-    const rack = firstTimberRack(state);
+    const rack = firstStoreOf(state, 'boards');
     if (rack) {
       const cell = standingCell(state, rack, 'operator');
       return { ...cell, facing: facingAt(cell, rack) };
@@ -2072,13 +2073,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       !item.broken && isServiced(item.specId) && serviceIsDue(item, state.clock.day) ? ' (service due)' : '';
     // A rack's name says what is on it and what it holds, the same share its plate is drawn with,
     // and not the whole stock over every rack's room, which read the same on every rack (v54).
-    // A timber store's says the boards on it, its plate the same (CLAUDE.md T29 2.11.2).
-    const rackLine =
-      sheetCapacityOf(item) > 0
-        ? `: ${sheetsOnRack(state, item)} / ${sheetCapacityOf(item)}`
-        : boardCapacityOf(item) > 0
-          ? `: ${boardsOnStore(state, item)} / ${boardCapacityOf(item)}`
-          : '';
+    // A timber store's says the boards on it, its plate the same (CLAUDE.md T29 2.11.2), and a glass
+    // rack's the glass units (CLAUDE.md T32 2.1).
+    const keeps = stockKindOf(item);
+    const rackLine = keeps === null ? '' : `: ${stockOnItem(state, item)} / ${capacityOf(item, keeps)}`;
     // A machine that wants a pipe and has none is not served: the hall says so under its name, in
     // the game's red, and never writes "connected" anywhere (CLAUDE.md T16 2.3).
     const unconnected = wantsExtraction(item) && !isConnected(state, item);
@@ -2126,8 +2124,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
             })) +
         palletStack(state, item, stands, files) +
         (unconnected ? notConnectedLabel(stands) : '') +
-        (sheetCapacityOf(item) > 0 ? rackCount(item, sheetsOnRack(state, item)) : '') +
-        (boardCapacityOf(item) > 0 ? rackCount(item, boardsOnStore(state, item)) : '') +
+        (keeps === null ? '' : rackCount(item, stockOnItem(state, item))) +
         fx.svg +
         (marked === undefined
           ? ''

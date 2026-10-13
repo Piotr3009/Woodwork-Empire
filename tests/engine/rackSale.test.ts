@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { canSell, isSellableFamily, sellMachine } from '../../src/engine/index';
-import { salePriceFor, sheetsStrandedBySale } from '../../src/engine/machines';
+import { salePriceFor, stockStrandedBySale } from '../../src/engine/machines';
 import { STATION_RACK, somebodyAtTheRack, storageSaleBlock } from '../../src/engine/stations';
 import { ownedTile } from '../../src/ui/catalogue';
 import { findSpec } from '../../src/engine/index';
@@ -46,7 +46,7 @@ describe('the rack is a thing the workshop can sell (CLAUDE.md T20 2.10)', () =>
   it('will not go while it holds sheets, and says how many are on it', () => {
     const state = hall(24);
     const rack = theRack(state);
-    expect(sheetsStrandedBySale(state, rack)).toBe(24);
+    expect(stockStrandedBySale(state, rack)).toBe(24);
     expect(storageSaleBlock(state, rack)).toBe('Empty it first, 24 sheets on it');
     // And the engine's own guard says it in the same words, so the Owned tab and `canSell` cannot
     // part company (CLAUDE.md T20 2.10, landed in T20-C1).
@@ -76,7 +76,7 @@ describe('the rack is a thing the workshop can sell (CLAUDE.md T20 2.10)', () =>
     expect(sellMachine(withTwo, first.id).ok).toBe(true);
     // A sold rack stands in the hall until the buyer's van comes in the morning, and it is no room
     // at all: the sheets are the second rack's now, and it stays until they are gone.
-    expect(sheetsStrandedBySale(withTwo, second)).toBe(24);
+    expect(stockStrandedBySale(withTwo, second)).toBe(24);
     expect(storageSaleBlock(withTwo, second)).toBe('Empty it first, 24 sheets on it');
   });
 

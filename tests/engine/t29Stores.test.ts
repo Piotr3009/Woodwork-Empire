@@ -23,13 +23,12 @@ import { canPlace } from '../../src/engine/layout';
 import { boardRoom, boardsHeld, findSpec, isHeavy, sheetsOnCounter } from '../../src/engine/machines';
 import {
   arriveDeliveries,
-  boardsOnStore,
   canUnload,
   drawSheetsFor,
   orderForJob,
-  sheetsOnRack,
   stockLines,
   unloadIntoStock,
+  stockOnItem,
 } from '../../src/engine/materials';
 import { shoppingList } from '../../src/engine/orders';
 import { startTaskCheck } from '../../src/engine/tasks';
@@ -38,7 +37,7 @@ import { renderBoard } from '../../src/ui/board';
 import { renderMaterials } from '../../src/ui/materials';
 import { renderHall } from '../../src/render/hall';
 import type { GameEvent } from '../../src/engine/index';
-import { act, acceptNow, buyNow, buyStartingKit, fillRack, newGame, nextDay, placeEnquiry, placeEquipment, testJoiner } from '../helpers';
+import { act, acceptNow, buyNow, buyStartingKit, fillRack, newGame, nextDay, placeEnquiry, placeEquipment, placeGlassRack, testJoiner } from '../helpers';
 
 /** The day one hall with every machine a window wants, its cutters, sheets on the rack, and the
  *  timber store named, or none. */
@@ -58,6 +57,8 @@ function windowHall(store: 'none' | 'rack' | 'shelter' = 'rack'): GameState {
     ['cuttersDoor', 0, 0],
   ];
   for (const [id, x, y] of kit) placeEquipment(state, id, { variantId: 'standard', x, y, id: `kit-${id}` });
+  // And a glass rack, which a window asks for from Turn 32 (CLAUDE.md T32 2.1).
+  placeGlassRack(state);
   if (store === 'rack') state = buyNow(state, 'timberRack');
   if (store === 'shelter') state = buyNow(state, 'timberShelter');
   state.cash = 1000000;
@@ -217,8 +218,8 @@ describe('a load of boards, whole or not at all (CLAUDE.md T29 2.11.2)', () => {
     const rack = state.equipment.find((item) => item.specId === 'timberRack');
     const sheetRack = state.equipment.find((item) => item.specId === 'sheetRack');
     if (rack === undefined || sheetRack === undefined) throw new Error('both racks are wanted');
-    expect(boardsOnStore(state, rack)).toBe(19);
-    expect(sheetsOnRack(state, sheetRack)).toBe(sheetsBefore);
+    expect(stockOnItem(state, rack)).toBe(19);
+    expect(stockOnItem(state, sheetRack)).toBe(sheetsBefore);
     expect(stockLines(state)[0]?.total).toBe(sheetsBefore);
     const page = renderMaterials(state, '');
     expect(page).toContain('Timber boards');
@@ -336,7 +337,7 @@ describe('a save made before the stores (CLAUDE.md T29 2.11.4)', () => {
     expect(boardsHeld(state)).toBe(19);
     const sheetRack = state.equipment.find((item) => item.specId === 'sheetRack');
     if (sheetRack === undefined) throw new Error('the rack is wanted');
-    expect(sheetsOnRack(state, sheetRack)).toBe(sheetsOnCounter(state));
+    expect(stockOnItem(state, sheetRack)).toBe(sheetsOnCounter(state));
     // The Low stock card and the contract man's mark count sheets only.
     expect(sheetsOnCounter(state)).toBe(state.stock.sheets - 19);
     // Nothing asks it for a store: it draws its boards off the counter to its last one.

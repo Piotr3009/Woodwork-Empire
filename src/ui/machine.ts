@@ -28,7 +28,6 @@ import {
   mediaFigure,
   metresBy,
   orderEquipmentCheck,
-  sheetCapacityOf,
   toolSlotsLine,
   unloadExtraMinutesFor,
   zoneOf,
@@ -77,7 +76,15 @@ import {
   unitCostFactor,
 } from '../engine/constants';
 import type { LineUpgradeSpec } from '../engine/constants';
-import { boardCapacityOf, findVariant, insuranceForClass, isLineModule, lineNumbers } from '../engine/machines';
+import {
+  capacityOf,
+  findVariant,
+  insuranceForClass,
+  isLineModule,
+  lineNumbers,
+  stockKindOf,
+  stockWords,
+} from '../engine/machines';
 import { lineBox } from '../engine/layout';
 import { lineUpgradeCheck, lineWindowEvery } from '../engine/lineContract';
 import { andList, inWords } from '../engine/text';
@@ -253,13 +260,13 @@ function benchLine(spec: EquipmentSpec, variant: EquipmentVariant): Line {
   return line(`${men}, ${per > 0 ? '+' : ''}${per}% pace`, per);
 }
 
-/** What a class of shelving holds: the rack's own effect (CLAUDE.md T7 3.6). */
+/** What a class of shelving holds: the rack's own effect (CLAUDE.md T7 3.6). A timber store holds
+ *  boards and never a sheet (CLAUDE.md T29 2.11.1), and a glass rack glass units (CLAUDE.md T32
+ *  2.1), each said in its kind's words. */
 function holdsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
-  const sheets = sheetCapacityOf({ specId: spec.id, variantId: variant.id });
-  if (sheets > 0) return `Holds ${plural(sheets, 'sheet', 'sheets')}`;
-  // A timber store holds boards and never a sheet (CLAUDE.md T29 2.11.1).
-  const boards = boardCapacityOf({ specId: spec.id, variantId: variant.id });
-  return boards > 0 ? `Holds ${plural(boards, 'board', 'boards')}` : '';
+  const item = { specId: spec.id, variantId: variant.id };
+  const kind = stockKindOf(item);
+  return kind === null ? '' : `Holds ${stockWords(kind, capacityOf(item, kind))}`;
 }
 
 /** A class with an extraction demand can take an automatic gate, which is worth this much output

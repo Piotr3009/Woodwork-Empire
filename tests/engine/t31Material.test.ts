@@ -43,13 +43,13 @@ import { boardRoom, boardsHeld, freeBoardRoom, sheetsOnCounter } from '../../src
 import {
   arriveDeliveries,
   boardsLine,
-  boardsOnStore,
   freeSheets,
   loadWords,
   pendingStockSheets,
   reserveSheetsFor,
   reservedSheets,
   unloadIntoStock,
+  stockOnItem,
 } from '../../src/engine/materials';
 import { shoppingList } from '../../src/engine/orders';
 import { acceptContract, drawContract, reserveContractSheets } from '../../src/engine/contracts';
@@ -195,7 +195,7 @@ describe('the line s boards are held (CLAUDE.md T31 2.1)', () => {
     expect(freeSheets(state)).toBe(free);
     expect(sheetsOnCounter(state)).toBe(counter);
     expect(freeBoardRoom(state)).toBe(room - 40);
-    expect(boardsOnStore(state, { id: 'kit-store' })).toBe(held + 40);
+    expect(stockOnItem(state, { id: 'kit-store' })).toBe(held + 40);
     expect(boardsLine(state).held).toBe(held + 40);
   });
 

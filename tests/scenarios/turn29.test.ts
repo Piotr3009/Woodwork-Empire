@@ -59,7 +59,7 @@ import type { Contract, Delivery, GameEvent, GameState, StagedJob } from '../../
 import { addWorkingDays } from '../../src/engine/clock';
 import { freeJoiners, stagedJob } from '../../src/engine/jobs';
 import { boardsHeld, hallPace, lineLevel, lineModules, sheetsOnCounter } from '../../src/engine/machines';
-import { boardsOnStore, canUnload, sheetsOnRack } from '../../src/engine/materials';
+import { canUnload, stockOnItem } from '../../src/engine/materials';
 import { migrateState } from '../../src/engine/migrate';
 import { chance, pick } from '../../src/engine/rng';
 import { hiringOptions } from '../../src/engine/staff';
@@ -549,8 +549,8 @@ describe('(aaa) boards and the timber stores, played with a labourer on duty (CL
     const rack = inside.equipment.find((item) => item.specId === 'timberRack');
     const sheetRack = inside.equipment.find((item) => item.specId === 'sheetRack');
     if (rack === undefined || sheetRack === undefined) throw new Error('both racks stand');
-    expect(boardsOnStore(inside, rack)).toBe(boardsHeld(inside));
-    expect(sheetsOnRack(inside, sheetRack)).toBe(20);
+    expect(stockOnItem(inside, rack)).toBe(boardsHeld(inside));
+    expect(stockOnItem(inside, sheetRack)).toBe(20);
     expect(warnings(inside).some((entry) => entry.key === 'boardsAtTheGate')).toBe(false);
   });
 

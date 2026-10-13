@@ -50,7 +50,7 @@ import { portFor } from '../../src/engine/ports';
 import { familyForStage, stageFamilyIn, stagePlanFor, stageSpeed } from '../../src/engine/stages';
 import { STATION_TABLE } from '../../src/engine/stations';
 import { catalogueTabFrom, renderCatalogue } from '../../src/ui/catalogue';
-import { act, buyStartingKit, newGame, nextDay, placeEquipment, withAir } from '../helpers';
+import { act, buyStartingKit, newGame, nextDay, placeEquipment, placeGlassRack, withAir } from '../helpers';
 
 const CLASSES = ['standard', 'pro', 'industrial'] as const;
 
@@ -82,6 +82,8 @@ function bigUnit(without: string[] = []): GameState {
     if (without.includes(id)) continue;
     placeEquipment(state, id, { variantId: 'standard', x, y, id: `kit-${id}` });
   }
+  // And a glass rack, which a window asks for from Turn 32 (CLAUDE.md T32 2.1).
+  if (!without.includes('glassRack')) placeGlassRack(state);
   return state;
 }
 

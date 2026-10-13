@@ -15,3 +15,9 @@ clean, 3,013 tests in 312 files green. Nothing moved, so no commit.
 markup from engine states of a snapshot of the A1 commit beside the same screen today, shot in
 headless Chromium, with a README and the lead's readings (`decisions.md`); built and reviewed by
 sub-agents, the review's findings put right before the commit.
+
+**T32-B1 The glass racks.** `glassRack` (40 units, £1,500, 2 x 1 x 2 m) and `glassRackLarge` (200,
+£6,000, 4 x 2 x 2.5 m), a family each in the storage tab, drawn by `objectArt`'s last branch with
+their name and plate, never serviced, sold by the racks' one rule; a window or a door wants one.
+One function each for a kind's capacity, room, spread over its racks and stranding at a sale
+(`capacityOf`, `roomFor`, `stockOnItem`, `stockStrandedBySale`); 3,020 tests in 313 files green.

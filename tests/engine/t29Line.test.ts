@@ -76,6 +76,7 @@ import {
   placeEquipment,
   testJoiner,
   withAir,
+  placeGlassRack,
 } from '../helpers';
 import { lineState } from '../../src/engine/lineContract';
 
@@ -110,6 +111,8 @@ function bigUnit(without: string[] = []): GameState {
     if (without.includes(id)) continue;
     placeEquipment(state, id, { variantId: 'standard', x, y, id: `kit-${id}` });
   }
+  // And a glass rack, which a window asks for from Turn 32 (CLAUDE.md T32 2.1).
+  if (!without.includes('glassRack')) placeGlassRack(state);
   return state;
 }
 

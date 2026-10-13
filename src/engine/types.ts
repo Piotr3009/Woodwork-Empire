@@ -43,6 +43,12 @@ export interface ClosureSpan {
 
 export type Finish = 'laminate' | 'lacquer' | 'veneer';
 
+/** The three materials the stores keep, each on a counter of its own and on kit of its own: the
+ *  sheets on the sheet racks, the boards on the timber stores and the glass units on the glass
+ *  racks. One function serves all three wherever they are bought and kept the same way (PIOTR,
+ *  13.10: "identically to the sheets"; CLAUDE.md T32 2.2) [TUNE: the names]. */
+export type StockKind = 'sheets' | 'boards' | 'glass';
+
 /** The stages a job goes through in the hall (CLAUDE.md T7 3.1): from v55 one stage a machine,
  *  Cutting on the saw, Edging on the edgebander, Moulding on the spindle moulder and Assembly at
  *  the bench, a quarter each, and Finishing in the booth for a lacquered job [PIOTR, 24.09: "every
@@ -236,6 +242,9 @@ export interface EquipmentVariant {
   /** Boards this class of timber store holds. Left out means the family's own (CLAUDE.md T29
    *  2.11.1). */
   boardCapacity?: number;
+  /** Glass units this class of glass rack holds. Left out means the family's own (CLAUDE.md T32
+   *  2.1). */
+  glassCapacity?: number;
   /** What must be owned before this class can be bought. Left out means the family's own: a
    *  floor edgebander wants extraction where a hand one wants a cabinet (CLAUDE.md T7 3.6). */
   requires?: string[];
@@ -294,6 +303,9 @@ export interface EquipmentSpec {
   /** Boards a timber store holds. Left out for everything that is not one: a store is never given
    *  a `sheetCapacity`, which would make it a sheet rack everywhere (CLAUDE.md T29 2.11.1). */
   boardCapacity?: number;
+  /** Glass units a glass rack holds, upright on the hall floor. Left out for everything that is not
+   *  one (CLAUDE.md T32 2.1). */
+  glassCapacity?: number;
   /** Reputation needed to buy. */
   minReputation: number;
   /** Parked for a later stage: shown with a price, buy button disabled. */

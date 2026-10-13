@@ -30,7 +30,7 @@ import { addWorkingDays, closureOf, isWeekday, monthOfDay } from '../../src/engi
 import { warnings } from '../../src/engine/warnings';
 import { applyAction } from '../../src/engine/index';
 import type { GameEvent, GameState, Job, LedgerEntry } from '../../src/engine/index';
-import { act, buyStartingKit, eventsOfKind, newGame, nextDay, placeEnquiry, placeEquipment, testJoiner } from '../helpers';
+import { act, buyStartingKit, eventsOfKind, newGame, nextDay, placeEnquiry, placeEquipment, placeGlassRack, testJoiner } from '../helpers';
 import { CAREFUL, playDay, type Policy } from './autopilot';
 
 // ---------------------------------------------------------------------------------------------
@@ -64,6 +64,8 @@ function windowCompany(): GameState {
   kit.forEach(([id, x, y], index) => {
     placeEquipment(state, id, { variantId: 'standard', x, y, id: `kit-t28-${index}` });
   });
+  // And a glass rack, which a window asks for from Turn 32 (CLAUDE.md T32 2.1).
+  placeGlassRack(state);
   state.workers.push(testJoiner('w-tom', 'Tom', 16, 12), testJoiner('w-ben', 'Ben', 16, 15));
   state.enquiries = [];
   placeEnquiry(state, {

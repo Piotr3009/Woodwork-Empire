@@ -1386,6 +1386,9 @@ export const TIMBER_STAND_INS: Record<string, readonly string[]> = {
   // 2.11.3).
   timberRack: ['timberShelter'],
   timberShelter: ['timberRack'],
+  // And a glass rack, either family (CLAUDE.md T32 2.1) [TUNE: chat].
+  glassRack: ['glassRackLarge'],
+  glassRackLarge: ['glassRack'],
 };
 
 /** The two timber stores. Boards are kept on a timber store and never on a sheet rack (CLAUDE.md
@@ -1393,6 +1396,12 @@ export const TIMBER_STAND_INS: Record<string, readonly string[]> = {
 export const TIMBER_STORES: readonly string[] = ['timberRack', 'timberShelter'];
 /** The one store the board's wanted list names, written `timber store` (CLAUDE.md T29 2.11.3). */
 export const TIMBER_STORE_WANTED = 'timberRack';
+/** The two glass racks: a window's glass units are kept upright on one and never on a sheet rack or
+ *  a timber store (CLAUDE.md T32 2.1). */
+export const GLASS_RACKS: readonly string[] = ['glassRack', 'glassRackLarge'];
+/** The one glass rack the board's wanted list names, written `glass rack`, after the timber store
+ *  (CLAUDE.md T32 2.1) [TUNE: chat]. */
+export const GLASS_RACK_WANTED = 'glassRack';
 
 /** The stages after which a timber job stands a night, and what it stands for: the glue cures
  *  after the pressing and the lacquer dries after the finishing [PIOTR: "a bit more complicated";
@@ -1748,6 +1757,9 @@ export const MACHINE_ENDURANCE_HOURS: Record<string, number> = {
   // The timber stores book no hours either (CLAUDE.md T29 2.11.1).
   timberRack: 100000,
   timberShelter: 100000,
+  // Nor do the glass racks (CLAUDE.md T32 2.1).
+  glassRack: 100000,
+  glassRackLarge: 100000,
 };
 
 /** The five classes every ladder in this game has, in order: class 5 is always the industrial one
@@ -2264,6 +2276,48 @@ export const TIMBER_SHELTER_VARIANTS: EquipmentVariant[] = [
     description:
       'A lean to roof over racks of boards, open at the front, standing outside behind the hall so ' +
       'it takes no floor of the hall.',
+  },
+];
+
+/** The glass rack's one class: the glass units of 40 windows upright on the hall floor [PIOTR,
+ *  13.10: 40 at £1,500] (CLAUDE.md T32 2.1). Its metres are chat's [TUNE: chat], its zone and its
+ *  pound a day the timber rack's way [TUNE], and its sentence the session's [TUNE wording]. */
+export const GLASS_RACK_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Glass rack',
+    price: 1500,
+    width: 2,
+    depth: 1,
+    height: 2,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    glassCapacity: 40,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A steel A frame holding the sealed units upright on rubber, two metres of it on the hall floor.',
+  },
+];
+
+/** The large glass rack's one class: 200 glass units [PIOTR, 13.10: 200 at £6,000] (CLAUDE.md T32
+ *  2.1), on chat's metres [TUNE: chat], the zone its footprint and a metre in front and its pound a
+ *  day the timber rack's way [TUNE]. Its sentence is the session's [TUNE wording]. */
+export const GLASS_RACK_LARGE_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Large glass rack',
+    price: 6000,
+    width: 4,
+    depth: 2,
+    height: 2.5,
+    zoneWidth: 4,
+    zoneDepth: 3,
+    glassCapacity: 200,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A slotted steel rack holding the sealed units upright in rows, four metres of it on the hall floor.',
   },
 ];
 
@@ -3643,6 +3697,9 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   // The two timber stores, one class each (CLAUDE.md T29 2.11.1).
   timberRack: TIMBER_RACK_VARIANTS,
   timberShelter: TIMBER_SHELTER_VARIANTS,
+  // The two glass racks, one class each, in the timber stores' shape (CLAUDE.md T32 2.1).
+  glassRack: GLASS_RACK_VARIANTS,
+  glassRackLarge: GLASS_RACK_LARGE_VARIANTS,
   edgebander: EDGEBANDER_VARIANTS,
   extractor: EXTRACTOR_VARIANTS,
   compressor: COMPRESSOR_VARIANTS,
@@ -4026,6 +4083,50 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'timberShelter',
     boardCapacity: 400,
     effect: 'Holds ten times a rack\u0027s boards outside behind the hall, and takes no floor of the hall.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'glassRack',
+    // Off the shelf, as the timber rack is [TUNE] (CLAUDE.md T32 2.1).
+    deliveryDays: 3,
+    folder: 'Glass racks',
+    tab: 'storage',
+    name: 'Glass rack',
+    price: 1500,
+    category: 'storage',
+    width: 2,
+    depth: 1,
+    height: 2,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    // No picture tonight: the hall draws it as it draws any kit whose picture has not landed
+    // (CLAUDE.md T32 2.1; docs/art/REQUESTS-T32.md G1).
+    spriteKey: 'glassRack',
+    glassCapacity: 40,
+    // [TUNE wording] (CLAUDE.md T32 2.1).
+    effect: 'Holds the glass units of the windows and doors on the hall floor, upright in their frames.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'glassRackLarge',
+    // Made to order [TUNE] (CLAUDE.md T32 2.1).
+    deliveryDays: 5,
+    // Each family its own folder, named for it in the plural, as the two timber stores are [TUNE:
+    // the name].
+    folder: 'Large glass racks',
+    tab: 'storage',
+    name: 'Large glass rack',
+    price: 6000,
+    category: 'storage',
+    width: 4,
+    depth: 2,
+    height: 2.5,
+    zoneWidth: 4,
+    zoneDepth: 3,
+    spriteKey: 'glassRackLarge',
+    glassCapacity: 200,
+    // [TUNE wording] (CLAUDE.md T32 2.1).
+    effect: 'Holds five times a glass rack\u0027s units on twice its floor.',
   },
 
   {
