@@ -183,8 +183,8 @@ the code:
 ## 6. Questions for Piotr
 
 1. **The second lorry** (5, found and left 1): should the owner take the next unloading by himself
-   when he finishes the first, as the queue does? It is one line, and it moves the sheet playthrough
-   by a day.
+   when he finishes the first, as the queue does? It is one line, and it moves the pinned sheet
+   playthrough's days and its cash.
 2. **Section 10's eleven choices**, as built in section 4 above: each is chat's, and none is yours yet.
 3. **The office's first restock** for a line on a big hall fills the shelter's 400 boards at once
    (£60,000, at the ladder's £150 a board): is that the office you want, or should it buy two days of
