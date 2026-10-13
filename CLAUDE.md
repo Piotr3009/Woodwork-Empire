@@ -1,645 +1,522 @@
-# Turn 31: the line's timber and glass, its books, the forklift's lane and its forklift, the hall that grows, the shelter behind the wall, and contracts that can be lost
+# Turn 32: one store for every material: sheets, boards and glass bought and kept the same way, the glass racks, and the line fed from the stores
 
 Woodwork Empire. Autonomous session brief for Claude Code (cloud, one writer, serial, effort
-high). Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), written 11.10.2026 from
-Piotr's words of that afternoon, against main at v90, and checked against v90 by a second reader
-before it was sent; brought to v91 that evening (v91 changes only how the line's sheets are
-played), and given the art side's L3 that evening: the line's forklift and its pallet (2.10).
+high). Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), written 13.10.2026 from
+Piotr's words of 12.10 evening and 13.10 morning, against main at v95 (commit `7735455`).
 
-Read this whole file (first line must say "Turn 31"; if the root CLAUDE.md does not, stop and
-report), then REPORT-T30.md section 0, then docs/notes-t30.md, then docs/ui-style.md, then
-docs/art/SPRITES.md sections 9.7, 9.8, 10, 13 and 15, then docs/art/REQUESTS-T30.md sections 1
-and 2 (what L3 was asked to be), then the archived briefs in docs/
-(docs/turn-30-brief.md is the last, and this ZIP put it there). Where files disagree, this one
-wins. All standing rules apply (no em or en dashes anywhere, scope 1:1, one code path, constants
-never in the UI, [TUNE] for every figure you choose and [PIOTR] for his, kill background
-processes, PR without merge, end the session, no PR watching, npm run check gated on its own exit
-code, every click single, one APP_VERSION bump, delete the old track and never write a parallel
-one, flip a test and never keep it beside a new one, the Skylon Development Ltd header on every
-new code file). The rule relaxed in Turn 26 stays relaxed [PIOTR, 01.10]: a scenario figure that
-moves is restated with ONE line of reason; a test that pins an exact pound of a played month may be
-loosened to a range when the exact figure says nothing about the rule under test, and the comment
-says so.
+Read this whole file (first line must say "Turn 32"; if the root CLAUDE.md does not, stop and
+report), then REPORT-T31.md section 0, then docs/notes-t31.md, docs/notes-v93.md, docs/notes-v94.md
+and docs/notes-v95.md, then docs/ui-style.md, then docs/art/SPRITES.md sections 1 to 3 and 13, then
+the archived briefs in docs/ (docs/turn-31-brief.md is the last, and this ZIP put it there). Where
+files disagree, this one wins. All standing rules apply (no em or en dashes anywhere, scope 1:1, one
+code path, constants never in the UI, [TUNE] for every figure you choose and [PIOTR] for his, kill
+background processes, PR without merge, end the session, no PR watching, npm run check gated on its
+own exit code, every click single, one APP_VERSION bump, delete the old track and never write a
+parallel one, flip a test and never keep it beside a new one, the Skylon Development Ltd header on
+every new code file). The rule relaxed in Turn 26 stays relaxed [PIOTR, 01.10]: a scenario figure
+that moves is restated with ONE line of reason; a test that pins an exact pound of a played month
+may be loosened to a range when the exact figure says nothing about the rule under test, and the
+comment says so.
 
-Before a line is written: clone, read what is there, and build with it. Every screen, card, tile,
-tab, row and strip line this turn needs already has its kind in the repo (the Contracts tab's
-running and ended blocks and their buttons, the Accounting page's tabs and the Summary tab's four
-columns, the Premises page's extension cards, the event card, the warning strip, the Materials
-page's rows, the gate lane's rule that nothing stands on it, the figures' sheets and the walkers
-that move them, the finished goods drawn at the gate with their label). Nothing here asks for a second
-version of any of them, and none is to be written [PIOTR, 18.09: one game, one look].
+Before a line is written: clone, read what is there, and build with it. Every screen, card, row,
+button and strip line this turn needs already has its kind in the repo: the Materials page's head
+row with its field, its ladder line, its storage line and its Restock button, and its stock lines;
+the job card's material line; the line's running block and its count rows; the timber stores'
+specs, catalogue cards, stations and plates; the lorry's card; the paid store and its fetch chore.
+Nothing here asks for a second version of any of them, and none is to be written [PIOTR, 18.09: one
+game, one look].
 
-Precondition. main carries v91: APP_VERSION 'v91', STATE_VERSION 43. This ZIP carries v91's seven
-files as well (the line's motion at the speed it was drawn, one loop a game hour a module), so main
-has it once the ZIP is pushed. If APP_VERSION is not 'v91', stop and report. Turn 30 ended green
-(2,847 tests in 297 files); v90 and v91 were each checked with the type check, the lint and the
-tests they touched. Task A0 runs the whole suite on v91 before anything is touched. This ZIP also
-brings the art side's L3: three pictures in `docs/pictures-l3/` and the rest of its pack in
-`docs/art/pack-l3-1110/` (2.10).
+Precondition. main carries v95: APP_VERSION 'v95', STATE_VERSION 47. If either is not so, stop and
+report. Turn 31 ended green (2,965 tests in 307 files). v93, v94 and v95 were built in chat after it
+and checked with the type check, the lint and the tests they touched only: task A0 runs the whole
+suite on v95 before anything is touched.
 
-The four rules of 18.09 bind every agent: one game, one look; nothing visual without a mockup;
-no sound without a recorded file; every modal, popover and list has the cross, Escape and click
+The four rules of 18.09 bind every agent: one game, one look; nothing visual without a mockup; no
+sound without a recorded file; every modal, popover and list has the cross, Escape and click
 outside (the event card with two choices is the game's standing exception). The mockups this turn
-needs are in section 9, into docs/mockups/t31/ before the code that makes them true. Piotr asked
-for this turn in one go tonight and has not seen those mockups: they are built only of what the
-game already draws, and the report shows each beside its nearest existing screen.
+needs are in section 9, into docs/mockups/t32/ before the code that makes them true. Piotr asked
+for this turn in one go and has not seen those mockups: they are built only of what the game
+already draws, and the report shows each beside its nearest existing screen.
 
-**What chat decided for Piotr and he has not yet confirmed** is marked [TUNE: chat] throughout
-and gathered in section 10. His own words are [PIOTR].
+**What chat decided for Piotr and he has not yet confirmed** is marked [TUNE: chat] throughout and
+gathered in section 10. His own words are [PIOTR].
 
-## 0. What this turn is for (PIOTR, 11.10, the afternoon)
+## 0. What this turn is for (PIOTR, 12.10 evening and 13.10 morning)
 
-Piotr played Turn 30 ("the look is super") and said:
+Piotr played v95 and said: "in this game there is no storage for glass at all, and ordering the
+timber for the windows and the glass should work identically to the sheets. I do not understand
+why you keep it in another place and why it is a different system of ordering. As much storage as
+we have, that much material there should be, like the sheets."
 
-**The line's material.** "There is no order timber and no order glass." Asked whether he meant
-the books, he said: "the material is not about the bookkeeping, it is about storage and ordering,
-so that it does not run out." He then said yes to chat's proposal: two boards and one glass a
-window, £600 as now; boards on the timber stores, glass at module 6 for up to 40 windows; Order
-timber and Order glass for 20 windows at a time, in on the next working day; the office admin
-orders by himself when two days are left; a line short of material stands.
+Chat checked the code of v95 and found three systems where there should be one:
 
-**The line's books.** "Show the finances please: in a tab in the finances, the production line's
-account: the turnover, the materials, the engineers, the efficiency, the net profit, by the day and
-by the year."
+1. **Sheets**: stand on the sheet racks; bought ahead for stock with Restock up to the racks' room
+   or past it; a job holds what it needs from the free stock and its shortfall is ordered for it,
+   by the owner's button or by the office admin; what does not fit on the racks goes to the paid
+   store for the night and is fetched in the morning.
+2. **Boards**: never stock. Ordered only for one timber job (or by a line's own button), on the
+   same counter as the sheets (`state.stock.sheets`) although they lie on the timber stores; a load
+   comes in whole or waits at the gate; a job is refused on the board when the stores could not
+   hold its boards even empty.
+3. **Glass**: no place in the hall at all. Ordered for one job from the glazier, who carries it to
+   the benches the next working day; a line's glass stands at its module 6, for 40 windows at most,
+   ordered by the line's own button.
 
-**The forklift's lane.** "Then a road will be needed: two yellow lines from the end of the
-production line to the door, for the forklift that will drive with the pallet." Yes to chat's
-route along the front wall and up the left wall to the gate, two metres wide, nothing standing on
-it, "and the forklift driving". That evening the art side delivered the forklift and the pallet
-standing alone (L3); Piotr approved them ("akceptacja jest") and asked: "won't we add it to this
-turn?" (2.10).
+Chat proposed one system, the sheets' system, for all three materials, and Piotr answered (13.10):
 
-**The hall.** "Add the expansion of the space in the factory: adding 200 m² at a time, each time
-20 per cent dearer than the present price for 200, and of course everything goes up
-automatically." From 600,000 [PIOTR: "from 600"], "as many as the player wants", and "yes, more
-people".
+- A glass rack for 40 glass units at £1,500 and a large one for 200 at £6,000, and until the art
+  side draws them the game draws them as it draws any kit with no picture: **"yes"**.
+- What a glass unit is and costs: **"no, the prices and the quantity of glass are already set by
+  the existing code for the production line"**. So nothing new is invented: a glass unit is the
+  glass of one window, at what the line's code makes it, £200 (`lineGlassPerWindowCost`: the
+  line's £600 of a window less its two boards at `SHEET_VALUE`), and a window takes one
+  (`LINE_GLASS_PER_WINDOW`). How many units a timber job takes is derived from those and from the
+  glass share the job's material already has (2.4) [TUNE: chat].
+- Boards and glass that do not fit go to the paid store, as sheets do: **"yes"**.
+- Glass comes by lorry and is unloaded, as sheets are: **"yes"**.
+- The line loses its two order buttons and the 40 windows' glass at module 6, and takes its boards
+  and glass from the stores as a standing contract takes its sheets: **"yes"**.
+- As a turn for Claude Code: **"yes, give the ZIP"**.
 
-**The timber shelter.** "The outside storage for timber somewhere else, because it hides our hall:
-rather where the extractors are, or behind them. Nothing in the hall may be hidden."
-
-**The sheet store.** "An outside store for sheets too, but dear: 1,000 sheets, about 100k." The
-art side has been asked for it; it is not here tonight (section 8).
-
-**The contracts.** "The profit from contracts should fall from time to time: we earn too much
-money after a while. Something has to happen, like we lost a contract once in a while and there is
-no new one for two or three weeks, or something else; think. I mean the contracts on sheets." Yes
-to chat's three: a client leaves now and then, two or three quiet weeks after, and a renewal that
-asks for less.
-
-What this turn is not: any change to a normal job, a sheet job's plan, a wage, the tax, the loan,
-the bank, the timber contracts of Turn 29, the line's contract's price, minutes, pallet and offer,
-or the frame loop; no picture drawn by an agent (the hall's longer background is made of the 800 m²
-picture by a script, as 9.7 and 9.8 were); not the sheet store.
+What this turn is not: any change to a sheet job's material, a sheet contract's material, the
+sheets' price ladder, the paid store's fee, a timber job's stages, nights or deadline, the line's
+contract's price, minutes, pallet, offer, books or forklift, the timber contracts of Turn 29 (the
+client's own timber and glass), the solid wood of a sheet product (the oak table's timber is still
+ordered for its job and lies on the sheet racks, as today), any machine, any wage, the tax, the
+loan, the bank, the hall's extensions; no picture drawn by an agent.
 
 ## 1. Rules restated (short)
 
-Everything from Turns 1 to 30 and the chat fixes to v91. Tonight in addition:
+Everything from Turns 1 to 31 and the chat fixes to v95. Tonight in addition:
 
-- APP_VERSION = 'v92'. STATE_VERSION 44, once (section 4); every save that loads today loads.
+- APP_VERSION = 'v96'. STATE_VERSION 48, once (section 4); every save that loads today loads.
+- **One store, three materials.** Whatever the sheets do, the boards and the glass do, through the
+  same functions taking the material as an argument, never through a copy of them. Where a rule of
+  Turns 28, 29 or 31 made the boards or the glass behave otherwise, it goes, and 2.8 lists each.
 - **A job takes as many men as the boss puts on it.** Nothing of `addToJob`, `assignJob` or
   `canBuild` is touched.
-- **The sheet department's jobs are not touched**; its standing contracts are, by 2.9 only.
-- **The art side's pictures go in as they are.** No agent draws, repaints, trims or scales a
-  picture. The shelter's two files change places (2.8), the hall's longer background is cut from
-  the 800 m² picture by a script and painted by nobody (2.7), and L3's three pictures go in under
-  their own names (2.10).
+- **The sheet department is not touched**: what a sheet job or a sheet contract holds, draws,
+  orders and pays is what it was, to the pound, in every pinned scenario.
+- **No agent draws.** The two glass racks have no picture tonight, and the game draws them as it
+  draws any kit whose picture has not landed (2.1).
 
 ## 2. Changes to the design (the contract)
 
-### 2.0 What v90 and v91 left (for A0's reasons)
-
-- The full suite was last run green at the end of Turn 30. v90 and v91 changed only how the line's
-  sheets are played, and their tests: from v91 each module plays one loop of its sheet, at the 6
-  frames a second it was drawn at, each time the game's clock reaches its minute of the hour
-  (`everyMinutes` and `atMinute` in `MACHINE_WORK_SHEETS`, read by `playSheets`), and stands on its
-  picture between two loops [PIOTR, 11.10: "at the speed it was drawn, but started now and then and
-  not all the time"].
-- `tests/ui/app.test.ts` plays the game in real time: no sub-agent runs `npm test`, `npm run build`
-  or `npm run check` while the lead's check is running.
-- The line exists only in the 800 m² unit; its contract is `state.windowLine.contract`
-  (`src/engine/lineContract.ts`), and each window made books £1,500 in and £600 of material out
-  (`makeWindow`). That booking of the material is what 2.1 replaces.
-
 ### A. The suite
 
-**2.0.1 A0.** Run `npm run check` on main as it stands. A failing test is handled as Turn 27's A0
-handled it: a moved figure re-pinned with one line of reason, a real fault fixed if the fix is
-plain and otherwise left red, that thread put first in section 0 of the report. One commit, or
-none.
+**2.0 A0.** Run `npm run check` on main as it stands. A failing test is handled as Turn 27's A0
+handled it: a moved figure re-pinned with one line of reason, a real fault fixed if the fix is plain
+and otherwise left red, that thread put first in section 0 of the report. One commit, or none.
 
-### B. The line's material and its books
+### B. The store
 
-**2.1 What a window takes [PIOTR: "yes" to chat's proposal].** A window takes
-`LINE_BOARDS_PER_WINDOW` 2 boards and `LINE_GLASS_PER_WINDOW` 1 glass. The £600 of a window
-(`lineMaterialPerWindow`, unchanged) is split: the boards at `SHEET_VALUE` each (2 x 200 = 400),
-and the glass the rest (200), both written from those constants and never as figures of their own
-[TUNE: chat: the split].
+**2.1 The glass racks [PIOTR: "yes"].** Two families, in the timber stores' shape (two specs of one
+class each, as `timberRack` and `timberShelter` are), in the catalogue's `storage` tab, a folder of
+their own, `Glass racks`:
 
-- **The boards** are the line's own, as a timber job's boards are the job's: a field
-  `state.windowLine.boards`, the boards the line holds on the timber stores. They are on the one
-  counter (`state.stock.sheets`) like every board, and held: `boardsHeld` adds them to what the
-  timber jobs hold, and `reservedSheets` adds them too, so `sheetsOnCounter`, `freeSheets`,
-  `freeBoardRoom`, the stores' plates (`boardsOnStore`) and the Materials page's boards row all
-  count them, and no sheet job can ever take one. One place each; nothing else counts them.
-- **The glass** stands at module 6 and on no store: a field `state.windowLine.glass`, the windows'
-  glass there, at most `LINE_GLASS_WINDOWS_MAX` 40 [PIOTR: "yes"], with what is on its way kept
-  beside it (`glassOnTheWay`: a list of `{ windows, day }`).
-- **When it is used.** The window in hand moves on only while the line has a window's boards and
-  glass: `lineMakesWindows` asks it, beside the engineers and the move, and a minute with too little
-  is a minute the line stands. The boards and the glass come off when the window is made (2 off
-  `windowLine.boards` and off the counter, 1 off `windowLine.glass`), in `makeWindow`, which no
-  longer books the £600: the material was paid at its order (2.2).
-- **When the contract ends** the material stays the line's, for the next contract, and nothing is
-  ordered for it. **When the line is sold**, its boards come off the counter and its glass goes,
-  written off on the material line (`Material written off: the line's timber and glass`, as a
-  dropped job's are), and a line load or line glass still on its way is called off and its price
-  given back, so no board is held for ever by a line that is gone [TUNE: chat].
+| Spec | Name | Holds | Price | Footprint w x d x h | Zone | Delivery |
+|---|---|---|---|---|---|---|
+| `glassRack` | Glass rack | 40 glass units | £1,500 [PIOTR] | 2 x 1 x 2 m [TUNE: chat] | 2 x 2 [TUNE] | 3 working days [TUNE] |
+| `glassRackLarge` | Large glass rack | 200 glass units | £6,000 [PIOTR] | 4 x 2 x 2.5 m [TUNE: chat] | 4 x 3 [TUNE] | 5 working days [TUNE] |
 
-**2.2 Ordering it [PIOTR: "storage and ordering, so that it does not run out"].** Two buttons on
-the line's running block of the Orders board's Contracts tab. That block has only `End it` today,
-in its head row: the two go in a row of buttons under its rows, as the ended block has one
-[TUNE].
+- Both stand on the hall floor, in any hall [TUNE: chat]; neither is rear or yard kit. A new field
+  `glassCapacity` on the spec and the class, read through `glassCapacityOf` beside
+  `sheetCapacityOf` and `boardCapacityOf`; nought for everything else.
+- Everything the timber stores have, the glass racks have, through the same tables: an entry in the
+  table of hours (100,000, they book none), `STATION_TABLE` (`freeSide`, as every rack), the plate
+  and the name's count on the hall (`rackCount`, `glassOnRack(state, item)`: the glass spread over
+  the racks in the order they were bought, as `boardsOnStore` spreads the boards), the sale's
+  stranding rule (`glassStrandedBySale`, the boards' rule), and never serviced (category
+  `storage`). Effect texts in the timber stores' tone [TUNE]: `Holds the glass units of the windows
+  and doors on the hall floor, upright in their frames.` and `Holds five times a glass rack's units
+  on twice its floor.`
+- **The board asks for one.** A window or a door wants a glass rack as it wants a timber store, last
+  of its list: `wantedKit` adds `GLASS_RACK_WANTED` (`glassRack`) after `TIMBER_STORE_WANTED`,
+  `wantedName` names it `glass rack`, and either family satisfies it (`TIMBER_STAND_INS` gains
+  `glassRack: ['glassRackLarge']` and `glassRackLarge: ['glassRack']`) [TUNE: chat].
+- **No picture.** `spriteKey` `glassRack` and `glassRackLarge`, and no file: the hall draws each as
+  `objectArt` draws kit with no picture (its last branch: the flat box in the kit's colours, with
+  its name), and the catalogue's card shows the empty picture slot the cutter sets showed. No entry
+  in `PLACEHOLDER_SPRITES`, no file in `public/sprites/`, nothing drawn. The art side is asked for
+  them in E1 (2.9).
 
-- `Order timber: 40 boards, £8,000`: `LINE_ORDER_WINDOWS` 20 windows' boards (40), at
-  `SHEET_VALUE` each, paid at the click on the material line (`Timber for the line: 40 boards`),
-  refused past the overdraft floor (`canAfford`) as every order the player places. One lorry, in at
-  the open of the next working day (`deliveryDay`, standard), a load of boards (`boards: true`) for
-  the line (`line: true`, a new optional mark; `jobId` null), unloaded as a timber job's boards are
-  unloaded: whole, onto the timber stores, by the unloading task as it is handed out today, or left
-  at the gate until there is room (Turn 29 2.11.2), with the card and `boardsAtTheGate` saying so,
-  naming the line where they name a job (`Boards at the gate, no room on the stores: the line's
-  timber`). Once unloaded the load is on the counter and the line's: `unloadIntoStock` gets a
-  branch for it beside the timber job's, which adds the load to `windowLine.boards`. A line load is
-  never stock: `pendingStockSheets` and every other reader of deliveries with no job pass over it,
-  and its words are its own (`Timber for the line: 40 boards`, on the task, the pallet, the Orders
-  list). It can be called off on the Orders list until its lorry comes, as any material order.
-- `Order glass: 20 windows, £4,000`: 20 windows' glass, paid at the click on the material line
-  (`Glass for the line: 20 windows`), in at the open of the next working day
-  (`GLASS_DELIVERY_WORKING_DAYS`, beside `arriveGlass`), carried to module 6 by the glazier as a
-  job's glass is carried to the benches: no lorry, no unloading, no store.
-- Each button is locked with its reason under it, as the board's and the catalogue's are:
-  `Not enough cash`; for the timber, `No timber store` with none, and `The timber stores hold fewer
-  than 40 boards` while the stores that stand hold fewer than a batch between them (`boardRoom`);
-  for the glass, `Module 6 holds glass for 40 windows` while the glass there and on its way and the
-  batch would be more than 40 (so a line with none takes two batches and is refused the third).
-- Neither is offered without the line's contract running [TUNE: chat]: the material is the
-  contract's.
+**2.2 Three counters [PIOTR: "as much storage as we have, that much material, like the
+sheets"].** `StockState` becomes:
 
-**2.3 The office orders it [PIOTR: "yes": the office admin orders by himself when two days are
-left].** While the line's contract runs, at the open of every working day and after every window
-made, the office admin on duty (`firstOnDutyOf(state, MATERIAL_ORDER_ROLES)`, as for a job's
-material) orders a batch of timber when the line's boards and those on their way are fewer than two
-working days of windows' boards (`LINE_REORDER_DAYS` 2: two days of windows at the minutes a window
-takes today, `MINUTES_PER_WORKING_DAY / lineWindowMinutes`, so 8 windows and 16 boards at 120
-minutes, 16 and 32 at 60), and a batch of glass on the same rule; through the same order functions
-as the buttons, with his name in the ledger line (`Timber for the line: 40 boards, ordered by
-Anna`). He orders only what the buttons allow at that minute, and one condition more of his own
-for the timber [TUNE: chat]: the stores' free room, less every load of boards already on its way,
-takes the whole batch, so that what he orders never waits at the gate. Otherwise he waits, as he
-does for a job. With no admin on duty nothing happens here and the strip says why (2.4).
+```ts
+export interface StockState {
+  sheets: number;
+  boards: number;
+  glass: number;
+  tempStorageSheets: number;
+  tempStorageBoards: number;
+  tempStorageGlass: number;
+}
+```
 
-**2.4 What the player reads.**
+and a new type `StockKind = 'sheets' | 'boards' | 'glass'` names the three wherever one function
+serves all three [TUNE: the names]. `MaterialKind` (a template's material, `sheet` or `solidWood`)
+is not touched.
 
-- **The offer card and the running block** keep their words but the material's: the card's
-  sentence `The timber and the glass for each one are bought as it is made, £600 a window.` becomes
-  `The timber and the glass cost £600 a window, ordered ahead: on the Contracts tab, or by the
-  office.`, and the block's row `£1,500 a window; the timber and the glass £600 a window` becomes
-  `£1,500 a window; the timber and the glass £600 a window, ordered ahead`.
-- **The running block** (Contracts tab), under its rows of Turn 30: `Timber on the stores: 24
-  boards, for 12 windows`, with `, 40 more on the way` while a load is coming; `Glass at module 6:
-  for 8 windows`, with `, 20 more on the way`; then the row of the two buttons. While the line
-  stands for want of either, its `Standing still` row reads `Standing still: no timber`, `no glass`
-  or `no timber or glass`.
-- **The strip**: `lineNeedsMaterial`, directly under `lineNeedsEngineer` in `WARNING_ORDER`
-  [TUNE]: `The line stands: no timber for its next window`, `no glass`, or `no timber or glass`.
-  Said only while the contract runs, two engineers are on duty and the material is what stops it.
-- **The Materials page**: the boards' row counts the line's boards as held (it reads `boardsHeld`);
-  one row more in the rows it has, `Glass at the line`, its windows and the 40 it holds, shown
-  only while the line stands.
-- **The ledger**: the two orders on the material line at their click; no per window material line
-  any more; the windows' £1,500 on the contract line as today.
+- **Where each lies**: the sheets on the sheet racks (`rackCapacity`), the boards on the timber
+  stores (`boardRoom`), the glass on the glass racks (`glassRoom`, new, the same sum over
+  `glassCapacityOf`). One function gives a kind's room (`roomFor(state, kind)`) and one its free
+  places (`freeRoomFor(state, kind)`: the room less what is on that counter, never below nought),
+  and the three old ones that do this for one kind (`stockFree`, `freeBoardRoom`) are folded into
+  them.
+- **The boards' own counter.** `state.stock.sheets` holds sheets only from tonight.
+  `sheetsOnCounter` (the counter less `boardsHeld`) and `boardsHeld` as a count of what is on the
+  counter go: the sheets are `state.stock.sheets` and the boards `state.stock.boards`. Every reader
+  of the old pair reads the counter of its kind (the racks' and the stores' plates, the Materials
+  page, the rack's sale, the low stock card, the bubble that reads the sheets).
+- **Held and free, per kind**: `reservedFor(state, kind)` and `freeFor(state, kind)` in place of
+  `reservedSheets` and `freeSheets` for every caller that is not the sheets', and the sheets' callers
+  read `kind` `sheets`, so what a sheet job and a sheet contract can hold is to the sheet what it
+  was. What holds what:
 
-**2.5 The line's books [PIOTR: "in a tab in the finances: the turnover, the materials, the
-engineers, the efficiency, the net profit, by the day and by the year"].** A fifth tab on the
-Accounting page, after `Finance`: `Production line` (`AccountingTab` gains `'line'`), shown only
-once the company has had the line standing [TUNE], and shown whether or not the books are up to
-date: it reads the line's own day book and not the ledger [TUNE]. In the classes the Summary tab's
-four columns have, one column each for `Today`, `This week`, `This month` and `This year`, these
-rows, each with what it is reckoned from:
-
-| Row | Reckoned from |
+| Kind | Held by |
 |---|---|
-| Windows made | the windows of the line's contract |
-| Turnover | the windows at `LINE_WINDOW_PRICE`; equal to the pound to the `Windows off the line: windows` lines of the ledger |
-| Timber and glass | the windows at `lineMaterialPerWindow`: the material used, not what was bought |
-| Engineers | each line engineer on the books, his `monthlyWage` over `DAYS_PER_MONTH` for each calendar day |
-| Power | the six modules' power, `LINE_MODULE_POWER_PER_DAY` each, for each calendar day |
-| Property cover | while the property cover is held, `lineValue` at the cover's rate and the unit's factor (`unitCostFactor`) over `DAYS_PER_YEAR`, for each calendar day |
-| Net profit | turnover less the four costs above |
-| Efficiency | the windows made of the windows the line could have made in the working minutes its contract ran (`88 of 96, 92%`) |
+| sheets | a sheet job's `sheetsReserved` (`job.timber` not true), a sheet contract's `sheetsReserved` |
+| boards | a timber job's `sheetsReserved` (its boards, as today), a running line contract's `boardsReserved` (2.5) |
+| glass | a timber job's `glassReserved` (2.4), a running line contract's `glassReserved` (2.5) |
 
-Under the columns, three lines: `A working day on average this month: 4 windows, £1,520 net`;
-`A year at this month's pace: £461,000 net` (this month's net over its days so far, times
-`DAYS_PER_YEAR`) [TUNE: chat]; `Paid back: £1,240,000 of £10,000,000 and the upgrades, 12%` (the
-net of every day since the line first stood, over what the line and its upgrades cost). And one
-line of what the efficiency lost, when it lost any: `Lost this month: 6 h for want of an engineer,
-2 h for want of timber` [TUNE].
+- **The insurer** counts all three (`insuredStockValue`): the sheets and the boards at
+  `SHEET_VALUE`, the glass at `glassUnitPrice()` (2.3). The boards are on the insured value today
+  through the shared counter; the glass is new on it [TUNE: chat].
+- **The burglar** takes the free sheets as today and nothing of the other two [TUNE: chat].
 
-The figures come from the line's own day book: `windowLine.today` (the day in hand: windows,
-turnover, material, the possible minutes and the minutes lost by cause), `windowLine.days` (one
-record a calendar day, written at the open of each working day for the days since the last one,
-weekends among them, and kept for 400 days) and `windowLine.since` (the totals since the line first
-stood). The engineers', power's and cover's shares accrue on every calendar day the line stands,
-contract or not [TUNE: chat]. Asserted row by row against what each is reckoned from, and the
-turnover against the ledger, for a played month.
+**2.3 Buying for stock: Restock for each kind [PIOTR: "identically to the sheets"].**
 
-### C. The line's lane, the shelter, the hall
+- `RESTOCK` carries the kind: `{ type: 'RESTOCK'; kind: StockKind; sheets?: number }` (the count
+  keeps its field name), and `restockSheets`, `restockSplit`, `restockCheck`, `buyStock` and
+  `pendingStockSheets` take the kind. Each does for the boards and the glass exactly what it does
+  for the sheets: the typed number whole, or with nothing typed what fills that kind's free places
+  less what of that kind is already on its way for stock; the split onto the stores and into the
+  paid store, quoted before the click; the refusals in the same order, the first in the kind's own
+  words: `No shelving yet` (sheets, as today), `No timber store` (boards), `No glass rack` (glass)
+  [TUNE]; `N boards are on the way`, `N glass units are on the way`; `Not enough cash`.
+- **The price.** The boards on the sheets' ladder (`sheetPriceFor`, `stockCostFor`), which is what a
+  timber job's own order of boards already pays today (`orderForJobCost`) [TUNE: chat]. The glass
+  at one price, the line's: `glassUnitPrice()`, a new function in `materials.ts` written from the
+  line's constants as `lineGlassPerWindowCost` is (`LINE_WINDOW_PRICE` x `LINE_MATERIAL_SHARE` less
+  `LINE_BOARDS_PER_WINDOW` x `SHEET_VALUE`: £200), and `lineGlassPerWindowCost` goes, its readers
+  reading this [PIOTR: "the prices are set by the existing code for the line"]. No ladder for glass.
+- **The ledger**: `40 sheets for stock` as today, `40 boards for stock`, `20 glass units for stock`,
+  each on the material line; with `, ordered by Anna` when the office placed it (2.5).
+- **The low stock badge** on each of the three stock lines, under the same `LOW_STOCK_SHEETS`, asked
+  only while that kind has a room (`stockIsLow(state, kind)`) [TUNE: chat]. The weekly low stock
+  card stays the sheets' alone, in its words of today [TUNE: chat].
 
-**2.6 The forklift's lane [PIOTR: "two yellow lines from the end of the production line to the
-door"; "yes" to chat's route].** Two metres wide, from the line to the gate:
+**2.4 A timber job's boards and glass come off the stores [PIOTR: "ordering the timber for the
+windows and the glass should work identically to the sheets"].**
 
-- **Where it is**, for a line whose module 1 stands at (x, y), in a hall `D` cells deep: the front
-  strip, from x 0 to the line's end (x + 36), y D - 2 and D - 1, along the front wall, from which the
-  forklift will take the pallet at module 6's front; and the left strip, x 0 and 1, from
-  `LINE_PALLET_LAYOUT`'s y (10) to D - 1, up the left wall to the pallets at the gate [TUNE: chat:
-  no strip round the line's end, which would leave the line only one place along a 40 m hall]. One
-  function gives the lane's boxes for a line's place (`forkliftLane(state, at)`); everything below
-  reads it. The lane follows the line, not the hall's length.
-- **The line's place asks for it.** The line, the metre in front of it where its men stand
-  (`STATION_TABLE`, the front) and its lane never overlap one another, and all of them are inside
-  the hall: so the line stands at y D - 6 at the most (14 in the 800 m² hall) and not over x 0 and 1
-  below y 10. `lineSite` (at the order) and `canPlaceLine` (the move) take a place only where the
-  line's 36 by 3 is clear as `canPlaceBox` asks today and every box of the lane that place would have
-  is clear of everything standing or held for a delivery but the line itself; the line asks this of
-  its new lane itself, and `canPlaceBox` does not learn the lane (or the line's present lane would
-  refuse its own move). The refusals become `No room in the hall for the line and its lane` at the
-  order and `The line needs a clear 36 m by 3 m and its lane` in setup mode [TUNE]. At
-  `WINDOW_LINE_ORIGIN` (2, 14) in the 800 m² hall this is chat's sketch: the line x 2 to 37, its men
-  at y 17, the lane at y 18 and 19 from x 0 to 38, and x 0 and 1 from y 10 up.
-- **Nothing else stands on it.** While the line stands or is on order, `canPlaceSpec` (and only it)
-  refuses every other thing a cell of the lane with `That is the forklift's lane` [TUNE], in setup
-  mode and at every purchase's search for a free place, as it refuses the gate lane today. Men walk
-  on it as on the gate lane.
-- **What stands on it already** (a save, or kit put there before the line was ordered) is not
-  moved: a strip line `laneBlocked`, directly under `boardsAtTheGate` [TUNE], `Kit stands on the
-  forklift's lane: the sheet rack and a workbench` (the catalogue's names, as `standingOn` gives
-  them, kit on order among them), until it is moved. A line of Turn 30 that stands where its lane
-  cannot be (y 15 to 17) keeps its place, no lane is drawn, and the same line reads `The line
-  stands too near the front wall for its lane: move it back` [TUNE]. The forklift of 2.10 drives on
-  the lane; a line with no lane has none, and its pallets go to the gate as in Turn 30.
-- **Drawn** as two yellow lines on the floor along the lane's outer edges, the corners joined,
-  under every piece of kit and every man. The hall's painted shell is cached and drawn again only
-  when its key changes, so the lane is drawn at the head of the hall's live drawing, where it
-  follows a purchase and a move. One CSS token is allowed for its colour, `--lane-yellow` [TUNE],
-  the one exception to "no new token" tonight.
+- **How many.** The boards as today (`boardsForJob`, the line's saving and all). The glass units:
+  `glassForJob(materialCost, timber)`, the job's glass share (`glassCostOf`, `GLASS_SHARE` of its
+  material, as today) over `glassUnitPrice()`, rounded up, nought for a job that is not timber
+  [TUNE: chat]: a 9,000 casement window job has 3,600 of material, 1,260 of it glass, so 7 glass
+  units; the board's tile and the job read the one function. The job's `materialCost` is not
+  touched, so its price, its labour and its books are what they were.
+- **The job's fields.** `sheets`, `sheetsUsed` and `sheetsReserved` stay and are its boards, as
+  today. `glass: GlassState` and `glassDay` go; in their place `glassUnits` (what it needs),
+  `glassReserved` and `glassUsed`, all nought on a job that is not timber. `GlassState` goes.
+- **Held at the click, as a sheet job's sheets are.** `takeEnquiry` holds the job's boards from the
+  free boards and its glass from the free glass at once (`reserveSheetsFor` serves the boards of a
+  timber job as it serves the sheets of a sheet job: its guard becomes a sheet job or a timber job,
+  not bespoke, so the oak table, solid wood and not timber, still holds nothing and is ordered in as
+  today; `reserveGlassFor` beside it), and every
+  unloading, fetch from the paid store and restock lets the jobs with a shortfall hold what they
+  can, in the order they were taken, as `reserveShortfalls` does for the sheets, then the line
+  (2.5). A bespoke timber job's boards are never off the stores and are ordered in, as a bespoke
+  sheet job's sheets are; its glass is the stores' glass [TUNE: chat].
+- **The shortfall** is `shortfallOf(job)` for its boards (as today) and `glassShortfallOf(job)` for
+  its glass. A job is `ready` on its boards, as today; its glass is wanted at its Glazing (below).
+- **Ordered as a sheet job's shortfall is.** `Order for this job` orders both shortfalls in one
+  click: the boards on one lorry at the ladder's price as today (bespoke uplift and days as today),
+  the glass on another at `glassUnitPrice()` a unit, both in at the next working day's open
+  (`deliveryDay`, standard; glass is never bespoke), each paid on the material line at the click:
+  `Material for Oak Lane: boards` and `Material for Oak Lane: glass` [TUNE] (a sheet job's line is
+  `Material for ...` as today). `orderForJobCheck`
+  says `Nothing short` when neither is, and `On its way already` while any load of the job is not
+  unloaded. `orderForJobCost` is the two together, and the button prints that sum. The office admin
+  orders both by himself at the same minute he orders the boards today (`autoOrderMaterial`), with
+  his name in both lines. A shortfall of glass alone (the boards in hand) is ordered the same way.
+- **Used at the Glazing.** The job takes its whole glass off the racks the minute its Glazing (the
+  `assembly` stage) starts: what it holds first, then free glass. A job at its Glazing that cannot
+  take all its glass stops there, `waiting for glass`, as it does today (`hallStops`), and moves on
+  the minute it can. Nothing else of the stage changes.
+- **Dropped** (`dropJob`): a timber job's boards and glass are dealt with exactly as a sheet job's
+  sheets are, each on its own counter: what it took off the stores and did not use goes back on
+  them free, and what was ordered in for it is written off as a sheet job's is. The Turn 29 branch
+  that took the boards off the counter and called the job's loads off goes, and the glass written off
+  as `Glass written off` goes with the glass state. The drop card's figure reads the same rule.
 
-**2.7 The hall that grows [PIOTR: "200 m² at a time, each 20 per cent dearer, from 600; as many as
-the player wants; everything goes up automatically; yes, more people"].**
+**2.5 The line takes its boards and glass from the stores [PIOTR: "yes": as a standing contract
+takes its sheets].**
 
-- **The offer.** Once the second extension is open, the Premises page has one more card, in the
-  extension cards' shape: `Extend the hall: 200 m² more`. It can be bought again and again, one
-  at a time; while the builders are in it reads as the other two read while they build (`Being
-  built`, the Paid badge). Each adds `UNIT_LONG_EXTENSION_CELLS` 10 metres along the rear wall (the
-  hall 50 by 20, then 60 by 20, and so on), opens the next working morning as the other two do, and
-  moves the apron and everything at or past the old kerb out with it (`moveTheApron`). The plant
-  behind the rear wall stays where it stands; the longer wall has room for more.
-- **The price** of the n-th (n from 0): `UNIT_LONG_EXTENSION_PRICE` 600,000 times
-  `UNIT_LONG_EXTENSION_GROWTH` 1.2 to the n, rounded to the pound: 600,000, 720,000, 864,000,
-  1,036,800 and on. With the landlord's deposit on the bigger rent, as the other two. Money is the
-  only condition, as for the other two. No limit.
-- **Everything goes up with the floor**, through the functions that already scale: the rent, the
-  rates and the bench slots by the area (`unitWith`); the standing power by the area; the joiners
-  the unit takes by the area (`crewLimit`); a security firm by the area. Two that do not scale today
-  are made to: `unitCostFactor` is the area over 400 past the 800 m² unit (2 at 800, as today; 2.5 at
-  1,000) [TUNE: chat], for the insurer and a flat security level; and `canteenLockers` in an
-  enlarged canteen is 32 and 8 more for every 200 m² past 800 [TUNE: chat], shown on as many pages of
-  plates as it takes (`canteenPages` already pages by sixteen), its word the figure where
-  `lockersInWords` has none. The card of each says what goes up, as the other two cards do.
-- **State**: `unit.longExtensions` (how many are open) and `unit.longExtension`
-  (`'none' | 'building'`) [TUNE: the names].
-- **The picture.** Nothing is painted (as 9.7 and 9.8). A script, `scripts/hall-long.py`, cuts
-  from `hallBackgroundDeep.png` what a longer hall is made of: a piece ten metres long of the hall
-  as it is from x 30 to 40 (its floor, its rear wall, the sky over it, its front kerb and the ground
-  in front of the kerb), with a feathered start of one metre so that the join with what is under it
-  does not show, and the end of the hall (the kerb under its end at x 40 and the ground beyond it)
-  to stand at the new end; RGBA, transparent outside what they are. The 800 m² picture is RGB and
-  is the whole of the scene today: the longer scene is laid of it, then one piece for each ten
-  metres past 40, each 480 by 240 px (2x) further along than the one before, then the end, and the
-  pieces cover everything the longer scene shows past the 800 m² picture. The scene, the camera's
-  bounds and the zoom that fits the hall all read the hall's own length. If the picture asks for
-  another cut, the session takes it and says why in SPRITES.md 9.9; the rule is that everything is
-  made of the 800 m² picture. Acceptance: the report shows a 60 m and a 100 m hall at x1 and a join
-  at the closest zoom, with no seam seen at x1.
+- **What goes**: the two buttons `Order timber` and `Order glass` and their row and reasons; the
+  actions `ORDER_LINE_TIMBER` and `ORDER_LINE_GLASS`; `orderLineTimber`, `orderLineGlass`,
+  `lineTimberCheck`, `lineGlassCheck`, `lineTimberBatch`, `lineTimberBatchCost`,
+  `lineGlassBatchCost`, `lineBoardsOnTheWay`, `lineGlassOnTheWay`, `arriveLineGlass`,
+  `lineGlassWindows`, `writeOffLineMaterial`; the line's own `boards`, `glass` and `glassOnTheWay`
+  (`LineGlassOnTheWay` with them); `LINE_GLASS_WINDOWS_MAX` and `LINE_ORDER_WINDOWS`; a delivery's
+  `line` mark and every branch that reads it (the line's load in `unloadIntoStock`,
+  `pendingStockSheets`, `loadWords`, `lineLoadInWords`, the lorry's card, the unloading's label).
+- **What it holds**, as a sheet contract holds the week's sheets (`reserveContractSheets`): a running
+  line contract (`LineContract`, two new fields `boardsReserved` and `glassReserved`) holds, from the
+  free boards and the free glass, what the windows left in the week in hand want: `lineWindowsAWeek`
+  less `windowsThisWeek`, times `LINE_BOARDS_PER_WINDOW` and `LINE_GLASS_PER_WINDOW`. It holds at the
+  open of every working day (`runLineDay`, after the jobs have had theirs, as `runContractDay` holds
+  the sheet contracts' after them), the minute it is taken, and after every unloading, fetch and
+  restock, after the jobs. What it holds goes back free when the contract ends, by `End it` or by the
+  line's sale: the contract is gone and its fields with it.
+- **What a window takes.** `makeWindow` takes 2 boards and 1 glass unit off the counters, out of what
+  the contract holds first, then the free ones, as `drawContractSheets` does. `lineShortOf` asks the
+  same: what it holds and what is free, of each. Nothing else of the window changes: its price, its
+  books (the £600 of material used, as today), its pallet.
+- **The office still orders it [PIOTR, 11.10: "the office admin orders by himself when two days are
+  left", kept] [TUNE: chat: as a restock].** `officeOrdersLineMaterial` is what it was, on the new
+  store: while a line's contract runs and an office admin is on duty, at the open of every working
+  day, the minute the contract is taken and after every window made, when the boards the line could
+  have (what it holds, the free boards, and the boards on their way for stock) are fewer than two
+  working days of its windows' boards (`lineReorderWindows` x `LINE_BOARDS_PER_WINDOW`), he places
+  the boards' Restock with nothing typed, which fills the stores' free places less what is on its
+  way and so never goes to the paid store, when `restockCheck` allows it and it buys at least one;
+  the same for the glass. His name in the ledger line. With no admin on duty nothing happens, and the
+  strip says why (`lineNeedsMaterial`, as today). The admin restocks for the line and for nothing
+  else: a sheet job, a timber job and a sheet contract are as they were.
+- **A line sold** writes nothing off: the boards and glass are the company's stock, and what the
+  contract held is free again.
+- **The offer card's sentence** `The timber and the glass cost £600 a window, ordered ahead: on the
+  Contracts tab, or by the office.` becomes `The timber and the glass cost £600 a window, taken from
+  your timber stores and glass racks: restock them on the Materials page, or the office does.`; the
+  running block's `£1,500 a window; the timber and the glass £600 a window, ordered ahead` becomes
+  `... £600 a window, from the stores`; its two rows become `Timber held: 24 boards, for 12 windows`
+  and `Glass held: for 8 windows` (what the contract holds), and the row of buttons and its reasons
+  go. Its `Standing still` row and the strip's `lineNeedsMaterial` keep their words.
 
-**2.8 The timber shelter behind the rear wall [PIOTR: "it hides our hall; rather where the
-extractors are, or behind them; nothing in the hall may be hidden"].**
+**2.6 Deliveries, unloading and the paid store, for all three [PIOTR: "yes" to the lorry and to the
+paid store].**
 
-- It stands behind the rear wall with the plant: `STARTING_LAYOUT.timberShelter` gets `rear: true`,
-  so `rearYardPlaceFor` gives it its place and `No room behind the hall` is its refusal. On the
-  apron stays the van alone.
-- It is declared as the art side drew it, 6 m along the wall by 3 m deep (Turn 29 declared it 3 by
-  6 only because the apron is 3 m wide), its zone its footprint, and its two files change places
-  back (the `.png` is the art side's 0 view again): `git mv` through a temporary name, nothing
-  edited. SPRITES.md section 13's sentence on it is put right, and its effect and description
-  texts no longer say `outside on the apron` but `outside behind the hall` [TUNE].
-- Kit behind the wall is drawn clipped to what shows over the wall's top (3.5 m): the shelter is 3
-  m high and is hidden behind the wall, which is what Piotr asked for. Its plate (the boards on it
-  and its room) is hung over the wall's top above it, where the player can read and click it, in
-  place of its place at 0.55 of its own height [TUNE: chat].
-- Nothing else of it changes: its 400 boards, its price, its delivery, never moved or turned.
+- **A delivery carries its kind.** `Delivery.material: StockKind` in place of `boards?: true` and
+  `line?: number` [TUNE: the name]. `createDelivery` takes it; `isBoards` goes, every reader asking
+  `delivery.material`. A load for a job is that job's (`jobId`), a load for stock has none, as today.
+- **Glass by lorry.** A load of glass comes at the open of the next working day
+  (`GLASS_DELIVERY_WORKING_DAYS`, 1, which `deliveryDay` reads for glass) on a lorry like any load:
+  `arriveDeliveries` puts its unloading on the task list (`Unload 7 glass units`), the lorry's card
+  is raised as for any load, and the unloading takes `unloadMinutes` of its count as any load does
+  [TUNE]. `arriveGlass` and the glazier go.
+- **Unloaded as sheets are** (`unloadIntoStock`, one path for all three): what fits on that kind's
+  free places goes on its counter, the rest goes to that kind's paid store at `TEMP_STORAGE_COST` for
+  the load (`moveOverflowToStorage`, `Temporary storage for 12 boards`), a job's own load is held for
+  that job first, and then every shortfall holds what it can (2.4, 2.5). The Turn 29 rule that a load
+  of boards comes in whole or waits at the gate goes. A load of a kind with no room at all (no
+  timber store, no glass rack) waits at the gate as a load of sheets with no rack waits, and the
+  lorry's card says so in its kind's words: `... there is no timber store to put them on. Buy one
+  from the catalogue.`, `... there is no glass rack to put them on. Buy one from the catalogue.`
+- **The fetch.** One chore in the morning brings back all three from the paid store
+  (`fetchFromStorage`), its label naming what it brings: `Fetch 12 sheets, 30 boards and 5 glass
+  units from storage` [TUNE]. The Materials page's hint names all three.
+- **Where the unloading walks.** `unloadFarStation`: a load of sheets to the sheet rack as today, of
+  boards to the first timber rack or the gate as today, of glass to the first glass rack of either
+  family on the floor (`STATION_GLASS_RACK`) [TUNE].
 
-### D. Contracts that can be lost
+**2.7 What the player reads.**
 
-**2.9 Three things that can happen to a sheet contract [PIOTR: "yes" to chat's three].** For the
-standing contracts of sheet pieces only (a piece with no `timber` mark): never a window or a door
-on a contract, never the line's contract.
+- **The Materials page** (mockup 1). The one head row of today, `Stock` with the sheets' field and
+  Restock, becomes three blocks in the same markup, one a kind, in the order sheets, boards, glass:
+  each a `row stock-head` with its name (`Sheets`, `Timber boards`, `Glass`) and its control (the
+  field, the ladder line or the glass's price line `20 glass units at £200 = £4,000`, the storage
+  line, the Restock button), and under it the kind's stock line (thumbnail, name, number, `Free`,
+  `Reserved`, `Total N of room`, the badge). The fields are `stockSheets` (as today),
+  `stockBoards` and `stockGlass`, each remembered by the page as the sheets' field is. The boards'
+  block and the glass block are shown once a store of their kind stands or anything of their kind is
+  on the counter, on its way or in the paid store, as the boards' row is today [TUNE]. The boards'
+  stock line takes the place of today's boards row; the per line glass rows go. Names and numbers
+  [TUNE wording]: `Timber boards`, `TMB-63-RED`; `Sealed glass units`, `IGU-4-16-4`; thumbnails
+  `thumb.solidWood` and `thumb.glass` through the one placeholder function, as today. The
+  `No shelving yet` warning stays the sheets'.
+- **The job card's material line** (mockup 2): the boards' figure as today (`12 of 12 boards of
+  timber in hand`, or red `5 of 12 boards of timber short`), and beside it the glass's in the same
+  classes (`7 of 7 glass units in hand`, or red `3 of 7 glass units short`), one `Order for this job`
+  button with the sum. The hint `Timber is ordered for the job: the racks hold sheets.` goes, and so
+  do `Glass not ordered`, `Glass ordered, here on ...`, `Glass is in` and the `Order glass` button.
+- **The board's tile**: a window's or a door's material line reads `12 boards and 7 glass units of
+  material` [TUNE]; the red line `N boards, and the timber stores hold M` goes with its rule (2.8).
+- **The strip**: `glassNotOrdered` and `boardsAtTheGate` go from `WARNING_ORDER` and from the code
+  (2.8). Nothing new.
+- **The hall**: each glass rack drawn as kit with no picture is, its name and its plate `7 / 40`, as
+  a timber rack's.
 
-- **A client leaves.** At each week's close of a running sheet contract (`runContractDay`, after
-  the short week's rule), with `CONTRACT_CLIENT_LEAVES_CHANCE` 0.03 [PIOTR: "yes" to 3 per cent],
-  the client ends it, exactly as `endedByClient` ends one (the week already closed by that close,
-  `endDay` today, `weekStartDay` null, so no second and empty week is closed and no point of
-  reputation is taken for it), with a new `endedBy`, `'lost'`. Its line reads `the client went
-  elsewhere`; its closing card is the one an ended contract has, its title `Cut sheet packs for
-  Northgate Interiors: the client went elsewhere`, and its last sentence, in place of the offer of
-  another term, `The client has found another supplier: there is no other term.` No price is
-  offered for another term (`renegotiatedPrice` null). The men on it are free.
-- **What the Contracts tab shows of it.** The ended block of a lost contract is the ended block
-  without the client's offer and without `Renew`: one button, `Let it go`, which takes it off the
-  tab. Today a null `renegotiatedPrice` makes `renewContract` refuse even the letting go (`The term
-  is not over`) while the block still draws an offer and `Renew`: both are put right for `'lost'`.
-- **Quiet weeks.** From the day a contract is lost, no standing contract is offered for
-  `CONTRACT_QUIET_DAYS` 14 to 21 days [PIOTR: "yes"], drawn once at the loss: `offerContract` draws
-  nothing before `state.contractQuietUntilDay`, the weekly offer owed among it. A renewal is not an
-  offer and is not stopped; the line's own contract is offered as before.
-- **A renewal that asks for less.** When a sheet contract's term ends and the client offers another
-  term, with `CONTRACT_RENEWAL_CUT_CHANCE` 0.25 [TUNE: chat] he offers 5 to 15 per cent less than the
-  price a piece it had [PIOTR: "yes" to 5 to 15], rounded to the pound, in place of what
-  `renegotiatedPriceFor` gives. The closing card's last sentence says so: `The client offers £96 a
-  piece for another term, 9% less than now: the market has turned.` The ended block's comparison
-  with the old price then reads the cut as it reads any offer.
-- **The draws.** Every draw of the three is made off a side stream of its own, seeded from the
-  save's seed, the contract's id and the day, the way `drawContract` draws its answer off a side
-  stream: nothing is drawn off the main stream, so where none of the three happens no offer, job,
-  event or price of any save moves by a step. Where one happens in a scenario that is pinned today,
-  the scenario moves: re-pin it with one line of reason, as the relaxed rule says, or choose its seed
-  so that it shows what it always showed, and say which in the report.
+### C. What goes, in one list
 
-### E. The line's forklift and the pallet standing alone (L3)
+**2.8 The rules of Turns 28, 29 and 31 that made the boards and the glass behave otherwise go**
+[TUNE: chat: each follows from Piotr's "identically"; section 10 repeats them]:
 
-**2.10 The forklift [PIOTR, 10.10: "when the pallet of windows is stacked, ten of them, the
-forklift takes it to the door"; 11.10: "two yellow lines from the end of the production line to the
-door, for the forklift that will drive with the pallet", "and the forklift driving"; that evening,
-having approved the art side's L3 ("akceptacja jest"): "won't we add it to this turn?"].**
+1. The glazier: `ORDER_GLASS`, `orderGlass`, `orderGlassFor`, `orderGlassCheck`, `arriveGlass`,
+   `GlassState`, `job.glass` and `job.glassDay`, the job card's glass figures and button, the
+   `glassNotOrdered` strip line, the drop's `Glass written off` line.
+2. The boards' "whole or at the gate": the branch in `unloadIntoStock`, `canUnload`'s whole load
+   question, the `boardsAtTheGate` strip line, the lorry card's `They wait at the gate until a job
+   uses its boards or another store is bought.`
+3. The board's refusal of a window the stores could not hold even empty: `storesHoldCheck`, its
+   tile line and its place in `canAccept`. A job bigger than the stores is taken as a sheet job
+   bigger than the racks is, and what does not fit goes to the paid store.
+4. The line's own material (2.5's first point), and the Materials page's glass rows of each line.
+5. The one counter of sheets and boards (2.2).
 
-*The pictures.* In `docs/pictures-l3/`, put there by this ZIP, checked by chat:
+Each goes with its tests flipped to say what is true now, never kept beside them.
 
-| File | What it is |
-|---|---|
-| `windowPallet.standard.png` | the pallet of ten wrapped windows standing alone, view 0: 160 by 172, anchor 104, 164, 2 x 1 x 1.75 m |
-| `vehicle.forklift.drive.sheet.png` | the line's forklift and its driver, forks empty: 1,632 by 1,024, four rows of six cells of 272 by 256 |
-| `vehicle.forklift.driveLoaded.sheet.png` | the same with the pallet of ten windows on its forks |
+### D. The art side
 
-The rest of the art side's pack is already in `docs/art/pack-l3-1110/`: its notes, figures and
-reports, the previews Piotr approved, its source, the two sheets' JSONs, and the pallet's 90 degree
-view, which nothing turns and which is not served; `EDITED.md` there says what chat left out and the
-dashes it replaced. The two JSONs say the same: `{"cellWidth": 272, "cellHeight": 256, "anchorX":
-136, "anchorY": 192, "frames": 6, "fps": 8, "rows": {"sw": 0, "se": 1, "nw": 2, "ne": 3}, "loop":
-true}`.
-
-What chat checked: the pallet's canvas and anchor are the contract's for 2 x 1 x 1.75 m, and its
-windows and its pallet are module 6's (`stack10` and the pallet drawn in module 6's picture); the
-rows are the figures' four directions in the game's own sense (`sw` along +y, `se` +x, `nw` -x,
-`ne` -y, as `facingTowards` gives them), and in every row the forks point the way it drives; every
-cell of a row has the same bounds, so the forklift drives on the spot and the game moves it; the
-anchor is one point of the floor under the forklift with its load, the same in both sheets, so the
-empty forklift is not centred on it and is not to be centred again. The forklift is drawn at true
-size, where the forklift family's own pictures are a 1 by 1 by 1 m frame (REQUESTS-T30 2.1): those
-are not touched tonight (E1).
-
-*To do, in task C4.*
-
-- `git add docs/pictures-l3` if they are not tracked yet, then `git mv` the three pictures into
-  `public/sprites/` under their own names, run `npm run sprites:manifest`, and `docs/pictures-l3/`
-  is gone.
-- **Two more kinds of file**, as Turn 30 2.2 taught the work sheets and the overlays: a vehicle's
-  sheet of four rows (`vehicle.<name>.<variant>.sheet.png`) and the picture of a thing that is no
-  family's class (`windowPallet.standard.png`). Every place that lists, counts or picks files learns
-  them: no count of class pictures or of turned pictures counts either, the Sprite check page lists
-  them, and the report says where they were taught.
-- Their figures written once as a constant (`FORKLIFT_SHEETS`, empty and loaded [TUNE: the name]),
-  from the JSONs, as `MACHINE_WORK_SHEETS` was.
-- SPRITES.md section 16, `The line's forklift and its pallet (L3, Turn 31, 11.10.2026)`: the table,
-  the rows and their directions, the anchor, the true size, and how the game uses them.
-
-*Whose it is, and who drives* [TUNE: chat: REQUESTS-T30 2.4's simplest]. The forklift is the line's
-own: it comes with the line and goes with it, costs nothing, and is not a piece of kit (no spec, no
-place, no power, no insurance, no catalogue card). It is not the company's forklift family, which
-stays as it is and goes on unloading the lorries. Its driver is part of the picture and takes no
-man's time.
-
-*Where it waits.* On the lane's front strip (2.6) in front of module 6's pallet, empty and facing
-`nw`, along the strip towards the left wall, standing still on frame 0 of its empty sheet's `nw`
-row [TUNE: chat: the cell]. It is drawn while the six modules stand and the line has its lane: a line
-with no lane (2.6) has no forklift, and its pallets go to the gate as in Turn 30.
-
-*The trip.* Whenever a pallet leaves module 6 for the gate (the tenth window, or a part pallet at the
-contract's end), the forklift takes it there along the lane and comes back:
-
-1. Loaded, from where it waits: along the front strip (`nw`) to the lane's corner, then up the left
-   strip (`ne`) until the pallet on its forks is over `LINE_PALLET_LAYOUT`. There the pallet is set
-   down: the forklift's sheet becomes the empty one and the pallet standing alone is drawn at its
-   place.
-2. Empty: down the left strip (`sw`) and along the front strip (`se`) to where it waits, and it faces
-   `nw` again.
-
-The pallet comes off module 6 onto the forks at once: the engine already draws module 6's pallet
-empty the moment the tenth window is made. Nothing is drawn of the forks lifting or setting down,
-and a corner is a turn on the spot [TUNE: chat].
-
-*The engine does not change* [TUNE: chat]. In the engine the pallet is at the gate the moment it
-leaves module 6, as in Turn 30, so the Contracts tab, the client's collection at the next working
-day's open and every engine test stay as they are. The forklift is the renderer's, as the walkers and
-the doors are: a small module of its own in their shape (`src/render/forklift.ts` [TUNE: the
-name]), with no game state, no lift and no minute booked. Its step runs in every frame with the
-state, whatever page is open, so a trip goes on while the player reads another page and he finds the
-forklift where it has got to; it sees a pallet leave when `palletsAtGate` goes up between two of its
-steps on the same day. It is set again after every page written (as `syncFigures` and `syncDoors`
-are), so a page written mid trip never puts it back where it waits; and it is forgotten, back where
-it waits, wherever a view is built from nothing (the load, the new game and the new morning that call
-`resetWalkers` and `resetDoors`), when the line is moved or sold, and when the clock goes to
-`WALK_SKIPPED_FROM_SPEED` or over. While its loaded leg runs, the newest pallet at the gate is not
-drawn: it is on the forks. A pallet sent while it is out is drawn at the gate at once [TUNE].
-
-*Its pace.* `FORKLIFT_CELLS_PER_SECOND` 3 [TUNE: chat: twice a man's walk], in real time, at every
-speed of the clock below `WALK_SKIPPED_FROM_SPEED`, and on while the clock is paused, as the men
-walk on. From `WALK_SKIPPED_FROM_SPEED` no trip is drawn: the pallet is at the gate at once and the
-forklift waits where it waits, as a man is put where he is going (v71). At 1x, with the line at
-(2, 14) in the 800 m² hall, a trip there and back is about 30 seconds.
-
-*How it is drawn.* From its sheet as a figure is (`characterArt`, `cellBox`: an `<svg>` clipped to
-one cell by its view box over the whole sheet), marked `data-forklift` with its leg: its row the way
-it is going, its six frames at the sheet's 8 a second while it moves and frame 0 while it stands; its
-anchor on the middle line of the strip it is on; in the hall's live drawing with the figures, by depth
-as a figure is, by the cell its anchor is on, so that it passes in front of and behind men and kit as
-they stand. It is longer than a man is wide: if it is drawn under or over something it should not
-be, the report shows it.
-
-*The pallet at the gate.* Drawn from `windowPallet.standard.png` at `LINE_PALLET_LAYOUT` (2 by 1,
-view 0, on the box's nearest corner as every picture is) in place of Turn 30's two boxes, with the
-label as it is; a second pallet, the most that is drawn, beside it along x, at x 2 to 3, y 10 [TUNE:
-chat]. Each keeps `data-line-pallet`. A part pallet is drawn as the full one, and the label counts
-pallets (REQUESTS-T30 1.4's simplest) [TUNE].
-
-*What the player reads.* Nothing new: no text, card, strip line or button.
+**2.9 The request.** `docs/art/REQUESTS-T32.md`: G1, the two glass racks, one class each, views 0
+and 90, in the contract of SPRITES.md sections 1 to 3: the glass rack 2 x 1 x 2 m (file 160 by
+184, anchor 104, 176) and the large glass rack 4 x 2 x 2.5 m (file 304 by 280, anchor 200, 272),
+each holding upright sealed units in an A frame or a slotted rack, in the timber racks' steel, no
+floor, no shadow. Checked against `spriteFileSize` and `spriteAnchorIn` before it is written; the
+figures in the request are the code's. Nothing else is asked tonight; S1 (the outside sheet store)
+is named as still owed.
 
 ## 3. How to run this session
 
-**One writer.** Only the lead agent edits files under `src/` and `tests/`, changes STATE_VERSION
-or APP_VERSION, commits and pushes, and it does the tasks strictly in the order of section 5, one
-at a time. No worktrees and no parallel branches.
+**One writer.** Only the lead agent edits files under `src/` and `tests/`, changes STATE_VERSION or
+APP_VERSION, commits and pushes, and it does the tasks strictly in the order of section 5, one at a
+time. No worktrees and no parallel branches.
 
 **Sub-agents are allowed, under that one rule.** They may only do work that touches no file another
 agent is touching: read the repo and report; build the mockups of section 9 under
-docs/mockups/t31/; draft `scripts/hall-long.py` and its pieces for the lead to run and check; draft
-test cases; review each finished task's diff against this brief and section 7 before its commit;
-write docs/notes-t31.md. A sub-agent never commits, never asks a question and never waits for an
-answer, and never runs `npm test`, `npm run build` or `npm run check` while the lead's own check
-is running. If a sub-agent's result disagrees with this brief, the brief wins.
+docs/mockups/t32/; draft test cases; review each finished task's diff against this brief and
+section 7 before its commit; write docs/notes-t32.md and docs/art/REQUESTS-T32.md. A sub-agent
+never commits, never asks a question and never waits for an answer, and never runs `npm test`,
+`npm run build` or `npm run check` while the lead's own check is running (`tests/ui/app.test.ts`
+plays the game in real time).
 
 **Do not stop and do not ask.** Piotr is not watching and nobody will answer a question. Where this
 brief leaves a choice open, take the simplest reading that fits what is already in the repo, mark it
 [TUNE] in the code and list it in the report. The only reasons to stop are the brief's own: the
-first line of CLAUDE.md is not "Turn 31", or APP_VERSION on main is not 'v91'. A red test is not a
-reason to stop the session: handle it as 2.0.1 says.
+first line of CLAUDE.md is not "Turn 32", or APP_VERSION on main is not 'v95'. A red test is not a
+reason to stop the session: handle it as 2.0 says.
 
 **Push after every task**, so that nothing is lost if the session ends early. If the session runs
 short: stop cleanly at the end of a task, never in the middle of one, and say first in section 0 of
-the report which tasks were not reached. Section 5 is in the order of what matters and is built so
-that every stopping place is a whole game.
+the report which tasks were not reached. Section 5 is in the order of what matters and every
+stopping place is a whole game.
 
 ## 4. State
 
-STATE_VERSION 44, once, in B1, the first task that needs it. B1 writes every new field of the turn
-with its default (the parts later tasks use among them) in a raw lift, `liftToVersion44`, so that the
-version moves once. A v43 save opens with:
+STATE_VERSION 48, once, in B2. A raw lift `liftToVersion48` in `src/engine/migrate.ts`, gated by
+the version as every lift, then one whole state step after the lifts where it needs the whole state.
+A v47 save opens with:
 
-- `windowLine` with `boards` 0, `glass` 0, `glassOnTheWay` [], `today` (all noughts), `days` []
-  and `since` (all noughts). A save whose line contract is running is given one batch of each, free:
-  40 boards on the line and on the counter, and glass for 20 windows, so that a line that ran on Turn
-  30's rule does not stop on the morning the rule changes [TUNE: chat]; its boards may stand over
-  the stores' room until they are used, and the plates say so as they do for any load. This needs
-  the whole state, so it is done after the raw lifts, gated `version < 44`, on the road
-  `takeTheTimberToolsBack` and Turn 30's `takeTheLineBack` took (`src/engine/migrate.ts`).
-- `unit` with `longExtensions` 0 and `longExtension` `'none'`; `state.contractQuietUntilDay` null.
-- A delivery's `line` mark and a contract's `'lost'` are new optional values that no save carries.
-- In C1, not B1: a timber shelter on the apron, standing or on order, is moved behind the rear wall
-  with the plant's own step (`standThePlantBehindTheWall(state, 'timberShelter')`), gated
-  `version < 44` and outside the chain of `else if` the plant's other moves are in, its footprint
-  the new 6 by 3; one that finds no room stays where it is and the report says so.
-- The forklift of 2.10 is the renderer's: no field and no lift for it.
+- **The counters split.** `stock.boards` is the boards the timber jobs held (every job with `timber`
+  true and not completed, its `sheetsReserved`) plus every line record's `boards`; `stock.sheets`
+  is the old counter less that, never below nought; `stock.glass` is what 2.4 and the line give it
+  below; the three `tempStorage` fields with `tempStorageSheets` as it was and the other two 0.
+- **The jobs.** Every job gets `glassUnits` (`glassForJob` of its `materialCost` and `timber`),
+  `glassReserved` and `glassUsed`, and then, by what its glass was:
+  - `in`, and its Glazing has started (its current stage is `assembly` or after, or it is past
+    production, as `currentStage` and the job's stage read it): `glassUsed` = `glassUnits`, nothing
+    on the counter for it; the glass is in the window.
+  - `in` before its Glazing, or `ordered`: its glass units are added to `stock.glass` and held for
+    it (`glassReserved` = `glassUnits`); the glass on the glazier's way is in at once, its price
+    already paid [TUNE: chat: no load is made in a lift].
+  - `toOrder`: it holds nothing, and its shortfall is ordered as 2.4 orders it.
+  - `none`: noughts.
+  `glass` and `glassDay` go from every job. Where telling the Glazing apart needs the whole state, it
+  is done in the whole state step and not in the raw lift.
+- **The lines.** Each line record's `boards` stay on `stock.boards` as free boards (counted above),
+  its `glass` and every entry of its `glassOnTheWay` go onto `stock.glass` free (its price already
+  paid) [TUNE: chat], and `boards`, `glass` and `glassOnTheWay` go from the record. A running
+  contract gets `boardsReserved` and `glassReserved` 0, and holds its week at its first open.
+- **The deliveries.** Each gets `material`: `boards` where `boards` was true, where `line` was set,
+  or where its job is a timber job; `sheets` otherwise. A line's load on its way becomes a load of
+  boards for stock (`jobId` null), its price already paid. `boards` and `line` go.
+- **Turn 31's first batch** for a v43 save whose line contract ran (`giveTheLineItsFirstBatch`, the
+  whole state step gated `version < 44`, which runs after every raw lift and so finds the new shape):
+  it gives the 40 boards to `stock.boards` and the 20 glass units to `stock.glass`, free, in place of
+  the line's own fields [TUNE: chat]. The figures stay written from the constants that remain
+  (`LINE_BOARDS_PER_WINDOW` and `LINE_GLASS_PER_WINDOW` times 20); `LINE_ORDER_WINDOWS` is gone, so
+  the 20 is the lift's own constant with its line of reason.
 - Nothing else changed.
 
 Every save that loads today loads, the fixtures among them. Assert the lift on raw saves in
-tests/cloud/migrate.test.ts: one with a running line contract (the free batch; in B1), one with a
-shelter on the apron (moved; in C1), one with neither (nothing but the defaults). Say in the report
-what the lift does and list the version pins flipped.
+tests/cloud/migrate.test.ts: one with a timber job holding boards and its glass in, one with its
+glass ordered, one with a running line holding boards, glass and glass on its way and a line load on
+the road, one with neither (the defaults); and a v43 save with a running line (the first batch on
+the counters). Say in the report what the lift does and list the version pins flipped.
 
 ## 5. Task queue, in order
 
-Branch turn-31-line-books from main. One commit per task, npm run check green on its own exit code
-before each, the branch pushed after each, two report lines per task in REPORT-T31.md.
+Branch turn-32-one-store from main. One commit per task, npm run check green on its own exit code
+before each, the branch pushed after each, two report lines per task in REPORT-T32.md.
 
-T31-A0 The suite on v91 (2.0.1).
-T31-A1 Housekeeping and v92: docs/turn-30-brief.md is already in docs/ (this ZIP put it there),
-this file as CLAUDE.md, the README's lines (the brief, REPORT-T31.md), APP_VERSION 'v92' and its
-pins (the pins of STATE_VERSION go with B1).
-T31-A2 The mockups of section 9 into docs/mockups/t31/ with a README.
-T31-B1 2.1 to 2.4: the line's timber and glass, its orders, the office's orders, what the player
-reads, with STATE_VERSION 44 and the lift of section 4 but the shelter's.
-T31-B2 2.5: the line's books, the Production line tab.
-T31-C1 2.8: the timber shelter behind the rear wall, with its lift.
-T31-C2 2.6: the forklift's lane.
-T31-C4 2.10: the line's forklift and the pallet standing alone (L3), straight after C2, whose lane it
-drives on.
-T31-D1 2.9: contracts that can be lost.
-T31-C3 2.7: the hall that grows, with its card, its scaling and its longer picture. One task: a
-longer hall without its picture is not a whole game.
-T31-E1 notes (docs/notes-t31.md), and docs/art/REQUESTS-T31.md: nothing new is asked of the art
-side tonight; it names what chat's order of 11.10 asked and is still to come (the outside sheet
-store of 1,000 sheets, S1) so the next turn can take it in; the forklift family's own pictures, a 1
-by 1 by 1 m frame beside L3's forklift at true size, for Piotr to say whether they are drawn again;
-and anything of tonight that sits badly (the forklift's depth against kit, the pallet's turn as it is
-set down, if either shows).
-T31-E2 scenarios, one line a moved figure, and five new ones. (hhh): a company with the line's
-contract running and no admin orders timber and glass, is refused a third glass batch over 40, sees
-the timber come on the next working day's lorry and go onto the stores, makes windows that take 2
-boards and 1 glass each, and stands with `no timber` when it runs out; with an admin the line never
-stands for material over a played month. (iii): the Production line tab after a played month reads
-each row as 2.5 reckons it and the turnover as the ledger has it, and the efficiency below 100 per
-cent on a day an engineer was away. (jjj): the line's lane refuses a rack put on it, the line moved
-onto a place whose lane is blocked is refused, a save with a bench on the lane shows `laneBlocked`.
-(kkk): the hall extended three times (600,000, 720,000, 864,000) is 70 by 20 m, its rent, rates,
-power, insurance and security up with it, 56 lockers in its enlarged canteen, the van and the apron
-moved out each time. (lll): over a played year of three sheet contracts with the seeds chosen to
-show it, one is lost and is let go off the tab, no contract is offered for the quiet days after,
-and a renewal comes in lower; a save where none of the three happens keeps every figure its
-scenario pins today.
-T31-E3 cross check. T31-E4 look and shoot: the pictures of section 7 into docs/report-t31/.
-T31-E5 report (REPORT-T31.md, section 0 first: what was not reached, what is red, section 10's list
-with what was built) and PR titled `Turn 31: the line's timber and glass, its books, the forklift's
-lane and its forklift, the hall that grows, the shelter behind the wall, and contracts that can be
-lost`, do not merge, end the session.
+T32-A0 The suite on v95 (2.0).
+T32-A1 Housekeeping and v96: docs/turn-31-brief.md is already in docs/ (this ZIP put it there),
+this file as CLAUDE.md, the README's lines (the brief, REPORT-T32.md, REQUESTS-T31.md and
+REQUESTS-T32.md), APP_VERSION 'v96' and its pins (the pins of STATE_VERSION go with B2).
+T32-A2 The mockups of section 9 into docs/mockups/t32/ with a README.
+T32-B1 2.1: the two glass racks, their capacity, tables, stations, plates, sale rule, and the board's
+wanting one. No state change.
+T32-B2 2.2 to 2.8: the three counters, Restock for each kind, the timber job's boards and glass off
+the stores, the line off the stores and the office's restock, the deliveries, the unloading and the
+paid store for all three, every page they touch, everything 2.8 lists gone, with STATE_VERSION 48
+and the lift of section 4. One task: a game with half of the store moved is not a whole game.
+T32-E1 notes (docs/notes-t32.md: where each rule lives, the save, section 10 as built, what was
+found and left, questions for Piotr) and docs/art/REQUESTS-T32.md (2.9).
+T32-E2 scenarios, one line a moved figure, and three new ones. (mmm): a company in the 800 m² hall
+with one timber rack (40 boards) and one glass rack (40 units) restocks 60 boards and 30 glass units
+(the ladder's price for the boards, £200 a unit for the glass, the 20 boards past the rack's room
+into the paid store and fetched the next morning), takes a casement window job that
+holds 12 boards and 7 glass units at once, makes it through its Glazing taking its glass there, and
+a second one, taken with the stores empty, has its shortfall of both ordered by the office admin and
+in on the next working day's two lorries. (nnn): a line on its contract with an office admin and
+both stores runs a played month without standing for material, every board and glass unit it used
+bought by his restocks; the same with no admin stands with `no timber` once the stores run dry, and
+a player's Restock of each sets it going. (ooo): a v95 save of a running line with its boards, its
+glass at module 6, glass on its way and a timber job with its glass ordered opens on v96 and plays a
+week: nothing lost, nothing bought twice, the line and the job carry on.
+T32-E3 cross check (section 7). T32-E4 look and shoot: the pictures of section 7 into
+docs/report-t32/.
+T32-E5 report (REPORT-T32.md, section 0 first: what was not reached, what is red, section 10's list
+with what was built) and PR titled `Turn 32: one store for every material: sheets, boards and glass
+bought and kept the same way, the glass racks, and the line fed from the stores`, do not merge, end
+the session.
 
-**Tests chat already knows will move.** Checked against v90, and against v91 for the files v91
-changed; a start and not the whole; the lines are v91's. Each is flipped to say what is true now,
-never kept beside a new one.
+**Tests chat already knows will move.** Found by name on v95; a start and not the whole. Each is
+flipped to say what is true now, never kept beside a new one.
 
-- A1: `tests/ui/saveCheck.test.ts` 141, `tests/ui/version.test.ts` 63 and 79 (every pin of 'v91').
-- B1: the pins of STATE_VERSION 43: `tests/ui/saveCheck.test.ts` 142, `tests/engine/v67.test.ts`
-  100, `tests/engine/types.test.ts` 54, and in `tests/cloud/migrate.test.ts` 154 and the lifted
-  versions at 299, 431, 650, 742, 838, 865, 877, 891, 910, 941, 999, 1111, 1160, 1199, 1250, 1281,
-  1408 and 1568 (`contracts.test.ts` 609 and `migrate.test.ts` 1443 pin a 43 that is not the
-  version: leave them). And `tests/engine/t30Contract.test.ts` (a window books £600 of material
-  as it is made; the offer card's sentence at 99), `tests/engine/t30Upgrades.test.ts` 110 to 119
-  (eight windows a day want their material), `tests/render/t30Sheets.test.ts` 36 (`working()`: the
-  sheets play only while the line makes windows, which now wants material, and every test of the
-  file builds on it), `tests/ui/t30Line.test.ts` 163 to
-  196 (the `Standing still` row), `tests/engine/warnings.test.ts` 400 to 455 (`WARNING_ORDER`
-  whole) and `tests/scenarios/turn30.test.ts`.
-- C1: `tests/engine/t29Stores.test.ts` and `tests/ui/t29Families.test.ts` (the shelter on the
-  apron, 3 by 6), `tests/engine/metres.test.ts`.
-- C2: `tests/engine/t30Move.test.ts` 51 to 56, 59 to 73, 88 to 90 and 96 (moves to y 17; the
-  refusal's words), `tests/scenarios/turn30.test.ts` 290 (the words) and 311 to 321 (the rack at
-  (20, 18) is on the new lane), `tests/engine/warnings.test.ts` again (`laneBlocked`).
-- D1: the scenarios whose seeded sheet contracts meet a loss or a cut (2.9's last paragraph):
-  `tests/scenarios/autopilot.ts` and the turn13, turn17, turn20 and turn29 scenarios may.
-- C4: `tests/ui/t30Line.test.ts` 204 to 218 (the boxes at the gate become the pallet's picture,
-  `data-line-pallet` kept, two drawn at the most), and any test that lists every file of
-  `public/sprites/` or the Sprite check page's rows. The counts of class pictures and of turns
-  (`tests/render/spriteClasses.test.ts` 218 and 260, `tests/engine/rotate.test.ts` 255) must not
-  move: if one does, a new kind of file was not taught.
-- C3: `tests/engine/v67.test.ts` 184 and 433 and `tests/ui/v67.test.ts` 292 to 326 (the 800 m²
-  unit as the last), and the locker count of 32 as the most.
+- A1: `tests/ui/saveCheck.test.ts` and `tests/ui/version.test.ts` (every pin of 'v95').
+- B2, the pins of STATE_VERSION 47: `tests/ui/saveCheck.test.ts`, `tests/engine/v67.test.ts`,
+  `tests/engine/types.test.ts`, `tests/cloud/v94Lanes.test.ts`, `tests/engine/v93Lines.test.ts`
+  and the lifted versions in `tests/cloud/migrate.test.ts` (`contracts.test.ts`'s `toBe(47)` is a
+  count of minutes, not the version: leave it).
+- B2, the line's own material: `tests/engine/t31Material.test.ts`, `tests/ui/t31Material.test.ts`,
+  `tests/engine/v93Lines.test.ts`, `tests/scenarios/turn31.test.ts`, `tests/scenarios/turn30.test.ts`,
+  `tests/engine/t30Contract.test.ts`, `tests/engine/t30Upgrades.test.ts`, `tests/ui/t30Line.test.ts`,
+  `tests/render/t30Sheets.test.ts`, `tests/engine/t31Books.test.ts`, `tests/engine/t31Shelter.test.ts`.
+- B2, the glazier and the glass state: `tests/engine/t28Timber.test.ts`,
+  `tests/scenarios/turn28.test.ts`, `tests/engine/catalog.test.ts`, `tests/engine/tasks.test.ts`,
+  `tests/engine/warnings.test.ts` (`WARNING_ORDER` whole).
+- B2, the boards' counter, the gate and the stores' refusal: `tests/engine/t29Stores.test.ts`,
+  `tests/engine/t29CrossCheck.test.ts`, `tests/scenarios/turn29.test.ts`.
+- B1: anything that lists every family of the catalogue or of its storage tab, and the board's
+  wanted list of a window (`Needs ... timber store` gains `glass rack`).
 
 ## 6. Do not (tonight)
 
+- Nothing of a sheet job's or a sheet contract's material, to the pound: what they hold, draw, order
+  and pay; nothing of `SHEET_PRICE_LADDER`, `TEMP_STORAGE_COST`, `LOW_STOCK_SHEETS` or the low stock
+  card.
 - No limit on the men of a normal job, and nothing of `addToJob`, `assignJob`, `canBuild`.
-- No change to the timber contracts of Turn 29, the line's contract's terms (its price, its
-  minutes, its pallet, its offer) beyond its material and the two sentences of 2.4, or the three
-  sheet pieces' price, bands, term, short week and payment beyond 2.9.
-- No change to a sheet template, a sheet stage, its shares, or a sheet job's plan.
-- No change to the places, pace, price or power of any family; no change to what asks for a spray
-  booth.
-- No change to the tax, the loan, the overdraft, the bank, the wages, the owner's base, the
-  reputation, the insurance's rate.
-- No change to `crewByFamily`, `MAX_CATCH_UP_MS`, the paced redraw, `playSheets` or the sprite cache
-  headers.
-- No picture drawn, repainted, trimmed or scaled by an agent (the longer hall is cut from the 800 m²
-  picture by a script, and the shelter's two files only change places); no placeholder drawn for a
-  sheet store, and no forklift but L3's; no sound; no new screen; no new CSS token but
-  `--lane-yellow`.
-- No change to the engine for the forklift (2.10): no state, no lift, no minute, no money; in the
-  engine the pallet is at the gate the moment it leaves module 6, as in Turn 30.
+- No change to a timber job's stages, shares, nights or deadline (`TIMBER_LEAD_DAYS` stays as it
+  is written), or to its `materialCost`.
+- No change to the line's contract's price, minutes, pallet, offer, upgrades, engineers, books,
+  lane, forklift or day book, beyond 2.5.
+- No change to the timber contracts of Turn 29 (the client's own timber and glass), or to the oak
+  table's timber.
+- No picture drawn, repainted, trimmed or scaled by an agent; no placeholder painted for the glass
+  racks (the game's own fallback draws them); no new CSS token; no sound; no new screen.
+- No change to the tax, the loan, the overdraft, the bank, the wages, the reputation, the insurance's
+  rate, the hall's extensions.
 - No storage access outside src/cloud/store.ts; no PixiJS, mobile, Steam, Electron.
 - No watch loops, nothing left running.
 
@@ -647,113 +524,79 @@ never kept beside a new one.
 
 - `npm run check` green on its own exit code; the count of tests and files in the report; every
   `it.skip` listed with its line of reason (the aim is none).
-- Material: a window takes 2 boards and 1 glass and is not made without them; the line's boards
-  are held (never free sheets, never a sheet job's, counted on the stores' plates and the boards
-  row); a timber order is one lorry on the next working day, unloaded whole onto the stores or left
-  at the gate; a glass order is in at the next working day's open with no lorry; both paid at the
-  click on the material line and refused past the overdraft; no £600 booked per window; the buttons'
-  refusals in their words; the admin on duty orders at two days left, only what the buttons allow
-  and the timber only into free room; with no admin, nothing is ordered by itself; the line's
-  material stays at the contract's end and is written off at the line's sale, its loads on the way
-  called off; `lineNeedsMaterial` sits directly under `lineNeedsEngineer` and is said only when
-  material is what stops the line. Asserted.
-- Books: the tab is there once the line has stood and not before; each row of each column as 2.5
-  reckons it and the turnover equal to the ledger's for a played month; the efficiency's possible
-  minutes are the contract's working minutes; the paid back line sums the days since the line first
-  stood. Asserted.
-- Lane: its boxes for the line at (2, 14) in the 800 m² hall are the ones of 2.6; a rack is refused
-  on it; the line is refused at the order and in setup mode where its lane is not clear, and can move
-  where it is; a bench already on it shows `laneBlocked` and is not moved; the two yellow lines are
-  drawn under kit and men and follow a move. Asserted.
-- Hall: the price of the first four long extensions; one at a time; the hall 10 m longer the next
-  working morning; the apron moved; the rent, the rates, the power, the insurance, a flat security
-  level and a firm's month, the joiners, the benches and the lockers each up as 2.7 says; no
-  limit; a 100 m hall draws, with no seam seen at x1. Asserted, the picture in the report.
-- Shelter: bought into the 800 m² unit, it stands behind the rear wall, 6 by 3, and never on the
-  apron; its plate is read over the wall; a save's shelter on the apron is moved there. Asserted.
-- Contracts: a sheet contract is lost only at a week's close and only by the side stream, with no
-  second week closed; a lost contract is let go off the tab and offers no term; the quiet days stop
-  every offer but the line's, and never a renewal; a renewal cut is 5 to 15 per cent under the price a
-  piece it had; no timber piece and no line contract is ever touched; where none of the three
-  happens, the seeded offers pinned today are unchanged. Asserted.
-- Forklift: drawn waiting where 2.10 says only while the six stand and the line has its lane, and
-  none with no lane; a pallet that leaves module 6 makes one trip, loaded `nw` then `ne`, empty `sw`
-  then `se`, at 3 cells a second of real time, its row and frames as it goes and frame 0 standing;
-  the newest pallet at the gate not drawn while it is on the forks and drawn once it is set down; a
-  page written mid trip leaves it where it is; no trip from 30x, and a trip ended at a move, a sale, a
-  load and a new morning; nothing of the engine changed; the pallet at the gate drawn from its
-  picture, two at the most, with its label; the three files in `public/sprites/` byte for byte the
-  art side's, and no count of class pictures or turns moved. Asserted.
-- `git diff main --stat -- src/ui/styles.css` shows `--lane-yellow` and no other new token; every
-  changed screen is in the report beside its nearest existing one.
-- The pictures: the running block with the material rows and the two buttons (offered, locked); the
-  strip with `lineNeedsMaterial`; the Production line tab after a played month; the 800 m² hall with
-  the line and its lane; `laneBlocked`; the Premises page's long extension card; a 60 m and a 100 m
-  hall, and a join at the closest zoom; the shelter behind the rear wall with its plate over the
-  wall, and the apron with the van alone; the lost contract's card and its ended block; a renewal
-  card with the cut; the forklift waiting at the line's end, loaded on the front strip, setting the
-  pallet down at the gate, and the pallet standing at the gate with its label; and a strip of the
-  forklift's frames on a trip, if the session can make one.
+- Store: three counters; the sheets' counter holds sheets only; each kind's room, free places, held
+  and free from one function each; the insured value counts all three. Asserted.
+- Restock: each kind refused in its words in the sheets' order; the typed number whole, the empty
+  field filling the free places less what is on its way; the boards on the ladder and the glass at
+  £200; the overflow quoted and sent to the paid store; nothing of the sheets' restock moved by a
+  pound. Asserted.
+- Jobs: a timber job holds its boards and glass at the click from the free stock; its glass units as
+  2.4 reckons them (7 for 3,600 of material); its shortfall of both ordered by one click and by the
+  office admin, on two lorries, at the two prices; its glass taken whole at the start of its Glazing
+  and the job stopped there without it; a drop puts back what it held and writes off what was
+  ordered in, on each counter. Asserted.
+- Line: no order buttons, no line material fields; the contract holds the week's boards and glass
+  after the jobs; a window takes 2 and 1, held first; the admin's restock at two days left, only into
+  free places, his name on the line; with no admin nothing is bought and the strip says `no timber`
+  or `no glass`; ending or selling the line frees what it held and writes nothing off. Asserted.
+- Deliveries: glass comes by lorry and is unloaded; every kind's overflow goes to its paid store at
+  one fee a load and comes back at the morning's one fetch; a kind with no room waits at the gate
+  with its card. Asserted.
+- Racks: both glass racks in the catalogue at their figures, on the floor, drawn by the fallback
+  with their plate, never serviced, refused for sale while their glass would be stranded; a window
+  on the board wants a glass rack and either family satisfies it. Asserted.
+- Gone: every name of 2.8 absent from `src/`. Asserted by a test that searches `src/` for them.
+- The lift of section 4 on raw saves. Asserted.
+- `git diff main --stat -- src/ui/styles.css` shows nothing; every changed screen in the report
+  beside its nearest existing one.
+- The pictures: the Materials page with the three blocks (a restock quoted past the room, a kind
+  refused); the job card's material line with boards and glass, in hand and short; the line's
+  running block without its buttons; the hall with a glass rack of each family and their plates; the
+  board's tile of a window; the lorry's card of a load of glass with no glass rack; the catalogue's
+  storage tab with the two glass racks.
 
 ## 8. Parked
 
-- **The outside sheet store** of 1,000 sheets at about 100,000 [PIOTR]: ordered from the art side
-  on 11.10 (S1), for the turn after its delivery.
-- **The forklift family's own pictures**, a 1 by 1 by 1 m frame beside L3's forklift at true size,
-  and the forks lifting and setting a pallet down: not drawn; Piotr's to say.
-- **The renewal's own rise**: `renegotiatedPriceFor` raises a contract 1 per cent for every full
-  week, so a six month term renewed twice in full is about 60 per cent dearer than it began. That
-  is one reason the contracts pay so well after a while. Not touched tonight: chat asks Piotr
-  whether to cap it.
-- The money of the line and its property cover (Turn 30 section 8).
-- Everything Turn 30 parked.
+- The outside sheet store of 1,000 sheets at about 100,000 [PIOTR, 11.10] (S1, REQUESTS-T31 1).
+- An office admin who restocks the sheets for the sheet contracts as he restocks for the line: not
+  asked; chat asks Piotr.
+- The burglar and the boards and glass (2.2).
+- Everything Turn 31 parked.
 
-## 9. Mockups (docs/mockups/t31/)
+## 9. Mockups (docs/mockups/t32/)
 
 Before the code, each in the classes of the screen it belongs to and beside that screen as it is
-today: (1) the line's running block with its material rows and the row of the two buttons, offered
-and locked, and `Standing still: no timber`, beside the block of Turn 30; (2) the strip with
-`lineNeedsMaterial` and with `laneBlocked`; (3) the Production line tab beside the Summary tab; (4)
-the 800 m² hall with the line and its yellow lane, beside the hall of Turn 30; (5) the Premises
-page with the long extension card beside the second extension's; (6) a longer hall: in A2 the 800 m²
-hall with the ten metres more drawn as an outline on it, the real picture coming with C3 into the
-report; (7) the shelter behind the rear wall with its plate over the wall, beside the shelter on
-the apron; (8) the lost contract's card and its ended block, and a renewal card with the cut,
-beside an ended contract's card and block; (9) the hall with the forklift waiting at the line's
-end, the forklift loaded on the front strip, and the pallet standing at the gate with its label,
-beside Turn 30's boxes at the gate. A README names which is which.
+today: (1) the Materials page with its three blocks, a restock of boards quoted past the stores'
+room and the glass block refused `No glass rack`, beside the page of v95; (2) the job card's
+material line of a window, boards and glass in hand, and both short with the one button, beside the
+card of v95 with its glass figure and its `Order glass`; (3) the line's running block with `Timber
+held` and `Glass held` and no buttons, beside v95's; (4) the hall with a glass rack and a large one
+drawn as kit with no picture is, with their plates, beside a timber rack; (5) the board's tile of a
+window with its boards and glass units, beside v95's; (6) the catalogue's storage tab with the
+`Glass racks` folder. A README names which is which.
 
 ## 10. What chat decided and Piotr has not confirmed
 
 For the report to repeat, each with what was built:
 
-1. A window's £600 split 400 for two boards and 200 for its glass; the material used when a window
-   is made, and the line standing at any minute it has not a window's worth.
-2. The two orders offered only while the line's contract runs; the timber refused when the stores
-   hold fewer than a batch, the glass when module 6 would be over 40; the line's material kept at
-   the contract's end and written off at the line's sale.
-3. The admin orders only what the buttons allow, at the day's open and after each window, and the
-   timber only into free room.
-4. The Production line tab: shown once the line has stood, whether the books are up to date or
-   not; the costs accrued by the calendar day; the year's pace as this month's over its days times
-   the game's 360; the paid back line over the line and its upgrades.
-5. The lane: the front strip to the line's end and the left strip up to the gate, no strip round the
-   line's end; nothing stands on it while the line stands or is on order; what stood there before is
-   named on the strip and not moved; a Turn 30 line too near the front wall keeps its place with no
-   lane; `--lane-yellow`.
-6. The long extensions: 10 m along the wall each; the insurer's and a flat security level's factor
-   the area over 400; 8 lockers more for every 200 m²; the picture cut from the 800 m² one.
-7. The shelter behind the wall, declared 6 by 3, its files back in their places, its plate over the
-   wall; a save's moved.
-8. The contracts: a lost contract's card, words and ended block; no offer at all in the quiet days
-   but the line's and the renewals; the renewal cut at a chance of one in four, under the price a
-   piece it had.
-9. The lift: a running line given one batch of timber and glass free.
-10. The forklift: the line's own, its driver part of the picture; waiting on the front strip in front
-    of module 6, facing `nw`; no lifting drawn, a corner a turn on the spot.
-11. The trip drawn by the renderer alone: the engine's pallet at the gate at once, as in Turn 30, the
-    newest pallet at the gate not drawn while it is on the forks; 3 cells a second of real time, on
-    while the clock is paused, none from 30x.
-12. The pallet at the gate: the second beside the first along x, a part pallet drawn as a full one.
+1. A timber job's glass units: its glass share of its material (`GLASS_SHARE`) over £200, rounded
+   up (7 for a 9,000 casement job); the £200 and the one unit a window are the line's own figures.
+2. The boards restocked on the sheets' ladder, as a timber job's boards are already priced; the
+   glass at a flat £200 a unit, with no ladder.
+3. The glass racks: 2 x 1 x 2 m and 4 x 2 x 2.5 m, 3 and 5 working days, on the floor of any hall;
+   a window or a door on the board wants one, either family.
+4. The admin's ordering for the line (Piotr's of 11.10) kept, as a restock of each kind that fills
+   the stores, for the line only.
+5. Gone with "identically": the glazier and his button, the `Glass not ordered` and `Boards at the
+   gate` strip lines, the boards' whole load rule, the board's refusal of a window too big for the
+   stores, the line's buttons and its glass at module 6.
+6. A bespoke timber job's boards ordered in as bespoke sheets are; its glass from the racks.
+7. A job's glass taken whole when its Glazing starts.
+8. The lift: the glass on the glazier's way and a line's glass on its way put on the counter at once;
+   a line's boards and glass become free stock; Turn 31's first batch given to the counters.
+9. The insurer counts the glass; the burglar takes sheets only, as today.
+10. The low stock badge on each kind's line; the weekly low stock card the sheets' alone.
+11. The words: `glass units`, `Sealed glass units` `IGU-4-16-4`, `Timber boards` `TMB-63-RED`, the
+    three block names, the restock and storage lines, the fetch's label.
 
 End of brief.
