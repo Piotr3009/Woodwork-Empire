@@ -49,3 +49,8 @@ assert it: 118 facts asserted, 29 in part and 22 not. The 51 were closed with
 `tests/engine/t32CrossCheck.test.ts` (16 tests) and additions to `t32Store` (engine and ui),
 `t31Material`, `migrate` and `turn32`; the "what goes" search now also covers `migrate.ts`.
 No skip anywhere, `styles.css` untouched; 3,085 tests in 317 files green.
+
+**T32-E4 Look and shoot.** Seven pictures in `docs/report-t32/`, every one the game's own markup
+from its own render functions over states the engine built and played, shot in headless Chromium,
+each v96 screen beside v95's same screen built from the A1 snapshot. The generators are in the
+session's scratchpad, not in the repo, and no server or browser was left running.
