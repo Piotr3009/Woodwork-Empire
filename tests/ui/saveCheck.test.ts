@@ -140,7 +140,8 @@ describe('a fresh game in this build', () => {
     // (PIOTR, 11.10). v92 is Turn 31 and state 44: the line's timber, glass and day book, the hall
     // made longer, the quiet weeks (CLAUDE.md T31 section 4). v93 is state 45: more lines than one.
     // v94 is state 46: a line given its lane. v95 is state 47: the hall made wider (PIOTR, 12.10).
-    expect(APP_VERSION).toBe('v95');
+    // v96 is Turn 32, still state 47 until its B2 gives the store its three counters.
+    expect(APP_VERSION).toBe('v96');
     expect(STATE_VERSION).toBe(47);
   });
 
