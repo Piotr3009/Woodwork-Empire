@@ -52,12 +52,14 @@ function working(): GameState {
     windowsMade: 0,
     revenue: 0,
     materialCost: 0,
+    boardsReserved: 0,
+    glassReserved: 0,
   };
   // And its timber and glass: from Turn 31 the line makes windows only with a window's worth of
-  // each (CLAUDE.md T31 2.1).
-  lineState(state, 1).boards = 40;
-  state.stock.sheets += 40;
-  lineState(state, 1).glass = 20;
+  // each (CLAUDE.md T31 2.1). Flipped in v96: on the counters of the boards and the glass, the
+  // company's stock that the line takes from (CLAUDE.md T32 2.5).
+  state.stock.boards += 40;
+  state.stock.glass += 20;
   state.clock.minute = 60;
   state.speed = 1;
   state.activeEvent = null;

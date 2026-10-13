@@ -107,6 +107,7 @@ describe('the card', () => {
       unloaded: true,
       bespoke: false,
       overflowSheets: 0,
+      material: 'sheets' as const,
     });
     expect(materialWrittenOff(state, job)).toBe(job.materialCost);
     const rows = rowsOf(renderDropCard(state, job));

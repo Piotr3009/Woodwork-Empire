@@ -4,11 +4,12 @@
 // stock badge, one Restock button at the top, and the projects in green and red under it (T13
 // 3.6). No per project question anywhere (T13 3.3).
 
+import { freeRoomFor } from '../../src/engine/machines';
 import { describe, expect, it } from 'vitest';
 import {
   LOW_STOCK_SHEETS,
 } from '../../src/engine/constants';
-import { rackCapacity, sheetPriceFor, stockFree, stockNumberFor } from '../../src/engine/materials';
+import { rackCapacity, sheetPriceFor, stockNumberFor } from '../../src/engine/materials';
 import { renderLaptop } from '../../src/ui/laptop';
 import { renderMaterials } from '../../src/ui/materials';
 import { money } from '../../src/ui/modal';
@@ -40,11 +41,12 @@ describe('the stock page', () => {
     const lines = page.querySelectorAll('.stock-line');
     expect(lines).toHaveLength(1);
     const line = lines[0] ?? null;
-    expect(line?.getAttribute('data-stock')).toBe('sheet');
+    // The store's kind from v96, `sheets`, its thumbnail the sheet's as before (CLAUDE.md T32 2.7).
+    expect(line?.getAttribute('data-stock')).toBe('sheets');
     // The thumbnail is the placeholder helper's flat board, one per kind (CLAUDE.md T13 9.8).
     expect(line?.querySelector('.stock-thumb svg [data-placeholder="thumb.sheet"]')).not.toBeNull();
     expect(text(line?.querySelector('.stock-name'))).not.toBe('');
-    expect(text(line?.querySelector('.stock-number'))).toBe(stockNumberFor(state, 'sheet'));
+    expect(text(line?.querySelector('.stock-number'))).toBe(stockNumberFor(state, 'sheets'));
     expect(text(line?.querySelector('.stock-number'))).toMatch(/^MFC-18-WHT-\d{3}$/);
   });
 
@@ -110,7 +112,7 @@ describe('the stock page', () => {
   it('fills the rack when no number is typed, and says so on the field', () => {
     const state = fillRack(ready(), 2);
     const page = parse(renderMaterials(state, ''));
-    const fills = stockFree(state);
+    const fills = freeRoomFor(state, 'sheets');
     expect(text(page.querySelector('[data-do="restock"]'))).toBe(
       `Restock: ${fills} sheets, ${money(fills * sheetPriceFor(fills))}`,
     );
@@ -125,7 +127,7 @@ describe('the stock page', () => {
     expect(page.querySelector('[data-do="restock"]')).toBeNull();
     expect(page.querySelector('button[disabled]')?.getAttribute('title')).toBe('No room on the rack');
     const low = fillRack(ready(), 1);
-    const ordered = act(low, { type: 'RESTOCK' });
+    const ordered = act(low, { type: 'RESTOCK', kind: 'sheets' });
     const again = parse(renderMaterials(ordered, '')).querySelector('button[disabled]');
     expect(again?.getAttribute('title')).toContain('on the way');
     // And the load is on the page, on its way.
@@ -173,7 +175,7 @@ describe('the stock page', () => {
     }
     // And it is still the laptop's Stock tab, reached the one way (CLAUDE.md T4 3.1).
     expect(renderLaptop(state, { page: 'stock', stockSheets: '6', teamTab: 'workshop', tickedTasks: [] })).toContain(
-      'data-stock="sheet"',
+      'data-stock="sheets"',
     );
   });
 

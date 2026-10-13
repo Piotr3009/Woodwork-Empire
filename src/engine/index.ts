@@ -283,7 +283,6 @@ export {
   jobProgress,
   openJobs,
   orderForJobCheck,
-  orderGlassCheck,
   orderShortfall,
   ownerJob,
   paperworkDone,
@@ -577,7 +576,10 @@ export {
   deliveriesArrivingOn,
   deliveriesInYard,
   deliveriesOnTheWay,
-  freeSheets,
+  freeFor,
+  glassForJob,
+  glassShortfallOf,
+  glassUnitPrice,
   materialCostFor,
   orderForJobCost,
   boardsCostOf,
@@ -585,7 +587,8 @@ export {
   glassCostOf,
   rackCanSupply,
   rackCapacity,
-  reservedSheets,
+  reservedFor,
+  reserveGlassFor,
   reserveSheetsFor,
   restockSheets,
   sheetsDueFor,
@@ -593,10 +596,11 @@ export {
   shortfallOf,
   sheetPriceFor,
   stockCostFor,
-  stockFree,
   stockIsLow,
   stockNumberFor,
 } from './materials';
+// One function gives a kind's room and one its free places (CLAUDE.md T32 2.2).
+export { freeRoomFor, roomFor } from './machines';
 
 // The hall floor
 export {
@@ -794,7 +798,7 @@ export {
   LIFE_LOW_FRACTION,
   PAST_LIFE_WEEK_HOURS,
   SERVICE_LIFE_EXTENSION,
-  STOCK_LINE_KINDS,
+  STOCK_KINDS,
   STOCK_LINE_NAME,
   TAKE_OFF_BUTTON_LABEL,
 } from './constants';

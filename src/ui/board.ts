@@ -3,6 +3,7 @@
 
 import {
   boardsForJob,
+  glassForJob,
   canAccept,
   formatReputation,
   has,
@@ -15,7 +16,6 @@ import {
 import { NO_INSURANCE_REASON } from '../engine/constants';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { bigJobCheck, bigJobLine, isBigJob } from '../engine/agency';
-import { storesHoldCheck } from '../engine/board';
 import { wantedKit, wantedName } from '../engine/catalog';
 import { effectiveReputation } from '../engine/index';
 import type { Enquiry, GameState } from '../engine/index';
@@ -68,10 +68,14 @@ function tile(state: GameState, enquiry: Enquiry): string {
   const allowed = canAccept(state, enquiry);
   const locked = enquiry.lockReason !== null;
   const byHand = !enquiry.unreachable && locked && enquiry.byHandAvailable;
-  // The boards the job will hold: a window's glass comes from the glazier and is no sheet on the
-  // rack, so its share is not counted (CLAUDE.md T28 2.9).
+  // The boards the job will hold, and a window's glass units beside them, the counts the job taken
+  // from it reads (CLAUDE.md T29 2.9.7, T32 2.4).
   const timber = template(enquiry.templateId).cutters !== null;
-  const sheets = boardsForJob(state, materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial), timber);
+  const materialCost = materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial);
+  const sheets = boardsForJob(state, materialCost, timber);
+  const material = timber
+    ? `${plural(sheets, 'board', 'boards')} and ${plural(glassForJob(materialCost, timber), 'glass unit', 'glass units')}`
+    : plural(sheets, 'sheet', 'sheets');
   // Days of his own time with the machines standing in the hall now, which is the same number
   // the deadline is worked out from (CLAUDE.md T6 3.7).
   const ownerDays =
@@ -115,12 +119,6 @@ function tile(state: GameState, enquiry: Enquiry): string {
     ? '<p class="tile-figures" data-big-job="crew">' +
       `<span class="${bigJobCheck(state, enquiry).ok ? 'good' : 'bad'}">${escapeHtml(bigJobLine(state, enquiry))}</span></p>`
     : '';
-  // A window's boards that the timber stores could not hold even empty: red, in the crew line's
-  // classes, printed only while it is true (CLAUDE.md T29 2.11.3).
-  const stores = storesHoldCheck(state, enquiry);
-  const storesLine = stores.ok
-    ? ''
-    : `<p class="tile-figures" data-stores="short"><span class="bad">${escapeHtml(stores.reason)}</span></p>`;
   const lockLine = enquiry.unreachable
     ? `<p class="lock">Cannot take this: ${escapeHtml(enquiry.blockReason)}</p>`
     : enquiry.lockReason === null
@@ -137,12 +135,11 @@ function tile(state: GameState, enquiry: Enquiry): string {
     `<p class="tile-price">Budget ${money(enquiry.budget)}</p>` +
     `<p class="tile-figures">${escapeHtml(enquiry.finish)} · deadline ` +
     `${days(enquiry.deadlineDays)} · ${escapeHtml(expiryLine(state, enquiry))}</p>` +
-    `<p class="tile-figures">${timber ? plural(sheets, 'board', 'boards') : plural(sheets, 'sheet', 'sheets')} of material · about ` +
+    `<p class="tile-figures">${material} of material · about ` +
     `${plural(ownerDays, 'owner day', 'owner days')}</p>` +
     `<p class="tile-figures">Needs ${escapeHtml(toolsLine(enquiry))}</p>` +
     `<p class="badges">${badges}</p>` +
     crewLine +
-    storesLine +
     lockLine +
     `<div class="tile-action">${action}</div>` +
     '</div>'

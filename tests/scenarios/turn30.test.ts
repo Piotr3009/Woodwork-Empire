@@ -18,8 +18,9 @@
 //       a turn, and put back; two engineers are hired; a window job's Cross cutting is on module 1,
 //       its Finishing on module 5 and its Glazing on module 6, at the engine's own pace.
 // (eee) The offer card comes at the first working morning with the six standing and two engineers
-//       on the books; taken, and from Turn 31 its timber and glass ordered at the same minute and in
-//       the next working morning (CLAUDE.md T31 2.2); a window every 120 minutes and four a working
+//       on the books; taken, and from Turn 32 its timber and glass restocked by the player at the
+//       same minute onto the timber store and the glass rack, in the next working morning, the line
+//       holding its week of them off the stores (CLAUDE.md T32 2.3, 2.5); a window every 120 minutes and four a working
 //       day, each £1,500 in; none in the dinner hour when the owner works through it; the tenth goes
 //       to the gate and is gone the next working morning; with one engineer away no window is made
 //       that day; a window job taken while it runs gets no line and no boards saved; ended, the jobs
@@ -46,7 +47,8 @@ import type { GameEvent, GameState, StagedJob } from '../../src/engine/index';
 import { isOvertime, isWorkingDay } from '../../src/engine/clock';
 import { canBuy } from '../../src/engine/game';
 import { stagedJob } from '../../src/engine/jobs';
-import { lineWindowMinutes } from '../../src/engine/lineContract';
+import { lineWindowMinutes, lineWindowsAWeek } from '../../src/engine/lineContract';
+import { pendingStockSheets } from '../../src/engine/materials';
 import { lineLevel, lineModules } from '../../src/engine/machines';
 import { migrateState } from '../../src/engine/migrate';
 import { jobPace, stagePlanFor } from '../../src/engine/stages';
@@ -60,6 +62,7 @@ import {
   nextDay,
   placeEnquiry,
   placeEquipment,
+  placeGlassRack,
   testJoiner,
   withAir,
   withExtraction,
@@ -160,7 +163,8 @@ function anchors(state: GameState): Array<[number, number]> {
 }
 
 /** The day's windows on its one growing line, and the material booked as they were made: none from
- *  Turn 31, which pays the timber and the glass at their order (CLAUDE.md T31 2.1). */
+ *  Turn 31, which pays the timber and the glass when they are bought, from Turn 32 by the restock
+ *  (CLAUDE.md T31 2.1, T32 2.5). */
 function windowsBooked(state: GameState, on: number): { windows: number[]; material: number[] } {
   return {
     windows: state.ledger.filter((entry) => entry.label === 'Windows off line 1: windows' && entry.day === on).map((entry) => entry.amount),
@@ -170,30 +174,30 @@ function windowsBooked(state: GameState, on: number): { windows: number[]; mater
   };
 }
 
-/** Plays on in half hours until the line's timber is off the lorry and on the stores and its glass
- *  is in, which is the morning after the order (CLAUDE.md T31 2.2). */
+/** Plays on in half hours until the boards and the glass bought for stock are off their lorries and
+ *  on the timber store and the glass rack, which is the morning after the restock: the labourer
+ *  takes them in (CLAUDE.md T32 2.6). Flipped in v96: the glass comes by lorry too. */
 function untilTheMaterialIsIn(state: GameState): GameState {
   let next = state;
-  for (let guard = 0; (lineState(next, 1).boards < 40 || lineState(next, 1).glass < 20) && guard < 200; guard += 1) {
+  for (let guard = 0; next.deliveries.some((delivery) => delivery.jobId === null && !delivery.unloaded) && guard < 200; guard += 1) {
     next = minutes(next, 30);
   }
   return next;
 }
 
-/** The player keeps the line in timber and glass, as the Contracts tab's two buttons let him: an
- *  order of each when what it holds and what is on its way would not last two days at an hour a
- *  window (CLAUDE.md T31 2.2). */
+/** The player keeps the line in timber and glass, as the Materials page's Restock lets him: forty
+ *  boards and twenty glass units for stock when what is on the stores and on its way would not last
+ *  two days at an hour a window (CLAUDE.md T32 2.3, 2.5). Flipped in v96: the line's two order
+ *  buttons are gone, and it takes its material from the stores. */
 function keepInMaterial(state: GameState): GameState {
   let next = state;
-  const boardsComing = next.deliveries.filter((delivery) => delivery.line === 1 && !delivery.unloaded).reduce((total, delivery) => total + delivery.sheets, 0);
-  const glassComing = lineState(next, 1).glassOnTheWay.reduce((total, entry) => total + entry.windows, 0);
-  if (lineState(next, 1).boards + boardsComing < 32) next = act(next, { type: 'ORDER_LINE_TIMBER', line: 1 });
-  if (lineState(next, 1).glass + glassComing < 16) next = act(next, { type: 'ORDER_LINE_GLASS', line: 1 });
+  if (next.stock.boards + pendingStockSheets(next, 'boards') < 32) next = act(next, { type: 'RESTOCK', kind: 'boards', sheets: 40 });
+  if (next.stock.glass + pendingStockSheets(next, 'glass') < 16) next = act(next, { type: 'RESTOCK', kind: 'glass', sheets: 20 });
   return next;
 }
 
-/** A company in the 800 m² unit, the second extension open, with the timber kit and a timber
- *  store, two joiners, and the money for the line. */
+/** A company in the 800 m² unit, the second extension open, with the timber kit, a timber store
+ *  and a glass rack, two joiners, and the money for the line. */
 function timberCompany(): GameState {
   let state = newGame({ difficulty: 'veryEasy' });
   state.cash = 9000000;
@@ -214,6 +218,9 @@ function timberCompany(): GameState {
     ['timberShelter', 40, 1],
   ];
   for (const [id, x, y] of kit) placeEquipment(state, id, { variantId: 'standard', x, y, id: `kit-${id}` });
+  // The line's glass is on the glass racks from Turn 32: a glass rack at the first free cells, at
+  // the back wall and clear of the line and its lane (CLAUDE.md T32 2.1, 2.5).
+  placeGlassRack(state);
   state.workers.push(testJoiner('w-tom', 'Tom'), testJoiner('w-ben', 'Ben'));
   return connectAll(state);
 }
@@ -367,12 +374,18 @@ for (let guard = 0; atOffer === null && guard < 10; guard += 1) {
   });
 }
 const offered: GameState = atOffer ?? hiring;
-// Taken at the card, and from Turn 31 its timber and glass ordered at the same minute from the
-// Contracts tab, in the next working morning: the windows start once the boards are off the lorry
-// (CLAUDE.md T31 2.2).
-const ordered = act(act(act(offered, { type: 'RESOLVE_EVENT', choiceId: 'take' }), { type: 'ORDER_LINE_TIMBER', line: 1 }), {
-  type: 'ORDER_LINE_GLASS',
-  line: 1,
+// Taken at the card, and from Turn 32 its timber and glass restocked at the same minute on the
+// Materials page, forty boards and twenty glass units, in the next working morning: the windows
+// start once both are off their lorries and the line holds its week of them (CLAUDE.md T32 2.3,
+// 2.5). The glass comes by lorry as the boards do, so a morning may bring two loads to take in: a
+// labourer on the books from the take does it, as the (aaa) company's does, so neither waits at
+// the gate behind the other's card (CLAUDE.md T32 2.6) [TUNE].
+const atTake = structuredClone(offered);
+atTake.workers.push({ ...testJoiner('w-gus', 'Gus'), role: 'helper', tier: null, rate: 0 });
+const ordered = act(act(act(atTake, { type: 'RESOLVE_EVENT', choiceId: 'take' }), { type: 'RESTOCK', kind: 'boards', sheets: 40 }), {
+  type: 'RESTOCK',
+  kind: 'glass',
+  sheets: 20,
 });
 let reachedMorning = day(ordered);
 while (!isWorkingDay(reachedMorning.clock.day)) reachedMorning = day(reachedMorning);
@@ -411,18 +424,30 @@ describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () 
     // Not one of the standing contracts (played a day further from Turn 31, so a standing offer of
     // the card's morning may have lapsed by then, and the count is not the check).
     expect(taken.contracts.some((contract) => contract.name === 'Windows off line 1')).toBe(false);
-    // Its timber and glass were paid at the click on the material line (CLAUDE.md T31 2.2).
-    const orders = taken.ledger.filter((entry) => entry.day === offered.clock.day && /for line 1/.test(entry.label));
+    // Its timber and glass were paid at the click on the material line (CLAUDE.md T31 2.2). Flipped
+    // in v96: bought for stock by the restock, the boards on the sheets' ladder (180 a board at
+    // forty) and the glass at 200 a unit (CLAUDE.md T32 2.3).
+    const orders = taken.ledger.filter((entry) => entry.day === offered.clock.day && / for stock$/.test(entry.label));
     expect(orders.map((entry) => [entry.label, entry.amount])).toEqual([
-      ['Timber for line 1: 40 boards', -8000],
-      ['Glass for line 1: 20 windows', -4000],
+      ['40 boards for stock', -7200],
+      ['20 glass units for stock', -4000],
     ]);
+    // And the line holds its week of them off the stores, two boards and a glass unit a window, as
+    // a sheet contract holds its week's sheets (CLAUDE.md T32 2.5).
+    const contract = lineState(taken, 1).contract;
+    expect(taken.stock.boards).toBe(40);
+    expect(taken.stock.glass).toBe(20);
+    expect(contract?.boardsReserved).toBe(Math.min(40, 2 * lineWindowsAWeek(taken, 1)));
+    expect(contract?.glassReserved).toBe(Math.min(20, lineWindowsAWeek(taken, 1)));
   });
 
   it('makes a window every 120 minutes and four a working day, each £1,500 in', () => {
     // From Turn 31 the windows start once the timber is on the stores, the morning after the order,
-    // and none of their material is booked as they are made (CLAUDE.md T31 2.1, 2.2).
-    const running = taken;
+    // and none of their material is booked as they are made (CLAUDE.md T31 2.1, 2.2). Flipped in
+    // v96: the labourer has both loads in by late morning, so the first window's two hours would run
+    // across the dinner hour, in which the line stands; they are counted from one o'clock.
+    const running = minutes(taken, BREAK_START_MINUTE + BREAK_MINUTES - taken.clock.minute);
+    expect(running.clock.minute).toBe(BREAK_START_MINUTE + BREAK_MINUTES);
     expect(windowsBooked(day(offered), offered.clock.day).windows).toEqual([]);
     expect(lineWindowMinutes(running, 1)).toBe(120);
     // Counted from the minutes the window in hand already has: the half hour the material came in.
@@ -476,7 +501,9 @@ describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () 
     engineer.absentDaysRemaining = 1;
     expect(lineLevel(state, 1)).toBe(3);
     const made = lineState(state, 1).contract?.windowsMade ?? 0;
-    expect(lineState(minutes(state, 540), 1).contract?.windowsMade).toBe(made);
+    // Played to five. Flipped in v96: the material is in by late morning, so 540 minutes from here
+    // would run into the next day, when he is back.
+    expect(lineState(minutes(state, 540 - state.clock.minute), 1).contract?.windowsMade).toBe(made);
   });
 
   it('gives a window job taken while it runs no line and no boards saved, and gives the jobs the line back once ended', () => {

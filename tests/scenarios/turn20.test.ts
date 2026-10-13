@@ -374,6 +374,7 @@ function helperDay(): HelperDay {
     unloaded: false,
     bespoke: false,
     overflowSheets: 0,
+    material: 'sheets' as const,
   });
   while (state.clock.day < arriveDay) state = playDay(state, HELPER_DAY, seen);
   const morning = state;

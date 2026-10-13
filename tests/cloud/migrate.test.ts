@@ -154,8 +154,9 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     // from v89: the line bought whole, and its own field (CLAUDE.md T30 section 4). 44 from v92:
     // the line's timber, glass and day book, the hall made longer, the quiet weeks (CLAUDE.md T31
     // section 4). 45 from v93: more lines than one. 46 from v94: a line given its lane. 47 from
-    // v95: the hall made wider.
-    expect(STATE_VERSION).toBe(47);
+    // v95: the hall made wider. 48 from v96: one store for the sheets, the boards and the glass
+    // (CLAUDE.md T32 section 4).
+    expect(STATE_VERSION).toBe(48);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -300,7 +301,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(47);
+    expect(lifted.version).toBe(48);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -432,7 +433,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(47);
+    expect(lifted.version).toBe(48);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
     // told the player he cost (CLAUDE.md T21 2.10). From v38 that holds until the v22 lift, which
@@ -651,7 +652,7 @@ describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
     // There is one track for money from tonight: a cost the player did not choose is paid out of
     // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
     // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
-    expect(lifted.version).toBe(47);
+    expect(lifted.version).toBe(48);
     expect(lifted.cash).toBe(-4998 - 2780);
   });
 
@@ -743,7 +744,7 @@ describe('a v35 save in this build (CLAUDE.md T23 section 4)', () => {
     // A played company starts its list at its next month end: the card the player was shown that
     // evening is the report, and one worked out again tonight would not be that card
     // (CLAUDE.md T23 2.14).
-    expect(lifted.version).toBe(47);
+    expect(lifted.version).toBe(48);
     expect(lifted.monthlyReports).toEqual([]);
   });
 
@@ -839,7 +840,7 @@ describe('a v23 save made under the split day (PIOTR, 21.09; v42)', () => {
   if (lifted === null) throw new Error('the lift refused a version 23 state');
 
   it('comes up at this build s version', () => {
-    expect(lifted.version).toBe(47);
+    expect(lifted.version).toBe(48);
   });
 
   it('takes every man on a running contract off the jobs he was standing on', () => {
@@ -866,7 +867,7 @@ describe('a v24 save in this build (v44)', () => {
   it('comes in with no evening take-over in hand', () => {
     const lifted = migrateState({ version: 24, owner: { wentHome: false } }, 24);
     if (lifted === null) throw new Error('the lift refused a version 24 state');
-    expect(lifted.version).toBe(47);
+    expect(lifted.version).toBe(48);
     expect(lifted.owner.tookOverJobId).toBe(null);
   });
 });
@@ -878,7 +879,7 @@ describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
       25,
     );
     if (lifted === null) throw new Error('the lift refused a version 25 state');
-    expect(lifted.version).toBe(47);
+    expect(lifted.version).toBe(48);
     expect(lifted.dayStats.byMan).toEqual({});
     // The figure the sheet prints above the block is the save's own and is not guessed at.
     expect(lifted.dayStats.workMinutes).toBe(12);
@@ -892,7 +893,7 @@ describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
       };
       const lifted = migrateState(raw.state, raw.state.version);
       if (lifted === null) throw new Error(`${path} did not open`);
-      expect(lifted.version).toBe(47);
+      expect(lifted.version).toBe(48);
       expect(lifted.dayStats.byMan).toEqual({});
     }
   });
@@ -911,7 +912,7 @@ describe('a v25 save in this build (PIOTR, 22.09; v51)', () => {
   if (lifted === null) throw new Error('the lift refused a version 25 state');
 
   it('comes up at this build s version, through v26 on the way', () => {
-    expect(lifted.version).toBe(47);
+    expect(lifted.version).toBe(48);
     expect(lifted.version).toBe(STATE_VERSION);
     expect(lifted.dayStats.byMan).toEqual({});
   });
@@ -942,7 +943,7 @@ describe('a v25 save in this build (PIOTR, 22.09; v51)', () => {
       26,
     );
     if (fromT24 === null) throw new Error('the lift refused a version 26 state');
-    expect(fromT24.version).toBe(47);
+    expect(fromT24.version).toBe(48);
     expect(fromT24.equipment[0]?.servicedDay).toBe(40);
   });
 });
@@ -1000,7 +1001,7 @@ describe('a v27 save in this build (CLAUDE.md T25 section 4)', () => {
 
   it('clears every claim on a machine and never writes one again', () => {
     const lifted = lifted27();
-    expect(lifted.version).toBe(47);
+    expect(lifted.version).toBe(48);
     for (const item of lifted.equipment) expect(item.takenBy, item.id).toBeNull();
   });
 
@@ -1112,7 +1113,7 @@ describe('a v28 save in this build (PIOTR, 24.09; v53)', () => {
 
   it('comes up at this build s version with no job waiting on the CNC', () => {
     const { after } = lifted28();
-    expect(after.version).toBe(47);
+    expect(after.version).toBe(48);
     for (const job of after.jobs) expect('sawFallback' in job, job.id).toBe(false);
   });
 
@@ -1161,7 +1162,7 @@ describe('a v29 save in this build (PIOTR, 24.09; v54)', () => {
 
   it('makes the pallet truck and the better forklift classes of the one family', () => {
     const after = lifted29();
-    expect(after.version).toBe(47);
+    expect(after.version).toBe(48);
     const byId = new Map(after.equipment.map((item) => [item.id, item]));
     expect([byId.get('kit-pt')?.specId, byId.get('kit-pt')?.variantId]).toEqual(['forklift', 'used']);
     expect([byId.get('kit-fb')?.specId, byId.get('kit-fb')?.variantId]).toEqual(['forklift', 'pro']);
@@ -1200,7 +1201,7 @@ describe('a v30 save in this build (PIOTR, 24.09; v55)', () => {
 
   it('empties the bags of the stages that are gone and loses nothing of the job', () => {
     const { after } = lifted30();
-    expect(after.version).toBe(47);
+    expect(after.version).toBe(48);
     const job = after.jobs[0];
     if (job === undefined) throw new Error('the job went missing in the lift');
     expect(job.stageLabour).toEqual({ cutting: job.labourValue * 0.25 });
@@ -1251,7 +1252,7 @@ describe('a v55 save with its spray booths at their old size (PIOTR, 25.09; v56)
     const { raw, used } = hallOfV55();
     const after = migrateState(raw, 31);
     if (after === null) throw new Error('the lift refused a v31 state');
-    expect(after.version).toBe(47);
+    expect(after.version).toBe(48);
     const booth = (id: string) => {
       const item = after.equipment.find((entry) => entry.id === id);
       if (item === undefined) throw new Error(`${id} went missing in the lift`);
@@ -1282,7 +1283,7 @@ describe('a v56 save with timber offers on its board (PIOTR, 25.09; v57)', () =>
     raw.version = 32;
     const after = migrateState(raw, 32);
     if (after === null) throw new Error('the lift refused a v32 state');
-    expect(after.version).toBe(47);
+    expect(after.version).toBe(48);
     const ids = after.enquiries.map((enquiry) => enquiry.id);
     expect(ids).toContain(shelves.id);
     expect(ids).not.toContain(oak.id);
@@ -1398,7 +1399,7 @@ function v41ContractSave(): Record<string, unknown> {
       { id: 'c-old', name: 'Wardrobe fronts for a builder', status: 'ended', assigned: [] },
     ],
     jobs: [
-      { id: 'job-1', stage: 'inProduction', assignees: ['j-10'], glass: 'ordered', glassDay: 52 },
+      { id: 'job-1', stage: 'inProduction', assignees: ['j-10'], timber: true, materialCost: 3600, sheetsReserved: 12, glass: 'ordered', glassDay: 52 },
       { id: 'job-2', stage: 'inProduction', assignees: [], glass: 'ordered', glassDay: 41 },
     ],
   };
@@ -1409,7 +1410,7 @@ describe('a v41 save in this build (CLAUDE.md T29 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 41 state');
 
   it('comes up at this build s version', () => {
-    expect(lifted.version).toBe(47);
+    expect(lifted.version).toBe(48);
   });
 
   it('keeps the four put on a contract first and gives the three taken off back to the boss', () => {
@@ -1442,10 +1443,17 @@ describe('a v41 save in this build (CLAUDE.md T29 section 4)', () => {
     expect(lifted.nextId).toBe(301);
   });
 
-  it('brings a glass on its way forward to the next working day, and leaves one due before it', () => {
-    // Day 40 is a Friday (30 day months, day 1 Monday 1 March 2025): the next working day is 43.
-    expect(lifted.jobs.find((job) => job.id === 'job-1')?.glassDay).toBe(43);
-    expect(lifted.jobs.find((job) => job.id === 'job-2')?.glassDay).toBe(41);
+  it('holds a window s glass ordered from the glazier for it, and gives a job that is no window none', () => {
+    // Flipped in v96: the glazier and his day are gone, and a window's glass ordered from him is on
+    // the glass counter and its own (CLAUDE.md T32 section 4); this fragment has no stock of its own
+    // to put it on, so the job's fields say it.
+    const window = lifted.jobs.find((job) => job.id === 'job-1');
+    expect([window?.glassUnits, window?.glassReserved, window?.glassUsed]).toEqual([7, 7, 0]);
+    expect(lifted.jobs.find((job) => job.id === 'job-2')).toMatchObject({ glassUnits: 0, glassReserved: 0, glassUsed: 0 });
+    for (const job of lifted.jobs) {
+      expect('glass' in job).toBe(false);
+      expect('glassDay' in job).toBe(false);
+    }
   });
 
   it('raises no card for a save with four or fewer on every contract', () => {
@@ -1569,7 +1577,7 @@ describe('a v42 save in this build (CLAUDE.md T30 section 4)', () => {
     const cash = raw.cash;
     const opened = migrateState(raw, 42);
     if (opened === null) throw new Error('the lift refused a whole version 42 state');
-    expect(opened.version).toBe(47);
+    expect(opened.version).toBe(48);
     expect(opened.cash).toBe(cash + 1500000);
     expect(opened.onOrder.some((item) => item.specId.startsWith('windowLine'))).toBe(false);
     expect(opened.equipment.some((item) => item.specId.startsWith('windowLine'))).toBe(false);
@@ -1577,7 +1585,8 @@ describe('a v42 save in this build (CLAUDE.md T30 section 4)', () => {
     expect(refunds.map((entry) => [entry.category, entry.amount])).toEqual([['equipment', 1500000]]);
     // The line's own field, every part at its default: Turn 30's, and from v92 Turn 31's, its day
     // book from the save's own day (CLAUDE.md T31 section 4); from v93 the one record of line 1,
-    // kept for the modules the save held before they were taken back (section 4 of v93).
+    // kept for the modules the save held before they were taken back (section 4 of v93). From v96
+    // the line keeps no timber or glass of its own (CLAUDE.md T32 2.5).
     expect(opened.windowLines).toEqual([{
       number: 1,
       contract: null,
@@ -1586,9 +1595,6 @@ describe('a v42 save in this build (CLAUDE.md T30 section 4)', () => {
       onPallet: 0,
       palletsAtGate: 0,
       upgrades: [],
-      boards: 0,
-      glass: 0,
-      glassOnTheWay: [],
       today: {
         day: 999,
         windows: 0,
@@ -1700,6 +1706,8 @@ function v43Save(): Record<string, unknown> & {
   raw.clock.day = 640;
   raw.activeEvent = null;
   raw.eventQueue = [];
+  // A v43 save's one counter, of sheets and boards both (CLAUDE.md T32 section 4).
+  raw.stock = { sheets: raw.stock.sheets, tempStorageSheets: 0 } as typeof raw.stock;
   return raw;
 }
 
@@ -1709,10 +1717,13 @@ describe('a v43 save in this build (CLAUDE.md T31 section 4)', () => {
     const sheets = raw.stock.sheets;
     const opened = migrateState(raw, 43);
     if (opened === null) throw new Error('the lift refused a whole version 43 state');
-    expect(opened.version).toBe(47);
-    expect(lineState(opened, 1).boards).toBe(0);
-    expect(lineState(opened, 1).glass).toBe(0);
-    expect(lineState(opened, 1).glassOnTheWay).toEqual([]);
+    expect(opened.version).toBe(48);
+    // Flipped in v96: the line keeps no timber or glass of its own, and the save's counters of
+    // boards and glass are nought (CLAUDE.md T32 section 4).
+    expect('boards' in lineState(opened, 1)).toBe(false);
+    expect('glass' in lineState(opened, 1)).toBe(false);
+    expect('glassOnTheWay' in lineState(opened, 1)).toBe(false);
+    expect([opened.stock.boards, opened.stock.glass, opened.stock.tempStorageBoards, opened.stock.tempStorageGlass]).toEqual([0, 0, 0, 0]);
     expect(lineState(opened, 1).today.day).toBe(640);
     expect(lineState(opened, 1).today.windows).toBe(0);
     expect(lineState(opened, 1).days).toEqual([]);
@@ -1723,7 +1734,7 @@ describe('a v43 save in this build (CLAUDE.md T31 section 4)', () => {
     expect(opened.stock.sheets).toBe(sheets);
   });
 
-  it('gives a line whose contract runs one batch of timber and glass, free, on the line and on the counter', () => {
+  it('gives a line whose contract runs one batch of timber and glass, free, on the counters of the boards and the glass', () => {
     const raw = v43Save();
     raw.windowLine.contract = {
       status: 'active',
@@ -1738,9 +1749,12 @@ describe('a v43 save in this build (CLAUDE.md T31 section 4)', () => {
     const cash = (raw as unknown as { cash: number }).cash;
     const opened = migrateState(raw, 43);
     if (opened === null) throw new Error('the lift refused a whole version 43 state');
-    expect(lineState(opened, 1).boards).toBe(40);
-    expect(opened.stock.sheets).toBe(sheets + 40);
-    expect(lineState(opened, 1).glass).toBe(20);
+    // Flipped in v96: the batch is the company's stock, on the counters of its kinds, free, and the
+    // sheets' counter holds sheets only (CLAUDE.md T32 section 4).
+    expect([opened.stock.boards, opened.stock.glass]).toEqual([40, 20]);
+    expect(opened.stock.sheets).toBe(sheets);
+    expect(lineState(opened, 1).contract).toMatchObject({ boardsReserved: 0, glassReserved: 0 });
+    expect('boards' in lineState(opened, 1)).toBe(false);
     expect(opened.cash).toBe(cash);
   });
 });
@@ -1797,9 +1811,210 @@ describe('a v46 save in this build (v95)', () => {
     delete raw.unit.wideExtension;
     const opened = migrateState(raw, 46);
     if (opened === null) throw new Error('the lift refused a whole version 46 state');
-    expect(opened.version).toBe(47);
+    expect(opened.version).toBe(48);
     expect(opened.unit).toEqual({ ...state.unit, wideExtensions: 0, wideExtension: 'none' });
     expect(opened.cash).toBe(state.cash);
     expect(opened.equipment).toEqual(state.equipment);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v47 to v48 (v96, Turn 32): one store for the sheets, the boards and the glass, the glazier gone,
+// and the line fed from the stores (CLAUDE.md T32 section 4)
+// ---------------------------------------------------------------------------
+
+type Raw = Record<string, unknown>;
+
+/** The 800 m2 company of today with a timber rack and 20 sheets, and casement windows of 9,000 taken
+ *  (3,600 of material each: 12 boards and 7 glass units), each holding its 12 boards off the stores. */
+function v96Windows(names: string[]): GameState {
+  let state = newGame({ difficulty: 'veryEasy' });
+  state.cash = 9000000;
+  state = lift(state, { type: 'EXTEND_UNIT' });
+  state = lift(state, { type: 'EXTEND_UNIT', stage: 'second' });
+  state = buyStartingKit(state);
+  state.reputation = 40;
+  state.enquiries = [];
+  state.activeEvent = null;
+  state.eventQueue = [];
+  placeEquipment(state, 'timberRack', { variantId: 'standard', x: 2, y: 6, id: 'kit-timber' });
+  state.stock.sheets = 20;
+  state.stock.boards = 12 * names.length;
+  for (const name of names) {
+    const enquiry = placeEnquiry(state, {
+      templateId: 'casementWindows',
+      name,
+      price: 9000,
+      basePrice: 9000,
+      finish: 'laminate',
+      materialKind: 'solidWood',
+      deadlineDays: 60,
+    });
+    state = acceptNow(state, enquiry.id);
+  }
+  for (const job of state.jobs) {
+    job.stage = 'inProduction';
+    state.tasks = state.tasks.filter((task) => task.jobId !== job.id);
+  }
+  return state;
+}
+
+/** The job's bar stood at the start of its Glazing: every stage before it worked, none of it. */
+function atItsGlazing(state: GameState, name: string): void {
+  const job = state.jobs.find((entry) => entry.name === name);
+  if (job === undefined) throw new Error(`${name} is on the books`);
+  const glazing = stagePlanFor(state, job).find((stage) => stage.id === 'assembly');
+  if (glazing === undefined) throw new Error('a window has its Glazing');
+  job.stageLabour = {};
+  job.labourRemaining = job.labourValue - glazing.from - 0.5;
+  if (currentStage(state, job)?.id !== 'assembly') throw new Error(`${name} stands at its Glazing`);
+}
+
+/** Today's game written raw and put back in v95's shape: one counter of sheets and boards, the
+ *  glazier's two fields on every job, and a delivery's marks of boards and of a line in place of its
+ *  kind. `glass` names each window's glass as v95 held it. */
+function v47Of(state: GameState, glass: Record<string, 'none' | 'toOrder' | 'ordered' | 'in'>): Raw & {
+  stock: Raw;
+  jobs: Raw[];
+  deliveries: Raw[];
+  windowLines: Raw[];
+} {
+  const raw = JSON.parse(JSON.stringify(state)) as ReturnType<typeof v47Of>;
+  raw.version = 47;
+  const boards = state.jobs.filter((job) => job.timber === true).reduce((total, job) => total + job.sheetsReserved, 0);
+  raw.stock = { sheets: state.stock.sheets + boards, tempStorageSheets: state.stock.tempStorageSheets };
+  for (const job of raw.jobs) {
+    delete job.glassUnits;
+    delete job.glassReserved;
+    delete job.glassUsed;
+    job.glass = glass[job.name as string] ?? 'none';
+    job.glassDay = job.glass === 'ordered' ? state.clock.day + 1 : null;
+  }
+  for (const delivery of raw.deliveries) {
+    if (delivery.material === 'boards') delivery.boards = true;
+    delete delivery.material;
+  }
+  for (const record of raw.windowLines) {
+    record.boards = 0;
+    record.glass = 0;
+    record.glassOnTheWay = [];
+    if (record.contract !== null && typeof record.contract === 'object') {
+      delete (record.contract as Raw).boardsReserved;
+      delete (record.contract as Raw).glassReserved;
+    }
+  }
+  return raw;
+}
+
+function jobOf(state: GameState, name: string) {
+  const job = state.jobs.find((entry) => entry.name === name);
+  if (job === undefined) throw new Error(`${name} is on the books`);
+  return job;
+}
+
+describe('a v47 save in this build (CLAUDE.md T32 section 4)', () => {
+  it('splits the one counter, and puts a window s glass in the window once its Glazing has begun and on the counter before it', () => {
+    const today = v96Windows(['Oak Lane', 'Elm Row']);
+    atItsGlazing(today, 'Elm Row');
+    const raw = v47Of(today, { 'Oak Lane': 'in', 'Elm Row': 'in' });
+    expect(raw.stock).toEqual({ sheets: 20 + 24, tempStorageSheets: 0 });
+    const opened = migrateState(raw, 47);
+    if (opened === null) throw new Error('the lift refused a whole version 47 state');
+    expect(opened.version).toBe(48);
+    // The sheets' counter holds sheets only; the boards the windows held are on theirs; of the glass
+    // only Oak Lane's, held, is on the counter: Elm Row's is in its window.
+    expect(opened.stock).toEqual({ sheets: 20, boards: 24, glass: 7, tempStorageSheets: 0, tempStorageBoards: 0, tempStorageGlass: 0 });
+    const oak = jobOf(opened, 'Oak Lane');
+    const elm = jobOf(opened, 'Elm Row');
+    expect([oak.sheetsReserved, oak.glassUnits, oak.glassReserved, oak.glassUsed]).toEqual([12, 7, 7, 0]);
+    expect([elm.sheetsReserved, elm.glassUnits, elm.glassReserved, elm.glassUsed]).toEqual([12, 7, 0, 7]);
+    for (const job of opened.jobs) {
+      expect('glass' in job).toBe(false);
+      expect('glassDay' in job).toBe(false);
+      expect('glassInBeforeTheLift' in job).toBe(false);
+    }
+    expect(opened.cash).toBe(today.cash);
+  });
+
+  it('holds a window s glass ordered from the glazier on the counter for it, its price paid, and makes no load', () => {
+    const today = v96Windows(['Oak Lane']);
+    const raw = v47Of(today, { 'Oak Lane': 'ordered' });
+    const opened = migrateState(raw, 47);
+    if (opened === null) throw new Error('the lift refused a whole version 47 state');
+    expect([opened.stock.sheets, opened.stock.boards, opened.stock.glass]).toEqual([20, 12, 7]);
+    const oak = jobOf(opened, 'Oak Lane');
+    expect([oak.glassUnits, oak.glassReserved, oak.glassUsed]).toEqual([7, 7, 0]);
+    expect(opened.deliveries).toEqual(today.deliveries);
+    expect(opened.cash).toBe(today.cash);
+  });
+
+  it('leaves a window s glass still to order to be ordered, holding nothing', () => {
+    const today = v96Windows(['Oak Lane']);
+    const opened = migrateState(v47Of(today, { 'Oak Lane': 'toOrder' }), 47);
+    if (opened === null) throw new Error('the lift refused a whole version 47 state');
+    expect(opened.stock.glass).toBe(0);
+    expect(jobOf(opened, 'Oak Lane')).toMatchObject({ glassUnits: 7, glassReserved: 0, glassUsed: 0 });
+  });
+
+  it('puts a running line s boards, its glass at module 6 and on its way onto the counters free, and its load on the road a load of boards for stock', () => {
+    const today = v96Windows([]);
+    lineState(today, 1).contract = {
+      status: 'active',
+      startDay: today.clock.day,
+      windowsThisWeek: 2,
+      weekStartDay: today.clock.day,
+      windowsMade: 30,
+      revenue: 45000,
+      materialCost: 18000,
+      boardsReserved: 0,
+      glassReserved: 0,
+    };
+    const raw = v47Of(today, {});
+    raw.stock.sheets = 20 + 24;
+    const record = raw.windowLines[0] as Raw;
+    record.boards = 24;
+    record.glass = 8;
+    record.glassOnTheWay = [{ windows: 20, day: today.clock.day + 1 }];
+    raw.deliveries = [
+      {
+        id: 'del-line-1',
+        jobId: null,
+        sheets: 40,
+        orderedDay: today.clock.day,
+        pricePaid: 8000,
+        arriveDay: today.clock.day + 1,
+        arrived: false,
+        unloaded: false,
+        bespoke: false,
+        overflowSheets: 0,
+        boards: true,
+        line: 1,
+      },
+    ];
+    const opened = migrateState(raw, 47);
+    if (opened === null) throw new Error('the lift refused a whole version 47 state');
+    expect([opened.stock.sheets, opened.stock.boards, opened.stock.glass]).toEqual([20, 24, 8 + 20]);
+    const line = lineState(opened, 1);
+    for (const key of ['boards', 'glass', 'glassOnTheWay']) expect(key in line).toBe(false);
+    expect(line.contract).toMatchObject({ status: 'active', windowsMade: 30, boardsReserved: 0, glassReserved: 0 });
+    expect(opened.deliveries).toHaveLength(1);
+    const load = opened.deliveries[0];
+    expect([load?.material, load?.jobId, load?.sheets, load?.pricePaid]).toEqual(['boards', null, 40, 8000]);
+    expect(load !== undefined && ('boards' in load || 'line' in load)).toBe(false);
+    expect(opened.cash).toBe(today.cash);
+  });
+
+  it('opens a save with neither a window nor a line at the defaults: the sheets as they were, nought of the rest', () => {
+    const today = v96Windows([]);
+    const raw = v47Of(today, {});
+    raw.deliveries = [
+      { id: 'del-1', jobId: null, sheets: 30, orderedDay: 10, pricePaid: 1500, arriveDay: 11, arrived: false, unloaded: false, bespoke: false, overflowSheets: 0 },
+    ];
+    const opened = migrateState(raw, 47);
+    if (opened === null) throw new Error('the lift refused a whole version 47 state');
+    expect(opened.stock).toEqual({ sheets: 20, boards: 0, glass: 0, tempStorageSheets: 0, tempStorageBoards: 0, tempStorageGlass: 0 });
+    expect(opened.deliveries[0]?.material).toBe('sheets');
+    expect(opened.windowLines).toEqual(today.windowLines);
+    expect(opened.cash).toBe(today.cash);
   });
 });

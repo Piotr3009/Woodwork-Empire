@@ -23,11 +23,13 @@
 //       give level 5; one engineer let go gives three modules and the strip's line; none gives a
 //       line that stands still and the old machines' pace; module 3 is refused for sale while 4
 //       stands.
-// (aaa) Played with a labourer on duty: a window's boards arrive with no timber store, are refused,
-//       and the card and the strip say so; with a timber rack they come in onto it and the sheet
-//       racks count sheets only; a second window's boards that the rack has no room for stand at
-//       the gate and come in whole once the first has drawn its own; a window dropped with its
-//       boards at the gate leaves no load and no board behind.
+// (aaa) Played with a labourer on duty: a window's boards arrive with no timber store and wait at
+//       the gate, and the card says so; with a timber rack they come in onto it and the sheet
+//       counter counts sheets only; what of a second window's boards the rack has no room for goes
+//       to the paid store for one fee and comes back at the next morning's fetch; a window dropped
+//       with its loads on the road has them written off as a sheet job's are, and they come in as
+//       free stock. Flipped in v96: the boards' whole load rule, the strip's line for them at the
+//       gate and the drop's own branch for them are gone (CLAUDE.md T32 2.4, 2.6, 2.8.2).
 // (bbb) A company in the 800 m² unit is offered sash windows as a contract, takes it with four
 //       men, is paid for every window with nothing off the racks, and makes more of them a week
 //       with the line than without; a company in the 400 m² unit is never offered one and its
@@ -42,6 +44,7 @@ import {
   LINE_FACTOR,
   LINE_MODULES,
   SPRAY_ROBOT_FINISH_FACTOR,
+  TEMP_STORAGE_COST,
 } from '../../src/engine/constants';
 import {
   contractAssignCheck,
@@ -55,11 +58,11 @@ import {
   offeredContract,
 } from '../../src/engine/contracts';
 import { applyAction } from '../../src/engine/index';
-import type { Contract, Delivery, GameEvent, GameState, StagedJob } from '../../src/engine/index';
+import type { Contract, Delivery, GameEvent, GameState, StagedJob, StockKind } from '../../src/engine/index';
 import { addWorkingDays } from '../../src/engine/clock';
 import { freeJoiners, stagedJob } from '../../src/engine/jobs';
-import { boardsHeld, hallPace, lineLevel, lineModules, sheetsOnCounter } from '../../src/engine/machines';
-import { canUnload, stockOnItem } from '../../src/engine/materials';
+import { hallPace, lineLevel, lineModules } from '../../src/engine/machines';
+import { boardsCostOf, freeFor, glassCostOf, stockOnItem } from '../../src/engine/materials';
 import { migrateState } from '../../src/engine/migrate';
 import { chance, pick } from '../../src/engine/rng';
 import { hiringOptions } from '../../src/engine/staff';
@@ -79,6 +82,7 @@ import {
   nextDay,
   placeEnquiry,
   placeEquipment,
+  placeGlassRack,
   sixJoinersOnSheetWork,
   testJoiner,
   withAir,
@@ -449,9 +453,9 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10; f
 // (aaa)
 // ---------------------------------------------------------------------------------------------
 
-/** The script that plays (aaa): it takes no work of its own, orders a job's boards once its
- *  paperwork is done, does the desk work, and puts a free joiner on a job; the unloading is the
- *  labourer's. */
+/** The script that plays (aaa): it takes no work of its own, orders a job's boards and glass once
+ *  its paperwork is done, does the desk work, and puts a free joiner on a job; the unloading and the
+ *  fetch are the labourer's. */
 const STORES_SCRIPT: Policy = { ...CAREFUL, buyKit: false, maxOpenJobs: 0, wanted: [] };
 
 /** A window of the board, taken as the engine takes it, and the job it became. */
@@ -489,8 +493,10 @@ function playUntil(
   return next;
 }
 
-function loadOf(state: GameState, jobId: string): Delivery | undefined {
-  return state.deliveries.find((delivery) => delivery.jobId === jobId);
+/** The job's own load of one kind: a window's boards and its glass come on two lorries (CLAUDE.md
+ *  T32 2.4). */
+function loadOf(state: GameState, jobId: string, material: StockKind = 'boards'): Delivery | undefined {
+  return state.deliveries.find((delivery) => delivery.jobId === jobId && delivery.material === material);
 }
 
 function atTheGate(state: GameState, jobId: string): boolean {
@@ -498,23 +504,27 @@ function atTheGate(state: GameState, jobId: string): boolean {
   return load !== undefined && !load.unloaded && load.arriveDay <= state.clock.day;
 }
 
-describe('(aaa) boards and the timber stores, played with a labourer on duty (CLAUDE.md T29 2.11)', () => {
+describe('(aaa) boards and the timber stores, played with a labourer on duty (CLAUDE.md T29 2.11, T32 2.6)', () => {
   // The company of a save made before the stores: the timber kit and no store, a labourer on the
   // books, and a window of 19 boards taken as v83 took it.
   // Twenty sheets of MFC on the sheet rack beside them, so its plate has something to count.
   const company = fillRack(timberCompany(), 20);
   company.equipment = company.equipment.filter((item) => item.specId !== 'timberShelter');
+  // A glass rack stands from the first day, so a window's glass comes in onto it and the scenario
+  // is about the boards (CLAUDE.md T32 2.1).
+  placeGlassRack(company);
   company.workers.push({ ...testJoiner('w-gus', 'Gus'), role: 'helper', tier: null, rate: 0 });
   const first = takeWindow(company, 14000, 'Sash windows for Mrs Patel');
   const seen: GameEvent[] = [];
   // The boards ordered, come, and standing at the gate with nowhere to go.
   const waiting = playUntil(first.state, (now) => atTheGate(now, first.jobId), seen);
-  // The card is raised the morning the lorry comes: on the screen, or answered already.
+  // The card is raised the morning the lorry comes: on the screen, or answered already. A load the
+  // labourer can take in raises none, so the card is the boards'.
   const refusedCard = [...seen, waiting.activeEvent, ...waiting.eventQueue].find(
     (event) => event?.kind === 'deliveryArrived',
   );
   const firstLoad = loadOf(waiting, first.jobId);
-  const sheetsBefore = sheetsOnCounter(waiting);
+  const sheetsBefore = waiting.stock.sheets;
   // A day at the gate, the labourer on duty and nothing for him to put it on.
   const stood = playDay(waiting, STORES_SCRIPT, seen);
   // A timber rack bought; it comes, and the labourer takes the boards in onto it.
@@ -523,79 +533,106 @@ describe('(aaa) boards and the timber stores, played with a labourer on duty (CL
   const rackOrder = bought.onOrder.find((item) => item.specId === 'timberRack');
   const inside = playUntil(bought, (now) => loadOf(now, first.jobId)?.unloaded === true, seen);
 
-  it('refuses the boards with no timber store, and the card and the strip say so', () => {
-    expect(firstLoad?.boards).toBe(true);
+  it('refuses the boards with no timber store, and the card says so', () => {
+    expect(firstLoad?.material).toBe('boards');
     expect(firstLoad?.sheets).toBe(19);
     expect(refusedCard?.body).toBe(
       '19 boards have arrived and there is no timber store to put them on. Buy one from the catalogue.',
     );
     expect(refusedCard?.choices).toEqual([{ id: 'later', label: 'Leave it at the gate' }]);
-    expect(warnings(waiting).find((entry) => entry.key === 'boardsAtTheGate')?.text).toBe(
-      'Boards at the gate, no timber store: Sash windows for Mrs Patel',
-    );
+    // Flipped in v96: the strip's own line for boards at the gate is gone, and the card is the word
+    // a load of any kind with no room gets (CLAUDE.md T32 2.6, 2.8.2).
+    expect(warnings(waiting).map((entry) => entry.key as string)).not.toContain('boardsAtTheGate');
     // A whole day on and the labourer has not taken it in, nor sent any of it to the paid store.
     expect(loadOf(stood, first.jobId)?.unloaded).toBe(false);
+    expect(stood.stock.tempStorageBoards).toBe(0);
     expect(stood.stock.tempStorageSheets).toBe(0);
-    expect(sheetsOnCounter(stood)).toBe(sheetsBefore);
+    expect(stood.stock.boards).toBe(0);
+    expect(stood.stock.sheets).toBe(sheetsBefore);
+    // Its glass came on its own lorry, onto the glass rack, and is held for it (CLAUDE.md T32 2.4).
+    const job = stood.jobs.find((entry) => entry.id === first.jobId);
+    expect(loadOf(stood, first.jobId, 'glass')?.unloaded).toBe(true);
+    expect(job?.glassUnits).toBeGreaterThan(0);
+    expect(job?.glassReserved).toBe(job?.glassUnits);
+    expect(stood.stock.glass).toBe(job?.glassUnits);
   });
 
-  it('takes them in whole onto a timber rack, and the sheet racks count sheets only', () => {
+  it('takes them in onto a timber rack, and the sheet counter counts sheets only', () => {
     expect(rackOrder?.dueDay).toBe(addWorkingDays(rackDay, 3));
     expect(inside.equipment.some((item) => item.specId === 'timberRack')).toBe(true);
-    expect(boardsHeld(inside)).toBeGreaterThan(0);
-    expect(inside.stock.tempStorageSheets).toBe(0);
-    expect(sheetsOnCounter(inside)).toBe(sheetsBefore);
+    // Flipped in v96: the boards have a counter of their own (CLAUDE.md T32 2.2). What the window
+    // has drawn since they came in is off it.
+    const job = inside.jobs.find((entry) => entry.id === first.jobId);
+    expect(inside.stock.boards).toBeGreaterThan(0);
+    expect(inside.stock.boards + (job?.sheetsUsed ?? 0)).toBe(19);
+    expect(inside.stock.tempStorageBoards).toBe(0);
+    expect(inside.stock.sheets).toBe(sheetsBefore);
     expect(sheetsBefore).toBe(20);
     const rack = inside.equipment.find((item) => item.specId === 'timberRack');
     const sheetRack = inside.equipment.find((item) => item.specId === 'sheetRack');
     if (rack === undefined || sheetRack === undefined) throw new Error('both racks stand');
-    expect(stockOnItem(inside, rack)).toBe(boardsHeld(inside));
+    expect(stockOnItem(inside, rack)).toBe(inside.stock.boards);
     expect(stockOnItem(inside, sheetRack)).toBe(20);
-    expect(warnings(inside).some((entry) => entry.key === 'boardsAtTheGate')).toBe(false);
   });
 
-  it('keeps a second window s boards at the gate for room, and takes them in whole once the first has drawn its own', () => {
-    // A second window of more boards than the rack has room for while the first holds its own, and
-    // no more than the rack holds empty, so the board takes it.
+  it('sends what of a second window s boards the rack has no room for to the paid store for one fee, and fetches it the next morning', () => {
+    // A second window of more boards than the rack has room for while the first holds its own.
+    // Flipped in v96: they come in the morning they land, what fits on the rack and the rest to the
+    // paid store, as a sheet job's sheets do (CLAUDE.md T32 2.6, 2.8.2).
     const second = takeWindow(inside, 26000, 'Sash windows for the Old Rectory');
     const wanted = second.state.jobs.find((job) => job.id === second.jobId)?.sheets ?? 0;
-    expect(wanted).toBeGreaterThan(40 - 19);
-    expect(wanted).toBeLessThanOrEqual(40);
+    expect(wanted).toBeGreaterThan(40 - inside.stock.boards);
     const seen2: GameEvent[] = [];
-    const gate = playUntil(second.state, (now) => atTheGate(now, second.jobId), seen2);
-    const load = loadOf(gate, second.jobId);
-    expect(load?.boards).toBe(true);
-    expect(canUnload(gate, load)).toBe(false);
-    expect(warnings(gate).find((entry) => entry.key === 'boardsAtTheGate')?.text).toBe(
-      'Boards at the gate, no room on the stores: Sash windows for the Old Rectory',
-    );
-    // A third window taken and dropped while its boards stand at the gate behind it: no load, no
-    // task and no board left behind.
-    const third = takeWindow(gate, 14000, 'Sash windows for the vicarage');
-    const thirdAt = playUntil(third.state, (now) => atTheGate(now, third.jobId), seen2);
-    const thirdLoad = loadOf(thirdAt, third.jobId);
-    expect(thirdLoad).toBeDefined();
-    const counter = thirdAt.stock.sheets;
-    const dropped = act(thirdAt, { type: 'DROP_JOB', jobId: third.jobId });
-    expect(dropped.deliveries.some((delivery) => delivery.id === thirdLoad?.id)).toBe(false);
-    expect(dropped.tasks.some((task) => task.deliveryId === thirdLoad?.id)).toBe(false);
-    expect(dropped.stock.sheets).toBe(counter);
-    // Played on: the first window draws its boards as it is made, and the second load comes in
-    // whole the day there is room for all of it, never a part to the paid store.
-    let now = dropped;
-    let guard = 0;
-    while (loadOf(now, second.jobId)?.unloaded !== true && guard < 80 && now.gameOver === null) {
-      guard += 1;
-      now = playDay(now, STORES_SCRIPT, seen2);
-      expect(now.stock.tempStorageSheets).toBe(0);
-      expect(boardsHeld(now)).toBeLessThanOrEqual(40);
-    }
-    expect(loadOf(now, second.jobId)?.unloaded).toBe(true);
-    const secondJob = now.jobs.find((job) => job.id === second.jobId);
-    expect(secondJob?.sheetsReserved).toBe(wanted);
-    // The first window had drawn its own by then: the rack never held more than its forty.
-    expect(boardsHeld(now)).toBeLessThanOrEqual(40);
-    expect(sheetsOnCounter(now)).toBe(20);
+    const landed = playUntil(second.state, (now) => loadOf(now, second.jobId)?.unloaded === true, seen2);
+    const load = loadOf(landed, second.jobId);
+    expect(load?.unloaded).toBe(true);
+    const fee = landed.ledger.filter((entry) => entry.category === 'storage');
+    expect(fee).toHaveLength(1);
+    const stored = Number(/^Temporary storage for (\d+) boards$/.exec(fee[0]?.label ?? '')?.[1] ?? 0);
+    expect(stored).toBeGreaterThan(0);
+    expect(fee[0]?.amount).toBe(-TEMP_STORAGE_COST);
+    // The whole load is the job's, on the rack or in the store: one order is one order.
+    const held = landed.jobs.find((job) => job.id === second.jobId);
+    expect((held?.sheetsReserved ?? 0) + (held?.sheetsUsed ?? 0)).toBe(wanted);
+    // The next morning's one fetch brings them back, the labourer's chore.
+    const fetch = landed.tasks.filter((task) => task.kind === 'fetchStorage');
+    expect(fetch.map((task) => task.label)).toEqual([`Fetch ${stored} boards from storage`]);
+    const fetched = playUntil(landed, (now) => now.stock.tempStorageBoards === 0, seen2, 3);
+    expect(fetched.stock.tempStorageBoards).toBe(0);
+    expect(fetched.tasks.find((task) => task.kind === 'fetchStorage')?.done).toBe(true);
+    expect(fetched.stock.sheets).toBe(20);
+  });
+
+  it('writes off a dropped window s loads as a sheet job s are, calls none of them off, and they come in free', () => {
+    // A third window taken, its boards and glass ordered by the owner's one click, and dropped the
+    // same minute with both loads on the road. Flipped in v96: the Turn 29 branch that called its
+    // loads off is gone; what was ordered in for it is written off on the one line a sheet job's is,
+    // and the loads come on their day and are the company's free stock (CLAUDE.md T32 2.4).
+    const third = takeWindow(inside, 14000, 'Sash windows for the vicarage');
+    const seen3: GameEvent[] = [];
+    const ordered = act(third.state, { type: 'ORDER_FOR_JOB', jobId: third.jobId });
+    const boards = loadOf(ordered, third.jobId);
+    const glass = loadOf(ordered, third.jobId, 'glass');
+    expect(boards?.arrived).toBe(false);
+    expect(glass?.arrived).toBe(false);
+    const job = ordered.jobs.find((entry) => entry.id === third.jobId);
+    if (job === undefined) throw new Error('the third window is taken');
+    const counters = { ...ordered.stock };
+    const dropped = act(ordered, { type: 'DROP_JOB', jobId: third.jobId });
+    expect(dropped.deliveries.filter((delivery) => delivery.jobId === third.jobId)).toHaveLength(2);
+    expect(dropped.ledger.filter((entry) => entry.label === 'Material written off: Sash windows for the vicarage').map((entry) => entry.amount)).toEqual([
+      -Math.round((boardsCostOf(job.materialCost, true) + glassCostOf(job)) * 100) / 100,
+    ]);
+    expect(dropped.ledger.some((entry) => entry.label === 'Glass written off: Sash windows for the vicarage')).toBe(false);
+    expect(dropped.stock.boards).toBe(counters.boards);
+    expect(dropped.stock.glass).toBe(counters.glass);
+    // Played on: both lorries come and are taken in, onto the stores, free.
+    const after = playUntil(dropped, (now) => now.deliveries.filter((delivery) => delivery.jobId === third.jobId).every((delivery) => delivery.unloaded), seen3, 6);
+    expect(after.deliveries.filter((delivery) => delivery.jobId === third.jobId).every((delivery) => delivery.unloaded)).toBe(true);
+    // Nobody holds them: the first window holds its own and nothing more.
+    expect(after.stock.tempStorageBoards + after.stock.tempStorageGlass).toBe(0);
+    expect(freeFor(after, 'boards')).toBe(boards?.sheets);
+    expect(freeFor(after, 'glass')).toBe(glass?.sheets);
   });
 });
 

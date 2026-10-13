@@ -191,9 +191,6 @@ import {
   nextLineNumber,
   findVariant,
   menAtPlaces,
-  boardRoom,
-  freeBoardRoom,
-  sheetsOnCounter,
 } from './machines';
 import {
   acceptEnquiry,
@@ -219,7 +216,6 @@ import {
   runBookedTransport,
   dropJob,
   endTheStands,
-  orderGlassFor,
   BUILDING_ROLES,
   takeOffJob,
   takeOverJob,
@@ -227,20 +223,15 @@ import {
 } from './jobs';
 import {
   answerLineOffer,
-  arriveLineGlass,
   buyLineUpgrade,
   emptyLineUpgrades,
   endLineContract,
   openLineDay,
-  orderLineGlass,
-  orderLineTimber,
   runLineDay,
   runLineMinute,
-  writeOffLineMaterial,
 } from './lineContract';
 import {
   arriveDeliveries,
-  arriveGlass,
   buyStock,
   canUnload,
   deliveriesArrivingOn,
@@ -249,9 +240,8 @@ import {
   rackCapacity,
   restockSheets,
   stockIsLow,
+  storedWords,
   unloadIntoStock,
-  isBoards,
-  lineLoadInWords,
   loadWords,
 } from './materials';
 import {
@@ -373,6 +363,7 @@ import type {
   Orientation,
   PeriodTotals,
   Speed,
+  StockKind,
   TaskInstance,
   TaskOrder,
   Worker,
@@ -475,7 +466,7 @@ export function createGame(options: NewGameOptions): GameState {
     },
     laptopBootedOnDay: null,
     taskQueue: [],
-    stock: { sheets: 0, tempStorageSheets: 0 },
+    stock: { sheets: 0, boards: 0, glass: 0, tempStorageSheets: 0, tempStorageBoards: 0, tempStorageGlass: 0 },
     equipment: [],
     onOrder: [],
     workers: [],
@@ -650,18 +641,17 @@ function startDay(state: GameState): void {
   runContractDay(state);
   runInsuranceDay(state);
   runBurglary(state);
-  if (state.stock.tempStorageSheets > 0) {
+  // One chore brings back every kind in the paid store, its label naming what it brings: `Fetch 12
+  // sheets, 30 boards and 5 glass units from storage` (CLAUDE.md T32 2.6) [TUNE].
+  const stored = storedWords(state);
+  if (stored !== '') {
     createTask(state, {
       kind: 'fetchStorage',
-      label: `Fetch ${state.stock.tempStorageSheets} sheets from storage`,
+      label: `Fetch ${stored} from storage`,
       minutes: AD_HOC_TASK_MINUTES.fetchStorage,
     });
   }
   const arriving = arriveDeliveries(state);
-  // The glass due today is at the benches, carried in by the glazier (CLAUDE.md T28 2.9), and the
-  // line's at module 6 (CLAUDE.md T31 2.2).
-  arriveGlass(state);
-  arriveLineGlass(state);
   const kit = arriveEquipmentOrders(state);
   collectSoldMachines(state);
   runBookedTransport(state);
@@ -998,7 +988,7 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
           { id: 'later', label: 'Leave it at the gate' },
         ]
       : [{ id: 'later', label: 'Leave it at the gate' }];
-    const body = deliveryCardBody(state, delivery, room);
+    const body = deliveryCardBody(delivery, room);
     queueEvent(state, {
       kind: 'deliveryArrived',
       title: 'Delivery at the gate',
@@ -1009,24 +999,22 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
   }
 }
 
-/** The lorry's card in the words of its load: sheets want a rack, and boards room on the timber
- *  stores for the whole load (CLAUDE.md T2 3.6, T29 2.11.2). */
-function deliveryCardBody(state: GameState, delivery: Delivery, room: boolean): string {
-  // The line's timber inside the card's sentences: `40 boards for the line` (CLAUDE.md T31 2.2).
-  const load = delivery.line !== undefined ? lineLoadInWords(delivery.sheets, delivery.line) : loadWords(state, delivery);
+/** The lorry's card in the words of its load: each kind wants its own kit, and a load waits at the
+ *  gate only while its kind has none at all, since what does not fit goes to the paid store
+ *  (CLAUDE.md T2 3.6, T32 2.6). */
+function deliveryCardBody(delivery: Delivery, room: boolean): string {
+  const load = loadWords(delivery);
   if (room) return `${load} have arrived. Nothing can be made until they are inside.`;
-  if (!isBoards(state, delivery)) {
-    return `${load} have arrived and there is no shelving to put them on. Buy some from the catalogue.`;
-  }
-  const stores = boardRoom(state);
-  if (stores <= 0) return `${load} have arrived and there is no timber store to put them on. Buy one from the catalogue.`;
-  return (
-    `${load} have arrived and the timber stores have room for ${freeBoardRoom(state)}. ` +
-    (delivery.line !== undefined
-      ? 'They wait at the gate until the line or a job uses its boards or another store is bought.'
-      : 'They wait at the gate until a job uses its boards or another store is bought.')
-  );
+  return `${load} have arrived and there is ${NO_KIT_WORDS[delivery.material]}`;
 }
+
+/** The end of the lorry's card when a load's kind has no kit at all, in its kind's words
+ *  (CLAUDE.md T32 2.6). */
+const NO_KIT_WORDS: Record<StockKind, string> = {
+  sheets: 'no shelving to put them on. Buy some from the catalogue.',
+  boards: 'no timber store to put them on. Buy one from the catalogue.',
+  glass: 'no glass rack to put them on. Buy one from the catalogue.',
+};
 
 /** Whether today's summary is one the player asked to see. Daily is every day, weekly is Friday
  *  and monthly is the last working day of the month (CLAUDE.md T4 3.6). */
@@ -1710,7 +1698,8 @@ function raiseNoMaterial(state: GameState): void {
 /** A rack under a tenth full is worth a word in the morning, once a week (CLAUDE.md T2 3.6).
  *  It never interrupts the working day: the line under the hall carries the live figure. */
 function checkLowStock(state: GameState): void {
-  if (!stockIsLow(state)) return;
+  // The sheets' card alone, in its words of today (CLAUDE.md T32 2.3) [TUNE: chat].
+  if (!stockIsLow(state, 'sheets')) return;
   if (!state.jobs.some((job) => job.stage !== 'completed')) return;
   const week = weekOfDay(state.clock.day);
   if (state.lastLowStockDay !== null && weekOfDay(state.lastLowStockDay) === week) return;
@@ -1718,11 +1707,11 @@ function checkLowStock(state: GameState): void {
   queueEvent(state, {
     kind: 'lowStock',
     title: 'The rack is nearly empty',
-    // The sheets on the counter, never the boards the timber jobs hold (CLAUDE.md T29 2.11.2).
+    // The sheets on their own counter (CLAUDE.md T29 2.11.2, T32 2.2).
     body:
-      `${plural(sheetsOnCounter(state), 'sheet', 'sheets')} left of ` +
+      `${plural(state.stock.sheets, 'sheet', 'sheets')} left of ` +
       `${rackCapacity(state)}. Order material before the benches stop.`,
-    data: { sheets: sheetsOnCounter(state) },
+    data: { sheets: state.stock.sheets },
   });
 }
 
@@ -2349,16 +2338,14 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'ACCEPT_ENQUIRY':
       acceptEnquiry(next, action.enquiryId, action.byHand);
       break;
-    case 'ORDER_GLASS':
-      orderGlassFor(next, action.jobId);
-      break;
     case 'ORDER_FOR_JOB':
       // The job's shortfall, bought at the ad hoc price for that job (CLAUDE.md T13 3.3).
       orderShortfall(next, action.jobId);
       break;
     case 'RESTOCK':
-      // The number the player typed, capped at the free places in the rack (CLAUDE.md T17 2.20).
-      buyStock(next, restockSheets(next, action.sheets));
+      // The number the player typed, whole, or what fills the kind's free places when he typed none
+      // (CLAUDE.md T17 2.20, T24 2.8, T32 2.3).
+      buyStock(next, action.kind, restockSheets(next, action.kind, action.sheets));
       break;
     case 'DROP_JOB':
       // The client has his deposit back and the company takes the hit (CLAUDE.md T9 3.9).
@@ -2438,7 +2425,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       placeSoftwareOrder(next, action.mode);
       break;
     case 'BUY_STOCK':
-      buyStock(next, action.sheets);
+      buyStock(next, 'sheets', action.sheets);
       break;
     case 'SET_SHOW_WHY':
       next.showWhy = action.on;
@@ -2506,16 +2493,6 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'BUY_LINE_UPGRADE':
       // The cash leaves at the click; the upgrade is fitted ten working days on (CLAUDE.md T30 2.10).
       buyLineUpgrade(next, action.line, action.upgradeId);
-      break;
-    case 'ORDER_LINE_TIMBER':
-      // Forty boards for a line, paid at the click, on the next working day's lorry (CLAUDE.md T31
-      // 2.2).
-      orderLineTimber(next, action.line);
-      break;
-    case 'ORDER_LINE_GLASS':
-      // Glass for twenty windows, paid at the click, at module 6 the next working day (CLAUDE.md T31
-      // 2.2).
-      orderLineGlass(next, action.line);
       break;
     case 'SET_SECOND_SHIFT':
       // No manager, no second shift (CLAUDE.md T13 3.9).
@@ -3127,9 +3104,7 @@ export function cancelOrder(state: GameState, orderId: string): BuyCheck {
   if (!delivery) return { ok: false, reason: 'Nothing on order' };
   if (delivery.arrived) return { ok: false, reason: 'It is at the gate' };
   if (timeIsPaused(state)) state.speed = 1;
-  // The line's timber in its own words (CLAUDE.md T31 2.2).
-  const what = delivery.line !== undefined ? lineLoadInWords(delivery.sheets, delivery.line) : loadWords(state, delivery);
-  refund(state, 'material', `Order cancelled: ${what}`, delivery.pricePaid);
+  refund(state, 'material', `Order cancelled: ${loadWords(delivery)}`, delivery.pricePaid);
   state.deliveries = state.deliveries.filter((entry) => entry.id !== delivery.id);
   const job = delivery.jobId === null ? null : findJob(state, delivery.jobId);
   if (job !== null && job.stage === 'materialOrdered') {
@@ -3183,13 +3158,11 @@ export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
     disconnectExtraction(state, sold.id);
   }
   // A running line contract ends the day the line is sold, and its upgrades go with it for nothing
-  // (CLAUDE.md T30 2.3.5, 2.6, 2.10).
+  // (CLAUDE.md T30 2.3.5, 2.6, 2.10). Nothing is written off: the boards and the glass are the
+  // company's stock, and what the contract held is free again (CLAUDE.md T32 2.5).
   if (line !== null) {
     endLineContract(state, line);
     emptyLineUpgrades(state, line);
-    // And its timber and glass are written off, its loads on the way called off (CLAUDE.md T31
-    // 2.1).
-    writeOffLineMaterial(state, line);
   }
   return OK;
 }

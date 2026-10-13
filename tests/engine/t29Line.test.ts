@@ -456,6 +456,8 @@ describe('the line on its own contract gives the jobs nothing (CLAUDE.md T30 2.5
       windowsMade: 0,
       revenue: 0,
       materialCost: 0,
+      boardsReserved: 0,
+      glassReserved: 0,
     };
     expect(lineLevel(working, 1)).toBe(6);
     const plan = planOf(working);
@@ -507,8 +509,9 @@ describe('the boards the line saves (CLAUDE.md T29 2.9.7, T30 2.5)', () => {
       });
       const tile = document.createElement('div');
       tile.innerHTML = renderBoard(state, '');
-      expect(tile.querySelector(`[data-enquiry="${enquiry.id}"]`)?.textContent, `${modules}`).toContain(
-        `${boards} boards of material`,
+      // Flipped in v96: a window's glass units beside its boards (CLAUDE.md T32 2.7).
+      expect(tile.querySelector(`[data-enquiry="${enquiry.id}"]`)?.textContent, `${modules}`).toMatch(
+        new RegExp(`${boards} boards and \\d+ glass units of material`),
       );
       const taken = acceptNow(state, enquiry.id);
       const job = taken.jobs.find((entry) => entry.templateId === 'sashWindows');

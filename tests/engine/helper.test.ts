@@ -299,6 +299,7 @@ describe('the labourer does the labourer s work (CLAUDE.md T17 2.3)', () => {
       unloaded: false,
       bespoke: false,
       overflowSheets: 0,
+      material: 'sheets' as const,
     });
     const unload = createTask(state, {
       kind: 'unload',

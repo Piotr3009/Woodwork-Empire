@@ -64,7 +64,7 @@ import {
   weekWanted,
 } from '../../src/engine/contracts';
 import { workerMinuteCost } from '../../src/engine/jobs';
-import { freeSheets, reservedSheets } from '../../src/engine/materials';
+import { freeFor, reservedFor } from '../../src/engine/materials';
 import {
   accumulateMachineMinute,
   hallPace,
@@ -710,13 +710,13 @@ describe('the material off the rack (CLAUDE.md T17 2.22)', () => {
   it('holds what the week wants on the rack, and the free stock counts it', () => {
     const state = joinerHall();
     const contract = packs(state, 20);
-    const free = freeSheets(state);
+    const free = freeFor(state, 'sheets');
     // Twenty packs at 0.15 of a sheet each: three sheets for the week.
     expect(contractShortfall(state, contract)).toBe(3);
     expect(reserveContractSheets(state, contract)).toBe(3);
     expect(contract.sheetsReserved).toBe(3);
-    expect(reservedSheets(state)).toBeGreaterThanOrEqual(3);
-    expect(freeSheets(state)).toBe(free - 3);
+    expect(reservedFor(state, 'sheets')).toBeGreaterThanOrEqual(3);
+    expect(freeFor(state, 'sheets')).toBe(free - 3);
     // Nothing more is held once the week is covered.
     expect(reserveContractSheets(state, contract)).toBe(0);
   });
@@ -762,7 +762,7 @@ describe('the material off the rack (CLAUDE.md T17 2.22)', () => {
     runContractDay(state);
     expect(contract.status).toBe('ended');
     expect(contract.sheetsReserved).toBe(0);
-    expect(reservedSheets(state)).toBe(0);
+    expect(reservedFor(state, 'sheets')).toBe(0);
   });
 });
 

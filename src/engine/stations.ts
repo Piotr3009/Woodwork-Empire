@@ -24,7 +24,6 @@ import {
   stockStrandedBySale,
   stockWords,
 } from './machines';
-import { isBoards } from './materials';
 import type { Cell } from './pipes';
 import type { Equipment, GameState, StockKind, TaskInstance } from './types';
 import { covers, footprintCells, isFree, isWalkable } from './walk';
@@ -99,10 +98,12 @@ export function unloadStation(task: TaskInstance, sheets: number, far: string = 
 
 /** The far end of an unloading's walk: the sheet rack for a load of sheets, the first timber rack
  *  on the floor for a load of boards, and the gate itself for boards with only a shelter, since
- *  nobody is walked out of the hall to it (CLAUDE.md T29 2.11.2; behind the wall from T31 2.8). */
+ *  nobody is walked out of the hall to it (CLAUDE.md T29 2.11.2; behind the wall from T31 2.8); the
+ *  first glass rack of either family for a load of glass (CLAUDE.md T32 2.6) [TUNE]. */
 export function unloadFarStation(state: GameState, task: TaskInstance): string {
   const delivery = task.deliveryId === null ? null : state.deliveries.find((entry) => entry.id === task.deliveryId);
-  if (!delivery || !isBoards(state, delivery)) return STATION_RACK;
+  if (!delivery || delivery.material === 'sheets') return STATION_RACK;
+  if (delivery.material === 'glass') return firstStoreOf(state, 'glass') === null ? STATION_GATE : STATION_GLASS_RACK;
   return firstStoreOf(state, 'boards') === null ? STATION_GATE : STATION_TIMBER_RACK;
 }
 

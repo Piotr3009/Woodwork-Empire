@@ -60,17 +60,15 @@ import {
   hallStops,
   lifecycleSteps,
   nightsLeft,
-  orderGlassCheck,
+  orderForJobCheck,
   paperworkDone,
   refreshJob,
   WAITING_FOR_GLASS,
 } from '../../src/engine/jobs';
 import { bubbleFor } from '../../src/engine/bubbles';
-import { boardsCostOf, glassCostOf, sheetsForCost } from '../../src/engine/materials';
-import { WARNING_ORDER, warnings } from '../../src/engine/warnings';
+import { boardsCostOf, glassCostOf, glassForJob, glassUnitPrice, sheetsForCost, unloadIntoStock } from '../../src/engine/materials';
 import { materialLine } from '../../src/ui/jobCard';
 import { renderBoard } from '../../src/ui/board';
-import { formatCalendarDay } from '../../src/engine/clock';
 import { workPlan } from '../../src/engine/plan';
 import { migrateState } from '../../src/engine/migrate';
 import { planPlaces } from '../../src/engine/production';
@@ -327,15 +325,16 @@ describe('a timber job s stages (CLAUDE.md T28 2.7)', () => {
     expect(oak.timber).toBeUndefined();
     expect(stagePlanFor(state, oak).map((stage) => stage.id)).toEqual(['cutting', 'edging', 'moulding', 'assembly']);
     expect(stageLabel('assembly', oak)).toBe('Assembly');
-    // It carries no glass and stands no night: lifted to 41 with none, and played through.
-    expect(oak.glass).toBe('none');
+    // It carries no glass and stands no night: lifted to 41 with none, and played through. Flipped in
+    // v96: its glass is a count of units, nought (CLAUDE.md T32 2.4).
+    expect([oak.glassUnits, oak.glassReserved, oak.glassUsed]).toEqual([0, 0, 0]);
     expect(oak.curing).toBeNull();
     expect(nightsLeft(state, oak)).toBe(0);
     let played = state;
     for (let step = 0; step < 6; step += 1) played = tick(clearEvents(played), 60);
     const after = played.jobs.find((entry) => entry.id === oak.id);
     expect(after?.curing ?? null).toBeNull();
-    expect(after?.glass).toBe('none');
+    expect(after?.glassUnits).toBe(0);
     // And a new one is not a window either.
     const kitted = timberHall();
     placeEquipment(kitted, 'thicknesser', { variantId: 'standard', x: 12, y: 6 });
@@ -358,6 +357,8 @@ describe('where a window man is drawn (CLAUDE.md T28 2.7)', () => {
     const windowJob = state.jobs.find((job) => job.templateId === 'sashWindows');
     const kitchenJob = state.jobs.find((job) => job.templateId === 'smallKitchen');
     if (windowJob === undefined || kitchenJob === undefined) throw new Error('jobs wanted');
+    // Flipped in v96: the window's boards lie on their own counter (CLAUDE.md T32 2.2).
+    state.stock.boards = windowJob.sheets;
     for (const job of [windowJob, kitchenJob]) {
       job.stage = 'inProduction';
       job.sheetsReserved = job.sheets;
@@ -404,6 +405,8 @@ function standingAt(stageId: 'pressing' | 'finishing', template = 'sashWindows')
   const job = firstJob(state);
   job.stage = 'inProduction';
   job.sheetsReserved = job.sheets;
+  // Flipped in v96: a window's boards lie on their own counter (CLAUDE.md T32 2.2).
+  if (job.timber === true) state.stock.boards = job.sheets;
   job.designMinutesRemaining = 0;
   const tom = testJoiner('w-tom', 'Tom');
   state.workers.push(tom);
@@ -525,8 +528,11 @@ describe('the glass (CLAUDE.md T28 2.9)', () => {
   it('is a timber job s alone: 0.35 of the material, the boards the rest', () => {
     const { state, job } = sashJob();
     expect(GLASS_SHARE).toBe(0.35);
-    expect(job.glass).toBe('toOrder');
-    expect(job.glassDay).toBeNull();
+    // Flipped in v96: the glass is a count of units, the glass share over the line's 200 a unit,
+    // rounded up, none held on a store with no glass on it (CLAUDE.md T32 2.4).
+    expect(job.glassUnits).toBe(Math.ceil(glassCostOf(job) / glassUnitPrice()));
+    expect(job.glassUnits).toBe(glassForJob(job.materialCost, true));
+    expect([job.glassReserved, job.glassUsed]).toEqual([0, 0]);
     expect(glassCostOf(job)).toBe(Math.round(job.materialCost * 0.35 * 100) / 100);
     expect(boardsCostOf(job.materialCost, true) + glassCostOf(job)).toBeCloseTo(job.materialCost, 2);
     expect(job.sheets).toBe(sheetsForCost(boardsCostOf(job.materialCost, true)));
@@ -535,43 +541,34 @@ describe('the glass (CLAUDE.md T28 2.9)', () => {
     const kitchen = placeEnquiry(state, { templateId: 'smallKitchen', name: 'Small kitchen', price: 5000 });
     const next = acceptNow(state, kitchen.id);
     const sheet = next.jobs.find((entry) => entry.templateId === 'smallKitchen');
-    expect(sheet?.glass).toBe('none');
+    expect(sheet?.glassUnits).toBe(0);
     expect(sheet?.sheets).toBe(sheetsForCost(sheet?.materialCost ?? 0));
   });
 
-  it('cannot be ordered before the paperwork is done, and is ordered by the owner s click after it', () => {
+  it('is ordered with the boards by the one Order for this job, on a lorry of its own at 200 a unit', () => {
+    // Flipped in v96: the glazier and his button are gone; the window's glass short of the racks is
+    // ordered as a sheet job's shortfall is, with its boards, by the one click (CLAUDE.md T32 2.4).
     const { state, job } = sashJob();
-    expect(paperworkDone(state, job)).toBe(false);
-    expect(orderGlassCheck(state, job)).toEqual({ ok: false, reason: 'The drawing is not finished' });
-    expect(materialLine(state, job)).toContain('data-glass="toOrder"');
-    // The button names the piece still to do: never the drawing once the strip says it is done.
-    const finish = (kind: string): void => {
-      for (const task of state.tasks) if (task.jobId === job.id && task.kind === kind) task.done = true;
-    };
-    finish('design');
-    job.designMinutesRemaining = 0;
-    expect(orderGlassCheck(state, job)).toEqual({ ok: false, reason: 'The site measure is not done' });
-    finish('siteMeasure');
-    expect(orderGlassCheck(state, job)).toEqual({ ok: false, reason: 'The material list is not made' });
     paperworkOf(state, job);
-    expect(orderGlassCheck(state, job)).toEqual({ ok: true, reason: '' });
+    expect(paperworkDone(state, job)).toBe(true);
+    expect(orderForJobCheck(state, job)).toEqual({ ok: true, reason: '' });
     const html = materialLine(state, job);
-    expect(html).toContain('Glass not ordered');
-    expect(html).toContain('data-do="orderGlass"');
+    expect(html).not.toContain('data-do="orderGlass"');
     expect(html).toContain('data-do="orderForJob"');
     const cash = state.cash;
-    const after = act(state, { type: 'ORDER_GLASS', jobId: job.id });
-    const ordered = firstJob(after);
-    expect(ordered.glass).toBe('ordered');
-    expect(ordered.glassDay).toBe(addWorkingDays(after.clock.day, GLASS_DELIVERY_WORKING_DAYS));
-    expect(after.cash).toBeCloseTo(cash - glassCostOf(job), 2);
-    const line = after.ledger[after.ledger.length - 1];
+    const after = act(state, { type: 'ORDER_FOR_JOB', jobId: job.id });
+    const glass = after.deliveries.filter((delivery) => delivery.jobId === job.id && delivery.material === 'glass');
+    expect(glass.map((delivery) => [delivery.sheets, delivery.pricePaid, delivery.arriveDay])).toEqual([
+      [job.glassUnits, job.glassUnits * 200, nextWorkingDay(after.clock.day)],
+    ]);
+    expect(after.deliveries.filter((delivery) => delivery.jobId === job.id && delivery.material === 'boards')).toHaveLength(1);
+    expect(after.cash).toBeLessThan(cash - job.glassUnits * 200);
+    const line = after.ledger.find((entry) => entry.label === 'Material for Sash windows: glass');
     expect(line?.category).toBe('material');
-    expect(line?.label).toBe('Glass for Sash windows');
-    expect(materialLine(after, ordered)).toContain(`Glass ordered, here on ${formatCalendarDay(ordered.glassDay ?? 0)}`);
-    // No minutes of his day: the clock did not move.
+    expect(line?.amount).toBe(-job.glassUnits * 200);
+    // No minutes of his day: the clock did not move; and no second order while it is on its way.
     expect(after.clock.minute).toBe(state.clock.minute);
-    expect(orderGlassCheck(after, ordered).reason).toBe('Ordered already');
+    expect(orderForJobCheck(after, firstJob(after)).reason).toBe('On its way already');
   });
 
   it('is ordered by the office admin with the boards', () => {
@@ -583,18 +580,19 @@ describe('the glass (CLAUDE.md T28 2.9)', () => {
     paperworkOf(state, job);
     refreshJob(state, job);
     expect(job.stage).toBe('materialOrdered');
-    expect(job.glass).toBe('ordered');
-    expect(state.ledger.some((entry) => entry.label === 'Glass for Sash windows, ordered by Sue')).toBe(true);
-    expect(state.ledger.some((entry) => entry.label.startsWith('Material for Sash windows'))).toBe(true);
+    // Flipped in v96: on two lorries, each named for its kind and for her (CLAUDE.md T32 2.4).
+    expect(state.deliveries.filter((delivery) => delivery.jobId === job.id).map((delivery) => delivery.material).sort()).toEqual(['boards', 'glass']);
+    expect(state.ledger.some((entry) => entry.label === 'Material for Sash windows: glass, ordered by Sue')).toBe(true);
+    expect(state.ledger.some((entry) => entry.label === 'Material for Sash windows: boards, ordered by Sue')).toBe(true);
     expect(autoOrderMaterial(state, job)).toBe(false);
   });
 
-  it('arrives the next working day, at the open of its day, and stops the Glazing until it does', () => {
+  it('comes by lorry the next working day, and stops the Glazing until it is unloaded', () => {
     const { state, job } = sashJob();
     paperworkOf(state, job);
-    const ordered = act(state, { type: 'ORDER_GLASS', jobId: job.id });
+    const ordered = act(state, { type: 'ORDER_FOR_JOB', jobId: job.id });
     const windowJob = firstJob(ordered);
-    // At the Glazing with every bag before it full.
+    // At the Glazing with every bag before it full, its boards in hand.
     const plan = stagePlanFor(ordered, windowJob);
     const bags: Partial<Record<string, number>> = {};
     for (const stage of plan) if (stage.id !== 'assembly') bags[stage.id] = stage.to - stage.from;
@@ -604,39 +602,38 @@ describe('the glass (CLAUDE.md T28 2.9)', () => {
     expect(hallStops(ordered, windowJob)).toBe(WAITING_FOR_GLASS);
     expect(WAITING_FOR_GLASS).toBe('waiting for glass');
     // Flipped in v84 (CLAUDE.md T29 2.1): the day it is ordered it is still on its way, and the
-    // next working day's open it is in.
+    // next working day's open it is in. Flipped in v96: in on a lorry, and unloaded as any load is
+    // (CLAUDE.md T32 2.6).
     expect(GLASS_DELIVERY_WORKING_DAYS).toBe(1);
-    expect(windowJob.glass).toBe('ordered');
-    expect(windowJob.glassDay).toBe(nextWorkingDay(ordered.clock.day));
+    const load = ordered.deliveries.find((delivery) => delivery.jobId === windowJob.id && delivery.material === 'glass');
+    expect(load?.arriveDay).toBe(nextWorkingDay(ordered.clock.day));
     let morning = ordered;
     morning.clock.minute = DAY_END_MINUTE;
     morning = clearEvents(act(clearEvents(morning), { type: 'END_DAY' }));
-    expect(firstJob(morning).glass, String(morning.clock.day)).toBe('in');
-    expect(morning.clock.day).toBe(windowJob.glassDay);
+    expect(morning.clock.day).toBe(load?.arriveDay);
+    const arrived = morning.deliveries.find((delivery) => delivery.id === load?.id);
+    expect(arrived?.arrived).toBe(true);
+    expect(morning.tasks.some((task) => task.kind === 'unload' && task.deliveryId === load?.id && task.label === `Unload ${windowJob.glassUnits} glass units`)).toBe(true);
+    expect(hallStops(morning, firstJob(morning))).toBe(WAITING_FOR_GLASS);
+    if (arrived === undefined) throw new Error('the glass is at the gate');
+    arrived.unloaded = true;
+    unloadIntoStock(morning, arrived);
+    expect(firstJob(morning).glassReserved).toBe(windowJob.glassUnits);
     expect(hallStops(morning, firstJob(morning))).toBe('');
-    expect(materialLine(morning, firstJob(morning))).toContain('Glass is in');
+    expect(materialLine(morning, firstJob(morning))).toContain(`${windowJob.glassUnits} of ${windowJob.glassUnits} glass units in hand`);
   });
 
-  it('is said on the strip while it is to order, directly under the drawing line', () => {
-    expect(WARNING_ORDER.indexOf('glassNotOrdered')).toBe(WARNING_ORDER.indexOf('drawingDone') + 1);
-    const { state, job } = sashJob();
-    const line = (now: GameState): string | undefined => warnings(now).find((entry) => entry.key === 'glassNotOrdered')?.text;
-    // Not before the paperwork is done.
-    expect(line(state)).toBeUndefined();
-    paperworkOf(state, job);
-    expect(line(state)).toBe('Glass not ordered: Sash windows');
-    const after = act(state, { type: 'ORDER_GLASS', jobId: job.id });
-    expect(line(after)).toBeUndefined();
-  });
-
-  it('is lost with a job dropped after it was ordered, as its boards are', () => {
+  it('is written off with a job dropped after it was ordered in for it, as its boards are', () => {
     const { state, job } = sashJob();
     paperworkOf(state, job);
-    const ordered = act(state, { type: 'ORDER_GLASS', jobId: job.id });
+    const ordered = act(state, { type: 'ORDER_FOR_JOB', jobId: job.id });
     const windowJob = firstJob(ordered);
-    const cost = glassCostOf(windowJob);
+    // Flipped in v96: one write off of what was ordered in for it, its boards and its glass, as a
+    // sheet job's is (CLAUDE.md T32 2.4); the glazier's own line is gone.
+    const cost = boardsCostOf(windowJob.materialCost, true) + glassCostOf(windowJob);
     expect(dropJob(ordered, windowJob.id)).toBe(true);
-    const loss = ordered.ledger.find((entry) => entry.label === 'Glass written off: Sash windows');
+    expect(ordered.ledger.some((entry) => entry.label.startsWith('Glass written off'))).toBe(false);
+    const loss = ordered.ledger.find((entry) => entry.label === 'Material written off: Sash windows');
     expect(loss?.amount).toBeCloseTo(-cost, 2);
   });
 });
@@ -769,8 +766,10 @@ describe('timber on the board of the 800 m2 hall (CLAUDE.md T28 2.3)', () => {
       'Needs cross cut saw, four sided planer, spindle moulder, sander, frame press, spray booth, sash window cutter set, timber store, glass rack</p>',
     );
     const job = firstJob(acceptNow(state, enquiry.id));
-    const figure = html.match(/(\d+) boards? of material/);
+    // Flipped in v96: the boards and the glass units both (CLAUDE.md T32 2.7).
+    const figure = html.match(/(\d+) boards? and (\d+) glass units? of material/);
     expect(Number(figure?.[1])).toBe(job.sheets);
+    expect(Number(figure?.[2])).toBe(job.glassUnits);
   });
 
   it('never has the agency draw a window or a door as a big job, at the tier the windows are weighted at', () => {
@@ -890,14 +889,4 @@ describe('what the cross check pins besides (CLAUDE.md T28 section 7)', () => {
     ]);
   });
 
-  it('refuses the owner s click on Order glass before the paperwork is done', () => {
-    const { state, job } = sashJob();
-    const cash = state.cash;
-    const lines = state.ledger.length;
-    const after = act(state, { type: 'ORDER_GLASS', jobId: job.id });
-    expect(firstJob(after).glass).toBe('toOrder');
-    expect(firstJob(after).glassDay).toBeNull();
-    expect(after.cash).toBe(cash);
-    expect(after.ledger.length).toBe(lines);
-  });
 });

@@ -19,9 +19,9 @@ import {
   arriveDeliveries,
   deliveriesInYard,
   fetchFromStorage,
-  freeSheets,
+  freeFor,
   rackCapacity,
-  reservedSheets,
+  reservedFor,
   shortfallOf,
   unloadIntoStock,
 } from '../../src/engine/materials';
@@ -84,8 +84,8 @@ describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2
     expect(storage).toHaveLength(1);
     expect(storage[0]?.amount).toBeCloseTo(-TEMP_STORAGE_COST, 6);
     // The whole load is claimed, so the rack has nothing to spare for anybody else.
-    expect(reservedSheets(state)).toBe(job.sheets);
-    expect(freeSheets(state)).toBe(0);
+    expect(reservedFor(state, 'sheets')).toBe(job.sheets);
+    expect(freeFor(state, 'sheets')).toBe(0);
     // And the card has nothing to order.
     expect(orderForJobCheck(state, job)).toEqual({ ok: false, reason: 'Nothing short' });
     const card = materialLine(state, job);
@@ -115,7 +115,7 @@ describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2
     expect(state.stock.sheets).toBe(job.sheets);
     expect(job.sheetsReserved).toBe(job.sheets);
     expect(shortfallOf(job)).toBe(0);
-    expect(freeSheets(state)).toBe(0);
+    expect(freeFor(state, 'sheets')).toBe(0);
   });
 
   it('puts a stock lorry s overflow into the store too, with its fee (CLAUDE.md T24 2.8)', () => {
@@ -134,6 +134,7 @@ describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2
       unloaded: false,
       bespoke: false,
       overflowSheets: 0,
+      material: 'sheets' as const,
     };
     state.deliveries.push(delivery);
     const cashBefore = state.cash;

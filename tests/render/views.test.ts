@@ -157,6 +157,7 @@ describe('the hall on day 1', () => {
       unloaded: false,
       bespoke: false,
       overflowSheets: 0,
+      material: 'sheets' as const,
     });
     const svg = renderHall(state);
     expect(svg).toContain('data-van="del-1"');

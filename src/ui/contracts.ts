@@ -53,23 +53,15 @@ import {
 import { OWNER, lineEngineersOnDuty, lineLevel, lineRecord } from '../engine/machines';
 import {
   LINE_BOARDS_PER_WINDOW,
+  LINE_GLASS_PER_WINDOW,
   LINE_MODULES,
-  LINE_ORDER_WINDOWS,
   LINE_PALLET_WINDOWS,
   LINE_WINDOW_PRICE,
   lineContractName,
 } from '../engine/constants';
 import {
-  lineBoardsOnTheWay,
-  lineGlassBatchCost,
-  lineGlassCheck,
-  lineGlassOnTheWay,
-  lineGlassWindows,
   lineMaterialPerWindow,
   lineShortOf,
-  lineTimberBatch,
-  lineTimberBatchCost,
-  lineTimberCheck,
   lineWindowEvery,
   lineWindowMinutes,
   lineWindowsAWeek,
@@ -79,6 +71,7 @@ import {
 import { inWords } from '../engine/text';
 import { ROLE_WORDS } from './team';
 import type { Contract, GameState, Worker } from '../engine/index';
+import type { LineContract } from '../engine/types';
 import {
   button,
   closeButton,
@@ -316,47 +309,24 @@ function lineContractBlock(state: GameState, line: number): string {
     `<span class="row-action">${button('endLineContract', 'End it', `data-line="${line}"`)}</span></div>` +
     `<p class="figures"><strong class="contract-count">This week: ${plural(contract.windowsThisWeek, 'window', 'windows')}. ` +
     `In all: ${contract.windowsMade}</strong> · ${money(LINE_WINDOW_PRICE)} a window; the timber and the glass ` +
-    `${money(lineMaterialPerWindow())} a window, ordered ahead</p>` +
+    `${money(lineMaterialPerWindow())} a window, from the stores</p>` +
     `<p class="hint">One window every ${escapeHtml(lineWindowEvery(minutesEach))}: about ${lineWindowsAWeek(state, line)} a week</p>` +
     countRow('On the pallet', `${record.onPallet} of ${LINE_PALLET_WINDOWS}`) +
     (record.palletsAtGate > 0 ? countRow('At the gate for collection', plural(record.palletsAtGate, 'pallet', 'pallets')) : '') +
     still +
-    lineMaterialRows(state, line) +
+    lineMaterialRows(contract) +
     '</div>'
   );
 }
 
-/** A line's timber and glass under its running block's rows, and the row of its two order
- *  buttons, each locked with its reason under the row, a reason said once (CLAUDE.md T31 2.2, 2.4)
- *  [TUNE: the reasons under the row]. */
-function lineMaterialRows(state: GameState, line: number): string {
-  const boards = lineRecord(state, line)?.boards ?? 0;
-  const boardsComing = lineBoardsOnTheWay(state, line);
-  const glassComing = lineGlassOnTheWay(state, line);
-  const timber =
-    `${plural(boards, 'board', 'boards')}, for ${plural(Math.floor(boards / LINE_BOARDS_PER_WINDOW), 'window', 'windows')}` +
-    (boardsComing > 0 ? `, ${boardsComing} more on the way` : '');
-  const glass =
-    `for ${plural(lineGlassWindows(state, line), 'window', 'windows')}` +
-    (glassComing > 0 ? `, ${glassComing} more on the way` : '');
-  const timberCheck = lineTimberCheck(state, line);
-  const glassCheck = lineGlassCheck(state, line);
-  const timberLabel = `Order timber: ${plural(lineTimberBatch(), 'board', 'boards')}, ${money(lineTimberBatchCost())}`;
-  const glassLabel = `Order glass: ${plural(LINE_ORDER_WINDOWS, 'window', 'windows')}, ${money(lineGlassBatchCost())}`;
-  const control = (check: { ok: boolean; reason: string }, action: string, label: string): string =>
-    check.ok ? button(action, label, `data-line="${line}"`) : lockedButton(label, check.reason);
-  const reasons = [timberCheck, glassCheck]
-    .filter((check) => !check.ok)
-    .map((check) => check.reason)
-    .filter((reason, index, all) => all.indexOf(reason) === index);
+/** What a line's contract holds of the stores under its running block's rows: the boards and the
+ *  windows they are for, and the windows its glass units are for (CLAUDE.md T32 2.5). No buttons:
+ *  the stores are restocked on the Materials page, or by the office. */
+function lineMaterialRows(contract: LineContract): string {
+  const windows = (units: number, each: number): string => plural(Math.floor(units / each), 'window', 'windows');
   return (
-    countRow('Timber on the stores', timber) +
-    countRow('Glass at module 6', glass) +
-    '<div class="row"><span class="row-main"></span><span class="row-action">' +
-    control(timberCheck, 'orderLineTimber', timberLabel) +
-    control(glassCheck, 'orderLineGlass', glassLabel) +
-    '</span></div>' +
-    reasons.map((reason) => `<p class="lock">${escapeHtml(reason)}</p>`).join('')
+    countRow('Timber held', `${plural(contract.boardsReserved, 'board', 'boards')}, for ${windows(contract.boardsReserved, LINE_BOARDS_PER_WINDOW)}`) +
+    countRow('Glass held', `for ${windows(contract.glassReserved, LINE_GLASS_PER_WINDOW)}`)
   );
 }
 

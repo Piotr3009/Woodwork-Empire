@@ -18,7 +18,7 @@ import { canAfford, charge, formatMoney, noteLoss } from './economy';
 import { queueEvent } from './events';
 import { insuredValue, lineValue } from './insurance';
 import { findSpec, isLineModule, isSold, itemStandsInTheHall, variantFor } from './machines';
-import { freeSheets } from './materials';
+import { freeFor } from './materials';
 import { disconnectExtraction } from './pipes';
 import { chance, int } from './rng';
 import { plural } from './text';
@@ -189,7 +189,7 @@ export function burgle(state: GameState): number {
   const count = int(state, BURGLARY_MACHINES_MIN, BURGLARY_MACHINES_MAX);
   const taken = burglaryTargets(state, count);
   for (const item of taken) takeMachine(state, item);
-  const sheets = freeSheets(state);
+  const sheets = freeFor(state, 'sheets');
   state.stock.sheets = Math.max(0, state.stock.sheets - sheets);
   const lost = taken.reduce((total, item) => total + item.purchasePrice, 0) + sheets * SHEET_VALUE;
   state.security.lastBurglaryDay = state.clock.day;

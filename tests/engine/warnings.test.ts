@@ -396,7 +396,7 @@ describe('the line that counts the days below the bank s limit (CLAUDE.md T22 2.
 });
 
 describe('the order of urgency', () => {
-  it('is bags, past the limit, nobody assigned, the line with no engineer, the line with no material, overdue, drawing done, glass not ordered, boards at the gate, the lane blocked, no insurance, below zero, spending over earning, tax coming, closure coming, crew full, first steps', () => {
+  it('is bags, past the limit, nobody assigned, the line with no engineer, the line with no material, overdue, drawing done, the lane blocked, no insurance, below zero, spending over earning, tax coming, closure coming, crew full, first steps', () => {
     expect(WARNING_ORDER).toEqual([
       'bagsFull',
       // Turn 21: above everything but the bags. The bags stop every machine in the hall this
@@ -411,12 +411,9 @@ describe('the order of urgency', () => {
       'deadlineAtRisk',
       // v78 (PIOTR, 03.10): the drawing is done and the material list is next.
       'drawingDone',
-      // Turn 28: a window's glass still to order, directly under it (CLAUDE.md T28 2.9).
-      'glassNotOrdered',
-      // Turn 29: a window's boards at the gate with nowhere to go, directly under it (CLAUDE.md T29
-      // 2.11.2).
-      'boardsAtTheGate',
-      // Turn 31: the forklift's lane blocked, directly under it (CLAUDE.md T31 2.6).
+      // Turn 31: the forklift's lane blocked, directly under it from Turn 32, where the glass not
+      // ordered and the boards at the gate stood: both are gone with the glazier and the boards'
+      // whole load (CLAUDE.md T31 2.6, T32 2.8).
       'laneBlocked',
       'noInsurance',
       'belowZero',
@@ -453,12 +450,10 @@ describe('the order of urgency', () => {
         (key) =>
           key !== 'firstSteps' &&
           key !== 'drawingDone' &&
-          key !== 'glassNotOrdered' &&
           key !== 'taxComing' &&
           key !== 'closureComing' &&
           key !== 'lineNeedsEngineer' &&
           key !== 'lineNeedsMaterial' &&
-          key !== 'boardsAtTheGate' &&
           key !== 'laneBlocked',
       ),
     );

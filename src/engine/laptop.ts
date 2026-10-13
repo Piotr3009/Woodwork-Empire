@@ -4,7 +4,7 @@
 // accepted without their material list yet, which is the office admin's queue (T13 3.8, T26 2.9).
 
 import { openJobs, takeOffOutstanding } from './jobs';
-import { freeSheets, stockLines } from './materials';
+import { freeFor, stockLines } from './materials';
 import { openTasks } from './tasks';
 import type { GameState } from './types';
 
@@ -29,7 +29,7 @@ export function laptopHome(state: GameState): LaptopHome {
   return {
     tasksOpen: open.length,
     tasksDueToday: open.filter((task) => task.day === state.clock.day).length,
-    sheetsFree: freeSheets(state),
+    sheetsFree: freeFor(state, 'sheets'),
     lowLines: stockLines(state).filter((line) => line.low).length,
     drawingsWaiting: openJobs(state).filter((job) => takeOffOutstanding(state, job)).length,
   };

@@ -11,12 +11,15 @@
 // department, and (ww) the company's holidays, played. The letters follow Turn 27's (uu).
 //
 // (vv) A company in the 800 m2 hall, the second extension open, with the five families of 2.4, a
-//      spindle moulder, a booth and the sash cutters, and no office admin, takes a sash window job
-//      off the board. The strip says its glass is not ordered once its paperwork is done; the owner
-//      orders it the next morning; the job stands a night after its pressing and a night after its
-//      finishing, waits for its glass if it is late, is glazed, delivered and paid. Played by the
-//      careful script, which takes the job, orders the boards, does the desk work and stands at
-//      the bench, with two joiners on the books [TUNE: the crew] and the owner's one click more.
+//      spindle moulder, a booth and the sash cutters, a timber store and a glass rack, and no
+//      office admin, takes a sash window job off the board. The stores are empty, so the job holds
+//      nothing and its boards and its glass are ordered by the one click, on two lorries, in on the
+//      next working day; the job stands a night after its pressing and a night after its
+//      finishing, takes its whole glass at its Glazing, is glazed, delivered and paid. Played by
+//      the careful script, which takes the job, orders its shortfall, does the desk work and stands
+//      at the bench, with two joiners on the books [TUNE: the crew]. Flipped in v96: the glazier
+//      and the strip's `Glass not ordered` are gone, and the glass is bought and kept as the sheets
+//      are (CLAUDE.md T32 2.4, 2.8.1).
 //
 // (ww) A company played by the same script from Tuesday 28 November 2025 to Monday 9 January 2026,
 //      with a joiner on the books, gets the break's card on Friday 1 December after the tax's,
@@ -27,9 +30,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { addWorkingDays, closureOf, isWeekday, monthOfDay } from '../../src/engine/clock';
-import { warnings } from '../../src/engine/warnings';
-import { applyAction } from '../../src/engine/index';
-import type { GameEvent, GameState, Job, LedgerEntry } from '../../src/engine/index';
+import { WAITING_FOR_GLASS } from '../../src/engine/constants';
+import { applyAction, glassForJob, glassShortfallOf, glassUnitPrice, orderForJobCheck } from '../../src/engine/index';
+import type { Delivery, GameEvent, GameState, Job, LedgerEntry } from '../../src/engine/index';
+import { currentStage } from '../../src/engine/stages';
 import { act, buyStartingKit, eventsOfKind, newGame, nextDay, placeEnquiry, placeEquipment, placeGlassRack, testJoiner } from '../helpers';
 import { CAREFUL, playDay, type Policy } from './autopilot';
 
@@ -38,8 +42,10 @@ import { CAREFUL, playDay, type Policy } from './autopilot';
 // ---------------------------------------------------------------------------------------------
 
 /** The 800 m2 company: both extensions bought and opened through the engine, the day one kit, the
- *  timber kit at its standard class and the sash cutters, two joiners, no admin. */
-function windowCompany(): GameState {
+ *  timber kit at its standard class and the sash cutters, two joiners, no admin. `boardsInHand`
+ *  puts boards enough for the job on the timber store before it is taken, so it holds them at the
+ *  click and is short of its glass alone (CLAUDE.md T32 2.4). */
+function windowCompany(boardsInHand = false): GameState {
   let state = newGame({ difficulty: 'veryEasy' });
   state.cash = 3000000;
   state = nextDay(act(state, { type: 'EXTEND_UNIT' }));
@@ -66,6 +72,8 @@ function windowCompany(): GameState {
   });
   // And a glass rack, which a window asks for from Turn 32 (CLAUDE.md T32 2.1).
   placeGlassRack(state);
+  // Forty boards on the shelter, more than the job's 19 [TUNE] (CLAUDE.md T32 2.4).
+  if (boardsInHand) state.stock.boards = 40;
   state.workers.push(testJoiner('w-tom', 'Tom', 16, 12), testJoiner('w-ben', 'Ben', 16, 15));
   state.enquiries = [];
   placeEnquiry(state, {
@@ -84,30 +92,34 @@ function windowCompany(): GameState {
 interface WindowRun {
   state: GameState;
   seen: GameEvent[];
-  /** Every step the script played through: the day, the minute, the strip's glass line, the job's
-   *  stand and its stop, its glass. */
-  steps: Array<{ day: number; minute: number; glassLine: boolean; curing: string | null; blocked: string; glass: string }>;
+  /** Every step the script played through: the day, the minute, the job's stand and its stop, its
+   *  stage, and the glass it has taken. */
+  steps: Array<{ day: number; minute: number; curing: string | null; blocked: string; stage: string; glassUsed: number }>;
+  /** The day the owner pressed Order for this job for the glass alone, in the late run. */
   glassOrderedOn: number | null;
 }
 
-/** Played by the script. `late` leaves the glass until the job has stopped at its Glazing for want
- *  of it, which is the owner who forgot: the job waits for the glazier to the next working day
- *  (ten working days before v84: CLAUDE.md T29 2.1). */
+/** Played by the script. `late` takes the job with its boards in hand and leaves its glass until
+ *  the job has stopped at its Glazing for want of it, which is the owner who forgot: the job waits
+ *  for the glass lorry to the next working day, as it waited for the glazier from v84 (CLAUDE.md
+ *  T29 2.1, T32 2.4). */
 function playTheWindow(late = false): WindowRun {
-  let state = windowCompany();
+  let state = windowCompany(late);
   const run: WindowRun = { state, seen: [], steps: [], glassOrderedOn: null };
   const job = (now: GameState): Job | undefined => now.jobs.find((entry) => entry.templateId === 'sashWindows');
   const policy: Policy = {
     ...CAREFUL,
     wanted: ['sashWindows'],
-    // The owner's click: the morning after the strip has said the glass is not ordered.
+    // The owner's click, in the late run: the morning after the job has stopped at its Glazing, he
+    // presses Order for this job for the glass it is short of. In the other the careful script's
+    // own click at the material list orders the boards and the glass together.
     onDay: (now) => {
       const window = job(now);
-      if (window === undefined || window.glass !== 'toOrder') return now;
-      if (!warnings(now).some((entry) => entry.key === 'glassNotOrdered')) return now;
-      if (late && window.blockedBy !== 'waiting for glass') return now;
+      if (!late || window === undefined || glassShortfallOf(window) <= 0) return now;
+      if (window.blockedBy !== WAITING_FOR_GLASS) return now;
+      if (!orderForJobCheck(now, window).ok) return now;
       run.glassOrderedOn = now.clock.day;
-      return applyAction(now, { type: 'ORDER_GLASS', jobId: window.id });
+      return applyAction(now, { type: 'ORDER_FOR_JOB', jobId: window.id });
     },
   };
   const watch = (now: GameState): void => {
@@ -115,10 +127,10 @@ function playTheWindow(late = false): WindowRun {
     run.steps.push({
       day: now.clock.day,
       minute: now.clock.minute,
-      glassLine: warnings(now).some((entry) => entry.key === 'glassNotOrdered'),
       curing: window?.curing?.reason ?? null,
       blocked: window?.blockedBy ?? '',
-      glass: window?.glass ?? 'gone',
+      stage: window === undefined ? 'gone' : (currentStage(now, window)?.id ?? window.stage),
+      glassUsed: window?.glassUsed ?? 0,
     });
   };
   let guard = 0;
@@ -132,19 +144,40 @@ function playTheWindow(late = false): WindowRun {
   return run;
 }
 
-describe('(vv) a sash window job through the timber department (CLAUDE.md T28 2.6 to 2.10)', () => {
+/** The job's own loads, of one kind. */
+function loadsOf(state: GameState, job: Job | undefined, material: Delivery['material']): Delivery[] {
+  return state.deliveries.filter((delivery) => delivery.jobId === job?.id && delivery.material === material);
+}
+
+describe('(vv) a sash window job through the timber department (CLAUDE.md T28 2.6 to 2.10, T32 2.4)', () => {
   const run = playTheWindow();
   const window = run.state.jobs.find((entry) => entry.templateId === 'sashWindows');
 
-  it('takes the job, says the glass is not ordered, and the owner orders it', () => {
+  it('takes the job, and its boards and its glass are ordered by the one click, on two lorries in on the next working day', () => {
     expect(run.state.gameOver).toBeNull();
     expect(window).toBeDefined();
     expect(window?.timber).toBe(true);
-    // The strip said it before the owner pressed the button, and not after.
-    const ordered = run.glassOrderedOn ?? Number.NaN;
-    expect(run.steps.some((step) => step.glassLine && step.day < ordered)).toBe(true);
-    expect(run.steps.some((step) => step.glassLine && step.day > ordered)).toBe(false);
-    expect(run.state.ledger.some((entry) => entry.label === 'Glass for Sash windows' && entry.day === ordered)).toBe(true);
+    // Its glass units out of its glass share at the line's 200 a unit (CLAUDE.md T32 2.4).
+    expect(window?.glassUnits).toBe(glassForJob(window?.materialCost ?? 0, true));
+    expect(window?.glassUnits).toBeGreaterThan(0);
+    // Flipped in v96: the one click buys both, each on its own line of the material, the same day,
+    // and no glazier's line (CLAUDE.md T32 2.4, 2.8.1).
+    const boards = run.state.ledger.filter((entry) => entry.label === 'Material for Sash windows: boards');
+    const glass = run.state.ledger.filter((entry) => entry.label === 'Material for Sash windows: glass');
+    expect(boards).toHaveLength(1);
+    expect(glass).toHaveLength(1);
+    expect(glass[0]?.day).toBe(boards[0]?.day);
+    expect(glass[0]?.amount).toBeCloseTo(-(window?.glassUnits ?? 0) * glassUnitPrice(), 2);
+    expect(run.state.ledger.some((entry) => entry.label === 'Glass for Sash windows')).toBe(false);
+    const ordered = boards[0]?.day ?? Number.NaN;
+    const boardLoads = loadsOf(run.state, window, 'boards');
+    const glassLoads = loadsOf(run.state, window, 'glass');
+    expect(boardLoads.map((load) => [load.sheets, load.arriveDay, load.unloaded])).toEqual([
+      [window?.sheets, addWorkingDays(ordered, 1), true],
+    ]);
+    expect(glassLoads.map((load) => [load.sheets, load.arriveDay, load.unloaded])).toEqual([
+      [window?.glassUnits, addWorkingDays(ordered, 1), true],
+    ]);
   });
 
   it('stands one night after the pressing and one after the finishing', () => {
@@ -159,12 +192,18 @@ describe('(vv) a sash window job through the timber department (CLAUDE.md T28 2.
     }
   });
 
-  it('waits for its glass if it is late, and is glazed, delivered and paid', () => {
-    const waited = run.steps.filter((step) => step.blocked === 'waiting for glass');
-    for (const step of waited) expect(step.glass).not.toBe('in');
+  it('never waits for its glass, takes it whole at its Glazing, and is glazed, delivered and paid', () => {
+    // Flipped in v96: the glass came with the boards, so the job never stood for it; it took the
+    // whole of it off the rack the minute its Glazing started (CLAUDE.md T32 2.4).
+    expect(run.steps.filter((step) => step.blocked === WAITING_FOR_GLASS)).toEqual([]);
+    const first = run.steps.findIndex((step) => step.glassUsed > 0);
+    expect(first).toBeGreaterThan(0);
+    expect(run.steps[first]?.stage).toBe('assembly');
+    expect(run.steps[first]?.glassUsed).toBe(window?.glassUnits);
     expect(window?.stage).toBe('completed');
     expect(window?.balancePaid).toBeGreaterThan(0);
-    expect(window?.glass).toBe('in');
+    expect(window?.glassUsed).toBe(window?.glassUnits);
+    expect(window?.glassReserved).toBe(0);
     // Paid: the balance in the ledger, the deposit and it the price less any penalty.
     const balance = run.state.ledger.filter((entry) => entry.category === 'jobBalance' && entry.label.includes('Sash windows'));
     expect(balance).toHaveLength(1);
@@ -173,19 +212,28 @@ describe('(vv) a sash window job through the timber department (CLAUDE.md T28 2.
   });
 });
 
-describe('(vv) the same job with the glass left until the Glazing (CLAUDE.md T28 2.9)', () => {
+describe('(vv) the same job with the glass left until the Glazing (CLAUDE.md T28 2.9, T32 2.4)', () => {
   const run = playTheWindow(true);
   const window = run.state.jobs.find((entry) => entry.templateId === 'sashWindows');
 
-  it('stops at the Glazing waiting for its glass, to the next working day, and then is glazed and paid', () => {
+  it('stops at the Glazing waiting for its glass, to the next working day s lorry, and then is glazed and paid', () => {
     expect(run.state.gameOver).toBeNull();
-    const waited = [...new Set(run.steps.filter((step) => step.blocked === 'waiting for glass').map((step) => step.day))];
+    // Its boards were in hand at the click, so only its glass was ever ordered (CLAUDE.md T32 2.4).
+    expect(run.state.ledger.some((entry) => entry.label === 'Material for Sash windows: boards')).toBe(false);
+    expect(loadsOf(run.state, window, 'boards')).toEqual([]);
+    const waited = [...new Set(run.steps.filter((step) => step.blocked === WAITING_FOR_GLASS).map((step) => step.day))];
     expect(waited.length).toBeGreaterThan(0);
+    for (const step of run.steps.filter((entry) => entry.blocked === WAITING_FOR_GLASS)) expect(step.stage).toBe('assembly');
     const ordered = run.glassOrderedOn ?? Number.NaN;
     expect(Math.min(...waited)).toBeLessThanOrEqual(ordered);
-    // One working day from v84, ten before it (CLAUDE.md T29 2.1).
-    expect(window?.glassDay).toBe(addWorkingDays(ordered, 1));
-    for (const day of waited) expect(day).toBeLessThan(window?.glassDay ?? 0);
+    expect(run.state.ledger.filter((entry) => entry.label === 'Material for Sash windows: glass').map((entry) => entry.day)).toEqual([ordered]);
+    // One working day, on a lorry, as the glazier's was from v84 (CLAUDE.md T29 2.1, T32 2.6).
+    // Flipped in v96: the job waits until the lorry is unloaded, so it may stand the morning it
+    // lands as well.
+    const glass = loadsOf(run.state, window, 'glass');
+    expect(glass.map((load) => [load.sheets, load.orderedDay, load.arriveDay])).toEqual([[window?.glassUnits, ordered, addWorkingDays(ordered, 1)]]);
+    for (const day of waited) expect(day).toBeLessThanOrEqual(glass[0]?.arriveDay ?? 0);
+    expect(window?.glassUsed).toBe(window?.glassUnits);
     expect(window?.stage).toBe('completed');
     expect(window?.balancePaid).toBeGreaterThan(0);
   });

@@ -13,7 +13,8 @@
 // functions. Nothing here is a second version of anything in src/ui/modal.ts.
 
 import { bankruptcyFloor } from '../engine/economy';
-import { boardsCostOf, canAfford, dropReputationCost, glassCostOf } from '../engine/index';
+import { canAfford, dropReputationCost } from '../engine/index';
+import { droppedMaterial } from '../engine/jobs';
 import type { GameState, Job } from '../engine/index';
 import { button, dangerButton, escapeHtml, money, signedFigure } from './modal';
 
@@ -25,15 +26,12 @@ export function dropCardTitle(job: Job): string {
 }
 
 /** What the material bought for this job and written off comes to. The same reading `dropJob`
- *  itself does: a job whose material was ordered in for it loses that money, and a job that drew
- *  from the rack puts what the bench has not cut back on it, which costs nothing
- *  (src/engine/jobs.ts `dropJob`; CLAUDE.md T2 3.6, T9 3.9). */
+ *  itself does, `droppedMaterial`: a job whose material was ordered in for it loses that money, and
+ *  a job that drew from the stores puts what the bench has not cut back on them, which costs
+ *  nothing, each kind on its own counter (src/engine/jobs.ts `dropJob`; CLAUDE.md T2 3.6, T9 3.9,
+ *  T32 2.4). */
 export function materialWrittenOff(state: GameState, job: Job): number {
-  const orderedIn = state.deliveries.some((delivery) => delivery.jobId === job.id);
-  const boards = orderedIn ? boardsCostOf(job.materialCost, job.timber === true) : 0;
-  // A window's glass, ordered for it, is lost with it as its boards are (CLAUDE.md T28 2.9).
-  const glass = job.glass === 'ordered' || job.glass === 'in' ? glassCostOf(job) : 0;
-  return Math.round((boards + glass) * 100) / 100;
+  return droppedMaterial(state, job).writtenOff;
 }
 
 /** Whether the deposit can be paid back out of the cash and what the overdraft has left in it. The

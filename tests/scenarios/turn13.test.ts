@@ -36,7 +36,7 @@ import {
   extractionDemandOf,
   extractionLoad,
   freeFloorM2,
-  freeSheets,
+  freeFor,
   hasGate,
   isWorkingDay,
   loanCheck,
@@ -149,7 +149,7 @@ describe('(u) a burglary on day 10', () => {
     expect(state.insurance.property).toBe(false);
     const before = state.equipment.filter((item) => item.soldOnDay === null).length;
     const dearest = Math.max(...state.equipment.map((item) => item.purchasePrice));
-    const freeBefore = freeSheets(state);
+    const freeBefore = freeFor(state, 'sheets');
     const lost = burgle(state);
     const paid = claimBurglary(state, lost);
     const after = state.equipment.filter((item) => item.soldOnDay === null).length;
@@ -158,7 +158,7 @@ describe('(u) a burglary on day 10', () => {
     // The dearest first: nothing left in the hall costs more than what went.
     expect(state.equipment.every((item) => item.purchasePrice <= dearest)).toBe(true);
     expect(state.equipment.some((item) => item.purchasePrice === dearest)).toBe(false);
-    expect(freeSheets(state)).toBe(0);
+    expect(freeFor(state, 'sheets')).toBe(0);
     expect(lost).toBeGreaterThanOrEqual(dearest + freeBefore * SHEET_VALUE);
     expect(paid).toBe(false);
     expect(state.insurance.payouts).toEqual([]);

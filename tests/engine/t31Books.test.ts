@@ -35,7 +35,7 @@ import { lineBooks, lineBooksShown, lineMonthPace, linePaidBack } from '../../sr
 import { lineMaterialPerWindow } from '../../src/engine/lineContract';
 import { lineValue } from '../../src/engine/insurance';
 import { renderAccounting } from '../../src/ui/accounting';
-import { act, buyStartingKit, newGame, nextDay, placeEquipment, testJoiner, withAir } from '../helpers';
+import { act, buyStartingKit, newGame, nextDay, placeEquipment, placeGlassRack, testJoiner, withAir } from '../helpers';
 import { lineState } from '../../src/engine/lineContract';
 
 function bigUnit(): GameState {
@@ -53,14 +53,20 @@ function worker(id: string, name: string, role: Worker['role'], monthlyWage: num
   return { ...testJoiner(id, name), role, tier: null, rate: 0, monthlyWage };
 }
 
-/** The line standing with its two engineers, a shelter, an office admin who keeps it in timber and
- *  glass, the property cover held, and its contract running from this morning. */
+/** The line standing with its two engineers, a shelter and a large glass rack, an office admin who
+ *  keeps them in boards and glass for it, a labourer who unloads what he buys, the property cover
+ *  held, and its contract running from this morning on forty boards and twenty glass units of
+ *  stock. Flipped in v96: the stock is the company's, on the stores, and the glass comes by lorry as
+ *  the boards do, so a morning can bring two loads and the labourer takes both off the list
+ *  (CLAUDE.md T32 2.5, 2.6). */
 function running(): GameState {
   const state = bigUnit();
   LINE_MODULES.forEach((id, index) => placeEquipment(state, id, { x: 2 + 6 * index, y: 14, id: `kit-line-${index + 1}` }));
   state.workers.push(worker('eng-1', 'Kev', 'lineEngineer', 15000), worker('eng-2', 'Raj', 'lineEngineer', 15000));
   state.workers.push(worker('adm-1', 'Anna', 'officeAdmin', 2000));
+  state.workers.push(worker('w-lab', 'Gus', 'helper', 1800));
   placeEquipment(state, 'timberShelter', { variantId: 'standard', x: 30, y: 2, id: 'kit-store' });
+  placeGlassRack(state, 'glassRackLarge');
   state.insurance.property = true;
   lineState(state, 1).contract = {
     status: 'active',
@@ -70,10 +76,11 @@ function running(): GameState {
     windowsMade: 0,
     revenue: 0,
     materialCost: 0,
+    boardsReserved: 0,
+    glassReserved: 0,
   };
-  lineState(state, 1).boards = 40;
-  state.stock.sheets += 40;
-  lineState(state, 1).glass = 20;
+  state.stock.boards += 40;
+  state.stock.glass += 20;
   return state;
 }
 

@@ -904,9 +904,9 @@ export function assignStaffTasks(state: GameState): void {
   }
 }
 
-/** True while the load an unloading is for has somewhere to go: a rack for sheets, room on the
- *  timber stores for the whole of a load of boards (CLAUDE.md T29 2.11.2). An unloading of no load
- *  asks nothing. */
+/** True while the load an unloading is for has somewhere to go: kit of its kind, a sheet rack for
+ *  sheets, a timber store for boards, a glass rack for glass; what does not fit goes to the paid
+ *  store (CLAUDE.md T29 2.11.2, T32 2.6). An unloading of no load asks nothing. */
 function roomToUnload(state: GameState, task: TaskInstance): boolean {
   if (task.deliveryId === null) return true;
   const delivery = state.deliveries.find((entry) => entry.id === task.deliveryId);

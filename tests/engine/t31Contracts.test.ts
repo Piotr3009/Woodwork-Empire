@@ -188,6 +188,8 @@ describe('a client goes elsewhere (CLAUDE.md T31 2.9)', () => {
       windowsMade: 12,
       revenue: 18000,
       materialCost: 0,
+      boardsReserved: 0,
+      glassReserved: 0,
     };
     const line = structuredClone(lineState(state, 1).contract);
     state.clock.day = 8;

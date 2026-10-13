@@ -19,6 +19,7 @@ import { dayOfMonth } from './clock';
 import { canAfford, charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { isLineModule, lineOf, variantFor } from './machines';
+import { glassUnitPrice } from './materials';
 import { int } from './rng';
 import type { GameState } from './types';
 
@@ -63,9 +64,10 @@ export function ownFigureCoverYearly(state: GameState): number {
   return yearly;
 }
 
-/** The stock's share: the sheets on the rack at their value. */
+/** The stock's share: the sheets and the boards on their kit at a sheet's value, and the glass
+ *  units on the glass racks at a unit's price (CLAUDE.md T32 2.2) [TUNE: chat: the glass on it]. */
 export function insuredStockValue(state: GameState): number {
-  return Math.round(state.stock.sheets * SHEET_VALUE);
+  return Math.round((state.stock.sheets + state.stock.boards) * SHEET_VALUE + state.stock.glass * glassUnitPrice());
 }
 
 /** What the property cover is written on: every machine in the hall at what it cost, and the

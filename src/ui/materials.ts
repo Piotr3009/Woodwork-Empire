@@ -11,24 +11,61 @@
 import { deliveriesInYard, deliveriesOnTheWay, formatCalendarDay, openJobs } from '../engine/index';
 import { restockCheck, sheetPriceFor, stockLines } from '../engine/index';
 // Straight off its own module: the public API does not carry it (REPORT-T13 10).
-import { boardsLine, loadWords, restockSheets, restockSplit } from '../engine/materials';
-import { lineStandsWhole, standingLines } from '../engine/machines';
-import { LINE_GLASS_WINDOWS_MAX, lineName } from '../engine/constants';
-import { lineGlassWindows } from '../engine/lineContract';
-import type { Delivery, GameState, Job, StockLine } from '../engine/index';
+import { glassUnitPrice, loadWords, restockSheets, restockSplit, storedWords } from '../engine/materials';
+import { stockWords } from '../engine/machines';
+import type { Delivery, GameState, Job, StockKind, StockLine } from '../engine/index';
 import { placeholderSvg } from '../render/placeholder';
 import { button, emptyLine, escapeHtml, lockedButton, money, plural } from './modal';
 import { materialLine } from './jobCard';
 
-/** The thumbnail, a flat coloured board in a fake photo frame, one per material kind, drawn
- *  through the one placeholder function: the art side owes nothing for it (CLAUDE.md T13 9.8). */
+/** The thumbnail, a flat coloured board in a fake photo frame, one per kind, drawn through the one
+ *  placeholder function: the art side owes nothing for it (CLAUDE.md T13 9.8, T32 2.7). */
 const THUMB_SIZE = { width: 64, height: 48 };
+
+/** The placeholder each kind's thumbnail is drawn as: the sheets' of today, the solid wood's for the
+ *  boards and the glass's for the glass (CLAUDE.md T32 2.7). */
+const THUMB_KEY: Record<StockKind, string> = {
+  sheets: 'thumb.sheet',
+  boards: 'thumb.solidWood',
+  glass: 'thumb.glass',
+};
+
+/** What each block of the page is headed, in the order sheets, boards, glass [TUNE wording]
+ *  (CLAUDE.md T32 2.7). */
+const BLOCK_NAME: Record<StockKind, string> = {
+  sheets: 'Sheets',
+  boards: 'Timber boards',
+  glass: 'Glass',
+};
+
+/** The field each block's count is typed into, which the page remembers as it remembers the
+ *  sheets' (CLAUDE.md T17 2.20, T32 2.7). */
+export const STOCK_FIELD: Record<StockKind, string> = {
+  sheets: 'stockSheets',
+  boards: 'stockBoards',
+  glass: 'stockGlass',
+};
+
+/** Where a restock past a kind's free places lands, in its words: on the rack, on the stores, on
+ *  the racks [TUNE wording] (CLAUDE.md T24 2.8, T32 2.3). */
+const ON_THE_KIT: Record<StockKind, string> = {
+  sheets: 'on the rack',
+  boards: 'on the stores',
+  glass: 'on the racks',
+};
+
+/** The word after a count in a field, as the sheets' field says `sheets`. */
+const UNIT_WORDS: Record<StockKind, string> = {
+  sheets: 'sheets',
+  boards: 'boards',
+  glass: 'glass units',
+};
 
 function thumbnail(line: StockLine): string {
   const label = line.number.split('-')[0] ?? line.kind;
   return (
     '<span class="stock-thumb">' +
-    placeholderSvg(`thumb.${line.kind}`, THUMB_SIZE, { label }) +
+    placeholderSvg(THUMB_KEY[line.kind], THUMB_SIZE, { label }) +
     '</span>'
   );
 }
@@ -52,106 +89,78 @@ function stockRow(line: StockLine): string {
   );
 }
 
-/** The boards' row, in the stock line's own markup: what the timber jobs hold, the room left on the
- *  timber stores and what they hold between them. Shown once a store stands or a board is held
- *  (CLAUDE.md T29 2.11.2) [TUNE: when]. */
-function boardsRow(state: GameState): string {
-  const { held, room } = boardsLine(state);
-  if (held <= 0 && room <= 0) return '';
-  return (
-    '<div class="stock-line" data-stock="boards">' +
-    '<span class="stock-thumb">' +
-    placeholderSvg('thumb.solidWood', THUMB_SIZE, { label: 'Timber' }) +
-    '</span>' +
-    '<span class="row-main"><span class="stock-name">Timber boards</span></span>' +
-    `<span class="row-figure stock-free">Held ${held}</span>` +
-    `<span class="row-figure stock-reserved">Room ${Math.max(0, room - held)}</span>` +
-    `<span class="row-figure stock-total">Total ${held} of ${room}</span>` +
-    '</div>'
-  );
-}
-
-/** Each line's glass, in the stock line's own markup: the windows it has glass for at its module
- *  6 and the windows module 6 holds glass for, one row a line that stands whole (CLAUDE.md T31 2.4;
- *  v93). */
-function lineGlassRow(state: GameState): string {
-  return standingLines(state)
-    .filter((line) => lineStandsWhole(state, line))
-    .map((line) => {
-      const windows = lineGlassWindows(state, line);
-      return (
-        `<div class="stock-line" data-stock="lineGlass" data-line="${line}">` +
-        '<span class="stock-thumb">' +
-        placeholderSvg('thumb.glass', THUMB_SIZE, { label: 'Glass' }) +
-        '</span>' +
-        `<span class="row-main"><span class="stock-name">Glass at ${escapeHtml(lineName(line).toLowerCase())}</span></span>` +
-        `<span class="row-figure stock-free">For ${plural(windows, 'window', 'windows')}</span>` +
-        `<span class="row-figure stock-total">Total ${windows} of ${LINE_GLASS_WINDOWS_MAX}</span>` +
-        '</div>'
-      );
-    })
-    .join('');
-}
-
 /** The number the player typed, or nothing when the field is empty and he wants what fills the
- *  rack (PIOTR, 16.09; CLAUDE.md T17 2.20). Anything that is not a number at all is nothing. */
+ *  kind's free places (PIOTR, 16.09; CLAUDE.md T17 2.20). Anything that is not a number at all is
+ *  nothing. */
 function askedSheets(typed: string): number | undefined {
   const asked = Number(typed);
   if (typed.trim() === '' || !Number.isFinite(asked) || asked <= 0) return undefined;
   return Math.floor(asked);
 }
 
-/** What the typed number would pay a sheet, and what the order comes to, said before the click
- *  and not after it: a sheet is priced by how many are on the order from Turn 23, so the player
- *  has to be able to see the next band before he decides how many to buy
- *  [PIOTR, 20.09] (CLAUDE.md T23 2.16). Empty while the field asks for nothing the rack can hold. */
-function ladderLine(sheets: number): string {
-  if (sheets <= 0) return '';
-  const each = sheetPriceFor(sheets);
-  return `${plural(sheets, 'sheet', 'sheets')} at ${money(each)} = ${money(sheets * each)}`;
+/** What the typed number would pay a piece, and what the order comes to, said before the click and
+ *  not after it: a sheet or a board is priced by how many are on the order from Turn 23, so the
+ *  player has to be able to see the next band before he decides how many to buy [PIOTR, 20.09]
+ *  (CLAUDE.md T23 2.16); a glass unit has its one price (CLAUDE.md T32 2.3). Empty while the field
+ *  asks for nothing. */
+function ladderLine(kind: StockKind, count: number): string {
+  if (count <= 0) return '';
+  const each = kind === 'glass' ? glassUnitPrice() : sheetPriceFor(count);
+  return `${stockWords(kind, count)} at ${money(each)} = ${money(count * each)}`;
 }
 
-/** Where a restock of this many sheets would land: on the rack, and in the temporary store when
- *  the player has asked for more than the rack holds, with what the store charges. Said before the
- *  click, because the click is not trimmed any more and a man who types sixty gets sixty
- *  [PIOTR, 22.09] (CLAUDE.md T24 2.8). Empty while the whole order fits. */
-function storageLine(split: { onRack: number; toStorage: number; storageCost: number }): string {
+/** Where a restock of this many would land: on its kind's kit, and in the temporary store when the
+ *  player has asked for more than it holds, with what the store charges. Said before the click,
+ *  because the click is not trimmed any more and a man who types sixty gets sixty [PIOTR, 22.09]
+ *  (CLAUDE.md T24 2.8, T32 2.3). Empty while the whole order fits. */
+function storageLine(kind: StockKind, split: { onRack: number; toStorage: number; storageCost: number }): string {
   if (split.toStorage <= 0) return '';
   return (
-    `${split.onRack + split.toStorage} sheets: ${split.onRack} on the rack, ` +
+    `${stockWords(kind, split.onRack + split.toStorage)}: ${split.onRack} ${ON_THE_KIT[kind]}, ` +
     `${split.toStorage} to storage at ${money(split.storageCost)}`
   );
 }
 
-/** The field and the one button beside it: so many sheets, whole, or the reason it cannot be
- *  pressed (CLAUDE.md T13 3.2, T17 2.20, T24 2.8). The field is empty until he types in it, and
- *  what it would buy then is what fills the rack, which the placeholder shows. */
-function restockControl(state: GameState, typed: string): string {
-  const check = restockCheck(state, askedSheets(typed));
-  const fills = restockSheets(state);
-  const split = restockSplit(state, askedSheets(typed));
+/** A kind's field and the one button beside it: so many, whole, or the reason it cannot be
+ *  pressed (CLAUDE.md T13 3.2, T17 2.20, T24 2.8, T32 2.3). The field is empty until he types in
+ *  it, and what it would buy then is what fills the kind's free places, which the placeholder
+ *  shows. */
+function restockControl(state: GameState, kind: StockKind, typed: string): string {
+  const check = restockCheck(state, kind, askedSheets(typed));
+  const fills = restockSheets(state, kind);
+  const split = restockSplit(state, kind, askedSheets(typed));
   const field =
     '<input type="text" inputmode="numeric" pattern="[0-9]*" class="num" ' +
-    `data-field="stockSheets" value="${escapeHtml(typed)}" placeholder="${fills}" ` +
-    'aria-label="Sheets to order" /> sheets';
+    `data-field="${STOCK_FIELD[kind]}" value="${escapeHtml(typed)}" placeholder="${fills}" ` +
+    `aria-label="${escapeHtml(BLOCK_NAME[kind])} to order" /> ${UNIT_WORDS[kind]}`;
   // The number the button would really buy, which is the number he typed: the price the player is
   // shown is the price he would pay.
-  const line = ladderLine(check.sheets);
+  const line = ladderLine(kind, check.sheets);
   // The game's own figure span, with a hook on it for the test: no new class and no new token
   // (docs/ui-style.md 11).
   const price =
     line === '' ? '' : `<span class="row-figure" data-ladder="1">${escapeHtml(line)}</span>`;
-  const where = storageLine(split);
+  const where = storageLine(kind, split);
   const landing =
     where === '' ? '' : `<span class="row-figure" data-storage="1">${escapeHtml(where)}</span>`;
   const action = check.ok
     ? button(
         'restock',
-        `Restock: ${plural(check.sheets, 'sheet', 'sheets')}, ${money(check.cost)}`,
-        `data-sheets="${check.sheets}"`,
+        `Restock: ${stockWords(kind, check.sheets)}, ${money(check.cost)}`,
+        `data-kind="${kind}" data-sheets="${check.sheets}"`,
       )
     : lockedButton('Restock', check.reason);
   return `${field}${price}${landing}<span class="row-action">${action}</span>`;
+}
+
+/** One block of the page: the kind's head row, today's head row in its markup, with its name and its
+ *  control, and its stock line under it (CLAUDE.md T32 2.7; docs/mockups/t32/materials-page.html). */
+function stockBlock(state: GameState, line: StockLine, typed: string): string {
+  return (
+    `<div class="row stock-head" data-stock-head="${line.kind}"><span class="row-main">${escapeHtml(BLOCK_NAME[line.kind])}</span>` +
+    `${restockControl(state, line.kind, typed)}</div>` +
+    `<div class="stock-list">${stockRow(line)}</div>`
+  );
 }
 
 /** A project and its material line: green with the sheets in hand, red with the shortfall and
@@ -168,8 +177,8 @@ function projectRow(state: GameState, job: Job): string {
   );
 }
 
-function deliveryRow(state: GameState, delivery: Delivery): string {
-  const what = `${loadWords(state, delivery)}${delivery.bespoke ? ', bespoke' : ''}`;
+function deliveryRow(delivery: Delivery): string {
+  const what = `${loadWords(delivery)}${delivery.bespoke ? ', bespoke' : ''}`;
   const when = delivery.arrived
     ? 'at the gate, waiting to be unloaded'
     : `arrives ${formatCalendarDay(delivery.arriveDay)}`;
@@ -179,25 +188,25 @@ function deliveryRow(state: GameState, delivery: Delivery): string {
   );
 }
 
-/** The Stock tab. The second argument is what the player has typed into the sheet count, which
- *  Restock buys (CLAUDE.md T17 2.20). */
-export function renderMaterials(state: GameState, sheets: string): string {
+/** The Stock tab. The arguments after the state are what the player has typed into each kind's
+ *  field, the sheets', the boards' and the glass's, which that kind's Restock buys (CLAUDE.md T17
+ *  2.20, T32 2.7). */
+export function renderMaterials(state: GameState, sheets: string, boards = '', glass = ''): string {
+  const typed: Record<StockKind, string> = { sheets, boards, glass };
   const lines = stockLines(state);
   // The projects whose material is still a question: a piece at the gate has used its sheets.
   const projects = openJobs(state).filter((job) => job.stage !== 'awaitingTransport');
   const deliveries = [...deliveriesInYard(state), ...deliveriesOnTheWay(state)];
-  const shelving = lines.some((line) => line.capacity > 0);
+  // The warning is the sheets' (CLAUDE.md T32 2.7).
+  const shelving = lines.some((line) => line.kind === 'sheets' && line.capacity > 0);
+  const stored = storedWords(state);
   return (
     (shelving
       ? ''
       : '<p class="warn">No shelving yet. Buy some from the catalogue before anything is ' +
         'delivered.</p>') +
-    '<div class="row stock-head"><span class="row-main">Stock</span>' +
-    `${restockControl(state, sheets)}</div>` +
-    `<div class="stock-list">${lines.map(stockRow).join('')}${boardsRow(state)}${lineGlassRow(state)}</div>` +
-    (state.stock.tempStorageSheets > 0
-      ? `<p class="hint">${plural(state.stock.tempStorageSheets, 'sheet is', 'sheets are')} in paid storage.</p>`
-      : '') +
+    lines.map((line) => stockBlock(state, line, typed[line.kind])).join('') +
+    (stored === '' ? '' : `<p class="hint">${escapeHtml(stored)} ${storedVerb(state)} in paid storage.</p>`) +
     '<h3>Projects</h3>' +
     (projects.length === 0
       ? emptyLine('No jobs on the books.')
@@ -205,6 +214,13 @@ export function renderMaterials(state: GameState, sheets: string): string {
     '<h3>Deliveries</h3>' +
     (deliveries.length === 0
       ? emptyLine('Nothing on the way.')
-      : deliveries.map((delivery) => deliveryRow(state, delivery)).join(''))
+      : deliveries.map((delivery) => deliveryRow(delivery)).join(''))
   );
+}
+
+/** `is` for one sheet alone in the paid store, as today's hint said it, and `are` for anything
+ *  more. */
+function storedVerb(state: GameState): string {
+  const { tempStorageSheets, tempStorageBoards, tempStorageGlass } = state.stock;
+  return tempStorageSheets + tempStorageBoards + tempStorageGlass === 1 ? 'is' : 'are';
 }

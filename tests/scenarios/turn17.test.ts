@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { CAREFUL, type Policy, playUntilDay } from './autopilot';
 import { acceptNow, act, buyStartingKit, fillRack, newGame, nextDay, placeEnquiry, withExtraction } from '../helpers';
 import { PAID_HOURS_PER_WORKING_DAY, RATE_WEEK_DAYS } from '../../src/engine/constants';
-import { contractPiece, contractPriceFor, drawContract, formatMoney, freeSheets, joiners, reservedSheets } from '../../src/engine/index';
+import { contractPiece, contractPriceFor, drawContract, formatMoney, freeFor, joiners, reservedFor } from '../../src/engine/index';
 import { monthRate, weekRate } from '../../src/engine/rate';
 import { renderCompany } from '../../src/ui/company';
 import { renderRateLine } from '../../src/ui/monthEnd';
@@ -179,8 +179,8 @@ describe('(y) a contract whose material comes off the rack', () => {
     expect(contract?.sheetsReserved ?? 0).toBeGreaterThan(0);
     // What it holds is held: the free count is the rack less every claim on it, the jobs' and
     // the contract's alike (CLAUDE.md T17 2.22).
-    expect(reservedSheets(MIDMONTH)).toBeGreaterThanOrEqual(contract?.sheetsReserved ?? 0);
-    expect(freeSheets(MIDMONTH)).toBe(Math.max(0, MIDMONTH.stock.sheets - reservedSheets(MIDMONTH)));
+    expect(reservedFor(MIDMONTH, 'sheets')).toBeGreaterThanOrEqual(contract?.sheetsReserved ?? 0);
+    expect(freeFor(MIDMONTH, 'sheets')).toBe(Math.max(0, MIDMONTH.stock.sheets - reservedFor(MIDMONTH, 'sheets')));
     // The term ran on to the month's end holding 3 from v54 to v59, as it did on v52; v53 lost it
     // to the client on day 15 with nothing held, to a saw line that counted two men who were not
     // at work (v54). From v60 the client ends it on day 15 again, and this time to the man: his

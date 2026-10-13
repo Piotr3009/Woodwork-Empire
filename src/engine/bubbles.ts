@@ -17,7 +17,7 @@
 
 import { BUBBLES } from './constants';
 import { contractOfWorker, contractWaitingForMaterial } from './contracts';
-import { OWNER, sheetsOnCounter } from './machines';
+import { OWNER } from './machines';
 import { ownerIsAvailable } from './owner';
 import { standsForAir } from './media';
 import { WAITING_FOR_MATERIAL, jobOf, stageOfMan } from './production';
@@ -94,7 +94,7 @@ function onAContract(state: GameState, who: string, contract: Contract): Bubble 
         .filter((job) => job.stage !== 'completed' && job.timber !== true)
         .reduce((total, job) => total + job.sheetsReserved, 0),
     );
-    if (sheetsOnCounter(state) > 0 && held > 0) {
+    if (state.stock.sheets > 0 && held > 0) {
       return bubble(who, 'sheetsHeld', { job: contract.name, held: String(held) });
     }
     return bubble(who, 'noMaterial', { job: contract.name });

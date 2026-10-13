@@ -12,8 +12,8 @@ import {
   EQUIPMENT_SPECS,
   HIRING_SPECS,
   LINE_GLASS_PER_WINDOW,
+  LINE_BOARDS_PER_WINDOW,
   LINE_MODULES,
-  LINE_ORDER_WINDOWS,
   LINE_PRICE,
   LOCKER_SLOT_LAYOUT,
   PRODUCT_TEMPLATES,
@@ -47,10 +47,11 @@ import {
 } from './layout';
 import { findSpec, isLineModule, isSold, lineNumbers, standingLines } from './machines';
 import { queueEvent } from './events';
-import { lineTimberBatch } from './lineContract';
+import { glassForJob } from './materials';
 import { planPlaces } from './production';
 import { rolesForTask } from './tasks';
-import type { Equipment, GameState, OnOrderItem, Orientation, TaskKind, WorkerRole, WorkerTier } from './types';
+import { currentStage } from './stages';
+import type { Equipment, GameState, Job, OnOrderItem, Orientation, TaskKind, WorkerRole, WorkerTier } from './types';
 
 /** The weeks in a month that the Turn 20 build converted a monthly wage with, thirty days over
  *  seven. Turn 21 deleted `WEEKS_PER_MONTH` from the constants because nothing in the game converts
@@ -1294,17 +1295,22 @@ function liftToVersion44(state: Raw): void {
   state.version = 44;
 }
 
+/** The windows Turn 31's first batch was for: twenty, the one order of the line's own buttons,
+ *  which are gone from Turn 32 with their constant, so the lift keeps its own figure (CLAUDE.md T31
+ *  section 4, T32 section 4). */
+const FIRST_BATCH_WINDOWS = 20;
+
 /** A line that ran on Turn 30's rule, its material bought as each window was made, does not stop on
  *  the morning the rule changes: a save whose line contract runs is given one batch of each, free,
- *  forty boards on the line and on the counter and glass for twenty windows. Its boards may stand
- *  over the stores' room until they are used, as any load may (CLAUDE.md T31 section 4) [TUNE:
- *  chat]. */
+ *  forty boards and twenty windows' glass units (CLAUDE.md T31 section 4) [TUNE: chat]. From Turn 32
+ *  they go onto the stores' counters as free stock, which the contract holds at its first open
+ *  (CLAUDE.md T32 section 4) [TUNE: chat]. They may stand over the stores' room until they are
+ *  used, as any load may. */
 function giveTheLineItsFirstBatch(state: GameState): void {
   for (const line of state.windowLines) {
     if (line.contract?.status !== 'active') continue;
-    line.boards += lineTimberBatch();
-    state.stock.sheets += lineTimberBatch();
-    line.glass += LINE_ORDER_WINDOWS * LINE_GLASS_PER_WINDOW;
+    state.stock.boards += FIRST_BATCH_WINDOWS * LINE_BOARDS_PER_WINDOW;
+    state.stock.glass += FIRST_BATCH_WINDOWS * LINE_GLASS_PER_WINDOW;
   }
 }
 
@@ -1453,6 +1459,114 @@ function liftToVersion47(state: Raw): void {
   state.version = 47;
 }
 
+/** A number of a raw record, nought when it is not one. */
+function numberOf(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/** Version 47 to 48 (v96). One store for every material (PIOTR, 13.10; CLAUDE.md T32 section 4):
+ *
+ *  - The counters split: the boards are what the timber jobs held (every job with `timber` and not
+ *    completed, its `sheetsReserved`) and every line's own boards; the sheets the old counter less
+ *    them, never below nought; the glass what the jobs and the lines give it below; the three paid
+ *    stores the sheets' as they were and nought of the other two.
+ *  - The jobs: every job gets its glass units (`glassForJob` of its material), and holds and has used
+ *    none; a window whose glass was ordered or in has its units put on the counter at once and held
+ *    for it, the glass on the glazier's way being in at once with its price paid [TUNE: chat: no load
+ *    is made in a lift]; one whose glass was still to order holds nothing, and its shortfall is
+ *    ordered as a shortfall is. Whether its Glazing has started needs the whole state, so a window
+ *    whose glass was in and whose Glazing had begun is set used in the whole state step
+ *    (`putTheGlassInTheWindows`), and the glazier's two fields go here.
+ *  - The lines: each line's boards stay on the boards' counter as free stock, its glass at module 6
+ *    and all of its glass on the way go onto the glass counter free, their price paid [TUNE: chat],
+ *    and the three fields go. A contract, running or offered, holds nothing yet: it holds its week
+ *    at its first open.
+ *  - The loads: each says what it is, boards where it was marked boards, was a line's or is a
+ *    timber job's, sheets otherwise; a line's load on the road is a load of boards for stock, its
+ *    price paid. The two marks go.
+ *
+ *  Nothing else of a save is touched. */
+function liftToVersion48(state: Raw): void {
+  const jobs = records(state.jobs);
+  const lines = records(state.windowLines);
+  let boards = 0;
+  let glass = 0;
+  for (const job of jobs) {
+    const timber = job.timber === true;
+    if (timber && job.stage !== 'completed') boards += numberOf(job.sheetsReserved);
+    const units = glassForJob(numberOf(job.materialCost), timber);
+    job.glassUnits = units;
+    // A window past production with its glass in has it in the window; one with its glass ordered or
+    // in before then has it on the counter and its own, until the whole state says whether its
+    // Glazing has begun.
+    const past = job.stage === 'awaitingTransport' || job.stage === 'completed';
+    const used = timber && past && job.glass === 'in' ? units : 0;
+    const held = timber && used === 0 && (job.glass === 'ordered' || job.glass === 'in') ? units : 0;
+    job.glassUsed = used;
+    job.glassReserved = held;
+    glass += held;
+    // The whole state step reads this one mark and takes it off again.
+    if (job.glass === 'in' && held > 0) job.glassInBeforeTheLift = true;
+    delete job.glass;
+    delete job.glassDay;
+  }
+  for (const line of lines) {
+    boards += numberOf(line.boards);
+    glass += numberOf(line.glass);
+    for (const entry of records(line.glassOnTheWay)) glass += numberOf(entry.windows) * LINE_GLASS_PER_WINDOW;
+    delete line.boards;
+    delete line.glass;
+    delete line.glassOnTheWay;
+    if (isRecord(line.contract)) {
+      line.contract.boardsReserved = 0;
+      line.contract.glassReserved = 0;
+    }
+  }
+  if (isRecord(state.stock)) {
+    const stock = state.stock;
+    stock.sheets = Math.max(0, numberOf(stock.sheets) - boards);
+    stock.boards = boards;
+    stock.glass = glass;
+    stock.tempStorageSheets = numberOf(stock.tempStorageSheets);
+    stock.tempStorageBoards = 0;
+    stock.tempStorageGlass = 0;
+  }
+  const timberJobs = new Set(jobs.filter((job) => job.timber === true).map((job) => job.id));
+  for (const delivery of records(state.deliveries)) {
+    const ofBoards =
+      delivery.boards === true ||
+      typeof delivery.line === 'number' ||
+      delivery.line === true ||
+      (typeof delivery.jobId === 'string' && timberJobs.has(delivery.jobId));
+    delivery.material = ofBoards ? 'boards' : 'sheets';
+    delete delivery.boards;
+    delete delivery.line;
+  }
+  state.version = 48;
+}
+
+/** The whole state step of the lift to 48: a window whose glass was in and whose Glazing had begun,
+ *  its current stage the Glazing, has its glass in the window, used and off the counter (CLAUDE.md
+ *  T32 section 4); one past production had it set so by the raw lift. Every other window keeps it
+ *  held. */
+function putTheGlassInTheWindows(state: GameState): void {
+  for (const job of state.jobs) {
+    const marked = job as Job & { glassInBeforeTheLift?: boolean };
+    if (marked.glassInBeforeTheLift !== true) continue;
+    delete marked.glassInBeforeTheLift;
+    if (currentStage(state, job)?.id !== 'assembly') continue;
+    state.stock.glass = Math.max(0, state.stock.glass - job.glassReserved);
+    job.glassUsed = job.glassUnits;
+    job.glassReserved = 0;
+  }
+}
+
+/** The mark of the raw lift to 48 taken off every job, whatever the whole state step could do: a
+ *  fragment of a state keeps its glass held. */
+function forgetTheLiftsMarks(state: Raw): void {
+  for (const job of records(state.jobs)) delete job.glassInBeforeTheLift;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -1489,6 +1603,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   44: liftToVersion45,
   45: liftToVersion46,
   46: liftToVersion47,
+  47: liftToVersion48,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -1573,7 +1688,8 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       // Not a whole hall: no floor to move a line on.
     }
   }
-  // A line on its contract given its first batch of timber and glass (v92).
+  // A line on its contract given its first batch of timber and glass (v92), onto the stores'
+  // counters from v96.
   if (version < 44 && Array.isArray(lifted.windowLines) && isRecord(lifted.stock)) {
     try {
       giveTheLineItsFirstBatch(lifted);
@@ -1581,6 +1697,15 @@ export function migrateState(raw: unknown, version: number): GameState | null {
       // Not a whole state: no line to give it to.
     }
   }
+  // The glass of a window whose Glazing had begun is in the window (v96).
+  if (version < 48 && Array.isArray(lifted.jobs) && Array.isArray(lifted.equipment) && isRecord(lifted.stock)) {
+    try {
+      putTheGlassInTheWindows(lifted);
+    } catch {
+      // Not a whole hall: its windows keep their glass held.
+    }
+  }
+  if (version < 48) forgetTheLiftsMarks(state);
   // Who has a place, worked out the moment the save is open rather than left for the first
   // minute: an old save opens with the right men working (CLAUDE.md T25 section 4). A fragment of
   // a state that is not a whole hall cannot be planned, and is lifted as it is: its first minute

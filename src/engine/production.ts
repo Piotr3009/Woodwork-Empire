@@ -12,7 +12,7 @@
 // pace, the hours onto the machine and the dust into the store. The night shift runs on it; the
 // day's production minute in game.ts does the same arithmetic (the note in REPORT-T13-B2.md).
 
-import { BUBBLES, DRAW_BLOCK_MINUTES, OWNER_LABOUR_PER_MINUTE, WET_AIR_FINISH_FACTOR } from './constants';
+import { BUBBLES, DRAW_BLOCK_MINUTES, OWNER_LABOUR_PER_MINUTE, WAITING_FOR_GLASS, WET_AIR_FINISH_FACTOR } from './constants';
 import { isBreak, workedMinutesOfDay } from './clock';
 import {
   addLabour,
@@ -40,7 +40,7 @@ import {
   machineForPlace,
   machineIsShared,
 } from './machines';
-import { drawSheetsFor, rackCanSupply } from './materials';
+import { drawGlassFor, drawSheetsFor, rackCanSupply } from './materials';
 import { movingMachines, openTasks } from './tasks';
 import {
   airFactorFor,
@@ -509,9 +509,19 @@ export function canWorkOn(state: GameState, job: Job): boolean {
   const block = hallBlock(state, job);
   job.blockedBy = block;
   if (block !== '') return false;
-  if (drawSheetsFor(state, job, jobProgress(job))) return true;
-  job.blockedBy = WAITING_FOR_MATERIAL;
-  return false;
+  if (!drawSheetsFor(state, job, jobProgress(job))) {
+    job.blockedBy = WAITING_FOR_MATERIAL;
+    return false;
+  }
+  // A window takes its whole glass off the racks the minute its Glazing starts, and stands there
+  // while they cannot give it all (CLAUDE.md T32 2.4).
+  if (job.timber === true && job.glassUsed < job.glassUnits && currentStage(state, job)?.id === 'assembly') {
+    if (!drawGlassFor(state, job)) {
+      job.blockedBy = WAITING_FOR_GLASS;
+      return false;
+    }
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------

@@ -29,7 +29,7 @@ import { lineUpgradeCheck, lineWindowEvery, lineWindowMinutes, lineWindowsAWeek 
 import { lineFactor } from '../../src/engine/machines';
 import { boardsForJob } from '../../src/engine/materials';
 import { catalogueTabFrom, renderCatalogue } from '../../src/ui/catalogue';
-import { act, buyStartingKit, newGame, nextDay, placeEquipment, testJoiner, withAir } from '../helpers';
+import { act, buyStartingKit, newGame, nextDay, placeEquipment, placeGlassRack, testJoiner, withAir } from '../helpers';
 import { lineState } from '../../src/engine/lineContract';
 
 /** A company in the 800 m² unit with the day one kit, air enough for a CNC, and money. */
@@ -49,14 +49,18 @@ function engineer(id: string): Worker {
 }
 
 /** The whole line standing from (2, 14), with its two engineers on the books, and from Turn 31 one
- *  batch of its timber and glass: eight windows a day want sixteen boards and eight glass
- *  (CLAUDE.md T31 2.1). */
+ *  batch of timber and glass: eight windows a day want sixteen boards and eight glass (CLAUDE.md T31
+ *  2.1). Flipped in v96: forty boards on a timber shelter and twenty glass units on a large glass
+ *  rack, the company's stock that the line takes from (CLAUDE.md T32 2.1, 2.5). */
 function withLine(state: GameState): GameState {
   LINE_MODULES.forEach((id, index) => placeEquipment(state, id, { x: 2 + 6 * index, y: 14, id: `kit-line-${index + 1}` }));
   for (const id of ['eng-1', 'eng-2']) state.workers.push(engineer(id));
-  lineState(state, 1).boards = 40;
-  state.stock.sheets += 40;
-  lineState(state, 1).glass = 20;
+  placeEquipment(state, 'timberShelter', { variantId: 'standard', x: 30, y: 2, id: 'kit-store' });
+  placeGlassRack(state, 'glassRackLarge');
+  // Its record written, as the open of a working day writes it for every line that stands.
+  lineState(state, 1);
+  state.stock.boards += 40;
+  state.stock.glass += 20;
   return state;
 }
 

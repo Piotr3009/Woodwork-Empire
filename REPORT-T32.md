@@ -21,3 +21,13 @@ sub-agents, the review's findings put right before the commit.
 their name and plate, never serviced, sold by the racks' one rule; a window or a door wants one.
 One function each for a kind's capacity, room, spread over its racks and stranding at a sale
 (`capacityOf`, `roomFor`, `stockOnItem`, `stockStrandedBySale`); 3,020 tests in 313 files green.
+
+**T32-B2 One store.** Three counters (`sheets`, `boards`, `glass`, each with its paid store) read
+through one function each for room, free places, held and free; Restock for each kind; a window's
+boards and glass held at the click, ordered as one shortfall on two lorries, its glass taken whole at
+its Glazing; the line holding its week off the stores and the admin's restock of each; glass by
+lorry; everything of 2.8 gone; STATE_VERSION 48 and its lift. 3,046 tests in 315 files green.
+
+The src review found a window could pass its Glazing holding glass that lay in the paid store, and a
+dropped job's load at the gate left with no unloading: both fixed. Queueing a second lorry's "Unload
+now" behind the first was tried and taken out, because it moved the sheet playthrough (section 0).

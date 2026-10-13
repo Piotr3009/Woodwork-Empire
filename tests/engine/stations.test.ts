@@ -113,6 +113,7 @@ describe('the walk between the pallet and the rack (CLAUDE.md T13 3.21)', () => 
       unloaded: false,
       bespoke: false,
       overflowSheets: 0,
+      material: 'sheets' as const,
     });
     const sheets = createTask(state, { kind: 'unload', label: 'Unload 4 sheets', minutes: 45, deliveryId: 'del-1' });
     expect(stationForTask(state, sheets)).toBe(STATION_GATE);

@@ -339,43 +339,10 @@ export function roomFor(state: GameState, kind: StockKind): number {
   return room;
 }
 
-/** What of a kind is on the kit that keeps it: the sheets, the boards the timber jobs and the line
- *  hold, and no glass yet, until the glass has a counter of its own (CLAUDE.md T32 2.1). */
-export function stockOnCounter(state: GameState, kind: StockKind): number {
-  if (kind === 'sheets') return sheetsOnCounter(state);
-  if (kind === 'boards') return boardsHeld(state);
-  return 0;
-}
-
-/** The boards in the workshop. A board is never free stock: it is always a timber job's own or the
- *  line's, ordered for it and held for it, so the boards on the one counter are what the timber
- *  jobs and the line hold, and everything else on it is sheets (CLAUDE.md T29 2.11.2, T31 2.1).
- *  Written here and not in `materials.ts`, which reads this module, as `stockStrandedBySale` is. */
-export function boardsHeld(state: GameState): number {
-  let held = 0;
-  for (const job of state.jobs) {
-    if (job.timber !== true || job.stage === 'completed') continue;
-    held += job.sheetsReserved;
-  }
-  // And every line's own, held for its windows as a job's are for its pieces (CLAUDE.md T31 2.1).
-  return held + state.windowLines.reduce((total, line) => total + line.boards, 0);
-}
-
-/** The sheets on the one counter: everything on it but the timber jobs' and the line's boards,
- *  never below nought (CLAUDE.md T29 2.11.2, 2.11.4, T31 2.1). */
-export function sheetsOnCounter(state: GameState): number {
-  return Math.max(0, state.stock.sheets - boardsHeld(state));
-}
-
-/** What the timber stores that stand hold between them (CLAUDE.md T29 2.11.1, 2.11.3): the one
- *  sum asked of the boards (CLAUDE.md T32 2.2). */
-export function boardRoom(state: GameState): number {
-  return roomFor(state, 'boards');
-}
-
-/** Room left on the timber stores, with the boards already on them counted off. */
-export function freeBoardRoom(state: GameState): number {
-  return Math.max(0, boardRoom(state) - boardsHeld(state));
+/** Room left on a kind's kit: what it holds less what of that kind is on its counter, never below
+ *  nought (CLAUDE.md T32 2.2). The one answer for the sheets, the boards and the glass. */
+export function freeRoomFor(state: GameState, kind: StockKind): number {
+  return Math.max(0, roomFor(state, kind) - state.stock[kind]);
 }
 
 /** How many men's hand tool sets this class of tool cabinet holds: one, one, two, four or eight up
@@ -573,8 +540,8 @@ export function emptyLineSince(): LineSince {
 }
 
 /** The record of a line that has never run: no contract, no offer yet, no window in hand, an empty
- *  pallet, nothing at the gate and no upgrade (CLAUDE.md T30 section 4); no timber, no glass and an
- *  empty day book (CLAUDE.md T31 section 4). The day in hand is the day given, the save's own when
+ *  pallet, nothing at the gate and no upgrade (CLAUDE.md T30 section 4), and an empty day book
+ *  (CLAUDE.md T31 section 4); its timber and glass are the stores' from Turn 32 (CLAUDE.md T32 2.5). The day in hand is the day given, the save's own when
  *  a save is lifted. */
 export function emptyWindowLine(number: number, day = 0): WindowLineState {
   return {
@@ -585,9 +552,6 @@ export function emptyWindowLine(number: number, day = 0): WindowLineState {
     onPallet: 0,
     palletsAtGate: 0,
     upgrades: [],
-    boards: 0,
-    glass: 0,
-    glassOnTheWay: [],
     today: emptyLineDay(day),
     days: [],
     since: emptyLineSince(),
@@ -743,7 +707,7 @@ export function stockStrandedBySale(state: GameState, item: Equipment): number {
   const kind = stockKindOf(item);
   if (kind === null) return 0;
   const room = roomFor(state, kind) - (isSold(item) || !itemStandsInTheHall(item) ? 0 : capacityOf(item, kind));
-  return Math.max(0, stockOnCounter(state, kind) - room);
+  return Math.max(0, state.stock[kind] - room);
 }
 
 /** Tools of this family that live in a cabinet: two men can have one out at once. */

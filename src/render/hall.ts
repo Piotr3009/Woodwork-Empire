@@ -65,7 +65,6 @@ import {
   placedMachines,
   placesLine,
   capacityOf,
-  sheetCapacityOf,
   shortageLine,
   stockKindOf,
 } from '../engine/machines';
@@ -82,6 +81,8 @@ import {
   STATION_LUNCH,
   STATION_OFFICE,
   STATION_PHONE,
+  STATION_GLASS_RACK,
+  STATION_OF_KIND,
   STATION_RACK,
   STATION_TIMBER_RACK,
   firstStoreOf,
@@ -103,7 +104,7 @@ import {
 } from '../engine/stations';
 import { ownerIsAvailable } from '../engine/owner';
 import { crewHasGoneHome, homeCellOf, isSeenOnTheHall } from '../engine/staff';
-import { FIGURE_DEPTH_OFFSET } from '../engine/constants';
+import { FIGURE_DEPTH_OFFSET, STOCK_KINDS } from '../engine/constants';
 import type { RoomBlock, RoomId } from '../engine/constants';
 import type {
   Bubble,
@@ -1226,18 +1227,12 @@ function stationAnchor(
       return standingAt(cell, item);
     }
   }
-  if (station === STATION_RACK) {
-    const rack = state.equipment.find(
-      (entry) => sheetCapacityOf(entry) > 0 && !isSold(entry) && itemStandsInTheHall(entry),
-    );
-    if (rack) {
-      const cell = standingCell(state, rack, 'operator');
-      return { ...cell, facing: facingAt(cell, rack) };
-    }
-  }
-  // The man unloading boards walks to the first timber rack on the floor (CLAUDE.md T29 2.11.2).
-  if (station === STATION_TIMBER_RACK) {
-    const rack = firstStoreOf(state, 'boards');
+  // The man at a kind's kit stands at its first rack on the floor: the sheet rack, the first timber
+  // rack for a load of boards, the first glass rack for a load of glass (CLAUDE.md T29 2.11.2, T32
+  // 2.6).
+  const kind = STOCK_KINDS.find((entry) => STATION_OF_KIND[entry] === station);
+  if (kind !== undefined) {
+    const rack = firstStoreOf(state, kind);
     if (rack) {
       const cell = standingCell(state, rack, 'operator');
       return { ...cell, facing: facingAt(cell, rack) };
@@ -1408,6 +1403,7 @@ function stationLabel(station: string, noPlaceFor = ''): string {
   if (station === STATION_HOME) return noPlaceFor === '' ? 'standing' : placeLine();
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_TIMBER_RACK) return 'the timber rack';
+  if (station === STATION_GLASS_RACK) return 'the glass rack'; // [TUNE] (CLAUDE.md T32 2.6)
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
   if (station === STATION_PHONE) return 'the phone';
@@ -2188,13 +2184,14 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // and the rack, and he never stands on it: he touches the pallet and goes, touches the rack
   // and comes back, for as long as the engine has him unloading (PIOTR, 16.09; CLAUDE.md T16
   // 2.2). The page gives the walker both ends of the loop.
-  // A load that is waiting for room is not being unloaded, however long it waits (CLAUDE.md T29
-  // 2.11.2).
+  // A load that is waiting for kit of its kind is not being unloaded, however long it waits
+  // (CLAUDE.md T29 2.11.2, T32 2.6).
   const unloadingNow = state.deliveries.some(
     (delivery) => delivery.arrived && !delivery.unloaded && canUnload(state, delivery),
   );
-  // The far end is the sheet rack, or for a load of boards the first timber rack, which carries its
-  // own station in the loop (CLAUDE.md T29 2.11.2).
+  // The far end is the sheet rack, or for a load of boards the first timber rack and for a load of
+  // glass the first glass rack, which carry their own station in the loop (CLAUDE.md T29 2.11.2,
+  // T32 2.6).
   const loopEnds = (far: string): string => {
     const gate = stationCell(state, STATION_GATE, { x: 2, y: 5 });
     const end = stationCell(state, far, { x: 2, y: 5 });
@@ -2202,12 +2199,13 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   };
   const onTheLoop = (taskId: string | null, station: string): string => {
     if (!unloadingNow) return '';
-    if (station === STATION_TIMBER_RACK) return loopEnds(STATION_TIMBER_RACK);
+    if (station === STATION_TIMBER_RACK || station === STATION_GLASS_RACK) return loopEnds(station);
     if (station !== STATION_GATE && station !== STATION_RACK) return '';
     const task = taskId === null ? undefined : state.tasks.find((entry) => entry.id === taskId);
     if (task === undefined || task.kind !== 'unload') return loopEnds(STATION_RACK);
     const far = unloadFarStation(state, task);
-    // Boards with only a shelter: he stays at the gate, and nobody is walked out of the hall to it.
+    // Boards with only a shelter, or glass with no glass rack on the floor: he stays at the gate, and
+    // nobody is walked out of the hall.
     if (far === STATION_GATE) return '';
     return loopEnds(far);
   };
@@ -2319,8 +2317,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // A pallet of sheets at the gate while a delivery is waiting to be unloaded: the material
   // arrives as what it is (CLAUDE.md T13 3.21). It keeps the lorry's hook, so a click on it
   // still asks who unloads it.
-  // The first waiting load that can be unloaded, and the first waiting load when none can: a load of
-  // boards that waits days for room keeps no hook from the loads behind it (CLAUDE.md T29 2.11.2).
+  // The first waiting load that can be unloaded, and the first waiting load when none can: a load
+  // that waits days for kit of its kind keeps no hook from the loads behind it (CLAUDE.md T29 2.11.2,
+  // T32 2.6).
   const atTheGate = state.deliveries.filter((delivery) => delivery.arrived && !delivery.unloaded);
   const waiting = atTheGate.find((delivery) => canUnload(state, delivery)) ?? atTheGate[0];
   if (waiting) {
@@ -2329,8 +2328,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       svg:
         `<g data-van="${waiting.id}" data-sprite="${PALLET_SPRITE}" class="clickable pallet">` +
         '<title>Click the pallet to decide who unloads it</title>' +
-        // The line's timber in its own words (CLAUDE.md T31 2.2).
-        palletArt(files, waiting.line !== undefined ? loadWords(state, waiting) : `Delivery: ${loadWords(state, waiting)}`) +
+        palletArt(files, `Delivery: ${loadWords(waiting)}`) +
         '</g>',
     });
   }

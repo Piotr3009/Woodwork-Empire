@@ -19,11 +19,11 @@ import { placeEquipmentOrder } from '../../src/engine/game';
 import { catalogueTabFrom, renderCatalogue } from '../../src/ui/catalogue';
 import { renderContracts, renderContractsTab } from '../../src/ui/contracts';
 import { renderHall } from '../../src/render/hall';
-import { testJoiner } from '../helpers';
+import { placeGlassRack, testJoiner } from '../helpers';
 import { currentState, mount, render } from '../../src/ui/app';
 import { tileToScreen } from '../../src/render/iso';
 import { act, buyStartingKit, newGame, nextDay, placeEquipment, withAir } from '../helpers';
-import { lineState } from '../../src/engine/lineContract';
+import { lineState, reserveLineMaterial } from '../../src/engine/lineContract';
 
 /** A company in the 800 m² unit with the day one kit, air enough for a CNC, and the money for the
  *  line. */
@@ -148,13 +148,19 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
       windowsMade: 112,
       revenue: 168000,
       materialCost: 67200,
+      boardsReserved: 0,
+      glassReserved: 0,
     };
     lineState(state, 1).onPallet = 7;
     lineState(state, 1).palletsAtGate = 1;
-    // Its timber and glass, from Turn 31 (CLAUDE.md T31 2.1).
-    lineState(state, 1).boards = 40;
-    state.stock.sheets += 40;
-    lineState(state, 1).glass = 20;
+    // Its timber and glass, from Turn 31 (CLAUDE.md T31 2.1). Flipped in v96: forty boards and twenty
+    // glass units on the stores, of which the contract holds what the week's thirteen windows left
+    // want (CLAUDE.md T32 2.5).
+    placeEquipment(state, 'timberShelter', { variantId: 'standard', x: 30, y: 2, id: 'kit-store' });
+    placeGlassRack(state, 'glassRackLarge');
+    state.stock.boards = 40;
+    state.stock.glass = 20;
+    reserveLineMaterial(state, 1);
     return state;
   }
 
@@ -167,13 +173,18 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     const text = block?.textContent ?? '';
     for (const words of [
       'Windows off line 1',
-      '£1,500 a window; the timber and the glass £600 a window, ordered ahead',
+      // Flipped in v96: from the stores, not ordered ahead (CLAUDE.md T32 2.5).
+      '£1,500 a window; the timber and the glass £600 a window, from the stores',
       'One window every 2 hours: about 20 a week',
       'This week: 7 windows. In all: 112',
       'On the pallet',
       '7 of 10',
       'At the gate for collection',
       '1 pallet',
+      'Timber held',
+      '26 boards, for 13 windows',
+      'Glass held',
+      'for 13 windows',
     ]) {
       expect(text, words).toContain(words);
     }

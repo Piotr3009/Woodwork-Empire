@@ -89,6 +89,7 @@ describe('Drop project', () => {
       unloaded: true,
       bespoke: false,
       overflowSheets: 0,
+      material: 'sheets' as const,
     });
     const onTheRack = state.stock.sheets;
     const cash = state.cash;

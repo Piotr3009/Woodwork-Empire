@@ -11,8 +11,9 @@
 // line is six modules of kit on the floor, bought whole, and everything of it that is not kit lives
 // in one record of the state, one a line by its number in `state.windowLines` (v93; PIOTR, 12.10:
 // "I want to see the next line"): its contract, the day it may be offered again, the minutes into
-// the window in hand, the windows on module 6's pallet, the full pallets at the gate, its timber
-// and glass, its upgrades and its day book. A record is written whole the first time its line is
+// the window in hand, the windows on module 6's pallet, the full pallets at the gate, its upgrades
+// and its day book. Its timber and glass are the company's stock from Turn 32, on the timber stores
+// and the glass racks, held by its contract as a sheet contract holds its sheets (CLAUDE.md T32 2.5). A record is written whole the first time its line is
 // asked for, every part with its default, and stays after the line is sold for its books (CLAUDE.md
 // T30 section 4) [TUNE: the name of this module].
 //
@@ -22,23 +23,19 @@
 // save moves by a step (CLAUDE.md T30 2.6). Its windows are made by the line's own minute, beside
 // the men's, and book nothing to any man or machine (2.7); every tenth goes to the gate on a pallet,
 // which the client takes at the open of the next working day (2.8). Every line has its own: its
-// own offer card, its own block, its own engineers, timber, glass, pallet and upgrades (PIOTR,
-// 12.10).
+// own offer card, its own block, its own engineers, pallet and upgrades (PIOTR, 12.10).
 
 import {
   DAYS_PER_MONTH,
   DAYS_PER_WEEK,
   DAYS_PER_YEAR,
-  GLASS_DELIVERY_WORKING_DAYS,
   LINE_BOARDS_PER_WINDOW,
   LINE_DAYS_KEPT,
   LINE_ENGINEERS_MAX,
   LINE_GLASS_PER_WINDOW,
-  LINE_GLASS_WINDOWS_MAX,
   LINE_MATERIAL_SHARE,
   LINE_MODULE_POWER_PER_DAY,
   LINE_MODULES,
-  LINE_ORDER_WINDOWS,
   LINE_PALLET_WINDOWS,
   LINE_REORDER_DAYS,
   LINE_UPGRADE_DAYS,
@@ -56,12 +53,12 @@ import {
   unitCostFactor,
 } from './constants';
 import { addWorkingDays, formatCalendarDay, isBreak, isWorkingDay, weekOfDay } from './clock';
-import { canAfford, charge, formatMoney, noteLoss, pay, refund } from './economy';
+import { canAfford, charge, formatMoney, pay } from './economy';
 import { queueEvent } from './events';
 import { lineValueOf } from './insurance';
 import { MATERIAL_ORDER_ROLES } from './jobs';
-import { boardRoom, freeBoardRoom, lineLevel, lineRecord, lineState, lineStandsWhole, standingLines } from './machines';
-import { createDelivery, isBoards, lineLoadInWords } from './materials';
+import { lineLevel, lineRecord, lineState, lineStandsWhole, standingLines } from './machines';
+import { buyStock, freeFor, pendingStockSheets, reserveWindowsShortfalls, restockCheck, restockSheets } from './materials';
 import { crewHasGoneHome, lineEngineers } from './staff';
 import { firstOnDutyOf, movingMachines } from './tasks';
 import { inWords, plural } from './text';
@@ -180,124 +177,65 @@ export function lineBoardsPerWindowCost(): number {
   return LINE_BOARDS_PER_WINDOW * SHEET_VALUE;
 }
 
-/** The glass of a window: the rest of its 600, 200, written from the two and never as a figure of
- *  its own (CLAUDE.md T31 2.1) [TUNE: chat: the split]. */
-export function lineGlassPerWindowCost(): number {
-  return lineMaterialPerWindow() - lineBoardsPerWindowCost();
-}
+/** What a window takes of each kind, and the contract's hold of it: two boards and a glass unit
+ *  (CLAUDE.md T31 2.1, T32 2.5). */
+const PER_WINDOW: Record<'boards' | 'glass', number> = {
+  boards: LINE_BOARDS_PER_WINDOW,
+  glass: LINE_GLASS_PER_WINDOW,
+};
 
-/** One order of a line's timber: twenty windows' boards, 40 (CLAUDE.md T31 2.2). */
-export function lineTimberBatch(): number {
-  return LINE_ORDER_WINDOWS * LINE_BOARDS_PER_WINDOW;
-}
-
-/** What one order of a line's timber costs: its boards at what a board is worth, 8,000. */
-export function lineTimberBatchCost(): number {
-  return lineTimberBatch() * SHEET_VALUE;
-}
-
-/** What one order of a line's glass costs: twenty windows' glass, 4,000. */
-export function lineGlassBatchCost(): number {
-  return LINE_ORDER_WINDOWS * lineGlassPerWindowCost();
+/** What a line could take of a kind for its windows this minute: what its contract holds, and the
+ *  free stock nobody has a claim on, as a sheet contract may take what it holds and the free sheets
+ *  (CLAUDE.md T32 2.5); never more than is on the counter. Only the free stock while no contract
+ *  runs. */
+function openTo(state: GameState, line: number, kind: 'boards' | 'glass'): number {
+  const contract = runningLineContract(state, line);
+  const held = contract === null ? 0 : kind === 'boards' ? contract.boardsReserved : contract.glassReserved;
+  return Math.min(held + freeFor(state, kind), state.stock[kind]);
 }
 
 /** What a line is short of for its next window, in the words the strip and the running block
- *  print, or null when it has a window's boards and glass: the one answer the line's minute, the
- *  strip and the `Standing still` row read (CLAUDE.md T31 2.1, 2.4). */
+ *  print, or null when what it holds and the free stock give a window's boards and glass: the one
+ *  answer the line's minute, the strip and the `Standing still` row read (CLAUDE.md T31 2.1, 2.4,
+ *  T32 2.5). */
 export function lineShortOf(state: GameState, line: number): 'timber' | 'glass' | 'timber or glass' | null {
-  const record = lineRecord(state, line);
-  const timber = (record?.boards ?? 0) < LINE_BOARDS_PER_WINDOW;
-  const glass = (record?.glass ?? 0) < LINE_GLASS_PER_WINDOW;
+  const timber = openTo(state, line, 'boards') < LINE_BOARDS_PER_WINDOW;
+  const glass = openTo(state, line, 'glass') < LINE_GLASS_PER_WINDOW;
   if (timber && glass) return 'timber or glass';
   if (timber) return 'timber';
   if (glass) return 'glass';
   return null;
 }
 
-/** The windows the glass at a line's module 6 is for: the one count of it in windows, which the
- *  orders, the cap, the office and the pages read (CLAUDE.md T31 2.1). */
-export function lineGlassWindows(state: GameState, line: number): number {
-  return Math.floor((lineRecord(state, line)?.glass ?? 0) / LINE_GLASS_PER_WINDOW);
-}
-
-/** The boards of a line's loads not yet unloaded, on the road or at the gate (CLAUDE.md T31
- *  2.2). */
-export function lineBoardsOnTheWay(state: GameState, line: number): number {
-  return state.deliveries
-    .filter((delivery) => delivery.line === line && !delivery.unloaded)
-    .reduce((total, delivery) => total + delivery.sheets, 0);
-}
-
-/** The windows of a line's glass ordered and not yet in (CLAUDE.md T31 2.2). */
-export function lineGlassOnTheWay(state: GameState, line: number): number {
-  return (lineRecord(state, line)?.glassOnTheWay ?? []).reduce((total, entry) => total + entry.windows, 0);
-}
-
-/** Whether a line's timber can be ordered, and why not, in the order the locked button reads
- *  (CLAUDE.md T31 2.2): only while its contract runs (the button is not drawn otherwise), then a
- *  timber store, then room on the stores that stand for a whole batch, then the cash. */
-export function lineTimberCheck(state: GameState, line: number): { ok: boolean; reason: string } {
-  if (runningLineContract(state, line) === null) return { ok: false, reason: 'The line has no contract running' };
-  const room = boardRoom(state);
-  if (room <= 0) return { ok: false, reason: 'No timber store' };
-  if (room < lineTimberBatch()) {
-    return { ok: false, reason: `The timber stores hold fewer than ${lineTimberBatch()} boards` };
+/** A running line contract holds, from the free boards and the free glass, what the windows left in
+ *  the week in hand want, as a sheet contract holds the week's sheets (`reserveContractSheets`):
+ *  at the open of every working day after the jobs have had theirs, the minute it is taken, and
+ *  after every unloading, fetch and restock, after the jobs (CLAUDE.md T32 2.5). */
+export function reserveLineMaterial(state: GameState, line: number): void {
+  const contract = runningLineContract(state, line);
+  if (contract === null) return;
+  const left = Math.max(0, lineWindowsAWeek(state, line) - contract.windowsThisWeek);
+  for (const kind of ['boards', 'glass'] as const) {
+    const held = kind === 'boards' ? contract.boardsReserved : contract.glassReserved;
+    const more = Math.min(Math.max(0, left * PER_WINDOW[kind] - held), freeFor(state, kind));
+    if (more <= 0) continue;
+    if (kind === 'boards') contract.boardsReserved += more;
+    else contract.glassReserved += more;
   }
-  if (!canAfford(state, lineTimberBatchCost())) return { ok: false, reason: 'Not enough cash' };
-  return { ok: true, reason: '' };
 }
 
-/** Whether a line's glass can be ordered, and why not: only while its contract runs, then module
- *  6's room for glass, what is there and on its way counted in, then the cash (CLAUDE.md T31 2.2). */
-export function lineGlassCheck(state: GameState, line: number): { ok: boolean; reason: string } {
-  if (runningLineContract(state, line) === null) return { ok: false, reason: 'The line has no contract running' };
-  if (lineGlassWindows(state, line) + lineGlassOnTheWay(state, line) + LINE_ORDER_WINDOWS > LINE_GLASS_WINDOWS_MAX) {
-    return { ok: false, reason: `Module 6 holds glass for ${LINE_GLASS_WINDOWS_MAX} windows` };
-  }
-  if (!canAfford(state, lineGlassBatchCost())) return { ok: false, reason: 'Not enough cash' };
-  return { ok: true, reason: '' };
+/** Every line on its contract holds its week, line 1 first (CLAUDE.md T32 2.5; v93). */
+export function reserveEveryLinesMaterial(state: GameState): void {
+  for (const record of state.windowLines) reserveLineMaterial(state, record.number);
 }
 
-/** A ledger label of a line's material, with the name of the admin who ordered it by himself, as
- *  a job's material names him (CLAUDE.md T31 2.3). */
-function orderLabel(what: string, orderedBy: string | null): string {
-  return orderedBy === null ? what : `${what}, ordered by ${orderedBy}`;
-}
-
-/** Orders a batch of a line's timber: paid at the click on the material line, one lorry in at
- *  the open of the next working day with a load of boards for the line, unloaded as a timber job's
- *  boards are (CLAUDE.md T31 2.2). */
-export function orderLineTimber(state: GameState, line: number, orderedBy: string | null = null): { ok: boolean; reason: string } {
-  const check = lineTimberCheck(state, line);
-  if (!check.ok) return check;
-  const cost = lineTimberBatchCost();
-  pay(state, 'material', orderLabel(`Timber for ${lineName(line).toLowerCase()}: ${plural(lineTimberBatch(), 'board', 'boards')}`, orderedBy), cost);
-  createDelivery(state, null, lineTimberBatch(), false, cost, true, line);
-  return check;
-}
-
-/** Orders a batch of a line's glass: paid at the click on the material line, in at the open of
- *  the next working day, carried to module 6 by the glazier with no lorry (CLAUDE.md T31 2.2). */
-export function orderLineGlass(state: GameState, line: number, orderedBy: string | null = null): { ok: boolean; reason: string } {
-  const check = lineGlassCheck(state, line);
-  if (!check.ok) return check;
-  pay(state, 'material', orderLabel(`Glass for ${lineName(line).toLowerCase()}: ${LINE_ORDER_WINDOWS} windows`, orderedBy), lineGlassBatchCost());
-  lineState(state, line).glassOnTheWay.push({
-    windows: LINE_ORDER_WINDOWS,
-    day: addWorkingDays(state.clock.day, GLASS_DELIVERY_WORKING_DAYS),
-  });
-  return check;
-}
-
-/** The open of a working day, beside a job's glass: every line's glass due today is at its module
- *  6 (CLAUDE.md T31 2.2). */
-export function arriveLineGlass(state: GameState): void {
-  for (const record of state.windowLines) {
-    const due = record.glassOnTheWay.filter((entry) => entry.day <= state.clock.day);
-    if (due.length === 0) continue;
-    record.glass += due.reduce((total, entry) => total + entry.windows, 0) * LINE_GLASS_PER_WINDOW;
-    record.glassOnTheWay = record.glassOnTheWay.filter((entry) => entry.day > state.clock.day);
-  }
+/** A window's boards or its glass unit taken off the counter: out of what the contract holds
+ *  first, then the free stock, as a sheet contract draws its sheets (CLAUDE.md T32 2.5). */
+function takeForWindow(state: GameState, contract: LineContract, kind: 'boards' | 'glass'): void {
+  const due = PER_WINDOW[kind];
+  state.stock[kind] = Math.max(0, state.stock[kind] - due);
+  if (kind === 'boards') contract.boardsReserved = Math.max(0, contract.boardsReserved - due);
+  else contract.glassReserved = Math.max(0, contract.glassReserved - due);
 }
 
 /** The windows of two working days at a line's pace today: 8 at 120 minutes a window, 16 at 60
@@ -306,76 +244,31 @@ export function lineReorderWindows(state: GameState, line: number): number {
   return LINE_REORDER_DAYS * Math.floor(MINUTES_PER_WORKING_DAY / lineWindowMinutes(state, line));
 }
 
-/** The office admin on duty orders a line's material by himself, while its contract runs, when
- *  what it holds and what is on its way are fewer than two working days of windows: only what the
- *  buttons allow at that minute, and the timber only when the stores' free room, less every load of
- *  boards already on its way, takes the whole batch, so that what he orders never waits at the gate
- *  [TUNE: chat]. With no admin on duty nothing is ordered (CLAUDE.md T31 2.3). */
+/** The office admin on duty restocks the boards and the glass for a line by himself, while its
+ *  contract runs [PIOTR, 11.10: "the office admin orders by himself when two days are left", kept]:
+ *  when what the line could have of a kind (what it holds, the free stock and what of the kind is on
+ *  its way for stock) is fewer than two working days of its windows' worth, he places that kind's
+ *  Restock with nothing typed, which fills the free places less what is on its way and so never goes
+ *  to the paid store, when the Restock would be allowed and buys at least one. His name is in the
+ *  ledger line. With no admin on duty nothing is bought (CLAUDE.md T31 2.3, T32 2.5) [TUNE: chat:
+ *  as a restock]. He restocks for the line and for nothing else. */
 export function officeOrdersLineMaterial(state: GameState, line: number): void {
   if (runningLineContract(state, line) === null) return;
   const admin = firstOnDutyOf(state, MATERIAL_ORDER_ROLES);
   if (admin === null) return;
   const windows = lineReorderWindows(state, line);
-  const record = lineState(state, line);
-  if (record.boards + lineBoardsOnTheWay(state, line) < windows * LINE_BOARDS_PER_WINDOW && lineTimberCheck(state, line).ok) {
-    const coming = state.deliveries
-      .filter((delivery) => !delivery.unloaded && isBoards(state, delivery))
-      .reduce((total, delivery) => total + delivery.sheets, 0);
-    if (freeBoardRoom(state) - coming >= lineTimberBatch()) orderLineTimber(state, line, admin.name);
-  }
-  if (lineGlassWindows(state, line) + lineGlassOnTheWay(state, line) < windows && lineGlassCheck(state, line).ok) {
-    orderLineGlass(state, line, admin.name);
+  for (const kind of ['boards', 'glass'] as const) {
+    const could = openTo(state, line, kind) + pendingStockSheets(state, kind);
+    if (could >= windows * PER_WINDOW[kind]) continue;
+    const count = restockSheets(state, kind);
+    if (count <= 0 || !restockCheck(state, kind).ok) continue;
+    buyStock(state, kind, count, admin.name);
   }
 }
 
-/** The office looks at every line's timber and glass, each line on its own rule (v93). */
+/** The office looks at every line's boards and glass, each line on its own rule (v93). */
 function officeOrdersEveryLinesMaterial(state: GameState): void {
   for (const record of state.windowLines) officeOrdersLineMaterial(state, record.number);
-}
-
-/** A line sold: its boards come off the counter and its glass goes, written off on the material
- *  line as a dropped job's are, and the loads of it still on their way are called off and their
- *  price given back, so no board is held for ever by a line that is gone [TUNE: chat]. A load
- *  already at the gate is written off with them and its unloading goes [TUNE]. */
-export function writeOffLineMaterial(state: GameState, line: number): void {
-  const record = lineState(state, line);
-  const atGate = state.deliveries.filter((delivery) => delivery.line === line && delivery.arrived && !delivery.unloaded);
-  const lost =
-    record.boards * SHEET_VALUE +
-    (record.glass / LINE_GLASS_PER_WINDOW) * lineGlassPerWindowCost() +
-    atGate.reduce((total, delivery) => total + delivery.pricePaid, 0);
-  noteLoss(state, 'material', `Material written off: ${lineName(line).toLowerCase()}'s timber and glass`, lost);
-  state.stock.sheets = Math.max(0, state.stock.sheets - record.boards);
-  record.boards = 0;
-  record.glass = 0;
-  for (const delivery of state.deliveries) {
-    if (delivery.line === line && !delivery.arrived) {
-      refund(state, 'material', `Order cancelled: ${lineLoadInWords(delivery.sheets, line)}`, delivery.pricePaid);
-    }
-  }
-  for (const entry of record.glassOnTheWay) {
-    refund(
-      state,
-      'material',
-      `Order cancelled: glass for ${lineName(line).toLowerCase()}, ${plural(entry.windows, 'window', 'windows')}`,
-      entry.windows * lineGlassPerWindowCost(),
-    );
-  }
-  record.glassOnTheWay = [];
-  const gone = new Set(
-    state.deliveries.filter((delivery) => delivery.line === line && !delivery.unloaded).map((delivery) => delivery.id),
-  );
-  if (gone.size === 0) return;
-  state.deliveries = state.deliveries.filter((delivery) => !gone.has(delivery.id));
-  const tasks = new Set(
-    state.tasks.filter((task) => task.deliveryId !== null && gone.has(task.deliveryId)).map((task) => task.id),
-  );
-  state.tasks = state.tasks.filter((task) => !tasks.has(task.id));
-  if (state.owner.currentTaskId !== null && tasks.has(state.owner.currentTaskId)) state.owner.currentTaskId = null;
-  if (state.owner.resumeTaskId !== null && tasks.has(state.owner.resumeTaskId)) state.owner.resumeTaskId = null;
-  for (const worker of state.workers) {
-    if (worker.taskId !== null && tasks.has(worker.taskId)) worker.taskId = null;
-  }
 }
 
 /** The minutes a window takes on a line's contract: the one answer the offer card, the running
@@ -462,8 +355,8 @@ function engineersOnTheBooks(state: GameState, line: number): number {
 export function lineOfferBody(state: GameState, line: number): string {
   return (
     `A window company will take every window ${lineName(line).toLowerCase()} makes, at ${formatMoney(LINE_WINDOW_PRICE)} a ` +
-    `window. The timber and the glass cost ${formatMoney(lineMaterialPerWindow())} a window, ordered ahead: ` +
-    'on the Contracts tab, or by the office. The line makes one every ' +
+    `window. The timber and the glass cost ${formatMoney(lineMaterialPerWindow())} a window, taken from your ` +
+    'timber stores and glass racks: restock them on the Materials page, or the office does. The line makes one every ' +
     `${lineWindowEvery(lineWindowMinutes(state, line))}, about ${lineWindowsAWeek(state, line)} a week, and the client ` +
     `collects each pallet of ${inWords(LINE_PALLET_WINDOWS)} the next working day. It runs until you end it.`
   );
@@ -483,8 +376,11 @@ export function runLineDay(state: GameState): void {
       contract.weekStartDay = state.clock.day;
     }
   }
-  // The office looks at every line's timber and glass at the open of every working day, after the
-  // day's lorries and glass are in (CLAUDE.md T31 2.3).
+  // Every line on its contract holds its week's boards and glass at the open of every working day,
+  // after the windows have had theirs, as the sheet contracts hold their sheets after the jobs
+  // (CLAUDE.md T32 2.5); then the office looks at what each could have (CLAUDE.md T31 2.3).
+  reserveWindowsShortfalls(state);
+  reserveEveryLinesMaterial(state);
   officeOrdersEveryLinesMaterial(state);
   for (const record of state.windowLines) offerLineContract(state, record.number);
 }
@@ -507,6 +403,8 @@ function offerLineContract(state: GameState, line: number): void {
     windowsMade: 0,
     revenue: 0,
     materialCost: 0,
+    boardsReserved: 0,
+    glassReserved: 0,
   };
   queueEvent(state, {
     kind: 'lineContractOffered',
@@ -530,8 +428,10 @@ export function answerLineOffer(state: GameState, line: number, choiceId: string
     contract.status = 'active';
     contract.startDay = state.clock.day;
     contract.weekStartDay = state.clock.day;
-    // The office looks at the line's material the minute it is taken too, so a new contract does
-    // not wait a working day for its first order (CLAUDE.md T31 2.3) [TUNE].
+    // It holds its week the minute it is taken (CLAUDE.md T32 2.5), and the office looks at the
+    // line's material then too, so a new contract does not wait a working day for its first order
+    // (CLAUDE.md T31 2.3) [TUNE].
+    reserveLineMaterial(state, line);
     officeOrdersLineMaterial(state, line);
     return;
   }
@@ -589,9 +489,9 @@ export function runLineMinute(state: GameState): void {
 }
 
 /** One window made on a line: its price in on the contract line, one growing line a day, and its
- *  two boards and its glass taken off what the line holds: the boards off the timber stores and the
- *  counter, the glass off module 6. The material was paid at its order, so nothing of it is booked
- *  here (CLAUDE.md T31 2.1). It stands on the pallet, and the tenth sends the pallet to the gate
+ *  two boards and its glass unit taken off the counters, out of what its contract holds first and
+ *  then the free stock (CLAUDE.md T32 2.5). The material was paid when it was bought, so nothing of
+ *  it is booked here (CLAUDE.md T31 2.1); its books count the £600 a window used, as before. It stands on the pallet, and the tenth sends the pallet to the gate
  *  (CLAUDE.md T30 2.7, 2.8). Then the office looks at what is left (CLAUDE.md T31 2.3). */
 function makeWindow(state: GameState, line: number): void {
   const contract = runningLineContract(state, line);
@@ -599,9 +499,8 @@ function makeWindow(state: GameState, line: number): void {
   const material = lineMaterialPerWindow();
   const record = lineState(state, line);
   charge(state, 'contract', `${lineContractName(line)}: windows`, LINE_WINDOW_PRICE, { merge: true });
-  record.boards -= LINE_BOARDS_PER_WINDOW;
-  state.stock.sheets = Math.max(0, state.stock.sheets - LINE_BOARDS_PER_WINDOW);
-  record.glass -= LINE_GLASS_PER_WINDOW;
+  takeForWindow(state, contract, 'boards');
+  takeForWindow(state, contract, 'glass');
   contract.windowsMade += 1;
   contract.windowsThisWeek += 1;
   contract.revenue += LINE_WINDOW_PRICE;

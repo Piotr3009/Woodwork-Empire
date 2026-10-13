@@ -178,15 +178,15 @@ describe('through the page', () => {
     if (state === null) throw new Error('no game');
     // The rack is low, so the line wears the badge and Restock is a button (CLAUDE.md T13 3.2).
     expect(laptop().querySelector('.stock-line .badge-low')).not.toBeNull();
-    const check = restockCheck(state);
+    const check = restockCheck(state, 'sheets');
     expect(check.ok).toBe(true);
     const restock = laptop().querySelector('[data-do="restock"]');
     expect(restock).not.toBeNull();
     expect(restock?.textContent).toContain('Restock');
-    expect(pendingStockSheets(state)).toBe(0);
+    expect(pendingStockSheets(state, 'sheets')).toBe(0);
     click('[data-modal="laptop"] [data-do="restock"]');
     // One click, one order on the road, and the button says so now.
-    expect(pendingStockSheets(currentState() as never)).toBe(check.sheets);
+    expect(pendingStockSheets(currentState() as never, 'sheets')).toBe(check.sheets);
     expect(page()).toBe('stock');
     expect(laptop().querySelector('[data-do="restock"]')).toBeNull();
     // The greyed button carries the reason, the way every locked button does (CLAUDE.md 9.2).
