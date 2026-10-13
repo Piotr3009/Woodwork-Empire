@@ -31,3 +31,8 @@ lorry; everything of 2.8 gone; STATE_VERSION 48 and its lift. 3,046 tests in 315
 The src review found a window could pass its Glazing holding glass that lay in the paid store, and a
 dropped job's load at the gate left with no unloading: both fixed. Queueing a second lorry's "Unload
 now" behind the first was tried and taken out, because it moved the sheet playthrough (section 0).
+
+**T32-E1 Notes and the art request.** `docs/notes-t32.md`: where each rule lives, the save, the
+readings of the brief, section 10 as built, what was found and fixed or left, and four questions for
+Piotr. `docs/art/REQUESTS-T32.md`: G1, the two glass racks, their files and anchors checked against
+`spriteFileSize` and `spriteAnchorIn`; S1 named as still owed.
