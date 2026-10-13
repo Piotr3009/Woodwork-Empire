@@ -36,3 +36,10 @@ now" behind the first was tried and taken out, because it moved the sheet playth
 readings of the brief, section 10 as built, what was found and fixed or left, and four questions for
 Piotr. `docs/art/REQUESTS-T32.md`: G1, the two glass racks, their files and anchors checked against
 `spriteFileSize` and `spriteAnchorIn`; S1 named as still owed.
+
+**T32-E2 Scenarios.** `tests/scenarios/turn32.test.ts`: (mmm) the restock of 60 boards and 30 glass
+units past one rack each, the window holding 12 and 7 at the click and taking its glass at its
+Glazing, a second ordered by the admin on two lorries; (nnn) a line fed by the admin's restocks for a
+played month and standing for nothing, and with no admin standing `no timber` until the player
+restocks; (ooo) a v95 save of a running line and a window with its glass ordered, played a week on
+v96. Each moved figure of the older scenarios was restated in B2 with its line of reason.
