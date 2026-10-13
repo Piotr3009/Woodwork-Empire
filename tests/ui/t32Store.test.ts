@@ -15,10 +15,11 @@
 import { describe, expect, it } from 'vitest';
 import { LINE_MODULES } from '../../src/engine/constants';
 import { lineState } from '../../src/engine/lineContract';
-import { buyStock } from '../../src/engine/materials';
+import { buyStock, orderForJob } from '../../src/engine/materials';
 import type { GameState, Job } from '../../src/engine/index';
 import { renderBoard } from '../../src/ui/board';
 import { renderContracts } from '../../src/ui/contracts';
+import { materialWrittenOff, renderDropCard } from '../../src/ui/dropCard';
 import { materialLine } from '../../src/ui/jobCard';
 import { renderMaterials } from '../../src/ui/materials';
 import { acceptNow, act, buyStartingKit, newGame, nextDay, placeEnquiry, placeEquipment, placeGlassRack, testJoiner, withAir } from '../helpers';
@@ -104,6 +105,18 @@ describe('the Materials page s three blocks (CLAUDE.md T32 2.7)', () => {
     expect(page.textContent).toContain('7 glass units');
   });
 
+  it('quotes the glass past the racks room in its own words before the click', () => {
+    const state = hall();
+    placeGlassRack(state);
+    const glass = parse(renderMaterials(state, '', '', '60')).querySelector('[data-stock-head="glass"]');
+    expect(text(glass?.querySelector('[data-ladder]'))).toBe('60 glass units at £200 = £12,000');
+    expect(text(glass?.querySelector('[data-storage]'))).toBe('60 glass units: 40 on the racks, 20 to storage at £150');
+    const restock = glass?.querySelector('[data-do="restock"]');
+    expect(text(restock)).toBe('Restock: 60 glass units, £12,000');
+    expect(restock?.getAttribute('data-kind')).toBe('glass');
+    expect(restock?.getAttribute('data-sheets')).toBe('60');
+  });
+
   it('names every kind in the paid store in its one hint', () => {
     const state = hall();
     state.stock.tempStorageSheets = 12;
@@ -140,6 +153,39 @@ describe('the job card s material line of a window (CLAUDE.md T32 2.7)', () => {
     expect(text(line.querySelector('[data-glass="1"].bad.shortfall'))).toBe('3 of 7 glass units short');
     const buttons = Array.from(line.querySelectorAll('button'));
     expect(buttons.map((button) => text(button))).toEqual(['Order for this job, £1,600']);
+  });
+});
+
+describe('the drop card of a window (CLAUDE.md T32 2.4, section 7)', () => {
+  /** The card's row of the material written off. */
+  function writtenOffRow(state: GameState, job: Job): string {
+    const rows = Array.from(parse(renderDropCard(state, job)).querySelectorAll('.row'));
+    const row = rows.find((node) => text(node.querySelector('.row-main')) === 'Material bought for it, written off');
+    return text(row?.querySelector('.row-figure'));
+  }
+
+  it('reads the drop s own rule: each kind ordered in at its share, what it holds off the stores at nought', () => {
+    const boardsIn = hall();
+    placeGlassRack(boardsIn);
+    boardsIn.stock.boards = 12;
+    const glassOrdered = casement(boardsIn);
+    orderForJob(glassOrdered.state, glassOrdered.job);
+    expect(materialWrittenOff(glassOrdered.state, glassOrdered.job)).toBe(1260);
+    expect(writtenOffRow(glassOrdered.state, glassOrdered.job)).toBe('-£1,260');
+    const glassIn = hall();
+    placeGlassRack(glassIn);
+    glassIn.stock.glass = 7;
+    const boardsOrdered = casement(glassIn);
+    orderForJob(boardsOrdered.state, boardsOrdered.job);
+    expect(materialWrittenOff(boardsOrdered.state, boardsOrdered.job)).toBe(2340);
+    expect(writtenOffRow(boardsOrdered.state, boardsOrdered.job)).toBe('-£2,340');
+    const both = hall();
+    placeGlassRack(both);
+    both.stock.boards = 12;
+    both.stock.glass = 7;
+    const inHand = casement(both);
+    expect(materialWrittenOff(inHand.state, inHand.job)).toBe(0);
+    expect(writtenOffRow(inHand.state, inHand.job)).toBe('£0');
   });
 });
 

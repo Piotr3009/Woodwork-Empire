@@ -29,7 +29,7 @@ import { LINE_MODULES, TEMP_STORAGE_COST } from '../../src/engine/constants';
 import { applyAction, runMinutes, tick } from '../../src/engine/index';
 import type { GameEvent, GameState, Job, Worker } from '../../src/engine/index';
 import { isOvertime, isWorkingDay } from '../../src/engine/clock';
-import { lineShortOf, lineState } from '../../src/engine/lineContract';
+import { lineShortOf, lineState, lineWindowsAWeek, runLineDay } from '../../src/engine/lineContract';
 import { migrateState } from '../../src/engine/migrate';
 import { warnings } from '../../src/engine/warnings';
 import { acceptNow, act, buyStartingKit, newGame, nextDay, placeEnquiry, placeEquipment, placeGlassRack, testJoiner, withAir } from '../helpers';
@@ -450,6 +450,16 @@ describe('(ooo) a v95 save of a running line and a window with its glass ordered
     const job = jobNamed(opened, 'Oak Lane');
     expect([job.sheetsReserved, job.glassUnits, job.glassReserved, job.glassUsed]).toEqual([12, 7, 7, 0]);
     expect(opened.deliveries.map((delivery) => [delivery.material, delivery.jobId, delivery.sheets])).toEqual([['boards', null, 40]]);
+    // The contract comes in holding nothing, and holds its week at its first open, out of what the
+    // window does not hold: 36 boards less its 12, 35 glass units less its 7.
+    expect(lineState(opened, 1).contract).toMatchObject({ boardsReserved: 0, glassReserved: 0 });
+    const first = JSON.parse(JSON.stringify(opened)) as GameState;
+    runLineDay(first);
+    const weekly = lineWindowsAWeek(first, 1);
+    expect(lineState(first, 1).contract).toMatchObject({
+      boardsReserved: Math.min(2 * weekly, 36 - 12),
+      glassReserved: Math.min(weekly, 35 - 7),
+    });
   });
 
   it('plays a week: nothing lost, nothing bought twice, the line and the job carry on', () => {

@@ -43,3 +43,9 @@ Glazing, a second ordered by the admin on two lorries; (nnn) a line fed by the a
 played month and standing for nothing, and with no admin standing `no timber` until the player
 restocks; (ooo) a v95 save of a running line and a window with its glass ordered, played a week on
 v96. Each moved figure of the older scenarios was restated in B2 with its line of reason.
+
+**T32-E3 Cross check.** Four read-only agents mapped every claim of section 7 to the tests that
+assert it: 118 facts asserted, 29 in part and 22 not. The 51 were closed with
+`tests/engine/t32CrossCheck.test.ts` (16 tests) and additions to `t32Store` (engine and ui),
+`t31Material`, `migrate` and `turn32`; the "what goes" search now also covers `migrate.ts`.
+No skip anywhere, `styles.css` untouched; 3,085 tests in 317 files green.

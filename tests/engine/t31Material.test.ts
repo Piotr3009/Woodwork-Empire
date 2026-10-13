@@ -19,6 +19,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  DAYS_PER_WEEK,
   LINE_BOARDS_PER_WINDOW,
   LINE_GLASS_PER_WINDOW,
   LINE_MODULES,
@@ -37,11 +38,13 @@ import {
   lineShortOf,
   officeOrdersLineMaterial,
   reserveLineMaterial,
+  runLineDay,
   runningLineContract,
 } from '../../src/engine/lineContract';
 import { freeRoomFor, roomFor } from '../../src/engine/machines';
 import {
   buyStock,
+  fetchFromStorage,
   freeFor,
   glassUnitPrice,
   reserveSheetsFor,
@@ -494,7 +497,10 @@ describe('the end and the sale (CLAUDE.md T31 2.1, T32 2.5)', () => {
     buyStock(state, 'glass', 20);
     const deliveries = state.deliveries.length;
     const cash = state.cash;
+    expect(held(state)).toEqual({ boards: 20, glass: 6 });
+    expect([reservedFor(state, 'boards'), reservedFor(state, 'glass')]).toEqual([20, 6]);
     expect(sellMachine(state, 'kit-line-3').ok).toBe(true);
+    expect([reservedFor(state, 'boards'), reservedFor(state, 'glass')]).toEqual([0, 0]);
     // Flipped in v96: nothing written off and no load called off (CLAUDE.md T32 2.5).
     expect(state.ledger.some((entry) => entry.label.startsWith('Material written off'))).toBe(false);
     expect(state.stock.boards).toBe(20);
@@ -503,6 +509,70 @@ describe('the end and the sale (CLAUDE.md T31 2.1, T32 2.5)', () => {
     expect(freeFor(state, 'glass')).toBe(6);
     expect(state.deliveries).toHaveLength(deliveries);
     expect(state.cash).toBe(cash);
+  });
+});
+
+/** A window job on the books of this company, its boards and glass as given (CLAUDE.md T32 2.4). */
+function windowOn(state: GameState, sheetsReserved: number, glassReserved: number): GameState {
+  const taken = acceptNow(state, placeEnquiry(state, {}).id);
+  const job = taken.jobs[taken.jobs.length - 1];
+  if (job === undefined) throw new Error('the job is taken');
+  Object.assign(job, { timber: true, sheets: 12, sheetsUsed: 0, sheetsReserved, glassUnits: 7, glassUsed: 0, glassReserved });
+  return taken;
+}
+
+describe('the line holds after the windows, at every turn (CLAUDE.md T32 2.5, section 7)', () => {
+  it('holds at the open only what the windows short of their material leave it, and a fresh week when the week turns', () => {
+    const taken = windowOn(running(), 0, 0);
+    const job = taken.jobs[taken.jobs.length - 1];
+    taken.stock.boards = 14;
+    taken.stock.glass = 8;
+    runLineDay(taken);
+    expect([job?.sheetsReserved, job?.glassReserved]).toEqual([12, 7]);
+    // The line first would have held all 14 and 8.
+    expect(held(taken)).toEqual({ boards: 2, glass: 1 });
+    const week = stocked(running(), 100, 50);
+    const contract = runningLineContract(week, 1);
+    if (contract === null) throw new Error('the contract runs');
+    contract.windowsThisWeek = 20;
+    contract.boardsReserved = 0;
+    contract.glassReserved = 0;
+    week.clock.day += DAYS_PER_WEEK;
+    runLineDay(week);
+    expect(contract.windowsThisWeek).toBe(0);
+    expect(held(week)).toEqual({ boards: 40, glass: 20 });
+  });
+
+  it('holds what the morning s fetch brings back from the paid store', () => {
+    const state = running();
+    state.stock.tempStorageBoards = 30;
+    state.stock.tempStorageGlass = 10;
+    fetchFromStorage(state);
+    expect([state.stock.boards, state.stock.glass]).toEqual([30, 10]);
+    expect(held(state)).toEqual({ boards: 30, glass: 10 });
+  });
+
+  it('never takes what a window holds: it stands beside it, the window s boards and glass untouched', () => {
+    const taken = windowOn(running(), 12, 7);
+    taken.stock.boards = 13;
+    taken.stock.glass = 7;
+    expect(lineShortOf(taken, 1)).toBe('timber or glass');
+    taken.stock.glass = 8;
+    expect(lineShortOf(taken, 1)).toBe('timber');
+    const after = play(taken, LINE_WINDOW_MINUTES);
+    expect(lineState(after, 1).contract?.windowsMade).toBe(0);
+    expect(after.stock.boards).toBe(13);
+  });
+
+  it('has the office look again after every window made', () => {
+    const state = stocked(running(), 17, 20);
+    state.workers.push(admin());
+    officeOrdersLineMaterial(state, 1);
+    // Seventeen boards and twenty glass units are two days of windows and more.
+    expect(officeLines(state)).toEqual([]);
+    const after = play(state, LINE_WINDOW_MINUTES);
+    expect(lineState(after, 1).contract?.windowsMade).toBe(1);
+    expect(officeLines(after)).toEqual([`${roomFor(after, 'boards') - 15} boards for stock, ordered by Anna`]);
   });
 });
 

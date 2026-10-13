@@ -23,6 +23,8 @@ import { acceptNow, buyStartingKit, newGame, placeEnquiry, placeEquipment, twoMe
 import { canPlace, firstFreeCell } from '../../src/engine/layout';
 import { nextWorkingDay } from '../../src/engine/clock';
 import { lineState } from '../../src/engine/lineContract';
+import { orderForJobCheck } from '../../src/engine/jobs';
+import { glassShortfallOf, orderForJobCost } from '../../src/engine/materials';
 
 /** A game saved by v18 on the morning of day 2, with a full bag on the saw, the question about
  *  it open and the bag change on the list: everything the bump took away, in the shape it had.
@@ -1954,6 +1956,74 @@ describe('a v47 save in this build (CLAUDE.md T32 section 4)', () => {
     if (opened === null) throw new Error('the lift refused a whole version 47 state');
     expect(opened.stock.glass).toBe(0);
     expect(jobOf(opened, 'Oak Lane')).toMatchObject({ glassUnits: 7, glassReserved: 0, glassUsed: 0 });
+    // Its glass is then ordered as any shortfall is: its 12 boards are held, so the glass alone.
+    const oak = jobOf(opened, 'Oak Lane');
+    expect(glassShortfallOf(oak)).toBe(7);
+    expect(orderForJobCheck(opened, oak)).toEqual({ ok: true, reason: '' });
+    expect(orderForJobCost(oak)).toBe(7 * 200);
+  });
+
+  it('puts in its window the glass of a window past production, and counts no boards of a window completed', () => {
+    const today = v96Windows(['Oak Lane', 'Elm Row']);
+    const raw = v47Of(today, { 'Oak Lane': 'in', 'Elm Row': 'in' });
+    (raw.jobs.find((job) => job.name === 'Oak Lane') as Raw).stage = 'completed';
+    (raw.jobs.find((job) => job.name === 'Elm Row') as Raw).stage = 'awaitingTransport';
+    raw.stock = { sheets: 32, tempStorageSheets: 0 };
+    const opened = migrateState(raw, 47);
+    if (opened === null) throw new Error('the lift refused a whole version 47 state');
+    // Elm Row's 12 boards are counted, Oak Lane's (completed) are not; both windows' glass is used.
+    expect([opened.stock.sheets, opened.stock.boards, opened.stock.glass]).toEqual([20, 12, 0]);
+    for (const name of ['Oak Lane', 'Elm Row']) {
+      expect(jobOf(opened, name)).toMatchObject({ glassUnits: 7, glassReserved: 0, glassUsed: 7 });
+      expect('glassInBeforeTheLift' in jobOf(opened, name)).toBe(false);
+    }
+  });
+
+  it('never leaves the sheets below nought, and keeps the sheets paid store as it was', () => {
+    const today = v96Windows(['Oak Lane', 'Elm Row']);
+    const raw = v47Of(today, { 'Oak Lane': 'toOrder', 'Elm Row': 'toOrder' });
+    raw.stock = { sheets: 5, tempStorageSheets: 12 };
+    const opened = migrateState(raw, 47);
+    if (opened === null) throw new Error('the lift refused a whole version 47 state');
+    expect(opened.stock).toEqual({ sheets: 0, boards: 24, glass: 0, tempStorageSheets: 12, tempStorageBoards: 0, tempStorageGlass: 0 });
+  });
+
+  it('keeps held the glass in of a window in a fragment of a state, and saves no mark of the lift', () => {
+    const lifted = migrateState(
+      { version: 47, jobs: [{ id: 'job-1', stage: 'inProduction', timber: true, materialCost: 3600, sheetsReserved: 12, glass: 'in', glassDay: null }] },
+      47,
+    );
+    expect(lifted?.jobs[0]).toMatchObject({ glassUnits: 7, glassReserved: 7, glassUsed: 0 });
+    expect('glassInBeforeTheLift' in (lifted?.jobs[0] ?? {})).toBe(false);
+  });
+
+  it('gives every load its kind: the boards mark, the line mark and a window s load are boards, the rest sheets', () => {
+    const today = v96Windows(['Oak Lane']);
+    const raw = v47Of(today, { 'Oak Lane': 'in' });
+    const oakId = jobOf(today, 'Oak Lane').id;
+    const load = (id: string, extra: Raw): Raw => ({
+      id,
+      jobId: null,
+      sheets: 10,
+      orderedDay: 10,
+      pricePaid: 1900,
+      arriveDay: 11,
+      arrived: false,
+      unloaded: false,
+      bespoke: false,
+      overflowSheets: 0,
+      ...extra,
+    });
+    raw.deliveries = [load('del-marked', { jobId: oakId, boards: true }), load('del-line', { line: 1 }), load('del-job', { jobId: oakId }), load('del-sheets', {})];
+    const opened = migrateState(raw, 47);
+    if (opened === null) throw new Error('the lift refused a whole version 47 state');
+    expect(opened.deliveries.map((delivery) => [delivery.id, delivery.material])).toEqual([
+      ['del-marked', 'boards'],
+      ['del-line', 'boards'],
+      ['del-job', 'boards'],
+      ['del-sheets', 'sheets'],
+    ]);
+    for (const delivery of opened.deliveries) expect('boards' in delivery || 'line' in delivery).toBe(false);
   });
 
   it('puts a running line s boards, its glass at module 6 and on its way onto the counters free, and its load on the road a load of boards for stock', () => {
@@ -1974,7 +2044,10 @@ describe('a v47 save in this build (CLAUDE.md T32 section 4)', () => {
     const record = raw.windowLines[0] as Raw;
     record.boards = 24;
     record.glass = 8;
-    record.glassOnTheWay = [{ windows: 20, day: today.clock.day + 1 }];
+    record.glassOnTheWay = [
+      { windows: 20, day: today.clock.day + 1 },
+      { windows: 12, day: today.clock.day + 2 },
+    ];
     raw.deliveries = [
       {
         id: 'del-line-1',
@@ -1993,7 +2066,7 @@ describe('a v47 save in this build (CLAUDE.md T32 section 4)', () => {
     ];
     const opened = migrateState(raw, 47);
     if (opened === null) throw new Error('the lift refused a whole version 47 state');
-    expect([opened.stock.sheets, opened.stock.boards, opened.stock.glass]).toEqual([20, 24, 8 + 20]);
+    expect([opened.stock.sheets, opened.stock.boards, opened.stock.glass]).toEqual([20, 24, 8 + 20 + 12]);
     const line = lineState(opened, 1);
     for (const key of ['boards', 'glass', 'glassOnTheWay']) expect(key in line).toBe(false);
     expect(line.contract).toMatchObject({ status: 'active', windowsMade: 30, boardsReserved: 0, glassReserved: 0 });

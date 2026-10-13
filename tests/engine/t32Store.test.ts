@@ -357,6 +357,18 @@ function lineCompany(): GameState {
 }
 
 describe('the line fed from the stores (CLAUDE.md T32 2.5)', () => {
+  it('keeps what it holds when a window is taken: the window holds from the free stock only', () => {
+    const state = lineCompany();
+    state.stock.boards = 30;
+    state.stock.glass = 30;
+    reserveLineMaterial(state, 1);
+    expect(lineState(state, 1).contract).toMatchObject({ boardsReserved: 30, glassReserved: 20 });
+    const { state: taken, job } = casement(state);
+    expect([job.sheetsReserved, job.glassReserved]).toEqual([0, 7]);
+    expect(lineState(taken, 1).contract).toMatchObject({ boardsReserved: 30, glassReserved: 20 });
+    expect(freeFor(taken, 'glass')).toBe(3);
+  });
+
   it('holds the week s boards and glass after the jobs, and a window takes two boards and a unit, held first', () => {
     const state = lineCompany();
     state.stock.boards = 30;
@@ -376,8 +388,7 @@ describe('the line fed from the stores (CLAUDE.md T32 2.5)', () => {
     state.stock.glass = 10;
     expect(lineShortOf(state, 1)).toBe('timber');
     expect(warnings(state).some((warning) => warning.key === 'lineNeedsMaterial' && warning.text === 'Line 1 stands: no timber for its next window')).toBe(true);
-    expect(Object.keys(lineState(state, 1))).not.toEqual(expect.arrayContaining(['boards']));
-    expect('glassOnTheWay' in lineState(state, 1)).toBe(false);
+    for (const key of ['boards', 'glass', 'glassOnTheWay']) expect(key in lineState(state, 1), key).toBe(false);
     expect(lineOfferBody(state, 1)).toContain(
       'The timber and the glass cost £600 a window, taken from your timber stores and glass racks: restock them on the Materials page, or the office does.',
     );
@@ -463,20 +474,35 @@ describe('what goes (CLAUDE.md T32 2.8)', () => {
       'freeBoardRoom',
       'reservedSheets',
       'freeSheets',
+      'stockFree',
       'Timber is ordered for the job',
       'Order glass',
       'Order timber',
+      // The job card's glass figures, the board's red line of the stores and the page's rows of a
+      // line's glass (CLAUDE.md T32 2.7, 2.8).
+      'Glass not ordered',
+      'Glass ordered, here on',
+      'Glass is in',
+      'and the timber stores hold',
+      'data-stores',
+      'lineGlass',
+      'boardsRow',
     ];
-    // The lifts read the old shape of a save by its old names, as raw JSON, and are the one place
-    // they may stand (CLAUDE.md T32 section 4).
-    const files = sourceFiles('src').filter((path) => !path.endsWith('migrate.ts'));
+    // No code name of them stands anywhere in src/, the lifts among them.
+    const everywhere = sourceFiles('src');
     for (const name of gone) {
-      const holders = files.filter((path) => readFileSync(path, 'utf8').includes(name));
+      const holders = everywhere.filter((path) => readFileSync(path, 'utf8').includes(name));
       expect(holders, name).toEqual([]);
     }
-    // And the glazier's two fields are read nowhere but in the lifts.
+    // The lifts read the old shape of a save by its old field names, as raw JSON, and are the one
+    // place those may stand (CLAUDE.md T32 section 4): the glazier's two fields, a job's glass state,
+    // a line's glass on its way and a delivery's two marks.
+    const files = everywhere.filter((path) => !path.endsWith('migrate.ts'));
     for (const field of ['glassDay', 'glassOnTheWay']) {
       expect(files.filter((path) => readFileSync(path, 'utf8').includes(field)), field).toEqual([]);
+    }
+    for (const pattern of [/\bjob\.glass\b/, /\bdelivery\.(line|boards)\b/, /\bboards\?: true/]) {
+      expect(files.filter((path) => pattern.test(readFileSync(path, 'utf8'))), String(pattern)).toEqual([]);
     }
   });
 });
