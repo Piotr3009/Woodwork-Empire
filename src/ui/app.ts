@@ -1779,6 +1779,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // The room shows its first lockers again, whichever it was showing.
       ui.canteenPage = 0;
       return;
+    case 'refitOffice':
+      // The Premises page's office card: the next level, paid at the click, open in the morning
+      // (v98).
+      dispatch({ type: 'REFIT_OFFICE' });
+      return;
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
       return;

@@ -10,7 +10,7 @@
 //
 // Every figure on the page is the engine's (`src/engine/premises.ts`): the page holds none.
 
-import { secondExtensionOf } from '../engine/constants';
+import { OFFICE_LEVELS, officeLevelSpec, secondExtensionOf } from '../engine/constants';
 import { crewLimit } from '../engine/layout';
 import {
   type ExtensionTerms,
@@ -19,6 +19,9 @@ import {
   extendUnitCheck,
   extensionStatus,
   extensionTerms,
+  nextOfficeLevel,
+  officeLevelOf,
+  refitOfficeCheck,
   secondExtensionAreaM2,
 } from '../engine/premises';
 import type { ExtensionStage, GameState } from '../engine/index';
@@ -204,6 +207,47 @@ function canteenCard(state: GameState): string {
   );
 }
 
+/** The office's card: the next refit offered with its price and its picture's words, the one being
+ *  done, or the top level reached. One card, as the canteen has one, for the six levels of
+ *  `OFFICE_LEVELS` taken one after the other (PIOTR, 15.10; v98). */
+function officeCard(state: GameState): string {
+  const level = officeLevelOf(state);
+  const refit = state.unit.officeRefit ?? null;
+  if (refit !== null) {
+    const spec = officeLevelSpec(refit.level);
+    return card(
+      'office',
+      `Refit the office: ${spec?.name ?? 'the next level'}`,
+      'Being refitted',
+      ' · paid for. The fitters are out in the morning.',
+      spec?.sentence ?? '',
+      '<span class="badge badge-held">Paid</span>',
+    );
+  }
+  const next = nextOfficeLevel(state);
+  if (next === null) {
+    const top = officeLevelSpec(level);
+    return card(
+      'office',
+      `The office: ${top?.name ?? 'the best there is'}`,
+      'Refitted',
+      ` · level ${level} of ${OFFICE_LEVELS.length}`,
+      top?.sentence ?? '',
+      DONE,
+    );
+  }
+  const check = refitOfficeCheck(state);
+  const now = level === 0 ? 'The day one office' : (officeLevelSpec(level)?.name ?? `Level ${level}`);
+  return card(
+    'office',
+    `Refit the office: ${next.name}`,
+    money(next.price),
+    ` · level ${next.level} of ${OFFICE_LEVELS.length}, ready the next morning. Today: ${now.toLowerCase()}.`,
+    `${next.sentence} Clients and callers notice a better office: a few points of reputation the morning it opens.`,
+    check.ok ? button('refitOffice', 'Refit') : greyed('Refit', check.reason),
+  );
+}
+
 export function renderPremises(state: GameState): string {
   const unit = state.unit;
   return (
@@ -217,6 +261,9 @@ export function renderPremises(state: GameState): string {
     // The hall grows longer once it is twenty metres deep (CLAUDE.md T31 2.7), and wider (v95).
     (secondExtensionOf(unit) === 'open' ? extendCard(state, 'long') + extendCard(state, 'wide') : '') +
     '<h3>Canteen</h3>' +
-    canteenCard(state)
+    canteenCard(state) +
+    // The office's six refits, one after the other (v98).
+    '<h3>Office</h3>' +
+    officeCard(state)
   );
 }

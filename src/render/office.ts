@@ -7,7 +7,9 @@
 // office itself, which is its layers, its regions, its two live texts and the man at the desk.
 
 import { formatTime } from '../engine/clock';
+import { officeLevelSpec, officeLevelSprite } from '../engine/constants';
 import { has } from '../engine/machines';
+import { officeLevelOf } from '../engine/premises';
 import { ownerIsAvailable } from '../engine/owner';
 import { companyTotals } from '../engine/reputation';
 import { STATION_OFFICE, STATION_PHONE } from '../engine/stations';
@@ -60,8 +62,15 @@ export const OFFICE_LAYERS: OfficeLayer[] = [
   { key: 'officeLaptop', name: 'Office laptop', needs: 'laptop' },
 ];
 
-/** The layers the room actually has this morning. */
+/** The layers the room actually has this morning. From the first refit the room is one picture of
+ *  its level with the desk and the laptop painted in, and the day one layers are put away; the
+ *  regions, the live text and the man at the desk are where they always were (PIOTR, 15.10; v98). */
 export function officeLayersOf(state: GameState): OfficeLayer[] {
+  const level = officeLevelOf(state);
+  if (level > 0) {
+    const spec = officeLevelSpec(level);
+    return [{ key: officeLevelSprite(level), name: `Office: ${spec?.name ?? `level ${level}`}`, needs: null }];
+  }
   return OFFICE_LAYERS.filter((layer) => layer.needs === null || has(state, layer.needs));
 }
 

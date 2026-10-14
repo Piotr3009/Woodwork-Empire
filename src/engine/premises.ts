@@ -27,18 +27,21 @@ import {
   UNIT_WIDE_EXTENSION_CELLS,
   UNIT_WIDTH_CELLS,
   canteenGrowthBox,
+  officeLevelSpec,
   roomById,
   roomsOf,
   secondExtensionOf,
   unitDepositFor,
 } from './constants';
-import { pay, standingPowerPerDay } from './economy';
+import type { OfficeLevelSpec } from './constants';
+import { canAfford, pay, standingPowerPerDay } from './economy';
 import { queueEvent } from './events';
 import type { EventDraft } from './events';
 import { monthlyPremiums } from './insurance';
 import { canteenLockers, crewLimit, standingOn } from './layout';
-import { findSpec } from './machines';
+import { findSpec, has } from './machines';
 import { routePipe } from './pipes';
+import { changeReputation, formatReputation } from './reputation';
 import { securitySubscriptionMonthly } from './security';
 import { andList, inASentence, inWords } from './text';
 import type { ExtensionStage, GameState, UnitExtension, UnitState } from './types';
@@ -335,6 +338,74 @@ export function openExtension(state: GameState): void {
   openStage(state, 'second');
   openStage(state, 'long');
   openStage(state, 'wide');
+}
+
+// ---------------------------------------------------------------------------
+// The office's refits (PIOTR, 15.10; v98): six levels, each a picture of the whole room from the
+// art side, bought one after the other on the Premises page once a desk and a laptop stand, paid at
+// the click and open the next morning as an extension is, with a card and a few points of
+// reputation for the better office.
+// ---------------------------------------------------------------------------
+
+/** The level the office is at, 0 for the day one room: read here, so a save from before v98 with
+ *  no figure on its unit is the day one room. */
+export function officeLevelOf(state: GameState): number {
+  return typeof state.unit.officeLevel === 'number' ? state.unit.officeLevel : 0;
+}
+
+/** The refit on offer next: the level after the one the office is at, or null at the top. */
+export function nextOfficeLevel(state: GameState): OfficeLevelSpec | null {
+  return officeLevelSpec(officeLevelOf(state) + 1);
+}
+
+/** Whether the next refit can be bought, in the order its card's locked button reads: the top
+ *  reached, one being done, the desk and the laptop, the cash (v98). */
+export function refitOfficeCheck(state: GameState): PremisesCheck {
+  const next = nextOfficeLevel(state);
+  if (next === null) return { ok: false, reason: 'The office is at its best' };
+  if (state.unit.officeRefit !== null && state.unit.officeRefit !== undefined) {
+    return { ok: false, reason: 'The fitters are in' };
+  }
+  // A refit of an office with no desk in it is a refit of nothing: the first level's picture has
+  // the desk and the laptop painted in, so both stand first (CLAUDE.md T7 3.8).
+  if (!has(state, 'desk') || !has(state, 'laptop')) return { ok: false, reason: 'Buy a desk and a laptop first' };
+  if (!canAfford(state, next.price)) return { ok: false, reason: 'Not enough cash' };
+  return OK;
+}
+
+/** The click: the next level paid for on a line of its own, the fitters in until the morning. */
+export function refitOffice(state: GameState): PremisesCheck {
+  const check = refitOfficeCheck(state);
+  if (!check.ok) return check;
+  const next = nextOfficeLevel(state);
+  if (next === null) return check;
+  pay(state, 'unitExtension', `Office refit: ${next.name}`, next.price);
+  state.unit.officeRefit = { level: next.level };
+  return OK;
+}
+
+/** The morning after the click: the office is the new picture, the company a little better
+ *  thought of, and a card says so (v98). */
+export function openOfficeRefit(state: GameState): void {
+  const refit = state.unit.officeRefit;
+  if (refit === null || refit === undefined) return;
+  const spec = officeLevelSpec(refit.level);
+  state.unit.officeRefit = null;
+  if (spec === null) return;
+  state.unit.officeLevel = spec.level;
+  const gained = changeReputation(state, spec.reputation, `Office refit: ${spec.name}`);
+  const next = officeLevelSpec(spec.level + 1);
+  queueEvent(state, {
+    kind: 'officeRefitted',
+    title: 'The office is refitted',
+    body:
+      `The fitters are out: ${spec.name.toLowerCase()}. ${spec.sentence} ` +
+      `Clients and callers notice: reputation ${gained >= 0 ? '+' : ''}${formatReputation(gained)}. ` +
+      (next === null
+        ? 'There is no better office to be had.'
+        : `The next refit, ${next.name.toLowerCase()}, is on the Premises page at ${next.price.toLocaleString('en-GB')}.`),
+    data: { level: spec.level },
+  });
 }
 
 /** What the canteen is and what it becomes, for the card: its floor and its lockers, as built and

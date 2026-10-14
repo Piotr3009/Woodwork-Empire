@@ -252,7 +252,8 @@ describe('what turning does to the picture', () => {
     // work sheet (`.work.sheet.png`) and a stack overlay (`.stackNN.png`) are neither a class's
     // picture nor a turned one, and none of them is counted here.
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    expect(turned).toHaveLength(108);
+    // One hundred and ten from v98: the two glass racks' turns (docs/art/SPRITES.md 17).
+    expect(turned).toHaveLength(110);
     expect(turned.some((name) => name.includes('.work.sheet') || /\.stack\d\d/.test(name))).toBe(false);
     // Nor a vehicle's sheet or the line's pallet of Turn 31 (CLAUDE.md T31 2.10).
     expect(turned.some((name) => name.startsWith('vehicle.') || name.startsWith('windowPallet'))).toBe(false);

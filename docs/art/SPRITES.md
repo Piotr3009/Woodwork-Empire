@@ -874,3 +874,55 @@ cells a second of real time, a corner a turn on the spot, its six frames playing
 newest pallet at the gate is not drawn while it is on the forks. Nothing is drawn of the forks lifting
 or setting down, and from 30x no trip is drawn.
 
+
+## 17. The two glass racks (G1, Turn 32; landed 14.10.2026, in the game from v98)
+
+Asked in `docs/art/REQUESTS-T32.md` G1 the night Turn 32 gave the glass a store of its own, and
+delivered by the art side the next evening, four files in one pack with a handoff note. Chat checked
+each against the contract before they went in (section 2's arithmetic, `spriteFileSize` and
+`spriteAnchorIn`): the pixel size, the lowest opaque pixel of the base on the anchor pixel, every
+corner transparent, 8 px of padding at the top and sides, 7 below the anchor row, no pixel under the
+base (no cast shadow), 8 bit RGBA with no colour profile. All four passed as delivered; no agent
+altered a pixel of any of them. In the hall they stand beside the timber rack in its green steel,
+the plate hung over the front face as on every rack.
+
+| File in public/sprites/ | Family | Metres w × d × h | File, px | Anchor, view 0 / `.r` | The art side drew it |
+|---|---|---|---|---|---|
+| `glassRack.standard.png` (and `.r`) | `glassRack` | 2 × 1 × 2 | 160 × 184 | 104, 176 / 56, 176 | an A frame of dark green steel on grey feet, lightly loaded with upright sealed units |
+| `glassRackLarge.standard.png` (and `.r`) | `glassRackLarge` | 4 × 2 × 2.5 | 304 × 280 | 200, 272 / 104, 272 | the same, two A frames long, lightly loaded |
+
+Both are drawn lightly loaded whatever is on them, as the timber stores are drawn full: one picture
+serves a rack however many units it holds, and the plate says the count. Until v98 the game drew
+each as the flat box of kit with no picture; from v98 the manifest lists the four files and the hall
+draws them, with no change to the code that stands them.
+
+## 18. The office's six levels (PIOTR, 14.10 and 15.10.2026; v98)
+
+Six pictures of the whole office from the art side, one a level, each the room's full canvas of
+section 8.1, **1672 × 941 px**, RGB PNG, with the desk, the laptop, the catalogue and the binder
+painted in. They are the refits of the office the player buys one after the other on the Premises
+page (`OFFICE_LEVELS` in `src/engine/constants.ts`: the names, the prices, the reputation), and from
+the first refit the room is that one picture: the day one layers of section 8.1 (the room, the desk,
+the laptop) are put away and come back for no level. Nothing else of section 8 changes: the regions
+of 8.2 are where they were on every level (the art side kept the layout: the work plan board, the
+door to the hall, the clock, the company board, the orders board, the laptop, the catalogue and the
+binder stand in their rectangles on all six, checked by overlay before the files went in), the live
+text, the company board's own picture and the man at the desk are drawn over the picture as before,
+and the door's light spot stands in for a lit layer, as it does today.
+
+| File in public/sprites/ | Level | Name on the Premises page | The art side called it |
+|---|---|---|---|
+| `officeLevel1.png` | 1 | A first office | `01-Poczatki-firmy` |
+| `officeLevel2.png` | 2 | A proper joinery office | `02-Porzadna-stolarnia` |
+| `officeLevel3.png` | 3 | A growing firm | `03-Rozwijajaca-sie-firma` |
+| `officeLevel4.png` | 4 | A big works | `04-Duzy-zaklad` |
+| `officeLevel5.png` | 5 | A prestigious head office | `05-Prestizowa-siedziba` |
+| `officeLevel6.png` | 6 | The empire | `06-Imperium-pelny-przepych` |
+
+Chat renamed them as the game names them and touched no pixel. Known and left: on level 6 the
+screen that stands in for the clock is painted about fifty canvas pixels under the clock's rectangle
+of 8.2, so the time is written on the wall just above it; the art side may move the screen up in a
+later pack, or the clock's box may be given a level of its own. The hall's six finishes the art side
+previewed on the same day (one sheet, not game files) are not in the game: the hall's background is
+one painting a size of hall (section 9), so a finish is a painting a size, and that is a request of
+its own for a later turn.

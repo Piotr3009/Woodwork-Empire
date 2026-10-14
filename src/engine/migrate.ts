@@ -1545,6 +1545,16 @@ function liftToVersion48(state: Raw): void {
   state.version = 48;
 }
 
+/** Version 48 to 49 (v98). The unit carries the office's level and the refit being done: a save
+ *  from before has the day one office and no fitters in (PIOTR, 15.10). */
+function liftToVersion49(state: Raw): void {
+  if (isRecord(state.unit)) {
+    if (typeof state.unit.officeLevel !== 'number') state.unit.officeLevel = 0;
+    if (!isRecord(state.unit.officeRefit)) state.unit.officeRefit = null;
+  }
+  state.version = 49;
+}
+
 /** The whole state step of the lift to 48: a window whose glass was in and whose Glazing had begun,
  *  its current stage the Glazing, has its glass in the window, used and off the counter (CLAUDE.md
  *  T32 section 4); one past production had it set so by the raw lift. Every other window keeps it
@@ -1604,6 +1614,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   45: liftToVersion46,
   46: liftToVersion47,
   47: liftToVersion48,
+  48: liftToVersion49,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

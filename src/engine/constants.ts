@@ -220,12 +220,15 @@ import type {
  *  counter onto their own; a job carries its glass units, what the racks hold for it and what it
  *  used, and no glazier's state; a line's contract holds its week of boards and glass and the line
  *  keeps none of its own; a load says what it is. The glass a save had ordered or held is put on the
- *  counter, its price already paid (CLAUDE.md T32 section 4). Every v12 to v47 save loads. */
-export const STATE_VERSION = 48;
+ *  counter, its price already paid (CLAUDE.md T32 section 4). Every v12 to v47 save loads.
+ *
+ *  Bumped in v98: the unit carries the office's level and the refit being done (PIOTR, 15.10).
+ *  Every v12 to v48 save loads. */
+export const STATE_VERSION = 49;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v97';
+export const APP_VERSION = 'v98';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -544,6 +547,79 @@ export function unitCostFactor(unit: { secondExtension?: UnitExtension; areaM2: 
 }
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
+
+/** [PIOTR, 14.10: the six office pictures from the art side; 15.10: "we go with the office
+ *  graphics", "I agree with you"] One refit of the office: a level, its name on the Premises page,
+ *  its price, what its card says, and the reputation it earns the company the morning it opens.
+ *  Each level is one picture of the whole room on the room's canvas (`officeLevelN`, 1672 by 941),
+ *  with the desk and the laptop painted in, so from the first refit the room is that one picture
+ *  and the day one layers (the room, the desk, the laptop) are put away; the click regions are
+ *  where they always were (docs/art/SPRITES.md 18). A refit is bought one after the other, once a
+ *  desk and a laptop stand, and is open the next morning as an extension is [TUNE: chat: the names,
+ *  the prices, the reputation] (v98). */
+export interface OfficeLevelSpec {
+  level: number;
+  name: string;
+  price: number;
+  sentence: string;
+  /** Reputation asked for the morning it opens, booked at the gain factor as every gain is. */
+  reputation: number;
+}
+
+export const OFFICE_LEVELS: readonly OfficeLevelSpec[] = [
+  {
+    level: 1,
+    name: 'A first office',
+    price: 5000,
+    sentence: 'A plywood desk and cupboards, a whiteboard, a cork board and a stool: the office of a firm that has just started, tidied up.',
+    reputation: 2,
+  },
+  {
+    level: 2,
+    name: 'A proper joinery office',
+    price: 15000,
+    sentence: 'Birch ply fitted round the walls, a glazed door to the hall, a plant on the shelf: the office of a workshop that means to stay.',
+    reputation: 2,
+  },
+  {
+    level: 3,
+    name: 'A growing firm',
+    price: 40000,
+    sentence: 'Fitted cupboards with lit shelves, a glass door and windows onto the hall, a leather desk mat: clients are met here now.',
+    reputation: 2,
+  },
+  {
+    level: 4,
+    name: 'A big works',
+    price: 100000,
+    sentence: 'Walnut and brass, a long window onto the shop floor, a sitting corner for the architects who call.',
+    reputation: 2,
+  },
+  {
+    level: 5,
+    name: 'A prestigious head office',
+    price: 250000,
+    sentence: 'Marble, walnut and glass, pendant lights over the desk, a lounge with a view of the lines.',
+    reputation: 2,
+  },
+  {
+    level: 6,
+    name: 'The empire',
+    price: 600000,
+    sentence: 'The head office of a joinery empire: double height glass, marble floors, a lounge and a view down the whole works.',
+    reputation: 2,
+  },
+];
+
+/** The refit of this level, or null for a level there is none of. */
+export function officeLevelSpec(level: number): OfficeLevelSpec | null {
+  return OFFICE_LEVELS.find((spec) => spec.level === level) ?? null;
+}
+
+/** The sprite key of a level's picture: the file in public/sprites. */
+export function officeLevelSprite(level: number): string {
+  return `officeLevel${level}`;
+}
 
 /** The systems that take the dust away by duct and pay the waste man instead of filling bags.
  *  Everything the central system does, the flexi one does (CLAUDE.md T4 3.5, T12 2.3). */

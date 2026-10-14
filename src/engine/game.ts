@@ -92,7 +92,7 @@ import {
   standsBehindTheWall,
   standsOutside,
 } from './layout';
-import { enlargeCanteen, extendUnit, openExtension } from './premises';
+import { enlargeCanteen, extendUnit, openExtension, openOfficeRefit, refitOffice } from './premises';
 import { raiseTaxWarning } from './tax';
 import { backFromTitle, raiseClosureWarning } from './closures';
 import {
@@ -426,6 +426,9 @@ export function createGame(options: NewGameOptions): GameState {
       longExtension: 'none',
       wideExtensions: 0,
       wideExtension: 'none',
+      // And the office as it was found: the day one room, no refit done or paid for (v98).
+      officeLevel: 0,
+      officeRefit: null,
     },
     owner: {
       present: true,
@@ -607,6 +610,8 @@ function startDay(state: GameState): void {
   // An extension paid for yesterday is there this morning, before the day is charged: its first
   // day is paid for at the bigger unit's rent (PIOTR, 03.10; v67).
   openExtension(state);
+  // And a refit of the office paid for yesterday is done this morning (v98).
+  openOfficeRefit(state);
   // The glue has cured and the lacquer dried overnight: the frames that stood are free (CLAUDE.md
   // T28 2.8).
   endTheStands(state);
@@ -2550,6 +2555,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'ENLARGE_CANTEEN':
       enlargeCanteen(next);
+      break;
+    case 'REFIT_OFFICE':
+      // The next level of the office, paid for at the click and open in the morning (v98).
+      refitOffice(next);
       break;
     case 'CONNECT_EXTRACTION':
       connectExtraction(next, action.equipmentId);

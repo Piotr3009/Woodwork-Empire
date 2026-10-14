@@ -65,7 +65,7 @@ describe('the version in the corner', () => {
     // the engineers in red shirts and the line given its lane (PIOTR, 12.10). v95 is the hall made
     // wider (PIOTR, 12.10). v96 is Turn 32: one store for every material, the glass racks, and the
     // line fed from the stores (PIOTR, 12.10 and 13.10).
-    expect(APP_VERSION).toBe('v97');
+    expect(APP_VERSION).toBe('v98');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -81,7 +81,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v97'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v98'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

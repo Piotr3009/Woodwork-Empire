@@ -115,31 +115,33 @@ describe('the two glass racks (CLAUDE.md T32 2.1)', () => {
     expect(roomFor(state, 'glass')).toBe(40);
   });
 
-  it('has no picture: the hall draws it as kit with no picture is drawn, with its name and its plate', () => {
-    expect(spriteFiles().some((file) => file.startsWith('glassRack'))).toBe(false);
+  it('has its picture from v98: the hall draws the art side s file of each, with its plate', () => {
+    // Flipped in v98: G1 landed on 14.10 (docs/art/SPRITES.md 17), where the box and its name stood
+    // in for each until then.
+    for (const file of ['glassRack.standard.png', 'glassRack.standard.r.png', 'glassRackLarge.standard.png', 'glassRackLarge.standard.r.png']) {
+      expect(spriteFiles()).toContain(file);
+    }
     const state = buyNow(buyNow(smallHall(), 'glassRack'), 'glassRackLarge');
     const holder = document.createElement('div');
     holder.innerHTML = renderHall(state);
-    for (const [specId, name] of [['glassRack', 'Glass rack: 0 / 40'], ['glassRackLarge', 'Large glass rack: 0 / 200']]) {
+    for (const specId of ['glassRack', 'glassRackLarge']) {
       const rack = state.equipment.find((item) => item.specId === specId);
       if (rack === undefined) throw new Error(`the ${specId} is bought`);
       const drawn = holder.querySelector(`[data-kit="${rack.id}"]`);
       if (drawn === null) throw new Error(`the ${specId} is drawn`);
-      // The last branch of objectArt: no picture and no painted placeholder, the box and its name.
-      expect(drawn.querySelector('image')).toBeNull();
+      expect(drawn.querySelector('image')?.getAttribute('href')).toBe(`/sprites/${specId}.standard.png`);
       expect(drawn.querySelector('.placeholder-art')).toBeNull();
-      expect(drawn.textContent).toContain(name);
       expect(drawn.querySelector('.rack-count')?.textContent).toBe('0');
       expect(stockOnItem(state, rack)).toBe(0);
     }
   });
 
-  it('says what it holds on its catalogue card, its picture slot empty as the cutter sets showed', () => {
+  it('says what it holds on its catalogue card, with its picture from v98', () => {
     const holder = document.createElement('div');
     holder.innerHTML = renderMachine(smallHall(), 'glassRackLarge', '');
     expect(holder.textContent).toContain('Holds 200 glass units');
-    expect(holder.querySelector('[data-sprite="glassRackLarge"] .tile-picture-box')).not.toBeNull();
-    expect(holder.querySelector('[data-sprite="glassRackLarge"] img')).toBeNull();
+    // Flipped in v98: the picture slot holds the art side's file (docs/art/SPRITES.md 17).
+    expect(holder.querySelector('[data-sprite="glassRackLarge"] img')?.getAttribute('src')).toBe('/sprites/glassRackLarge.standard.png');
   });
 
   it('is sold by the racks own rule: nothing on it, nobody at it', () => {

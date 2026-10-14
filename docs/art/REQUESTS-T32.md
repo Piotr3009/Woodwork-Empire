@@ -18,7 +18,7 @@ contract's arithmetic (`docs/art/SPRITES.md` 2): the canvas `(w + d) x 48` by `(
 
 | # | Priority | What | Asked or for Piotr |
 |---|---|---|---|
-| G1 | [HIGH] | The two glass racks, one class each, views 0 and 90 | asked tonight |
+| G1 | [HIGH] | The two glass racks, one class each, views 0 and 90 | asked tonight; **landed 14.10, in the game from v98** (SPRITES.md 17) |
 | S1 | [HIGH] | The outside store of 1,000 sheets | asked on 11.10 (`REQUESTS-T31.md` 1), still owed |
 
 ## G1. The two glass racks (CLAUDE.md T32 2.1, 2.9)
@@ -51,6 +51,10 @@ What each is [TUNE: chat, the look]:
   height, as on every rack; nothing of it is to be painted.
 
 Until G1 lands the game is whole as it is: the box and its name stand in for each.
+
+**Landed 14.10.2026.** The four files came as asked, at the table's sizes and anchors to the pixel,
+checked by chat before they went into `public/sprites/` with v98 (`docs/art/SPRITES.md` 17). G1 is
+closed.
 
 ## S1. Still owed: the outside store of 1,000 sheets
 
