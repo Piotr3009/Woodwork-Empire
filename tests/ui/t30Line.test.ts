@@ -154,8 +154,9 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     lineState(state, 1).onPallet = 7;
     lineState(state, 1).palletsAtGate = 1;
     // Its timber and glass, from Turn 31 (CLAUDE.md T31 2.1). Flipped in v96: forty boards and twenty
-    // glass units on the stores, of which the contract holds what the week's thirteen windows left
-    // want (CLAUDE.md T32 2.5).
+    // glass units on the stores, of which the contract holds what the week's windows left want
+    // (CLAUDE.md T32 2.5). From v97 the week is forty windows and thirty three are left, more than
+    // the stores hold, so it holds all forty boards and all twenty units (PIOTR, 14.10).
     placeEquipment(state, 'timberShelter', { variantId: 'standard', x: 30, y: 2, id: 'kit-store' });
     placeGlassRack(state, 'glassRackLarge');
     state.stock.boards = 40;
@@ -175,16 +176,17 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
       'Windows off line 1',
       // Flipped in v96: from the stores, not ordered ahead (CLAUDE.md T32 2.5).
       '£1,500 a window; the timber and the glass £600 a window, from the stores',
-      'One window every 2 hours: about 20 a week',
+      // Flipped in v97: one window an hour at the start (PIOTR, 14.10).
+      'One window every 1 hour: about 40 a week',
       'This week: 7 windows. In all: 112',
       'On the pallet',
       '7 of 10',
       'At the gate for collection',
       '1 pallet',
       'Timber held',
-      '26 boards, for 13 windows',
+      '40 boards, for 20 windows',
       'Glass held',
-      'for 13 windows',
+      'for 20 windows',
     ]) {
       expect(text, words).toContain(words);
     }
@@ -196,12 +198,12 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
     expect(plan.textContent).not.toContain('Windows off line 1');
   });
 
-  it('reads its pace off the upgrades fitted: every 1 h 45 min with one, about 22 a week', () => {
+  it('reads its pace off the upgrades fitted: every 50 min with one, about 48 a week', () => {
     const state = running();
     lineState(state, 1).upgrades = [{ id: 'lineTooling', fittedOnDay: state.clock.day }];
     const tab = document.createElement('div');
     tab.innerHTML = renderContracts(state);
-    expect(tab.querySelector('[data-line-contract]')?.textContent).toContain('One window every 1 h 45 min: about 22 a week');
+    expect(tab.querySelector('[data-line-contract]')?.textContent).toContain('One window every 50 min: about 48 a week');
   });
 
   it('says it stands still for want of an engineer, and nothing of a gate with no pallet at it', () => {
@@ -242,6 +244,6 @@ describe('what the player reads of the line s contract (CLAUDE.md T30 2.9)', () 
   it('says on the line s card that it can make windows on a contract of its own', () => {
     const page = document.createElement('div');
     page.innerHTML = renderCatalogue(bigUnit(), '', catalogueTabFrom('line'), 'windowLine1');
-    expect(page.textContent).toContain('It can make windows on a contract of its own: one every 2 hours');
+    expect(page.textContent).toContain('It can make windows on a contract of its own: one every 1 hour');
   });
 });

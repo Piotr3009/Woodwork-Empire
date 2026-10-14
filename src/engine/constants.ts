@@ -225,7 +225,7 @@ export const STATE_VERSION = 48;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v96';
+export const APP_VERSION = 'v97';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -5473,9 +5473,11 @@ export const LINE_WINDOW_PRICE = 1500;
  *  labour, twenty per cent, is the two engineers' wages, which the month already pays (CLAUDE.md
  *  T30 2.6; T31 2.1). */
 export const LINE_MATERIAL_SHARE = 0.4;
-/** [PIOTR, 10.10: "one window every two hours"] The minutes a window takes on the line's contract
- *  (CLAUDE.md T30 2.7). */
-export const LINE_WINDOW_MINUTES = 120;
+/** [PIOTR, 14.10: "give the bigger tempo of making windows", after the line's books showed a line of
+ *  ten million making four windows a day could not earn: one window an hour at the start, in place
+ *  of the two hours of 10.10] The minutes a window takes on the line's contract (CLAUDE.md T30
+ *  2.7; v97). */
+export const LINE_WINDOW_MINUTES = 60;
 /** [PIOTR, 10.10: "ten of them"] The windows a pallet takes before it goes to the gate (CLAUDE.md
  *  T30 2.8). */
 export const LINE_PALLET_WINDOWS = 10;
@@ -5521,12 +5523,14 @@ export const LINE_DAYS_KEPT = 400;
 export const LINE_REORDER_DAYS = 2;
 
 /** [PIOTR, 11.10: "later add ons can be bought, better new knives, better software, so that it
- *  later speeds up to one window an hour"; TUNE: chat: the fifteen minutes] What each upgrade of the
- *  line fitted takes off every window of its contract (CLAUDE.md T30 2.10). */
-export const LINE_UPGRADE_MINUTES = 15;
-/** [PIOTR, 11.10: "up to one window an hour"] The line's contract never makes a window faster than
- *  this, whatever is fitted (CLAUDE.md T30 2.7, 2.10). */
-export const LINE_WINDOW_MINUTES_MIN = 60;
+ *  later speeds up"; 14.10: "especially once we have everything upgraded"; TUNE: chat: the ten
+ *  minutes] What each upgrade of the line fitted takes off every window of its contract: the four
+ *  of them take the hour down to twenty minutes (CLAUDE.md T30 2.10; v97). */
+export const LINE_UPGRADE_MINUTES = 10;
+/** [PIOTR, 14.10: the bigger tempo, most of all with every upgrade fitted; TUNE: chat: twenty
+ *  minutes, 24 windows a day] The line's contract never makes a window faster than this, whatever
+ *  is fitted (CLAUDE.md T30 2.7, 2.10; v97). */
+export const LINE_WINDOW_MINUTES_MIN = 20;
 /** The working days from the order of an upgrade to the day it is fitted (CLAUDE.md T30 2.10)
  *  [TUNE: chat]. */
 export const LINE_UPGRADE_DAYS = 10;
@@ -5541,8 +5545,8 @@ export interface LineUpgradeSpec {
   sentence: string;
 }
 
-/** The four upgrades of the line, to one window an hour [TUNE: chat: the four, their prices and
- *  their sentences] (CLAUDE.md T30 2.10). */
+/** The four upgrades of the line, to one window every twenty minutes from v97 [TUNE: chat: the
+ *  four, their prices and their sentences] (CLAUDE.md T30 2.10). */
 export const LINE_UPGRADES: readonly LineUpgradeSpec[] = [
   {
     id: 'lineTooling',

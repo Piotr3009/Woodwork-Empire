@@ -97,10 +97,10 @@ describe('the line s running block (CLAUDE.md T31 2.2, 2.4, T32 2.5)', () => {
   });
 
   it('holds no more than the week in hand wants, whatever stands on the stores', () => {
-    // Three windows made this week of twenty: seventeen left, so 34 boards and 17 glass units.
+    // Three windows made this week of forty (v97): thirty seven left, so 74 boards and 37 units.
     const state = running(200, 100);
-    expect(rowOf(state, 'Timber held')).toBe('34 boards, for 17 windows');
-    expect(rowOf(state, 'Glass held')).toBe('for 17 windows');
+    expect(rowOf(state, 'Timber held')).toBe('74 boards, for 37 windows');
+    expect(rowOf(state, 'Glass held')).toBe('for 37 windows');
   });
 
   it('says it stands still for want of timber, of glass, or of both, the engineer said first', () => {

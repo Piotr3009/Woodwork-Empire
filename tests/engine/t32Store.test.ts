@@ -360,12 +360,13 @@ describe('the line fed from the stores (CLAUDE.md T32 2.5)', () => {
   it('keeps what it holds when a window is taken: the window holds from the free stock only', () => {
     const state = lineCompany();
     state.stock.boards = 30;
-    state.stock.glass = 30;
+    // Fifty units from v97: the week's forty windows hold forty, and ten are free for the window.
+    state.stock.glass = 50;
     reserveLineMaterial(state, 1);
-    expect(lineState(state, 1).contract).toMatchObject({ boardsReserved: 30, glassReserved: 20 });
+    expect(lineState(state, 1).contract).toMatchObject({ boardsReserved: 30, glassReserved: 40 });
     const { state: taken, job } = casement(state);
     expect([job.sheetsReserved, job.glassReserved]).toEqual([0, 7]);
-    expect(lineState(taken, 1).contract).toMatchObject({ boardsReserved: 30, glassReserved: 20 });
+    expect(lineState(taken, 1).contract).toMatchObject({ boardsReserved: 30, glassReserved: 40 });
     expect(freeFor(taken, 'glass')).toBe(3);
   });
 
@@ -374,11 +375,11 @@ describe('the line fed from the stores (CLAUDE.md T32 2.5)', () => {
     state.stock.boards = 30;
     state.stock.glass = 30;
     reserveLineMaterial(state, 1);
-    // Twenty windows a week at two hours: forty boards and twenty units wanted, what is free held.
-    expect(lineState(state, 1).contract).toMatchObject({ boardsReserved: 30, glassReserved: 20 });
+    // Forty windows a week at an hour (v97): eighty boards and forty units wanted, what is free held.
+    expect(lineState(state, 1).contract).toMatchObject({ boardsReserved: 30, glassReserved: 30 });
     const cash = state.cash;
     const after = play(state, LINE_WINDOW_MINUTES);
-    expect(lineState(after, 1).contract).toMatchObject({ windowsMade: 1, boardsReserved: 28, glassReserved: 19 });
+    expect(lineState(after, 1).contract).toMatchObject({ windowsMade: 1, boardsReserved: 28, glassReserved: 29 });
     expect([after.stock.boards, after.stock.glass]).toEqual([28, 29]);
     expect(after.cash).toBe(cash + LINE_WINDOW_PRICE);
   });
@@ -398,8 +399,8 @@ describe('the line fed from the stores (CLAUDE.md T32 2.5)', () => {
     const state = lineCompany();
     state.workers.push(admin());
     state.stock.boards = 10;
-    // Sixteen boards are two working days at a window every two hours.
-    expect(lineReorderWindows(state, 1) * 2).toBe(16);
+    // Thirty two boards are two working days at a window an hour (v97).
+    expect(lineReorderWindows(state, 1) * 2).toBe(32);
     const next = act(state, { type: 'SET_SPEED', speed: 1 });
     const fresh = play(nextDay(next), 1);
     const labels = fresh.ledger.map((entry) => entry.label);

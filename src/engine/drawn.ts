@@ -19,6 +19,7 @@ import { DRAWN_TURN_MINUTES, PACED_FAMILIES, TIMBER_FAMILIES } from './constants
 import { contractFamiliesOf, contractOfWorker, contractPiece } from './contracts';
 import { jobHeldBy } from './jobs';
 import { OWNER, menAtPlaces, placedMachines, placesOf } from './machines';
+import { pinned } from './pinned';
 import { stagePlanFor } from './stages';
 import type { Equipment, GameState } from './types';
 
@@ -59,8 +60,16 @@ function hiringOrder(state: GameState, who: string): number {
  *  (`menAtPlaces`), and nobody else: a man with no place, on an errand, at his dinner or gone home
  *  is drawn where he always was. Each is drawn at the machine or bench his turn gives him this
  *  hour, the hour of the day and his place in the hiring order, or at the next one along that
- *  nobody is drawn at; with more men than machines the rest are drawn where they work. */
+ *  nobody is drawn at; with more men than machines the rest are drawn where they work.
+ *
+ *  Worked out once for the state the page is drawing (`pinned`, v97): the hall asks it once a
+ *  machine and the sound sixty times a second, of a state that does not change between two
+ *  minutes. The engine's own minute, on its own clone, is never pinned and gets it afresh. */
 export function drawnPlaces(state: GameState): DrawnPlace[] {
+  return pinned(state, 'drawnPlaces', () => placesDrawn(state));
+}
+
+function placesDrawn(state: GameState): DrawnPlace[] {
   const working = menAtPlaces(state);
   if (working.length === 0) return [];
   // The timber department's machines are spots only for a man on a timber job or on a contract
@@ -122,5 +131,5 @@ export function drawnItemOf(state: GameState, who: string): Equipment | null {
 /** The ids of every machine and bench a man is drawn at this minute: what the hall spins a blade
  *  and plays a sound for. */
 export function drawnInUse(state: GameState): Set<string> {
-  return new Set(drawnPlaces(state).map((entry) => entry.item.id));
+  return pinned(state, 'drawnInUse', () => new Set(drawnPlaces(state).map((entry) => entry.item.id)));
 }

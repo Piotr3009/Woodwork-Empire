@@ -441,7 +441,7 @@ describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () 
     expect(contract?.glassReserved).toBe(Math.min(20, lineWindowsAWeek(taken, 1)));
   });
 
-  it('makes a window every 120 minutes and four a working day, each £1,500 in', () => {
+  it('makes a window every 60 minutes and eight a working day, each £1,500 in', () => {
     // From Turn 31 the windows start once the timber is on the stores, the morning after the order,
     // and none of their material is booked as they are made (CLAUDE.md T31 2.1, 2.2). Flipped in
     // v96: the labourer has both loads in by late morning, so the first window's two hours would run
@@ -449,17 +449,19 @@ describe('(eee) the line s own contract, played (CLAUDE.md T30 2.6 to 2.8)', () 
     const running = minutes(taken, BREAK_START_MINUTE + BREAK_MINUTES - taken.clock.minute);
     expect(running.clock.minute).toBe(BREAK_START_MINUTE + BREAK_MINUTES);
     expect(windowsBooked(day(offered), offered.clock.day).windows).toEqual([]);
-    expect(lineWindowMinutes(running, 1)).toBe(120);
+    // Flipped in v97: an hour a window (PIOTR, 14.10).
+    expect(lineWindowMinutes(running, 1)).toBe(60);
     // Counted from the minutes the window in hand already has: the half hour the material came in.
     const from = lineState(running, 1).minutes;
     expect(lineState(running, 1).contract?.windowsMade).toBe(0);
-    expect(lineState(minutes(running, 119 - from), 1).contract?.windowsMade).toBe(0);
-    expect(lineState(minutes(running, 120 - from), 1).contract?.windowsMade).toBe(1);
+    expect(lineState(minutes(running, 59 - from), 1).contract?.windowsMade).toBe(0);
+    expect(lineState(minutes(running, 60 - from), 1).contract?.windowsMade).toBe(1);
     let whole = day(running);
     while (!isWorkingDay(whole.clock.day)) whole = day(whole);
     const morning = whole.clock.day;
     whole = day(whole);
-    expect(windowsBooked(whole, morning)).toEqual({ windows: [4 * LINE_WINDOW_PRICE], material: [] });
+    // Eight a day from v97.
+    expect(windowsBooked(whole, morning)).toEqual({ windows: [8 * LINE_WINDOW_PRICE], material: [] });
   });
 
   it('makes none in the dinner hour when the owner works through it', () => {
@@ -556,20 +558,27 @@ describe('(fff) the four upgrades, and the line sold (CLAUDE.md T30 2.10, 2.3.5)
   for (let guard = 0; state.clock.day < ready && guard < 30; guard += 1) state = day(keepInMaterial(state));
   const fitted = keepInMaterial(state);
 
-  it('brings the window to 60 minutes and eight a working day', () => {
+  it('brings the window to 20 minutes and twenty four a working day', () => {
     expect(bought.ledger.filter((entry) => entry.label.startsWith('Line 1 upgrade: ')).map((entry) => entry.amount)).toEqual(
       LINE_UPGRADES.map((upgrade) => -upgrade.price),
     );
-    expect(lineWindowMinutes(fitted, 1)).toBe(60);
+    // Flipped in v97: ten minutes an upgrade, twenty minutes with all four (PIOTR, 14.10).
+    expect(lineWindowMinutes(fitted, 1)).toBe(20);
     expect(lineState(fitted, 1).contract?.status).toBe('active');
-    // The second working day at 60 minutes: from Turn 31 the line stood now and then for its
+    // The second working day at 20 minutes: from Turn 31 the line stood now and then for its
     // material in the ten days before, so the first day's count carries the minutes of a slower
     // window in hand (CLAUDE.md T31 2.1).
     let next = day(fitted);
     while (!isWorkingDay(next.clock.day)) next = day(next);
     const morning = next.clock.day;
-    const whole = day(keepInMaterial(next));
-    expect(windowsBooked(whole, morning).windows).toEqual([8 * LINE_WINDOW_PRICE]);
+    // Twenty four windows a day want 48 boards and 24 units on the stores at the open, more than
+    // one rack of each holds (v97): the shelter and the large glass rack, stocked for the day.
+    placeEquipment(next, 'timberShelter', { variantId: 'standard', x: 30, y: 2, id: 'kit-shelter-fff' });
+    placeGlassRack(next, 'glassRackLarge');
+    next.stock.boards = 100;
+    next.stock.glass = 50;
+    const whole = day(next);
+    expect(windowsBooked(whole, morning).windows).toEqual([24 * LINE_WINDOW_PRICE]);
   });
 
   it('is sold whole from one module s tile, takes the upgrades with it, and pays 5,000,000 on one ledger line', () => {

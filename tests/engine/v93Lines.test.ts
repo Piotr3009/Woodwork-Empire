@@ -268,17 +268,18 @@ describe('each line s own contract, material, pallet and forklift', () => {
   it('makes windows on each line on its own contract, books them to its own name, and stacks its own pallet', () => {
     const state = running(running(twoLines(4), 1), 2);
     const played = play(state, 240);
-    expect(lineState(played, 1).contract?.windowsMade).toBe(2);
-    expect(lineState(played, 2).contract?.windowsMade).toBe(2);
-    expect(lineState(played, 1).onPallet).toBe(2);
-    expect(lineState(played, 2).onPallet).toBe(2);
+    // Four each in four hours from v97 (an hour a window).
+    expect(lineState(played, 1).contract?.windowsMade).toBe(4);
+    expect(lineState(played, 2).contract?.windowsMade).toBe(4);
+    expect(lineState(played, 1).onPallet).toBe(4);
+    expect(lineState(played, 2).onPallet).toBe(4);
     const labels = played.ledger.filter((entry) => entry.category === 'contract').map((entry) => entry.label);
     expect(labels).toContain('Windows off line 1: windows');
     expect(labels).toContain('Windows off line 2: windows');
     // With only three engineers line 2 runs as three modules and makes nothing.
     const short = running(running(twoLines(3), 1), 2);
     const playedShort = play(short, 240);
-    expect(lineState(playedShort, 1).contract?.windowsMade).toBe(2);
+    expect(lineState(playedShort, 1).contract?.windowsMade).toBe(4);
     expect(lineState(playedShort, 2).contract?.windowsMade).toBe(0);
   });
 
@@ -286,18 +287,19 @@ describe('each line s own contract, material, pallet and forklift', () => {
     // Flipped in v96: no line orders for itself; each running contract holds its week from the free
     // stock, in the order of the lines (CLAUDE.md T32 2.5).
     const state = running(running(twoLines(4), 1), 2);
-    state.stock.boards = 50;
-    state.stock.glass = 30;
+    // A week is forty windows from v97: line 1 holds eighty boards and forty units, line 2 the rest.
+    state.stock.boards = 100;
+    state.stock.glass = 50;
     reserveEveryLinesMaterial(state);
-    expect([lineState(state, 1).contract?.boardsReserved, lineState(state, 1).contract?.glassReserved]).toEqual([40, 20]);
-    expect([lineState(state, 2).contract?.boardsReserved, lineState(state, 2).contract?.glassReserved]).toEqual([10, 10]);
-    expect(reservedFor(state, 'boards')).toBe(50);
+    expect([lineState(state, 1).contract?.boardsReserved, lineState(state, 1).contract?.glassReserved]).toEqual([80, 40]);
+    expect([lineState(state, 2).contract?.boardsReserved, lineState(state, 2).contract?.glassReserved]).toEqual([20, 10]);
+    expect(reservedFor(state, 'boards')).toBe(100);
     expect(freeFor(state, 'glass')).toBe(0);
     // Line 2's contract ended, what it held is free again and line 1's hold is as it was.
     endLineContract(state, 2);
-    expect(freeFor(state, 'boards')).toBe(10);
+    expect(freeFor(state, 'boards')).toBe(20);
     expect(freeFor(state, 'glass')).toBe(10);
-    expect(lineState(state, 1).contract?.boardsReserved).toBe(40);
+    expect(lineState(state, 1).contract?.boardsReserved).toBe(80);
   });
 
   it('ends one line s contract at its own End it and shows one block a line on the Contracts tab', () => {
@@ -350,9 +352,10 @@ describe('each line sold on its own (PIOTR, 12.10)', () => {
     // Flipped in v96: nothing written off and nothing taken off the counter; what line 2 held is free
     // again, and line 1 holds what it held (CLAUDE.md T32 2.5).
     expect(state.stock.boards).toBe(boards);
-    expect(lineState(state, 1).contract?.boardsReserved).toBe(40);
-    expect(reservedFor(state, 'boards')).toBe(40);
-    expect(freeFor(state, 'boards')).toBe(boards - 40);
+    // Eighty from v97: the week's forty windows at two boards each.
+    expect(lineState(state, 1).contract?.boardsReserved).toBe(80);
+    expect(reservedFor(state, 'boards')).toBe(80);
+    expect(freeFor(state, 'boards')).toBe(boards - 80);
     expect(state.ledger.some((entry) => entry.label.startsWith('Material written off'))).toBe(false);
     const seen: GameEvent[] = [];
     const morning = nextDay(state, seen);

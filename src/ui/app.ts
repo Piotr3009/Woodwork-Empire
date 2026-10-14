@@ -112,6 +112,7 @@ import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
 import { OWNER, hasCentralExtraction, isLineModule } from '../engine/machines';
+import { pinState } from '../engine/pinned';
 import { nextSpriteOrientation, playSheets } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
@@ -1258,6 +1259,18 @@ function keepSetupHonest(): void {
 }
 
 export function render(): void {
+  // The state the page is drawn from, pinned for this one writing of the page: what is worked out
+  // of it once is kept for every question the page asks, and thrown away with the page
+  // (src/engine/pinned.ts; v97).
+  pinState(state);
+  try {
+    writePage();
+  } finally {
+    pinState(null);
+  }
+}
+
+function writePage(): void {
   const parts = halves();
   if (parts === null) return;
   keepSetupHonest();
@@ -2939,8 +2952,15 @@ function driveSound(now: number): void {
     stopAllSounds();
     return;
   }
-  setLoops(hallLoops(state));
-  for (const name of hallOneShots(state)) soundPlay(name, now);
+  // One frame's two questions of the hall, pinned together: the loops and the one shots ask where
+  // every man is drawn once a machine each, and this makes it once a frame (v97).
+  pinState(state);
+  try {
+    setLoops(hallLoops(state));
+    for (const name of hallOneShots(state)) soundPlay(name, now);
+  } finally {
+    pinState(null);
+  }
 }
 
 function frame(now: number): void {

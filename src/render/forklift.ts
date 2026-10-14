@@ -39,7 +39,7 @@ import type { GameState } from '../engine/types';
 import { type Facing, cellBox, frameAt, walksAreSkipped } from './characters';
 import { depthKey, tileToScreen } from './iso';
 import { SPRITE_DIR, SPRITE_SCALE } from './sprites';
-import { placeAmongDrawables } from './walkers';
+import { placeAmongDrawables, writeAttribute } from './walkers';
 
 interface Point {
   x: number;
@@ -262,9 +262,11 @@ function draw(root: ParentNode, nowMs: number): void {
   }
   const pallets = Array.from(root.querySelectorAll('[data-line-pallet]'));
   for (const pallet of pallets) {
-    if (onForks.has(Number(pallet.getAttribute('data-line-pallet')))) pallet.setAttribute('visibility', 'hidden');
-    else pallet.removeAttribute('visibility');
+    if (onForks.has(Number(pallet.getAttribute('data-line-pallet')))) writeAttribute(pallet, 'visibility', 'hidden');
+    else if (pallet.hasAttribute('visibility')) pallet.removeAttribute('visibility');
   }
+  // Every attribute written only when it changes: a forklift that waits writes nothing in a frame
+  // (v97).
   for (const node of Array.from(root.querySelectorAll('[data-forklift]'))) {
     const forklift = forklifts.get(Number(node.getAttribute('data-forklift-line'))) ?? null;
     if (forklift === null) continue;
@@ -272,14 +274,15 @@ function draw(root: ParentNode, nowMs: number): void {
     const moving = forklift.path.length > 0;
     const row = sheet.rows[forklift.facing];
     const frame = moving ? frameAt(sheet, nowMs) : 0;
-    node.setAttribute('data-forklift', forklift.leg);
-    node.setAttribute('transform', screenAt(forklift.at));
+    writeAttribute(node, 'data-forklift', forklift.leg);
+    writeAttribute(node, 'transform', screenAt(forklift.at));
     const art = node.querySelector('[data-forklift-art]');
     if (art !== null) {
-      art.setAttribute('data-row', String(row));
-      art.setAttribute('data-frame', String(frame));
-      art.setAttribute('viewBox', cellBox(sheet, row, frame));
-      art.querySelector('image')?.setAttribute('href', `${SPRITE_DIR}/${sheet.file}`);
+      writeAttribute(art, 'data-row', String(row));
+      writeAttribute(art, 'data-frame', String(frame));
+      writeAttribute(art, 'viewBox', cellBox(sheet, row, frame));
+      const picture = art.querySelector('image');
+      if (picture !== null) writeAttribute(picture, 'href', `${SPRITE_DIR}/${sheet.file}`);
     }
     placeAmongDrawables(node, depthAt(forklift.at), forklift.at);
   }

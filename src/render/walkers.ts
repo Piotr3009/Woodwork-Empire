@@ -162,11 +162,34 @@ export function resortFigures(root: ParentNode): number {
   return moved;
 }
 
+/** Writes an attribute only when it would change. A write of the same value still costs the
+ *  browser a style pass, and the frame loop asks for thousands of them a second of things that
+ *  stand still: measured on v96, a paused game laid the page out and painted the hall again sixty
+ *  times a second for nothing (v97). True when it was written. */
+export function writeAttribute(node: Element, name: string, value: string): boolean {
+  if (node.getAttribute(name) === value) return false;
+  node.setAttribute(name, value);
+  return true;
+}
+
+/** Where each moving thing was last put: its depth and its feet, so a frame in which it has not
+ *  moved puts it nowhere and reads none of its neighbours (v97). */
+const lastPlaced = new WeakMap<Element, string>();
+
 /** Writes a moving thing's depth for this frame and puts it in the painter's order among the
  *  drawables round it, as a figure is put: the one insertion the figures and the line's forklift
- *  share (CLAUDE.md T31 2.10). True when it was moved. */
+ *  share (CLAUDE.md T31 2.10). True when it was moved.
+ *
+ *  A thing put where it already stands, with the depth it already carries, is left alone (v97):
+ *  the scene writes the depth itself when the page is written again, in its own order, so a node
+ *  that still carries what was last written here is where it was put, or where the scene has
+ *  just put it for the same feet. */
 export function placeAmongDrawables(node: Element, depth: number, feet: { x: number; y: number }): boolean {
-  node.setAttribute('data-depth', String(Math.round(depth * 1000) / 1000));
+  const written = String(Math.round(depth * 1000) / 1000);
+  const key = `${written}|${feet.x}|${feet.y}`;
+  if (lastPlaced.get(node) === key && node.getAttribute('data-depth') === written) return false;
+  writeAttribute(node, 'data-depth', written);
+  lastPlaced.set(node, key);
   const parent = node.parentNode;
   if (parent === null) return false;
   const { run, index } = runAround(node);

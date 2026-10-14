@@ -19,6 +19,7 @@ import {
   LINE_MODULES,
   LINE_UPGRADE_DAYS,
   LINE_UPGRADES,
+  LINE_UPGRADE_MINUTES,
   LINE_WINDOW_MINUTES,
   LINE_WINDOW_MINUTES_MIN,
 } from '../../src/engine/constants';
@@ -90,16 +91,17 @@ function play(state: GameState, minutes: number, answer: (event: GameEvent) => s
 }
 
 describe('the minutes a window (CLAUDE.md T30 2.7, 2.10)', () => {
-  it('takes fifteen off for each upgrade fitted, 120, 105, 90, 75 and 60, and never less', () => {
+  it('takes ten off for each upgrade fitted, 60, 50, 40, 30 and 20, and never less', () => {
     const state = withLine(bigUnit());
     const minutes = [lineWindowMinutes(state, 1)];
     for (const upgrade of LINE_UPGRADES) {
       lineState(state, 1).upgrades.push({ id: upgrade.id, fittedOnDay: state.clock.day });
       minutes.push(lineWindowMinutes(state, 1));
     }
-    expect(minutes).toEqual([120, 105, 90, 75, 60]);
+    // Flipped in v97: an hour at the start, ten minutes an upgrade (PIOTR, 14.10).
+    expect(minutes).toEqual([60, 50, 40, 30, 20]);
     expect(LINE_UPGRADES.reduce((total, upgrade) => total + upgrade.price, 0)).toBe(1800000);
-    // A fifth on the list, if one ever came, takes nothing past one window an hour.
+    // A fifth on the list, if one ever came, takes nothing past one window every twenty minutes.
     lineState(state, 1).upgrades.push({ id: 'extra', fittedOnDay: state.clock.day });
     expect(lineWindowMinutes(state, 1)).toBe(LINE_WINDOW_MINUTES_MIN);
     // One on its way takes nothing off until its day.
@@ -108,25 +110,33 @@ describe('the minutes a window (CLAUDE.md T30 2.7, 2.10)', () => {
     expect(lineWindowMinutes(waiting, 1)).toBe(LINE_WINDOW_MINUTES);
   });
 
-  it('says the card s and the block s words off the same minutes: every 1 h 45 min, about 22 a week', () => {
+  it('says the card s and the block s words off the same minutes: every 50 min, about 48 a week', () => {
     const state = withLine(bigUnit());
     lineState(state, 1).upgrades.push({ id: 'lineTooling', fittedOnDay: state.clock.day });
-    expect(lineWindowEvery(lineWindowMinutes(state, 1))).toBe('1 h 45 min');
-    expect(lineWindowsAWeek(state, 1)).toBe(22);
-    expect(lineWindowEvery(lineWindowMinutes(allFitted(state), 1))).toBe('1 hour');
-    expect(lineWindowsAWeek(state, 1)).toBe(40);
+    // Flipped in v97: an hour at the start, ten minutes an upgrade, twenty minutes with all four
+    // (PIOTR, 14.10).
+    expect(lineWindowEvery(lineWindowMinutes(state, 1))).toBe('50 min');
+    expect(lineWindowsAWeek(state, 1)).toBe(48);
+    expect(lineWindowEvery(lineWindowMinutes(allFitted(state), 1))).toBe('20 min');
+    expect(lineWindowsAWeek(state, 1)).toBe(120);
   });
 
-  it('makes eight windows a working day with all four fitted', () => {
+  it('makes twenty four windows a working day with all four fitted', () => {
     const seen: GameEvent[] = [];
-    const state = nextDay(allFitted(withLine(bigUnit())), seen);
+    const fitted = allFitted(withLine(bigUnit()));
+    // A day of twenty four windows wants 48 boards and 24 glass units on the stores, more than the
+    // forty and twenty `withLine` gives: the shelter and the large rack have the room (v97).
+    fitted.stock.boards += 40;
+    fitted.stock.glass += 20;
+    const state = nextDay(fitted, seen);
     // The offer is taken off its card by nextDay's first answer.
     expect(seen.some((event) => event.kind === 'lineContractOffered')).toBe(true);
     const morning = state.clock.day;
     const day = play(state, DAY_END_MINUTE + 60, (event) => (event.kind === 'goingHome' ? 'home' : event.choices[0]?.id ?? 'ok'));
     // The day's own windows, on its one growing line: past five the play runs into the next morning.
     const windows = day.ledger.filter((entry) => entry.label === 'Windows off line 1: windows' && entry.day === morning);
-    expect(windows.map((entry) => entry.amount)).toEqual([8 * 1500]);
+    // Flipped in v97: twenty minutes a window with all four fitted, 24 a day (PIOTR, 14.10).
+    expect(windows.map((entry) => entry.amount)).toEqual([24 * 1500]);
   });
 });
 
@@ -173,7 +183,7 @@ describe('buying an upgrade (CLAUDE.md T30 2.10)', () => {
       next = nextDay(next);
     }
     expect(next.clock.day).toBe(ready);
-    expect(lineWindowMinutes(next, 1)).toBe(LINE_WINDOW_MINUTES - 15);
+    expect(lineWindowMinutes(next, 1)).toBe(LINE_WINDOW_MINUTES - LINE_UPGRADE_MINUTES);
   });
 
   it('changes nothing of the jobs: the same factor and the same boards with all four fitted', () => {
@@ -213,7 +223,7 @@ describe('the upgrade cards in the line s folder (CLAUDE.md T30 2.10)', () => {
       expect(tile.querySelector('.tile-price')?.textContent).toBe(`£${upgrade.price.toLocaleString('en-GB')}`);
       expect(tile.querySelector('.card-description')?.textContent).toBe(upgrade.sentence);
       expect(Array.from(tile.querySelectorAll('.card-effects .tile-figures')).map((node) => node.textContent)).toEqual([
-        "Takes 15 minutes off each window of the line's contract",
+        "Takes 10 minutes off each window of the line's contract",
         'Fitted 10 working days after the order',
       ]);
       const buy = tile.querySelector('[data-do="buyLineUpgrade"]');

@@ -35,7 +35,7 @@ import {
 import { walkPath } from '../../src/engine/walk';
 import { renderHall, stationCell } from '../../src/render/hall';
 import { centreOf } from '../../src/render/iso';
-import { resetWalkers, stepWalkers, syncWalkers, walkerOf } from '../../src/render/walkers';
+import { placeAmongDrawables, resetWalkers, stepWalkers, syncWalkers, walkerOf, writeAttribute } from '../../src/render/walkers';
 import type { GameState } from '../../src/engine/index';
 import { buyNow, buyStartingKit, fillRack, hireNow, newGame } from '../helpers';
 
@@ -550,5 +550,60 @@ describe('nobody walks on the spot (CLAUDE.md T17 1, section 7)', () => {
       expect(rest, figure.getAttribute('data-figure') ?? '').not.toBe('walk');
       expect(rest, figure.getAttribute('data-figure') ?? '').not.toBe('carry');
     }
+  });
+});
+
+describe('a frame in which nothing moves writes nothing (v97)', () => {
+  it('writes an attribute only when its value would change', () => {
+    const node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    expect(writeAttribute(node, 'transform', 'translate(1 2)')).toBe(true);
+    expect(node.getAttribute('transform')).toBe('translate(1 2)');
+    let writes = 0;
+    const set = node.setAttribute.bind(node);
+    node.setAttribute = (name: string, value: string): void => {
+      writes += 1;
+      set(name, value);
+    };
+    expect(writeAttribute(node, 'transform', 'translate(1 2)')).toBe(false);
+    expect(writes).toBe(0);
+    expect(writeAttribute(node, 'transform', 'translate(3 4)')).toBe(true);
+    expect(writes).toBe(1);
+  });
+
+  it('puts a thing among the drawables once for the same feet, and reads none of its neighbours again', () => {
+    const parent = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const sibling = (depth: number, foot: string): Element => {
+      const node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      node.setAttribute('data-depth', String(depth));
+      node.setAttribute('data-foot', foot);
+      parent.appendChild(node);
+      return node;
+    };
+    sibling(1, '0,0,1,1');
+    const mover = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    parent.appendChild(mover);
+    const far = sibling(9, '8,8,1,1');
+    // The first placing writes the depth and reads the run round it.
+    placeAmongDrawables(mover, 5, { x: 4, y: 4 });
+    expect(mover.getAttribute('data-depth')).toBe('5');
+    let reads = 0;
+    const get = far.getAttribute.bind(far);
+    far.getAttribute = (name: string): string | null => {
+      reads += 1;
+      return get(name);
+    };
+    // The same feet again: nothing written, nothing read of the neighbours, nothing moved.
+    expect(placeAmongDrawables(mover, 5, { x: 4, y: 4 })).toBe(false);
+    expect(reads).toBe(0);
+    // Moved on: the neighbours are read again.
+    placeAmongDrawables(mover, 6, { x: 5, y: 5 });
+    expect(reads).toBeGreaterThan(0);
+    expect(mover.getAttribute('data-depth')).toBe('6');
+    // The page written again writes the scene's own depth: a different value is a fresh placing.
+    mover.setAttribute('data-depth', '7');
+    reads = 0;
+    placeAmongDrawables(mover, 6, { x: 5, y: 5 });
+    expect(reads).toBeGreaterThan(0);
+    expect(mover.getAttribute('data-depth')).toBe('6');
   });
 });

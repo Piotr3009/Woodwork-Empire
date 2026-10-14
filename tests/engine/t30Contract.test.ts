@@ -109,7 +109,8 @@ describe('the offer (CLAUDE.md T30 2.6)', () => {
       // Flipped in v96: the material is taken from the stores (CLAUDE.md T32 2.5).
       'A window company will take every window line 1 makes, at £1,500 a window. The timber and ' +
         'the glass cost £600 a window, taken from your timber stores and glass racks: restock them on ' +
-        'the Materials page, or the office does. The line makes one every 2 hours, about 20 a week, and ' +
+        // Flipped in v97: one window an hour at the start (PIOTR, 14.10).
+        'the Materials page, or the office does. The line makes one every 1 hour, about 40 a week, and ' +
         'the client collects each pallet of ten the next working day. It runs until you end it.',
     );
     expect(card?.choices).toEqual([
@@ -193,29 +194,32 @@ function withOffer(state: GameState): GameState {
 }
 
 describe('the windows (CLAUDE.md T30 2.7)', () => {
-  it('makes one every 120 minutes, four a working day, each 1,500 in on one growing line a day and its timber and glass taken off what its contract holds', () => {
+  it('makes one every 60 minutes, eight a working day, each 1,500 in on one growing line a day and its timber and glass taken off what its contract holds', () => {
     const state = taken(withLine(bigUnit()));
     expect(lineWindowMinutes(state, 1)).toBe(LINE_WINDOW_MINUTES);
     const morning = state.clock.day;
     const sheets = state.stock.sheets;
     const day = play(state, DAY_END_MINUTE + 60, (event) => (event.kind === 'goingHome' ? 'home' : event.choices[0]?.id ?? 'ok'));
     const contract = lineState(day, 1).contract;
-    // The day it was taken: taken at its open, so the whole of its 480 working minutes.
-    expect(contract?.windowsMade).toBe(4);
+    // The day it was taken: taken at its open, so the whole of its 480 working minutes. Flipped in
+    // v97: an hour a window, eight in the day and a ninth in the next morning's hour the play runs
+    // into (PIOTR, 14.10).
+    expect(contract?.windowsMade).toBe(9);
     const windows = day.ledger.filter((entry) => entry.label === 'Windows off line 1: windows' && entry.day === morning);
-    expect(windows.map((entry) => [entry.category, entry.amount])).toEqual([['contract', 4 * LINE_WINDOW_PRICE]]);
+    expect(windows.map((entry) => [entry.category, entry.amount])).toEqual([['contract', 8 * LINE_WINDOW_PRICE]]);
     // From Turn 31 the material was paid when it was bought and nothing of it is booked as a window
     // is made (CLAUDE.md T31 2.1). Flipped in v96: two boards off the timber stores and one glass
     // unit off the glass racks a window, out of what the contract holds, and no sheet (CLAUDE.md T32
     // 2.5).
     expect(day.ledger.some((entry) => entry.label === 'Windows off line 1: timber and glass')).toBe(false);
-    expect(day.stock.boards).toBe(40 - 4 * 2);
-    expect(day.stock.glass).toBe(20 - 4);
+    expect(day.stock.boards).toBe(40 - 9 * 2);
+    expect(day.stock.glass).toBe(20 - 9);
     expect(day.stock.sheets).toBe(sheets);
-    expect([contract?.boardsReserved, contract?.glassReserved]).toEqual([40 - 4 * 2, 20 - 4]);
+    // The week left wants more than the stores hold, so the contract holds all that is free.
+    expect([contract?.boardsReserved, contract?.glassReserved]).toEqual([40 - 9 * 2, 20 - 9]);
     expect(lineMaterialPerWindow()).toBe(600);
-    expect(contract?.revenue).toBe(6000);
-    expect(contract?.materialCost).toBe(2400);
+    expect(contract?.revenue).toBe(9 * LINE_WINDOW_PRICE);
+    expect(contract?.materialCost).toBe(9 * 600);
     // No minute of any machine is booked for it.
     for (const item of day.equipment.filter((entry) => LINE_MODULES.includes(entry.specId))) {
       expect(item.hoursUsed, item.id).toBe(0);
@@ -233,9 +237,9 @@ describe('the windows (CLAUDE.md T30 2.7)', () => {
     const morning = state.clock.day;
     const day = play(state, DAY_END_MINUTE + 60, home);
     const plain = play(quiet, DAY_END_MINUTE + 60, home);
-    // The day's four, and none in the night that followed it.
+    // The day's eight (v97: an hour a window), and none in the night that followed it.
     const windows = day.ledger.filter((entry) => entry.label === 'Windows off line 1: windows' && entry.day === morning);
-    expect(windows.map((entry) => entry.amount)).toEqual([4 * LINE_WINDOW_PRICE]);
+    expect(windows.map((entry) => entry.amount)).toEqual([8 * LINE_WINDOW_PRICE]);
     expect(day.onOrder).toEqual(plain.onOrder);
     expect(day.deliveries).toEqual(plain.deliveries);
     expect(day.tasks.filter((task) => task.kind === 'unload')).toEqual(plain.tasks.filter((task) => task.kind === 'unload'));

@@ -101,6 +101,7 @@ import { jobHeldBy } from './jobs';
 import { stageOfMan } from './production';
 import { contractFamiliesOf, contractOfWorker, contractPiece, contractPieceSpeed } from './contracts';
 import { jobPace, stageDoing, stagePlanFor } from './stages';
+import { pinned } from './pinned';
 import { isWorkingToday, managerPaceFor, nightCrew } from './staff';
 import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
@@ -434,6 +435,12 @@ export function lineNumbers(state: GameState): number[] {
  *  stand reads, so a minute of a big hall with two lines asks the kit no more than one line did
  *  (v93). */
 function standingModuleMasks(state: GameState): Map<number, number> {
+  // Once for the state the page is drawing (v97): the stage plans ask it tens of thousands of
+  // times a second of a state that does not change between two minutes (`pinned`).
+  return pinned(state, 'standingModuleMasks', () => moduleMasksOf(state));
+}
+
+function moduleMasksOf(state: GameState): Map<number, number> {
   const masks = new Map<number, number>();
   for (const item of state.equipment) {
     const index = LINE_MODULES.indexOf(item.specId);

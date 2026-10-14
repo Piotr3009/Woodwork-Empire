@@ -26,7 +26,7 @@ import { crewHasGoneHome } from '../engine/staff';
 import type { GameState } from '../engine/types';
 import { type CharacterOptions, type Facing, characterArt, faceCharacter, walkPace } from './characters';
 import { depthKey, tileToScreen } from './iso';
-import { placeAmongDrawables } from './walkers';
+import { placeAmongDrawables, writeAttribute } from './walkers';
 
 interface Point {
   x: number;
@@ -207,7 +207,8 @@ function draw(root: ParentNode, state: GameState): void {
     const path = engineerPath(state, line);
     if (walk === undefined || path === null) continue;
     const at = pointOf(path, index, walk.along);
-    node.setAttribute('transform', screenAt(at));
+    // Written only when it changes: an engineer who stands writes nothing in a frame (v97).
+    writeAttribute(node, 'transform', screenAt(at));
     const art = node.querySelector('[data-character]');
     if (art !== null) faceCharacter(art, facingOf(walk.direction));
     placeAmongDrawables(node, depthAt(at), at);

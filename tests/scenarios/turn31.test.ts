@@ -255,11 +255,13 @@ describe('(hhh) the line s timber and glass, bought by the player and by the off
     let next = takeDay + 1;
     while (!isWorkingDay(next)) next += 1;
     for (const load of loads) expect(load.arriveDay).toBe(next);
-    expect(stocked.stock.boards).toBe(40);
-    expect(stocked.stock.glass).toBe(40);
+    // Forty boards and forty units landed, less the first window: at an hour a window (v97) the line
+    // makes it in the half hour the loads come in, where two hours made none.
+    expect(stocked.stock.boards).toBe(38);
+    expect(stocked.stock.glass).toBe(39);
     expect(stocked.stock.tempStorageBoards + stocked.stock.tempStorageGlass).toBe(0);
-    expect(stockOnItem(stocked, { id: kitOf(stocked, 'timberShelter') })).toBe(40);
-    expect(stockOnItem(stocked, { id: kitOf(stocked, 'glassRack') })).toBe(40);
+    expect(stockOnItem(stocked, { id: kitOf(stocked, 'timberShelter') })).toBe(38);
+    expect(stockOnItem(stocked, { id: kitOf(stocked, 'glassRack') })).toBe(39);
     holdsItsWeek(stocked);
     expect(lineState(stocked, 1).contract?.boardsReserved).toBeGreaterThan(0);
   });
@@ -280,8 +282,9 @@ describe('(hhh) the line s timber and glass, bought by the player and by the off
   it('stands with no timber when it runs out, and says so on the strip and the tab', () => {
     expect(lineShortOf(dry, 1)).toBe('timber');
     expect(dry.stock.boards).toBe(0);
+    // Nineteen windows from the thirty eight boards left after the first (v97), then dry.
     expect(dry.stock.glass).toBe(20);
-    expect((lineState(dry, 1).contract?.windowsMade ?? 0) - before.windows).toBe(20);
+    expect((lineState(dry, 1).contract?.windowsMade ?? 0) - before.windows).toBe(19);
     expect(lineShortOf(onDuty, 1)).toBe('timber');
     expect(warnings(onDuty).find((warning) => warning.key === 'lineNeedsMaterial')?.text).toBe('Line 1 stands: no timber for its next window');
     const holder = document.createElement('div');

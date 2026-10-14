@@ -272,8 +272,8 @@ function officeOrdersEveryLinesMaterial(state: GameState): void {
 }
 
 /** The minutes a window takes on a line's contract: the one answer the offer card, the running
- *  block and the line's minute read. Each upgrade fitted takes its fifteen minutes off, and never
- *  below one window an hour (CLAUDE.md T30 2.7, 2.10). */
+ *  block and the line's minute read. Each upgrade fitted takes its ten minutes off, and never
+ *  below one window every twenty minutes (CLAUDE.md T30 2.7, 2.10; v97). */
 export function lineWindowMinutes(state: GameState, line: number): number {
   const fitted = (lineRecord(state, line)?.upgrades ?? []).filter((upgrade) => upgradeIsFitted(state, upgrade.fittedOnDay)).length;
   return Math.max(LINE_WINDOW_MINUTES_MIN, LINE_WINDOW_MINUTES - LINE_UPGRADE_MINUTES * fitted);
@@ -319,7 +319,7 @@ export function emptyLineUpgrades(state: GameState, line: number): void {
   lineState(state, line).upgrades = [];
 }
 
-/** A window's minutes in the words the card and the running block print: `2 hours`, `1 h 45 min`. */
+/** A window's minutes in the words the card and the running block print: `1 hour`, `50 min`. */
 export function lineWindowEvery(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;

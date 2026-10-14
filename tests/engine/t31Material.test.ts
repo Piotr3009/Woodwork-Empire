@@ -263,13 +263,13 @@ describe('the line s boards are held (CLAUDE.md T31 2.1, T32 2.5)', () => {
 
   it('holds the week in hand s boards and glass and no more, from the free stock only', () => {
     const state = stocked(running(), 100, 50);
-    // Twenty windows a week at 120 minutes, none made yet: forty boards and twenty glass units.
-    expect(held(state)).toEqual({ boards: 40, glass: 20 });
-    expect(freeFor(state, 'boards')).toBe(60);
-    expect(freeFor(state, 'glass')).toBe(30);
+    // Forty windows a week at 60 minutes (v97), none made yet: eighty boards and forty glass units.
+    expect(held(state)).toEqual({ boards: 80, glass: 40 });
+    expect(freeFor(state, 'boards')).toBe(20);
+    expect(freeFor(state, 'glass')).toBe(10);
     const contract = runningLineContract(state, 1);
     if (contract === null) throw new Error('the contract is wanted');
-    contract.windowsThisWeek = 15;
+    contract.windowsThisWeek = 35;
     contract.boardsReserved = 0;
     contract.glassReserved = 0;
     reserveLineMaterial(state, 1);
@@ -377,7 +377,8 @@ describe('the line s material comes in (CLAUDE.md T32 2.3, 2.6)', () => {
 
 describe('the office orders it (CLAUDE.md T31 2.3, T32 2.5)', () => {
   it('restocks each kind at two working days left, named in the ledger, and nothing with no admin on duty', () => {
-    expect(lineReorderWindows(running(), 1)).toBe(8);
+    // Two working days of windows: sixteen at an hour a window (v97).
+    expect(lineReorderWindows(running(), 1)).toBe(16);
     const state = stocked(running(), 14, 7);
     officeOrdersLineMaterial(state, 1);
     expect(stockLoads(state, 'boards') + stockLoads(state, 'glass')).toBe(0);
@@ -436,7 +437,8 @@ describe('the office orders it (CLAUDE.md T31 2.3, T32 2.5)', () => {
   });
 
   it('does not order while two days are on hand, and orders the boards only into free places', () => {
-    const plenty = stocked(running(), 16, 8);
+    // Two days on hand are sixteen windows from v97: 32 boards and 16 glass units.
+    const plenty = stocked(running(), 32, 16);
     plenty.workers.push(admin());
     officeOrdersLineMaterial(plenty, 1);
     expect(officeLines(plenty)).toEqual([]);
@@ -464,8 +466,9 @@ describe('the office orders it (CLAUDE.md T31 2.3, T32 2.5)', () => {
       if (isWorkingDay(state.clock.day)) workingDays += 1;
       state = nextDay(state, seen);
     }
-    // Four windows every working day played, so it never stood for its timber or glass.
-    expect(lineState(state, 1).contract?.windowsMade).toBe(4 * workingDays);
+    // Eight windows every working day played (v97: an hour a window), so it never stood for its
+    // timber or glass.
+    expect(lineState(state, 1).contract?.windowsMade).toBe(8 * workingDays);
     const labels = officeLines(state);
     expect(labels.filter((label) => label.includes(' boards for stock')).length).toBeGreaterThanOrEqual(1);
     expect(labels.filter((label) => label.includes(' glass units for stock')).length).toBeGreaterThanOrEqual(1);
@@ -534,13 +537,14 @@ describe('the line holds after the windows, at every turn (CLAUDE.md T32 2.5, se
     const week = stocked(running(), 100, 50);
     const contract = runningLineContract(week, 1);
     if (contract === null) throw new Error('the contract runs');
-    contract.windowsThisWeek = 20;
+    contract.windowsThisWeek = 40;
     contract.boardsReserved = 0;
     contract.glassReserved = 0;
     week.clock.day += DAYS_PER_WEEK;
     runLineDay(week);
     expect(contract.windowsThisWeek).toBe(0);
-    expect(held(week)).toEqual({ boards: 40, glass: 20 });
+    // A fresh week of forty windows (v97): eighty boards and forty units.
+    expect(held(week)).toEqual({ boards: 80, glass: 40 });
   });
 
   it('holds what the morning s fetch brings back from the paid store', () => {
@@ -565,14 +569,14 @@ describe('the line holds after the windows, at every turn (CLAUDE.md T32 2.5, se
   });
 
   it('has the office look again after every window made', () => {
-    const state = stocked(running(), 17, 20);
+    const state = stocked(running(), 33, 20);
     state.workers.push(admin());
     officeOrdersLineMaterial(state, 1);
-    // Seventeen boards and twenty glass units are two days of windows and more.
+    // Thirty three boards and twenty glass units are two days of windows (sixteen from v97) and more.
     expect(officeLines(state)).toEqual([]);
     const after = play(state, LINE_WINDOW_MINUTES);
     expect(lineState(after, 1).contract?.windowsMade).toBe(1);
-    expect(officeLines(after)).toEqual([`${roomFor(after, 'boards') - 15} boards for stock, ordered by Anna`]);
+    expect(officeLines(after)).toEqual([`${roomFor(after, 'boards') - 31} boards for stock, ordered by Anna`]);
   });
 });
 
