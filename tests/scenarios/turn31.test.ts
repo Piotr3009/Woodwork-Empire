@@ -10,11 +10,15 @@
 // @vitest-environment jsdom
 // The Turn 31 scenarios of CLAUDE.md T31 E2. The letters follow Turn 30's (ggg).
 //
-// (hhh) A company with the line's contract running and no office admin orders the line's timber and
-//       glass itself, is refused a third batch of glass over 40, sees the timber come on the next
-//       working day's lorry and go onto the stores, makes windows that take two boards and one glass
-//       each, and stands with `no timber` when it runs out; with an admin the line never stands for
-//       material over a played month once its first batches are in.
+// (hhh) A company with the line's contract running and no office admin restocks the line's timber
+//       and glass itself on the Materials page, is refused a third restock of glass with nothing
+//       typed while the glass rack's room is on its way, sees both come on the next working day's
+//       lorries and go onto the timber store and the glass rack, the contract holding its week of
+//       them, makes windows that take two boards and one glass unit each, and stands with `no
+//       timber` when it runs out; with an admin, who restocks both for it, the line never stands for
+//       material over a played month once its first loads are in. Flipped in v96: the line's own
+//       order buttons and its glass at module 6 are gone, and it takes its boards and glass from the
+//       stores (CLAUDE.md T32 2.5).
 // (iii) The Production line tab after that played month reads each row as 2.5 reckons it, the
 //       turnover as the ledger has it, and the efficiency under 100 per cent on a day an engineer
 //       was away.
@@ -31,7 +35,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   DAYS_PER_MONTH,
-  LINE_GLASS_WINDOWS_MAX,
   LINE_MODULES,
   LINE_MODULE_POWER_PER_DAY,
   LINE_WINDOW_PRICE,
@@ -47,8 +50,8 @@ import { standingPowerPerDay } from '../../src/engine/economy';
 import { monthlyPremiums } from '../../src/engine/insurance';
 import { canPlace, canPlaceSpec, canteenLockers, crewLimit } from '../../src/engine/layout';
 import { lineBooks } from '../../src/engine/lineBooks';
-import { lineGlassCheck, lineMaterialPerWindow, lineShortOf } from '../../src/engine/lineContract';
-import { boardsOnStore } from '../../src/engine/materials';
+import { lineMaterialPerWindow, lineShortOf, lineWindowsAWeek } from '../../src/engine/lineContract';
+import { restockCheck, restockSplit, stockOnItem } from '../../src/engine/materials';
 import { migrateState } from '../../src/engine/migrate';
 import { next } from '../../src/engine/rng';
 import { securitySubscriptionMonthly, securitySubscriptionParts } from '../../src/engine/security';
@@ -64,6 +67,7 @@ import {
   newGame,
   nextDay,
   placeEquipment,
+  placeGlassRack,
   testJoiner,
   withAir,
   withExtraction,
@@ -128,8 +132,11 @@ function engineer(id: string): Worker {
 }
 
 /** A company in the 800 m² unit with the day one kit, its timber shelter bought (behind the rear
- *  wall, 2.8), the line standing whole at (2, 14), two engineers and two joiners, and an office admin
- *  when asked for. */
+ *  wall, 2.8), the line standing whole at (2, 14), a glass rack on the floor clear of its lane, two
+ *  engineers, two joiners and a labourer, and an office admin when asked for. From Turn 32 the line's
+ *  glass is on a glass rack, and its boards and glass come on lorries for stock, two a morning at
+ *  times: the labourer takes them in, so neither waits at the gate behind the other's card
+ *  (CLAUDE.md T32 2.1, 2.6) [TUNE]. */
 function lineCompany(withAdmin: boolean): GameState {
   let state = newGame({ difficulty: 'veryEasy' });
   state.cash = 9000000;
@@ -141,7 +148,9 @@ function lineCompany(withAdmin: boolean): GameState {
   state.enquiries = [];
   state = buyNow(state, 'timberShelter');
   LINE_MODULES.forEach((id, index) => placeEquipment(state, id, { x: 2 + 6 * index, y: 14, id: `kit-line-${index + 1}` }));
+  placeGlassRack(state);
   state.workers.push(engineer('eng-1'), engineer('eng-2'), testJoiner('w-tom', 'Tom'), testJoiner('w-ben', 'Ben'));
+  state.workers.push({ ...testJoiner('w-gus', 'Gus'), role: 'helper', tier: null, rate: 0 });
   if (withAdmin) state.workers.push({ ...testJoiner('adm-1', 'Anna'), role: 'officeAdmin', tier: null, rate: 0, monthlyWage: 2000 });
   return state;
 }
@@ -154,10 +163,25 @@ function taken(state: GameState): GameState {
   return next;
 }
 
-function shelterOf(state: GameState): string {
-  const shelter = state.equipment.find((item) => item.specId === 'timberShelter');
-  if (shelter === undefined) throw new Error('the shelter is wanted');
-  return shelter.id;
+function kitOf(state: GameState, specId: string): string {
+  const kit = state.equipment.find((item) => item.specId === specId);
+  if (kit === undefined) throw new Error(`the ${specId} is wanted`);
+  return kit.id;
+}
+
+/** True while a load bought for stock is still on its lorry or at the gate. */
+function stockOnTheWay(state: GameState): boolean {
+  return state.deliveries.some((delivery) => delivery.jobId === null && !delivery.unloaded);
+}
+
+/** What the running contract holds of each kind is what the windows left in its week want, as far
+ *  as the stores have it, every minute: it holds its week at the take, at every working open and
+ *  after every unloading, and each window takes out of what it holds first (CLAUDE.md T32 2.5). */
+function holdsItsWeek(state: GameState): void {
+  const contract = lineState(state, 1).contract;
+  const left = lineWindowsAWeek(state, 1) - (contract?.windowsThisWeek ?? 0);
+  expect(contract?.boardsReserved).toBe(Math.min(2 * left, state.stock.boards));
+  expect(contract?.glassReserved).toBe(Math.min(left, state.stock.glass));
 }
 
 function line(state: GameState, label: string): number[] {
@@ -168,19 +192,21 @@ function line(state: GameState, label: string): number[] {
 // (hhh)
 // ---------------------------------------------------------------------------------------------
 
-describe('(hhh) the line s timber and glass, ordered by the player and by the office (CLAUDE.md T31 2.1 to 2.4)', () => {
+describe('(hhh) the line s timber and glass, bought by the player and by the office (CLAUDE.md T31 2.1 to 2.4, T32 2.5)', () => {
   const take = taken(lineCompany(false));
   const takeDay = take.clock.day;
-  // The player's clicks, at the minute the contract was taken.
-  let ordered = act(take, { type: 'ORDER_LINE_TIMBER', line: 1 });
-  ordered = act(ordered, { type: 'ORDER_LINE_GLASS', line: 1 });
-  ordered = act(ordered, { type: 'ORDER_LINE_GLASS', line: 1 });
-  const third = act(ordered, { type: 'ORDER_LINE_GLASS', line: 1 });
-  // Played on until the timber is on the stores and the glass at module 6.
+  // The player's clicks on the Materials page, at the minute the contract was taken: forty boards
+  // and twice twenty glass units, which is the glass rack's room (CLAUDE.md T32 2.3).
+  let ordered = act(take, { type: 'RESTOCK', kind: 'boards', sheets: 40 });
+  ordered = act(ordered, { type: 'RESTOCK', kind: 'glass', sheets: 20 });
+  ordered = act(ordered, { type: 'RESTOCK', kind: 'glass', sheets: 20 });
+  // And a third of the glass with nothing typed: what fills the free places less what is on its way.
+  const third = act(ordered, { type: 'RESTOCK', kind: 'glass' });
+  // Played on until both are off their lorries and on the stores.
   let stocked = ordered;
-  for (let guard = 0; (lineState(stocked, 1).boards < 40 || lineState(stocked, 1).glass < 40) && guard < 60; guard += 1) stocked = minutes(stocked, 30);
+  for (let guard = 0; stockOnTheWay(stocked) && guard < 60; guard += 1) stocked = minutes(stocked, 30);
   // A whole working day of windows, and then on until the timber runs out.
-  const before = { windows: lineState(stocked, 1).contract?.windowsMade ?? 0, boards: lineState(stocked, 1).boards, glass: lineState(stocked, 1).glass, sheets: stocked.stock.sheets };
+  const before = { windows: lineState(stocked, 1).contract?.windowsMade ?? 0, boards: stocked.stock.boards, glass: stocked.stock.glass, sheets: stocked.stock.sheets };
   let after = day(stocked);
   while (!isWorkingDay(after.clock.day)) after = day(after);
   after = minutes(after, 300);
@@ -193,48 +219,68 @@ describe('(hhh) the line s timber and glass, ordered by the player and by the of
     onDuty = minutes(onDuty, 30);
   }
 
-  it('orders nothing by itself with no admin: the line stands for both from the take', () => {
-    expect(lineState(take, 1).boards).toBe(0);
-    expect(lineState(take, 1).glass).toBe(0);
-    expect(lineState(take, 1).glassOnTheWay).toEqual([]);
-    expect(take.deliveries.some((delivery) => delivery.line === 1)).toBe(false);
+  it('buys nothing by itself with no admin: the line stands for both from the take', () => {
+    // Flipped in v96: nothing is bought for stock, and the contract holds nothing because the stores
+    // are empty (CLAUDE.md T32 2.5).
+    expect(take.stock.boards).toBe(0);
+    expect(take.stock.glass).toBe(0);
+    expect(take.deliveries.some((delivery) => delivery.jobId === null)).toBe(false);
+    expect(take.ledger.some((entry) => / for stock/.test(entry.label))).toBe(false);
+    expect(lineState(take, 1).contract?.boardsReserved).toBe(0);
+    expect(lineState(take, 1).contract?.glassReserved).toBe(0);
     expect(lineShortOf(take, 1)).toBe('timber or glass');
   });
 
-  it('pays for the player s orders at the click, on the material line, and refuses a third glass over 40', () => {
-    expect(line(ordered, 'Timber for line 1: 40 boards')).toEqual([-8000]);
-    expect(line(ordered, 'Glass for line 1: 20 windows')).toEqual([-4000, -4000]);
-    expect(lineState(ordered, 1).glassOnTheWay.reduce((total, entry) => total + entry.windows, 0)).toBe(LINE_GLASS_WINDOWS_MAX);
-    expect(lineGlassCheck(ordered, 1)).toEqual({ ok: false, reason: 'Module 6 holds glass for 40 windows' });
+  it('pays for the player s restocks at the click, on the material line, and refuses a third with nothing typed while the rack s room is on its way', () => {
+    // Flipped in v96: the boards on the sheets' ladder (180 a board at forty), the glass at 200 a
+    // unit (CLAUDE.md T32 2.3).
+    expect(line(ordered, '40 boards for stock')).toEqual([-7200]);
+    expect(line(ordered, '20 glass units for stock')).toEqual([-4000, -4000]);
+    // The glass rack's forty on their way: an empty field buys nothing and says so, in the sheets'
+    // words for glass; a typed twenty would be bought whole and go to the paid store (CLAUDE.md T24
+    // 2.8, T32 2.3).
+    expect(restockCheck(ordered, 'glass')).toEqual({ ok: false, reason: '40 glass units are on the way', sheets: 0, cost: 0 });
+    expect(restockSplit(ordered, 'glass', 20)).toEqual({ sheets: 20, onRack: 0, toStorage: 20, storageCost: 150 });
     expect(third.cash).toBe(ordered.cash);
+    expect(third.deliveries).toHaveLength(ordered.deliveries.length);
   });
 
-  it('brings the timber on the next working day s lorry, onto the stores, and the glass to module 6', () => {
-    const load = ordered.deliveries.find((delivery) => delivery.line === 1);
-    expect(load?.boards).toBe(true);
-    expect(load?.sheets).toBe(40);
+  it('brings the boards and the glass on the next working day s lorries, onto the timber store and the glass rack, and holds the week s', () => {
+    const loads = ordered.deliveries.filter((delivery) => delivery.jobId === null);
+    expect(loads.map((load) => [load.material, load.sheets])).toEqual([
+      ['boards', 40],
+      ['glass', 20],
+      ['glass', 20],
+    ]);
     let next = takeDay + 1;
     while (!isWorkingDay(next)) next += 1;
-    expect(load?.arriveDay).toBe(next);
-    expect(lineState(stocked, 1).boards).toBe(40);
-    expect(lineState(stocked, 1).glass).toBe(40);
-    expect(boardsOnStore(stocked, { id: shelterOf(stocked) })).toBeGreaterThanOrEqual(40);
+    for (const load of loads) expect(load.arriveDay).toBe(next);
+    expect(stocked.stock.boards).toBe(40);
+    expect(stocked.stock.glass).toBe(40);
+    expect(stocked.stock.tempStorageBoards + stocked.stock.tempStorageGlass).toBe(0);
+    expect(stockOnItem(stocked, { id: kitOf(stocked, 'timberShelter') })).toBe(40);
+    expect(stockOnItem(stocked, { id: kitOf(stocked, 'glassRack') })).toBe(40);
+    holdsItsWeek(stocked);
+    expect(lineState(stocked, 1).contract?.boardsReserved).toBeGreaterThan(0);
   });
 
-  it('makes windows that take two boards and one glass each, off the counter and module 6', () => {
+  it('makes windows that take two boards and one glass unit each, off the counters, out of what it holds first', () => {
     const made = (lineState(after, 1).contract?.windowsMade ?? 0) - before.windows;
     expect(made).toBeGreaterThan(0);
-    expect(lineState(after, 1).boards).toBe(before.boards - 2 * made);
-    expect(lineState(after, 1).glass).toBe(before.glass - made);
-    expect(after.stock.sheets).toBe(before.sheets - 2 * made);
-    // No material booked a window: it was paid at its order.
+    expect(after.stock.boards).toBe(before.boards - 2 * made);
+    expect(after.stock.glass).toBe(before.glass - made);
+    // Flipped in v96: the boards have their own counter, and the sheets' is not touched (CLAUDE.md
+    // T32 2.2).
+    expect(after.stock.sheets).toBe(before.sheets);
+    holdsItsWeek(after);
+    // No material booked a window: it was paid when it was bought.
     expect(after.ledger.some((entry) => entry.label === 'Windows off line 1: timber and glass')).toBe(false);
   });
 
   it('stands with no timber when it runs out, and says so on the strip and the tab', () => {
     expect(lineShortOf(dry, 1)).toBe('timber');
-    expect(lineState(dry, 1).boards).toBe(0);
-    expect(lineState(dry, 1).glass).toBe(20);
+    expect(dry.stock.boards).toBe(0);
+    expect(dry.stock.glass).toBe(20);
     expect((lineState(dry, 1).contract?.windowsMade ?? 0) - before.windows).toBe(20);
     expect(lineShortOf(onDuty, 1)).toBe('timber');
     expect(warnings(onDuty).find((warning) => warning.key === 'lineNeedsMaterial')?.text).toBe('Line 1 stands: no timber for its next window');
@@ -254,7 +300,7 @@ describe('(hhh) the line s timber and glass, ordered by the player and by the of
 const office = taken(lineCompany(true));
 const officeTakeDay = office.clock.day;
 let firstIn = office;
-for (let guard = 0; (lineState(firstIn, 1).boards === 0 || lineState(firstIn, 1).glass === 0) && guard < 40; guard += 1) firstIn = minutes(firstIn, 30);
+for (let guard = 0; (firstIn.stock.boards === 0 || firstIn.stock.glass === 0) && guard < 40; guard += 1) firstIn = minutes(firstIn, 30);
 const inFrom = firstIn.clock.day;
 let month = firstIn;
 let awayDay = -1;
@@ -268,14 +314,23 @@ for (let guard = 0; month.clock.day < inFrom + 30 && guard < 40; guard += 1) {
 }
 month = minutes(month, 300);
 
-describe('(hhh) with an office admin the line never stands for material (CLAUDE.md T31 2.3)', () => {
-  it('orders both at the take and in time ever after, in his name: from the day after the first batches are in, no minute stands for material', () => {
-    expect(office.deliveries.some((delivery) => delivery.line === 1)).toBe(true);
-    expect(lineState(office, 1).glassOnTheWay.length).toBeGreaterThan(0);
-    expect(office.ledger.some((entry) => entry.label === 'Timber for line 1: 40 boards, ordered by Anna')).toBe(true);
+describe('(hhh) with an office admin the line never stands for material (CLAUDE.md T31 2.3, T32 2.5)', () => {
+  it('restocks both at the take and in time ever after, in his name: from the day after the first loads are in, no minute stands for material', () => {
+    // Flipped in v96: his order is a restock of each kind with nothing typed, which fills the
+    // stores' free places: the shelter's 400 boards and the glass rack's 40 units, each on its
+    // lorry for stock, his name on the material line (CLAUDE.md T32 2.5).
+    expect(office.deliveries.filter((delivery) => delivery.jobId === null).map((delivery) => [delivery.material, delivery.sheets])).toEqual([
+      ['boards', 400],
+      ['glass', 40],
+    ]);
+    expect(line(office, '400 boards for stock, ordered by Anna')).toHaveLength(1);
+    expect(line(office, '40 glass units for stock, ordered by Anna')).toEqual([-8000]);
     expect(inFrom).toBeGreaterThan(officeTakeDay);
-    // The first batches come on the next working morning's lorry and are unloaded in the first
-    // hour of it, which is the one wait for material the line has.
+    // Only ever into the stores' free places: nothing he bought went to the paid store.
+    expect(month.ledger.some((entry) => entry.category === 'storage')).toBe(false);
+    expect(month.ledger.filter((entry) => / for stock, ordered by Anna$/.test(entry.label)).length).toBeGreaterThan(2);
+    // The first loads come on the next working morning's lorries and are unloaded in the first
+    // hours of it, which is the one wait for material the line has.
     const material = lineState(month, 1).days.filter((record) => record.day > inFrom);
     expect(material.length).toBeGreaterThan(25);
     for (const record of material) {
@@ -486,7 +541,7 @@ interface YearLog {
 function contractManager(log: YearLog): (state: GameState, day: number) => GameState {
   return (state, day) => {
     let current = state;
-    if (current.stock.sheets < 40) current = act(current, { type: 'RESTOCK', sheets: 60 });
+    if (current.stock.sheets < 40) current = act(current, { type: 'RESTOCK', kind: 'sheets', sheets: 60 });
     for (const contract of current.contracts.filter((entry) => entry.status === 'offered')) log.offered.add(contract.offeredDay);
     for (const contract of current.contracts.filter((entry) => entry.status === 'ended')) {
       if (contract.endedBy === 'lost') {

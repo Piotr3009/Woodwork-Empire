@@ -76,7 +76,7 @@ const CHEAP_START: Policy = {
       next.contracts.some((contract) => contract.status === 'active') &&
       next.stock.sheets < RESTOCK_WHEN_UNDER
     ) {
-      next = act(next, { type: 'RESTOCK', sheets: RESTOCK_SHEETS });
+      next = act(next, { type: 'RESTOCK', kind: 'sheets', sheets: RESTOCK_SHEETS });
     }
     // One more man a quarter, with the kit the gate asks for: the card's own refusal is what he
     // buys to, which from tonight counts his own place at a bench (CLAUDE.md T24 2.2). He asks

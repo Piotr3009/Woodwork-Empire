@@ -202,8 +202,9 @@ describe('the daily list', () => {
       rating: null,
       overdueWarned: false,
       curing: null,
-      glass: 'none',
-      glassDay: null,
+      glassUnits: 0,
+      glassReserved: 0,
+      glassUsed: 0,
     });
     createDailyTasks(state);
     expect(tasksOfKind(state, 'dailyOrdering')).toHaveLength(1);

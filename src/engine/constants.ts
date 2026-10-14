@@ -20,6 +20,7 @@ import type {
   SoftwareTier,
   StageId,
   StageSpec,
+  StockKind,
   TimberStandReason,
   UnitExtension,
   WorkerIdleReason,
@@ -212,12 +213,19 @@ import type {
  *
  *  Version 47 is v95 (PIOTR, 12.10: "and where is the width?"). The unit gains the count of its
  *  wide extensions and the one being built, none and none in every save. Every v12 to v46 save
- *  loads. */
-export const STATE_VERSION = 47;
+ *  loads.
+ *
+ *  Version 48 is v96, Turn 32 (PIOTR, 13.10: "identically to the sheets"). One store for every
+ *  material: the stock has three counters and a paid store of each, the boards off the sheets'
+ *  counter onto their own; a job carries its glass units, what the racks hold for it and what it
+ *  used, and no glazier's state; a line's contract holds its week of boards and glass and the line
+ *  keeps none of its own; a load says what it is. The glass a save had ordered or held is put on the
+ *  counter, its price already paid (CLAUDE.md T32 section 4). Every v12 to v47 save loads. */
+export const STATE_VERSION = 48;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v95';
+export const APP_VERSION = 'v96';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -908,25 +916,27 @@ export const SHEET_PRICE_LADDER: ReadonlyArray<{ from: number; price: number }> 
  *  rack when he types none, so there is no figure to bring a line back up to (CLAUDE.md T17 2.20). */
 export const LOW_STOCK_SHEETS = 4;
 /** The stock number a line carries, in the style of the software the player is meant to
- *  recognise: the prefix per material kind, and three digits off the seed [TUNE wording]
- *  (CLAUDE.md T13 3.2). */
-export const STOCK_NUMBER_PREFIX: Record<MaterialKind, string> = {
-  sheet: 'MFC-18-WHT',
-  solidWood: 'OAK-27-PAR',
+ *  recognise: the prefix per kind the store keeps, and three digits off the seed [TUNE wording]
+ *  (CLAUDE.md T13 3.2, T32 2.7). */
+export const STOCK_NUMBER_PREFIX: Record<StockKind, string> = {
+  sheets: 'MFC-18-WHT',
+  boards: 'TMB-63-RED',
+  glass: 'IGU-4-16-4',
 };
 /** Material always arrives the next working day (PIOTR). */
 export const DELIVERY_WORKING_DAYS_STANDARD = 1;
 /** [TUNE] bespoke material takes three working days and costs 15% more. */
 export const DELIVERY_WORKING_DAYS_BESPOKE = 3;
 
-/** A window's glass is made to size by a glazier and cannot be ordered before the drawing says the
- *  sizes: it is in at the open of the next working day after it is ordered, beside the boards
- *  ordered with it (CLAUDE.md T28 2.9; PIOTR, 05.10: "the glass, next day", CLAUDE.md T29 2.1). */
+/** A load of glass units comes by lorry at the open of the next working day after it is ordered, as
+ *  the boards ordered with it do, and is unloaded onto the glass racks (CLAUDE.md T28 2.9; PIOTR,
+ *  05.10: "the glass, next day", CLAUDE.md T29 2.1; PIOTR, 13.10: "yes" to the lorry, T32 2.6). */
 export const GLASS_DELIVERY_WORKING_DAYS = 1;
 /** The share of a timber job's material cost that is glass and ironmongery; the rest is boards
  *  (CLAUDE.md T28 2.9) [TUNE: chat]. */
 export const GLASS_SHARE = 0.35;
-/** What a window at its Glazing says while its glass is not in (CLAUDE.md T28 2.9). */
+/** What a window at its Glazing says while the glass racks cannot give it all its glass (CLAUDE.md
+ *  T28 2.9, T32 2.4). */
 export const WAITING_FOR_GLASS = 'waiting for glass';
 export const BESPOKE_COST_UPLIFT = 0.15;
 /** Temporary storage for a delivery that does not fit (PIOTR). */
@@ -1386,6 +1396,9 @@ export const TIMBER_STAND_INS: Record<string, readonly string[]> = {
   // 2.11.3).
   timberRack: ['timberShelter'],
   timberShelter: ['timberRack'],
+  // And a glass rack, either family (CLAUDE.md T32 2.1) [TUNE: chat].
+  glassRack: ['glassRackLarge'],
+  glassRackLarge: ['glassRack'],
 };
 
 /** The two timber stores. Boards are kept on a timber store and never on a sheet rack (CLAUDE.md
@@ -1393,6 +1406,12 @@ export const TIMBER_STAND_INS: Record<string, readonly string[]> = {
 export const TIMBER_STORES: readonly string[] = ['timberRack', 'timberShelter'];
 /** The one store the board's wanted list names, written `timber store` (CLAUDE.md T29 2.11.3). */
 export const TIMBER_STORE_WANTED = 'timberRack';
+/** The two glass racks: a window's glass units are kept upright on one and never on a sheet rack or
+ *  a timber store (CLAUDE.md T32 2.1). */
+export const GLASS_RACKS: readonly string[] = ['glassRack', 'glassRackLarge'];
+/** The one glass rack the board's wanted list names, written `glass rack`, after the timber store
+ *  (CLAUDE.md T32 2.1) [TUNE: chat]. */
+export const GLASS_RACK_WANTED = 'glassRack';
 
 /** The stages after which a timber job stands a night, and what it stands for: the glue cures
  *  after the pressing and the lacquer dries after the finishing [PIOTR: "a bit more complicated";
@@ -1748,6 +1767,9 @@ export const MACHINE_ENDURANCE_HOURS: Record<string, number> = {
   // The timber stores book no hours either (CLAUDE.md T29 2.11.1).
   timberRack: 100000,
   timberShelter: 100000,
+  // Nor do the glass racks (CLAUDE.md T32 2.1).
+  glassRack: 100000,
+  glassRackLarge: 100000,
 };
 
 /** The five classes every ladder in this game has, in order: class 5 is always the industrial one
@@ -2264,6 +2286,48 @@ export const TIMBER_SHELTER_VARIANTS: EquipmentVariant[] = [
     description:
       'A lean to roof over racks of boards, open at the front, standing outside behind the hall so ' +
       'it takes no floor of the hall.',
+  },
+];
+
+/** The glass rack's one class: the glass units of 40 windows upright on the hall floor [PIOTR,
+ *  13.10: 40 at £1,500] (CLAUDE.md T32 2.1). Its metres are chat's [TUNE: chat], its zone and its
+ *  pound a day the timber rack's way [TUNE], and its sentence the session's [TUNE wording]. */
+export const GLASS_RACK_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Glass rack',
+    price: 1500,
+    width: 2,
+    depth: 1,
+    height: 2,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    glassCapacity: 40,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A steel A frame holding the sealed units upright on rubber, two metres of it on the hall floor.',
+  },
+];
+
+/** The large glass rack's one class: 200 glass units [PIOTR, 13.10: 200 at £6,000] (CLAUDE.md T32
+ *  2.1), on chat's metres [TUNE: chat], the zone its footprint and a metre in front and its pound a
+ *  day the timber rack's way [TUNE]. Its sentence is the session's [TUNE wording]. */
+export const GLASS_RACK_LARGE_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Large glass rack',
+    price: 6000,
+    width: 4,
+    depth: 2,
+    height: 2.5,
+    zoneWidth: 4,
+    zoneDepth: 3,
+    glassCapacity: 200,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A slotted steel rack holding the sealed units upright in rows, four metres of it on the hall floor.',
   },
 ];
 
@@ -3643,6 +3707,9 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   // The two timber stores, one class each (CLAUDE.md T29 2.11.1).
   timberRack: TIMBER_RACK_VARIANTS,
   timberShelter: TIMBER_SHELTER_VARIANTS,
+  // The two glass racks, one class each, in the timber stores' shape (CLAUDE.md T32 2.1).
+  glassRack: GLASS_RACK_VARIANTS,
+  glassRackLarge: GLASS_RACK_LARGE_VARIANTS,
   edgebander: EDGEBANDER_VARIANTS,
   extractor: EXTRACTOR_VARIANTS,
   compressor: COMPRESSOR_VARIANTS,
@@ -4026,6 +4093,50 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'timberShelter',
     boardCapacity: 400,
     effect: 'Holds ten times a rack\u0027s boards outside behind the hall, and takes no floor of the hall.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'glassRack',
+    // Off the shelf, as the timber rack is [TUNE] (CLAUDE.md T32 2.1).
+    deliveryDays: 3,
+    folder: 'Glass racks',
+    tab: 'storage',
+    name: 'Glass rack',
+    price: 1500,
+    category: 'storage',
+    width: 2,
+    depth: 1,
+    height: 2,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    // No picture tonight: the hall draws it as it draws any kit whose picture has not landed
+    // (CLAUDE.md T32 2.1; docs/art/REQUESTS-T32.md G1).
+    spriteKey: 'glassRack',
+    glassCapacity: 40,
+    // [TUNE wording] (CLAUDE.md T32 2.1).
+    effect: 'Holds the glass units of the windows and doors on the hall floor, upright in their frames.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'glassRackLarge',
+    // Made to order [TUNE] (CLAUDE.md T32 2.1).
+    deliveryDays: 5,
+    // Each family its own folder, named for it in the plural, as the two timber stores are [TUNE:
+    // the name].
+    folder: 'Large glass racks',
+    tab: 'storage',
+    name: 'Large glass rack',
+    price: 6000,
+    category: 'storage',
+    width: 4,
+    depth: 2,
+    height: 2.5,
+    zoneWidth: 4,
+    zoneDepth: 3,
+    spriteKey: 'glassRackLarge',
+    glassCapacity: 200,
+    // [TUNE wording] (CLAUDE.md T32 2.1).
+    effect: 'Holds five times a glass rack\u0027s units on twice its floor.',
   },
 
   {
@@ -5398,21 +5509,15 @@ export function lineName(line: number): string {
  *  the timber stores as it is made; at `SHEET_VALUE` each they are 400 of its 600 (CLAUDE.md T31
  *  2.1) [TUNE: chat: the split]. */
 export const LINE_BOARDS_PER_WINDOW = 2;
-/** [PIOTR, 11.10: "yes"] The glass a window takes, one window's worth, from what stands at module
- *  6: the rest of its 600 (CLAUDE.md T31 2.1). */
+/** [PIOTR, 11.10: "yes"] The glass a window takes, one glass unit, off the glass racks from Turn 32:
+ *  the rest of its 600 (CLAUDE.md T31 2.1, T32 2.5). */
 export const LINE_GLASS_PER_WINDOW = 1;
-/** [PIOTR, 11.10: "yes"] Module 6 holds glass for this many windows, what is on its way counted
- *  in (CLAUDE.md T31 2.1, 2.2). */
-export const LINE_GLASS_WINDOWS_MAX = 40;
-/** [PIOTR, 11.10: "yes"] One order of the line's timber or glass is for this many windows: 40
- *  boards, or glass for 20 windows (CLAUDE.md T31 2.2). */
-export const LINE_ORDER_WINDOWS = 20;
 /** The calendar days the line's own day book keeps behind the day in hand: more than a year of
  *  the game's, so the tab's year is always whole (CLAUDE.md T31 2.5). */
 export const LINE_DAYS_KEPT = 400;
-/** [PIOTR, 11.10: "the office admin orders by himself when two days are left"] The office orders
- *  the line's timber or glass when what it holds and what is on its way are fewer than this many
- *  working days of windows at the line's pace (CLAUDE.md T31 2.3). */
+/** [PIOTR, 11.10: "the office admin orders by himself when two days are left"] The office restocks
+ *  the boards or the glass for the line when what the line could have of it is fewer than this many
+ *  working days of its windows at the line's pace (CLAUDE.md T31 2.3, T32 2.5). */
 export const LINE_REORDER_DAYS = 2;
 
 /** [PIOTR, 11.10: "later add ons can be bought, better new knives, better software, so that it
@@ -6326,15 +6431,17 @@ export const CONTRACT_CLIENTS: readonly string[] = [
 ];
 
 /** What the stock lines are called on the page, in the words of the software the player is meant
- *  to recognise [TUNE wording] (CLAUDE.md T13 3.2). */
-export const STOCK_LINE_NAME: Record<MaterialKind, string> = {
-  sheet: 'MFC 18 mm, white',
-  solidWood: 'Oak, 27 mm',
+ *  to recognise, one a kind the store keeps [TUNE wording] (CLAUDE.md T13 3.2, T32 2.7). */
+export const STOCK_LINE_NAME: Record<StockKind, string> = {
+  sheets: 'MFC 18 mm, white',
+  boards: 'Timber boards',
+  glass: 'Sealed glass units',
 };
 
-/** The material kinds held on the rack as stock: the sheets, and nothing else tonight. Solid wood
- *  and bespoke material are ordered for the job and never held (CLAUDE.md T13 3.2, 3.3). */
-export const STOCK_LINE_KINDS: readonly MaterialKind[] = ['sheet'];
+/** The three kinds the store keeps, in the order the Materials page draws them: the sheets on the
+ *  sheet racks, the boards on the timber stores, the glass units on the glass racks. Solid wood
+ *  and bespoke material are ordered for the job and never held (CLAUDE.md T13 3.2, 3.3, T32 2.2). */
+export const STOCK_KINDS: readonly StockKind[] = ['sheets', 'boards', 'glass'];
 
 /** The reputation tier the client's answer is neutral at: at it the draw is uniform in the band,
  *  under it the skew is negative and the offers land nearer the bottom of the band more often,

@@ -64,8 +64,8 @@ describe('a v93 save whose line has no lane (v94)', () => {
     const cash = state.cash;
     const opened = migrateState(asV45(state), 45);
     if (opened === null) throw new Error('the save opens');
-    expect(STATE_VERSION).toBe(47);
-    expect(opened.version).toBe(47);
+    expect(STATE_VERSION).toBe(48);
+    expect(opened.version).toBe(48);
     expect(rows(opened, 1)).toEqual([14, 14, 14, 14, 14, 14]);
     expect(lineLanes(opened).map((lane) => lane.line)).toEqual([1]);
     expect(opened.cash).toBe(cash);

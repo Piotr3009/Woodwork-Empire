@@ -219,6 +219,7 @@ describe('the walker', () => {
       unloaded: false,
       bespoke: false,
       overflowSheets: 0,
+      material: 'sheets' as const,
     });
     // The owner unloads by hand: the page puts the loop on him, both ends of it.
     state.owner.station = STATION_GATE;

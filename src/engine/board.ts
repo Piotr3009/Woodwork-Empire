@@ -35,9 +35,7 @@ import {
   ANSWER_SKEW_NEUTRAL_TIER,
 } from './constants';
 import { bigJobCheck, isBigJob } from './agency';
-import { boardRoom, has } from './machines';
-import { boardsForJob, materialCostFor } from './materials';
-import { plural } from './text';
+import { has } from './machines';
 import {
   availableFinishes,
   findTemplate,
@@ -348,25 +346,6 @@ export function kitBlockFor(state: GameState, entry: ProductTemplate): BoardBloc
   return null;
 }
 
-/** The boards a timber enquiry would hold, on the one count the tile and the job taken from it
- *  read (CLAUDE.md T29 2.9.7); nought for any other enquiry. */
-export function enquiryBoards(state: GameState, enquiry: Enquiry): number {
-  const entry = findTemplate(enquiry.templateId);
-  if (entry === null || entry.cutters === null) return 0;
-  return boardsForJob(state, materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial), true);
-}
-
-/** Whether the timber stores that stand could hold this enquiry's boards even empty: a load comes
- *  in whole, so a job bigger than every store would stand at the gate for ever. Asked only once a
- *  store stands; with none the lock says `Needs timber store` (CLAUDE.md T29 2.11.3) [TUNE: chat].
- *  The words are the tile's red line, in the big job's crew line's shape. */
-export function storesHoldCheck(state: GameState, enquiry: Enquiry): { ok: boolean; reason: string } {
-  const boards = enquiryBoards(state, enquiry);
-  const room = boardRoom(state);
-  if (boards <= 0 || room <= 0 || boards <= room) return { ok: true, reason: '' };
-  return { ok: false, reason: `${plural(boards, 'board', 'boards')}, and the timber stores hold ${room}` };
-}
-
 /** Why this template is out of the company's reach, or null while it is not: what it is short of,
  *  and then the hands it has against the days the client gives. */
 export function blockFor(
@@ -508,9 +487,6 @@ export function canAccept(state: GameState, enquiry: Enquiry): { ok: boolean; re
   // 2.13).
   const crew = bigJobCheck(state, enquiry);
   if (!crew.ok) return crew;
-  // And a window's boards a home: in the crew's shape, beside it (CLAUDE.md T29 2.11.3).
-  const stores = storesHoldCheck(state, enquiry);
-  if (!stores.ok) return stores;
   if (enquiry.lockReason === null) return { ok: true, reason: '' };
   if (enquiry.byHandAvailable) return { ok: true, reason: '' };
   return { ok: false, reason: enquiry.lockReason };

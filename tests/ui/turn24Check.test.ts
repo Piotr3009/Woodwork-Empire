@@ -185,7 +185,7 @@ describe('section 7, the contract and the hall', () => {
 
   it('takes sixty sheets into a rack with room for forty and stores the twenty', () => {
     const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 10);
-    expect(restockSplit(state, 60)).toEqual({
+    expect(restockSplit(state, 'sheets', 60)).toEqual({
       sheets: 60,
       onRack: 40,
       toStorage: 20,

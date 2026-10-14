@@ -114,6 +114,7 @@ import type {
   LineDay,
   LineSince,
   StageId,
+  StockKind,
   WindowLineState,
   Worker,
   WorkerTier,
@@ -292,39 +293,56 @@ export function boardCapacityOf(item: { specId: string; variantId: string }): nu
   return variantOf(spec, item.variantId).boardCapacity ?? spec.boardCapacity ?? 0;
 }
 
-/** The boards in the workshop. A board is never free stock: it is always a timber job's own or the
- *  line's, ordered for it and held for it, so the boards on the one counter are what the timber
- *  jobs and the line hold, and everything else on it is sheets (CLAUDE.md T29 2.11.2, T31 2.1).
- *  Written here and not in `materials.ts`, which reads this module, as `sheetsStrandedBySale` is. */
-export function boardsHeld(state: GameState): number {
-  let held = 0;
-  for (const job of state.jobs) {
-    if (job.timber !== true || job.stage === 'completed') continue;
-    held += job.sheetsReserved;
-  }
-  // And every line's own, held for its windows as a job's are for its pieces (CLAUDE.md T31 2.1).
-  return held + state.windowLines.reduce((total, line) => total + line.boards, 0);
+/** Glass units this item holds: a glass rack's figure, nought for everything else (CLAUDE.md T32
+ *  2.1). */
+export function glassCapacityOf(item: { specId: string; variantId: string }): number {
+  const spec = findSpec(item.specId);
+  if (!spec) return 0;
+  return variantOf(spec, item.variantId).glassCapacity ?? spec.glassCapacity ?? 0;
 }
 
-/** The sheets on the one counter: everything on it but the timber jobs' and the line's boards,
- *  never below nought (CLAUDE.md T29 2.11.2, 2.11.4, T31 2.1). */
-export function sheetsOnCounter(state: GameState): number {
-  return Math.max(0, state.stock.sheets - boardsHeld(state));
+/** What this item holds of a kind: the one question every rack, store and glass rack is asked,
+ *  through its kind's own figure (CLAUDE.md T32 2.1, 2.2). */
+export function capacityOf(item: { specId: string; variantId: string }, kind: StockKind): number {
+  if (kind === 'sheets') return sheetCapacityOf(item);
+  if (kind === 'boards') return boardCapacityOf(item);
+  return glassCapacityOf(item);
 }
 
-/** What the timber stores that stand hold between them (CLAUDE.md T29 2.11.1, 2.11.3). */
-export function boardRoom(state: GameState): number {
+/** The kind this item keeps, or null for anything that keeps none: a sheet rack the sheets, a
+ *  timber store the boards, a glass rack the glass (CLAUDE.md T32 2.1). */
+export function stockKindOf(item: { specId: string; variantId: string }): StockKind | null {
+  if (sheetCapacityOf(item) > 0) return 'sheets';
+  if (boardCapacityOf(item) > 0) return 'boards';
+  if (glassCapacityOf(item) > 0) return 'glass';
+  return null;
+}
+
+/** A count of a kind in the player's words: `12 sheets`, `12 boards`, `7 glass units` (CLAUDE.md
+ *  T32 2.2) [TUNE: the words]. */
+export function stockWords(kind: StockKind, count: number): string {
+  if (kind === 'sheets') return plural(count, 'sheet', 'sheets');
+  if (kind === 'boards') return plural(count, 'board', 'boards');
+  return plural(count, 'glass unit', 'glass units');
+}
+
+/** What the kit that stands holds of a kind between it: the sheet racks' sheets, the timber
+ *  stores' boards, the glass racks' glass units. A rack that is sold stands in the hall until the
+ *  van comes, and it is no room (CLAUDE.md T20 2.10). The one sum, for all three (CLAUDE.md T32
+ *  2.2). */
+export function roomFor(state: GameState, kind: StockKind): number {
   let room = 0;
   for (const item of state.equipment) {
     if (isSold(item) || !itemStandsInTheHall(item)) continue;
-    room += boardCapacityOf(item);
+    room += capacityOf(item, kind);
   }
   return room;
 }
 
-/** Room left on the timber stores, with the boards already on them counted off. */
-export function freeBoardRoom(state: GameState): number {
-  return Math.max(0, boardRoom(state) - boardsHeld(state));
+/** Room left on a kind's kit: what it holds less what of that kind is on its counter, never below
+ *  nought (CLAUDE.md T32 2.2). The one answer for the sheets, the boards and the glass. */
+export function freeRoomFor(state: GameState, kind: StockKind): number {
+  return Math.max(0, roomFor(state, kind) - state.stock[kind]);
 }
 
 /** How many men's hand tool sets this class of tool cabinet holds: one, one, two, four or eight up
@@ -522,8 +540,8 @@ export function emptyLineSince(): LineSince {
 }
 
 /** The record of a line that has never run: no contract, no offer yet, no window in hand, an empty
- *  pallet, nothing at the gate and no upgrade (CLAUDE.md T30 section 4); no timber, no glass and an
- *  empty day book (CLAUDE.md T31 section 4). The day in hand is the day given, the save's own when
+ *  pallet, nothing at the gate and no upgrade (CLAUDE.md T30 section 4), and an empty day book
+ *  (CLAUDE.md T31 section 4); its timber and glass are the stores' from Turn 32 (CLAUDE.md T32 2.5). The day in hand is the day given, the save's own when
  *  a save is lifted. */
 export function emptyWindowLine(number: number, day = 0): WindowLineState {
   return {
@@ -534,9 +552,6 @@ export function emptyWindowLine(number: number, day = 0): WindowLineState {
     onPallet: 0,
     palletsAtGate: 0,
     upgrades: [],
-    boards: 0,
-    glass: 0,
-    glassOnTheWay: [],
     today: emptyLineDay(day),
     days: [],
     since: emptyLineSince(),
@@ -681,36 +696,18 @@ export function isSellableFamily(specId: string): boolean {
   );
 }
 
-/** The sheets that would have nowhere to go if this rack went: the hall's stock less what the
- *  rest of the racks could hold (CLAUDE.md T20 2.10). With one rack in the hall, which is the
- *  workshop Piotr plays, that is every sheet on it.
- *
- *  It is `rackCapacity` of `materials.ts` less this one rack, written here because `materials.ts`
- *  reads this module and not the other way about; it is the same sum over the same
- *  `sheetCapacityOf`. Bringing the two sums into one is still open (REPORT-T20.md, what was not
- *  done). */
-export function sheetsStrandedBySale(state: GameState, item: Equipment): number {
-  let room = 0;
-  for (const other of state.equipment) {
-    // A rack that is already sold is no room at all: it stands in the hall until the buyer's van
-    // comes in the morning, and counting it would let the last two racks be sold one after the
-    // other on the same day with the sheets still on them (CLAUDE.md T20 2.10).
-    if (other.id === item.id || isSold(other) || !itemStandsInTheHall(other)) continue;
-    room += sheetCapacityOf(other);
-  }
-  // Sheets only: the boards are on the timber stores (CLAUDE.md T29 2.11.2).
-  return Math.max(0, sheetsOnCounter(state) - room);
-}
-
-/** The boards a timber store's sale would leave with nowhere to go: the boards held less what the
- *  other stores that stand hold, the rack's own rule (CLAUDE.md T29 2.11.2). */
-export function boardsStrandedBySale(state: GameState, item: Equipment): number {
-  let room = 0;
-  for (const other of state.equipment) {
-    if (other.id === item.id || isSold(other) || !itemStandsInTheHall(other)) continue;
-    room += boardCapacityOf(other);
-  }
-  return Math.max(0, boardsHeld(state) - room);
+/** What of its kind would have nowhere to go if this rack, store or glass rack went: what is on its
+ *  kind's kit less what the rest of that kit could hold (CLAUDE.md T20 2.10). With one rack in the
+ *  hall, which is the workshop Piotr plays, that is everything on it. A rack that is already sold is
+ *  no room at all: it stands in the hall until the buyer's van comes in the morning, and counting it
+ *  would let the last two racks be sold one after the other on the same day with the sheets still on
+ *  them (CLAUDE.md T20 2.10). The one rule for the three kinds: the sheets', the boards' and the
+ *  glass's (CLAUDE.md T29 2.11.2, T32 2.1). Nought for anything that keeps nothing. */
+export function stockStrandedBySale(state: GameState, item: Equipment): number {
+  const kind = stockKindOf(item);
+  if (kind === null) return 0;
+  const room = roomFor(state, kind) - (isSold(item) || !itemStandsInTheHall(item) ? 0 : capacityOf(item, kind));
+  return Math.max(0, state.stock[kind] - room);
 }
 
 /** Tools of this family that live in a cabinet: two men can have one out at once. */

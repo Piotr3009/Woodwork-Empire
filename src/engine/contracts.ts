@@ -54,7 +54,7 @@ import { inWords, plural, pluralOf } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { isOnJob, stagedJob, takeOffJob, workerMinuteCost } from './jobs';
-import { freeSheets } from './materials';
+import { freeFor } from './materials';
 import {
   OWNER,
   bestMachineOf,
@@ -383,7 +383,7 @@ export function contractShortfall(state: GameState, contract: Contract): number 
  *  held, like the job side's own `reserveSheetsFor`. */
 export function reserveContractSheets(state: GameState, contract: Contract): number {
   if (contract.status !== 'active') return 0;
-  const held = Math.min(contractShortfall(state, contract), freeSheets(state));
+  const held = Math.min(contractShortfall(state, contract), freeFor(state, 'sheets'));
   if (held <= 0) return 0;
   contract.sheetsReserved += held;
   return held;
@@ -397,7 +397,7 @@ function sheetsOwedByContract(contract: Contract, piece: ContractPieceSpec): num
 /** What this contract may take off the rack: what it is holding, and the sheets nobody has a
  *  claim on. It never cuts into what a job is holding (CLAUDE.md T13 3.2). */
 function sheetsOpenTo(state: GameState, contract: Contract): number {
-  return contract.sheetsReserved + freeSheets(state);
+  return contract.sheetsReserved + freeFor(state, 'sheets');
 }
 
 /** True while the rack cannot give this contract the sheets its next piece needs: the men on it

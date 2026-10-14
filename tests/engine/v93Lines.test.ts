@@ -13,7 +13,9 @@
 // line costs 10 million as always"]. Each line is bought whole for the same price, stands seven
 // metres deep with its own lane, has its own two engineers (line 1 staffed first), its own contract,
 // timber, glass, pallet, forklift, upgrades and books, is named by its number everywhere, and is sold
-// and moved on its own. The line a save held becomes line 1.
+// and moved on its own. The line a save held becomes line 1. From Turn 32 no line has timber or glass
+// of its own: every line takes its boards and glass from the one store, each contract holding its
+// own week of it, line 1 first (CLAUDE.md T32 2.5).
 
 import { describe, expect, it } from 'vitest';
 import { LINE_MODULES, LINE_PRICE, WINDOW_LINE_ORIGIN } from '../../src/engine/constants';
@@ -26,10 +28,11 @@ import {
   answerLineOffer,
   endLineContract,
   lineState,
-  orderLineTimber,
   palletsAtTheGate,
+  reserveEveryLinesMaterial,
   runningLineContract,
 } from '../../src/engine/lineContract';
+import { freeFor, reservedFor } from '../../src/engine/materials';
 import {
   itemName,
   jobsLine,
@@ -64,6 +67,8 @@ function bigUnit(): GameState {
   state.reputation = 40;
   state.enquiries = [];
   placeEquipment(state, 'timberRack', { variantId: 'standard', x: 36, y: 0, id: 'kit-timber-rack' });
+  // And a glass rack beside it for the lines' glass (CLAUDE.md T32 2.1).
+  placeEquipment(state, 'glassRack', { variantId: 'standard', x: 33, y: 0, id: 'kit-glass-rack' });
   // The day one rack and bench out of the rows the second line and its ground take.
   for (const item of state.equipment) {
     if (item.specId === 'sheetRack') [item.anchorX, item.anchorY] = [11, 2];
@@ -76,8 +81,9 @@ function engineer(id: string): Worker {
   return { ...testJoiner(id, id), role: 'lineEngineer', tier: null, rate: 0, monthlyWage: 15000 };
 }
 
-/** A whole line standing with module 1 at this cell, under this number, with a batch of timber and
- *  glass on it. */
+/** A whole line standing with module 1 at this cell, under this number, and a batch of boards and
+ *  glass put on the stores for it. Flipped in v96: the company's stock, on the counters of their
+ *  kinds, and no line's own (CLAUDE.md T32 2.2, 2.5). */
 function withLine(state: GameState, line: number, at: { x: number; y: number }): GameState {
   LINE_MODULES.forEach((id, index) =>
     placeEquipment(state, id, { x: at.x + 6 * index, y: at.y, id: `kit-line-${line}-${index + 1}` }),
@@ -85,9 +91,10 @@ function withLine(state: GameState, line: number, at: { x: number; y: number }):
   for (const item of state.equipment) {
     if (item.id.startsWith(`kit-line-${line}-`)) item.line = line;
   }
-  lineState(state, line).boards = 40;
-  state.stock.sheets += 40;
-  lineState(state, line).glass = 20;
+  // Its record written, as the open of a working day writes it for every line that stands.
+  lineState(state, line);
+  state.stock.boards += 40;
+  state.stock.glass += 20;
   return state;
 }
 
@@ -108,6 +115,8 @@ function running(state: GameState, line: number): GameState {
     windowsMade: 0,
     revenue: 0,
     materialCost: 0,
+    boardsReserved: 0,
+    glassReserved: 0,
   };
   return state;
 }
@@ -248,8 +257,9 @@ describe('each line s own contract, material, pallet and forklift', () => {
     expect(lineState(morning, 1).contract?.status).toBe('active');
     expect(lineState(morning, 2).contract?.status).toBe('active');
     const state = twoLines(4);
-    lineState(state, 1).contract = { status: 'offered', startDay: 1, windowsThisWeek: 0, weekStartDay: 1, windowsMade: 0, revenue: 0, materialCost: 0 };
-    lineState(state, 2).contract = { status: 'offered', startDay: 1, windowsThisWeek: 0, weekStartDay: 1, windowsMade: 0, revenue: 0, materialCost: 0 };
+    const offered = { status: 'offered' as const, startDay: 1, windowsThisWeek: 0, weekStartDay: 1, windowsMade: 0, revenue: 0, materialCost: 0 };
+    lineState(state, 1).contract = { ...offered, boardsReserved: 0, glassReserved: 0 };
+    lineState(state, 2).contract = { ...offered, boardsReserved: 0, glassReserved: 0 };
     answerLineOffer(state, 2, 'notNow');
     expect(lineState(state, 1).contract?.status).toBe('offered');
     expect(lineState(state, 2).contract).toBeNull();
@@ -272,16 +282,22 @@ describe('each line s own contract, material, pallet and forklift', () => {
     expect(lineState(playedShort, 2).contract?.windowsMade).toBe(0);
   });
 
-  it('orders timber for one line and unloads it onto that line, the load and the ledger naming it', () => {
+  it('holds its own week of the one store s boards and glass, line 1 first, each contract on its own', () => {
+    // Flipped in v96: no line orders for itself; each running contract holds its week from the free
+    // stock, in the order of the lines (CLAUDE.md T32 2.5).
     const state = running(running(twoLines(4), 1), 2);
-    expect(orderLineTimber(state, 2).ok).toBe(true);
-    expect(state.ledger.at(-1)?.label).toBe('Timber for line 2: 40 boards');
-    const load = state.deliveries.at(-1);
-    expect(load?.line).toBe(2);
-    const landed = nextDay(state);
-    const unloaded = landed.deliveries.find((delivery) => delivery.line === 2);
-    expect(unloaded).toBeDefined();
-    expect(lineState(landed, 1).boards).toBeLessThanOrEqual(40);
+    state.stock.boards = 50;
+    state.stock.glass = 30;
+    reserveEveryLinesMaterial(state);
+    expect([lineState(state, 1).contract?.boardsReserved, lineState(state, 1).contract?.glassReserved]).toEqual([40, 20]);
+    expect([lineState(state, 2).contract?.boardsReserved, lineState(state, 2).contract?.glassReserved]).toEqual([10, 10]);
+    expect(reservedFor(state, 'boards')).toBe(50);
+    expect(freeFor(state, 'glass')).toBe(0);
+    // Line 2's contract ended, what it held is free again and line 1's hold is as it was.
+    endLineContract(state, 2);
+    expect(freeFor(state, 'boards')).toBe(10);
+    expect(freeFor(state, 'glass')).toBe(10);
+    expect(lineState(state, 1).contract?.boardsReserved).toBe(40);
   });
 
   it('ends one line s contract at its own End it and shows one block a line on the Contracts tab', () => {
@@ -290,7 +306,10 @@ describe('each line s own contract, material, pallet and forklift', () => {
     expect(Array.from(tab.querySelectorAll('[data-line-contract]')).map((node) => node.getAttribute('data-line-contract'))).toEqual(['1', '2']);
     expect(tab.querySelector('[data-line-contract="2"] h3')?.textContent).toBe('Windows off line 2');
     expect(tab.querySelector('[data-line-contract="2"] [data-do="endLineContract"]')?.getAttribute('data-line')).toBe('2');
-    expect(tab.querySelector('[data-line-contract="2"] [data-do="orderLineTimber"]')?.getAttribute('data-line')).toBe('2');
+    // Flipped in v96: no order buttons; each block reads what its own contract holds (CLAUDE.md T32
+    // 2.5).
+    expect(tab.querySelector('[data-line-contract="2"] [data-do="orderLineTimber"]')).toBeNull();
+    expect(tab.querySelector('[data-line-contract="2"]')?.textContent).toContain('Timber held');
     const ended = act(state, { type: 'END_LINE_CONTRACT', line: 2 });
     expect(runningLineContract(ended, 1)).not.toBeNull();
     expect(runningLineContract(ended, 2)).toBeNull();
@@ -314,6 +333,8 @@ describe('each line s own contract, material, pallet and forklift', () => {
 describe('each line sold on its own (PIOTR, 12.10)', () => {
   it('sells one line from any of its modules, for half of what its six cost, and leaves the other running', () => {
     const state = running(running(twoLines(4), 1), 2);
+    reserveEveryLinesMaterial(state);
+    const boards = state.stock.boards;
     const spec = findSpec('windowLine3');
     const module = state.equipment.find((item) => item.id === 'kit-line-2-3');
     if (spec === null || module === undefined) throw new Error('module 3 of line 2 stands');
@@ -326,8 +347,13 @@ describe('each line sold on its own (PIOTR, 12.10)', () => {
     expect(lineItems(state, 1).every((item) => item.soldOnDay === null)).toBe(true);
     expect(runningLineContract(state, 1)).not.toBeNull();
     expect(runningLineContract(state, 2)).toBeNull();
-    expect(lineState(state, 2).boards).toBe(0);
-    expect(lineState(state, 1).boards).toBe(40);
+    // Flipped in v96: nothing written off and nothing taken off the counter; what line 2 held is free
+    // again, and line 1 holds what it held (CLAUDE.md T32 2.5).
+    expect(state.stock.boards).toBe(boards);
+    expect(lineState(state, 1).contract?.boardsReserved).toBe(40);
+    expect(reservedFor(state, 'boards')).toBe(40);
+    expect(freeFor(state, 'boards')).toBe(boards - 40);
+    expect(state.ledger.some((entry) => entry.label.startsWith('Material written off'))).toBe(false);
     const seen: GameEvent[] = [];
     const morning = nextDay(state, seen);
     expect(seen.find((event) => event.kind === 'machineCollected')?.title).toBe('Window production line, line 2 collected');
@@ -379,30 +405,58 @@ describe('the upgrades and the books, a line each', () => {
 });
 
 describe('a v44 save in this build (v93 section 4)', () => {
-  it('opens with its line as line 1, its modules and its loads carrying the number, and its record first of the list', () => {
+  it('opens with its line as line 1, its modules carrying the number, its record first of the list, and its material on the counters', () => {
     const state = running(withLine(bigUnit(), 1, WINDOW_LINE_ORIGIN), 1);
     state.workers.push(engineer('eng-1'), engineer('eng-2'));
-    expect(orderLineTimber(state, 1).ok).toBe(true);
     const raw = JSON.parse(JSON.stringify(state)) as Record<string, unknown> & {
       windowLines: Record<string, unknown>[];
       equipment: Record<string, unknown>[];
       deliveries: Record<string, unknown>[];
+      stock: Record<string, unknown>;
     };
     raw.version = 44;
-    const record: Record<string, unknown> = { ...(raw.windowLines[0] ?? {}) };
+    // The save of v92 as it was: one counter of sheets and boards, the line's own forty boards and
+    // its glass for twenty windows, and a batch of its timber on the road (CLAUDE.md T31 2.1, 2.2).
+    // Flipped in v96: built by hand, the line's own orders being gone (CLAUDE.md T32 section 4).
+    const sheets = Number(raw.stock.sheets);
+    raw.stock = { sheets: sheets + 40, tempStorageSheets: 0 };
+    const record: Record<string, unknown> = { ...(raw.windowLines[0] ?? {}), boards: 40, glass: 20, glassOnTheWay: [] };
     delete record.number;
+    const contract = record.contract as Record<string, unknown>;
+    delete contract.boardsReserved;
+    delete contract.glassReserved;
     raw.windowLine = record;
     delete (raw as { windowLines?: unknown }).windowLines;
     for (const item of raw.equipment) delete item.line;
-    for (const delivery of raw.deliveries) if (delivery.line === 1) delivery.line = true;
+    raw.deliveries = [
+      {
+        id: 'del-line',
+        jobId: null,
+        sheets: 40,
+        orderedDay: state.clock.day,
+        pricePaid: 8000,
+        arriveDay: state.clock.day + 1,
+        arrived: false,
+        unloaded: false,
+        bespoke: false,
+        overflowSheets: 0,
+        boards: true,
+        line: true,
+      },
+    ];
     const opened = migrateState(raw, 44);
     if (opened === null) throw new Error('the save opens');
-    expect(opened.version).toBe(47);
+    // Flipped in v96: STATE_VERSION 48 (CLAUDE.md T32 section 4).
+    expect(opened.version).toBe(48);
     expect(opened.windowLines.map((record) => record.number)).toEqual([1]);
     expect(opened.windowLines[0]?.contract?.status).toBe('active');
-    expect(opened.windowLines[0]?.boards).toBe(40);
+    // Flipped in v96: the line's forty boards and twenty glass units are free stock on the counters,
+    // and its load on the road a load of boards for stock (CLAUDE.md T32 section 4).
+    expect(opened.windowLines[0]).not.toHaveProperty('boards');
+    expect(opened.stock).toMatchObject({ sheets, boards: 40, glass: 20 });
     expect(opened.equipment.filter((item) => LINE_MODULES.includes(item.specId)).map((item) => item.line)).toEqual([1, 1, 1, 1, 1, 1]);
-    expect(opened.deliveries.filter((delivery) => delivery.line !== undefined).map((delivery) => delivery.line)).toEqual([1]);
+    expect(opened.deliveries.map((delivery) => [delivery.material, delivery.jobId, delivery.sheets])).toEqual([['boards', null, 40]]);
+    expect(opened.deliveries[0]).not.toHaveProperty('line');
     expect(runningLineContract(opened, 1)).not.toBeNull();
     expect(lineLevel(opened, 1)).toBe(6);
   });

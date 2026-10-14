@@ -43,13 +43,17 @@ export interface ClosureSpan {
 
 export type Finish = 'laminate' | 'lacquer' | 'veneer';
 
+/** The three materials the stores keep, each on a counter of its own and on kit of its own: the
+ *  sheets on the sheet racks, the boards on the timber stores and the glass units on the glass
+ *  racks. One function serves all three wherever they are bought and kept the same way (PIOTR,
+ *  13.10: "identically to the sheets"; CLAUDE.md T32 2.2) [TUNE: the names]. */
+export type StockKind = 'sheets' | 'boards' | 'glass';
+
 /** The stages a job goes through in the hall (CLAUDE.md T7 3.1): from v55 one stage a machine,
  *  Cutting on the saw, Edging on the edgebander, Moulding on the spindle moulder and Assembly at
  *  the bench, a quarter each, and Finishing in the booth for a lacquered job [PIOTR, 24.09: "every
  *  machine has its own stage, split evenly"]. `cnc` is the one stage a CNC does instead of Cutting;
  *  `delivery` carries no labour at all. `machining`, the 15% of v53 and before, is gone. */
-/** Where a timber job's glass is (CLAUDE.md T28 2.9). */
-export type GlassState = 'none' | 'toOrder' | 'ordered' | 'in';
 
 /** What a timber job stands for overnight (CLAUDE.md T28 2.8). */
 export type TimberStandReason = 'glue curing' | 'lacquer drying';
@@ -236,6 +240,9 @@ export interface EquipmentVariant {
   /** Boards this class of timber store holds. Left out means the family's own (CLAUDE.md T29
    *  2.11.1). */
   boardCapacity?: number;
+  /** Glass units this class of glass rack holds. Left out means the family's own (CLAUDE.md T32
+   *  2.1). */
+  glassCapacity?: number;
   /** What must be owned before this class can be bought. Left out means the family's own: a
    *  floor edgebander wants extraction where a hand one wants a cabinet (CLAUDE.md T7 3.6). */
   requires?: string[];
@@ -294,6 +301,9 @@ export interface EquipmentSpec {
   /** Boards a timber store holds. Left out for everything that is not one: a store is never given
    *  a `sheetCapacity`, which would make it a sheet rack everywhere (CLAUDE.md T29 2.11.1). */
   boardCapacity?: number;
+  /** Glass units a glass rack holds, upright on the hall floor. Left out for everything that is not
+   *  one (CLAUDE.md T32 2.1). */
+  glassCapacity?: number;
   /** Reputation needed to buy. */
   minReputation: number;
   /** Parked for a later stage: shown with a price, buy button disabled. */
@@ -769,11 +779,12 @@ export interface Job {
    *  the lacquer dries: the reason the hall says and the day whose open ends it. Null on every
    *  other job and between the two (CLAUDE.md T28 2.8). */
   curing: TimberStand | null;
-  /** A window's or a door's glass: `none` on every other job, then to order, ordered and in
-   *  (CLAUDE.md T28 2.9). */
-  glass: GlassState;
-  /** The working day the glass ordered for it is in, at that day's open; null until it is ordered. */
-  glassDay: number | null;
+  /** A window's or a door's glass units: what it needs (`glassForJob` of its material), what the
+   *  glass racks hold for it, and what it took off them at its Glazing. Noughts on every job that is
+   *  not timber (CLAUDE.md T32 2.4). */
+  glassUnits: number;
+  glassReserved: number;
+  glassUsed: number;
 }
 
 /** One call from the client: when he rings, and what happened when he did. */
@@ -801,19 +812,17 @@ export interface LineContract {
   windowsMade: number;
   revenue: number;
   materialCost: number;
+  /** The boards and the glass units the stores hold for the windows left in the week in hand, as a
+   *  sheet contract holds the week's sheets; gone with the contract when it ends (CLAUDE.md T32
+   *  2.5). */
+  boardsReserved: number;
+  glassReserved: number;
 }
 
 /** One upgrade of the line, fitted or on its way, and the day it is fitted (CLAUDE.md T30 2.10). */
 export interface LineUpgrade {
   id: string;
   fittedOnDay: number;
-}
-
-/** Glass for the line ordered from the glazier and not yet in: the windows it is for and the day it
- *  comes (CLAUDE.md T31 2.1, 2.2). */
-export interface LineGlassOnTheWay {
-  windows: number;
-  day: number;
 }
 
 /** The minutes of a day the line's contract could have made windows in and did not, by why: no two
@@ -859,8 +868,9 @@ export interface LineSince {
 /** One line's own state, everything of it that is not kit on the floor (CLAUDE.md T30 section 4):
  *  its contract, the day it may be offered again, the minutes into the window in hand, the windows
  *  on module 6's pallet, the full pallets waiting at the gate, and the upgrades. From Turn 31 its
- *  timber and glass, the glass on its way, and its own day book (CLAUDE.md T31 2.1, 2.5). From v93
- *  one record a line, by the line's number, in `GameState.windowLines` (PIOTR, 12.10). */
+ *  own day book (CLAUDE.md T31 2.5). From v93 one record a line, by the line's number, in
+ *  `GameState.windowLines` (PIOTR, 12.10). From v96 it keeps no timber or glass of its own: its
+ *  contract holds them on the company's stores (CLAUDE.md T32 2.5). */
 export interface WindowLineState {
   /** The line's number, 1 for the first bought and one more for each after it: what its modules
    *  carry, what every tile, card, strip line and ledger line names it by, never given twice. */
@@ -872,12 +882,6 @@ export interface WindowLineState {
   onPallet: number;
   palletsAtGate: number;
   upgrades: LineUpgrade[];
-  /** The boards the line holds on the timber stores, on the one counter and held: never free
-   *  stock, never a job's (CLAUDE.md T31 2.1). */
-  boards: number;
-  /** The windows' glass standing at module 6, on no store. */
-  glass: number;
-  glassOnTheWay: LineGlassOnTheWay[];
   /** The day in hand, the calendar days closed (the last 400) and the totals since it first
    *  stood. */
   today: LineDay;
@@ -908,16 +912,11 @@ export interface Delivery {
   arrived: boolean;
   unloaded: boolean;
   bespoke: boolean;
-  /** Sheets that did not fit in the rack and still need a decision. */
+  /** What of the load did not fit on its kind's kit and still needs a decision. */
   overflowSheets: number;
-  /** A load of boards for a timber job, set when it is ordered for one: it goes on a timber store
-   *  and never on a sheet rack. A delivery without the mark is read from its job, so a save's
-   *  deliveries need no lift (CLAUDE.md T29 2.11.2). */
-  boards?: true;
-  /** A load of boards for a line's contract, by the line's number: no job's and never stock,
-   *  unloaded whole onto the timber stores and that line's from then on (CLAUDE.md T31 2.2). No
-   *  save carries it before v92; v92's `true` is lifted to 1 (v93). */
-  line?: number;
+  /** What the load is: sheets for the sheet racks, boards for the timber stores, glass units for the
+   *  glass racks; its count is `sheets` whatever it is (CLAUDE.md T32 2.6) [TUNE: the name]. */
+  material: StockKind;
 }
 
 export type TaskKind =
@@ -1178,10 +1177,17 @@ export interface FinanceState {
   booked: BookedTotals;
 }
 
+/** The three counters of the store, one a kind, each on its own kit, and what of each is in the
+ *  paid store for the night, fetched the next morning (PIOTR, 13.10: "as much storage as we have,
+ *  that much material there should be, like the sheets"; CLAUDE.md T32 2.2). */
 export interface StockState {
   sheets: number;
+  boards: number;
+  glass: number;
   /** Sheets sitting in paid temporary storage, fetched next morning. */
   tempStorageSheets: number;
+  tempStorageBoards: number;
+  tempStorageGlass: number;
 }
 
 /** The covers held and what the property cover is written on (CLAUDE.md T13 3.15). */
@@ -1649,10 +1655,6 @@ export type GameAction =
   | { type: 'END_LINE_CONTRACT'; line: number }
   /** An upgrade of a line bought, fitted ten working days on (CLAUDE.md T30 2.10; v93). */
   | { type: 'BUY_LINE_UPGRADE'; line: number; upgradeId: string }
-  /** A line's timber and its glass ordered for twenty windows, at one click (CLAUDE.md T31 2.2;
-   *  v93). */
-  | { type: 'ORDER_LINE_TIMBER'; line: number }
-  | { type: 'ORDER_LINE_GLASS'; line: number }
   /** Run the clock at 4x until the task the owner is out on is over (CLAUDE.md T8 3.3). */
   | { type: 'SKIP_AHEAD' }
   | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }
@@ -1673,11 +1675,10 @@ export type GameAction =
   | { type: 'BOOT_LAPTOP' }
   /** Buys a job's shortfall at the ad hoc price, for that job (CLAUDE.md T13 3.3). */
   | { type: 'ORDER_FOR_JOB'; jobId: string }
-  /** A window's glass, ordered from the glazier (CLAUDE.md T28 2.9). */
-  | { type: 'ORDER_GLASS'; jobId: string }
-  /** Orders sheets onto the rack: the number the player typed, capped at the free places in it
-   *  (CLAUDE.md T13 3.2, T17 2.20). */
-  | { type: 'RESTOCK'; sheets?: number }
+  /** Orders a kind for stock: the number the player typed, whole, or what fills its free places
+   *  less what of it is on its way when he typed none; the count keeps its field name (CLAUDE.md T13
+   *  3.2, T17 2.20, T24 2.8, T32 2.3). */
+  | { type: 'RESTOCK'; kind: StockKind; sheets?: number }
   /** Gives the client his deposit back and takes the job off the plan (CLAUDE.md T9 3.9). */
   | { type: 'DROP_JOB'; jobId: string }
   | { type: 'BUY_STOCK'; sheets: number }

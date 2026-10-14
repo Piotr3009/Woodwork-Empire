@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { LOW_STOCK_SHEETS } from '../../src/engine/constants';
 import {
-  freeSheets,
+  freeFor,
   laptopHome,
   openTasks,
   stockLines,
@@ -49,7 +49,7 @@ describe('laptopHome', () => {
   it('reads the stock page: the free sheets and the low lines', () => {
     const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 20);
     let home = laptopHome(state);
-    expect(home.sheetsFree).toBe(freeSheets(state));
+    expect(home.sheetsFree).toBe(freeFor(state, 'sheets'));
     expect(home.sheetsFree).toBe(20);
     expect(home.lowLines).toBe(0);
     // Under the low figure the one line of sheets wears the badge, and the count says so.

@@ -5,9 +5,10 @@
 // fits goes on the rack, the rest goes into the temporary store on the same rule a job's own
 // delivery has followed since Turn 20, and the tab says the split and the fee before the click.
 
+import { freeRoomFor } from '../../src/engine/machines';
 import { describe, expect, it } from 'vitest';
 import { TEMP_STORAGE_COST, TEMP_STORAGE_FETCH_MINUTES } from '../../src/engine/constants';
-import { rackCapacity, restockCheck, restockSheets, restockSplit, stockFree } from '../../src/engine/materials';
+import { rackCapacity, restockCheck, restockSheets, restockSplit } from '../../src/engine/materials';
 import { renderMaterials } from '../../src/ui/materials';
 import { money } from '../../src/ui/modal';
 import type { GameState } from '../../src/engine/index';
@@ -24,21 +25,21 @@ function roomForForty(): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 10);
   state.enquiries = [];
   expect(rackCapacity(state)).toBe(50);
-  expect(stockFree(state)).toBe(40);
+  expect(freeRoomFor(state, 'sheets')).toBe(40);
   return state;
 }
 
 describe('a rack with room for forty and an order of sixty', () => {
   it('buys all sixty: the click is not trimmed', () => {
     const state = roomForForty();
-    expect(restockSheets(state, 60)).toBe(60);
-    expect(restockCheck(state, 60)).toMatchObject({ ok: true, sheets: 60 });
-    const bought = act(state, { type: 'RESTOCK', sheets: 60 });
+    expect(restockSheets(state, 'sheets', 60)).toBe(60);
+    expect(restockCheck(state, 'sheets', 60)).toMatchObject({ ok: true, sheets: 60 });
+    const bought = act(state, { type: 'RESTOCK', kind: 'sheets', sheets: 60 });
     expect(bought.deliveries[0]?.sheets).toBe(60);
   });
 
   it('puts forty on the rack and twenty in the store, and charges the store once', () => {
-    let state = act(roomForForty(), { type: 'RESTOCK', sheets: 60 });
+    let state = act(roomForForty(), { type: 'RESTOCK', kind: 'sheets', sheets: 60 });
     state = clearEvents(runToDay(state, 2).state);
     state = doTask(state, 'unload');
     expect(state.stock.sheets).toBe(50);
@@ -54,7 +55,7 @@ describe('a rack with room for forty and an order of sixty', () => {
   });
 
   it('leaves the fetch chore in the morning, and the sheets come back whole', () => {
-    let state = act(roomForForty(), { type: 'RESTOCK', sheets: 60 });
+    let state = act(roomForForty(), { type: 'RESTOCK', kind: 'sheets', sheets: 60 });
     state = doTask(clearEvents(runToDay(state, 2).state), 'unload');
     state = clearEvents(runToDay(state, 3).state);
     const fetch = state.tasks.find((task) => task.kind === 'fetchStorage' && !task.done);
@@ -66,7 +67,7 @@ describe('a rack with room for forty and an order of sixty', () => {
 
   it('says the split and the fee on the tab, before the click', () => {
     const state = roomForForty();
-    const split = restockSplit(state, 60);
+    const split = restockSplit(state, 'sheets', 60);
     expect(split).toEqual({ sheets: 60, onRack: 40, toStorage: 20, storageCost: TEMP_STORAGE_COST });
     const page = parse(renderMaterials(state, '60'));
     const line = page.querySelector('[data-storage="1"]');
@@ -87,7 +88,7 @@ describe('a rack with room for forty and an order of sixty', () => {
 
   it('still fills the rack and no more when the player types nothing', () => {
     const state = roomForForty();
-    expect(restockSheets(state)).toBe(40);
+    expect(restockSheets(state, 'sheets')).toBe(40);
     const page = parse(renderMaterials(state, ''));
     expect(page.querySelector('[data-field="stockSheets"]')?.getAttribute('placeholder')).toBe('40');
     expect(page.querySelector('[data-storage="1"]')).toBeNull();

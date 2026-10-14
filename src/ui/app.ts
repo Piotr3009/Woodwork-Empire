@@ -30,6 +30,7 @@ import type {
   GameState,
   Orientation,
   Speed,
+  StockKind,
   SummaryCadence,
   WorkerRole,
   WorkerTier,
@@ -187,7 +188,11 @@ interface Ui {
   filters: Record<string, string>;
   /** Field to put the caret back in after the next render. */
   focusNext: string | null;
+  /** What the player has typed into each kind's field on the Stock page (CLAUDE.md T17 2.20, T32
+   *  2.7). */
   stockSheets: string;
+  stockBoards: string;
+  stockGlass: string;
   /** What the player has typed into the loan field (CLAUDE.md T13 3.14). */
   loanAmount: string;
   /** Which tab of the Orders page is on top (CLAUDE.md T13 3.16). */
@@ -404,6 +409,8 @@ function freshUi(): Ui {
     filters: { board: '', catalogue: '' },
     focusNext: null,
     stockSheets: '',
+    stockBoards: '',
+    stockGlass: '',
     loanAmount: '10000',
     boardTab: 'enquiries',
     workPlanTab: 'jobs',
@@ -542,6 +549,8 @@ function modalBody(id: ModalId, current: GameState): string {
       return renderLaptop(current, {
         page: ui.laptopPage,
         stockSheets: ui.stockSheets,
+        stockBoards: ui.stockBoards,
+        stockGlass: ui.stockGlass,
         teamTab: ui.teamTab,
         teamTrade: ui.teamTrade,
         tickedTasks: ui.tickedTasks,
@@ -1420,6 +1429,12 @@ function lineOfElement(element: DataElement): number {
   return Number.isInteger(line) && line > 0 ? line : 1;
 }
 
+/** The kind a Restock button carries, the sheets' when it carries none (CLAUDE.md T32 2.3). */
+function stockKindOf(element: DataElement): StockKind {
+  const kind = element.dataset.kind;
+  return kind === 'boards' || kind === 'glass' ? kind : 'sheets';
+}
+
 function handleAction(element: DataElement, point: { x: number; y: number }): void {
   batched(() => runAction(element, point));
 }
@@ -1809,14 +1824,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // T30 2.6; v93).
       dispatch({ type: 'END_LINE_CONTRACT', line: lineOfElement(element) });
       return;
-    case 'orderLineTimber':
-      // Forty boards for a line, one click (CLAUDE.md T31 2.2).
-      dispatch({ type: 'ORDER_LINE_TIMBER', line: lineOfElement(element) });
-      return;
-    case 'orderLineGlass':
-      // Glass for twenty windows, one click (CLAUDE.md T31 2.2).
-      dispatch({ type: 'ORDER_LINE_GLASS', line: lineOfElement(element) });
-      return;
     case 'buyLineUpgrade':
       // An upgrade of a line, paid at the click and fitted ten working days on (CLAUDE.md T30
       // 2.10; v93: the button carries its line).
@@ -1848,16 +1855,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       dispatch({ type: 'SET_WEBSITE_LEVEL', level: Number(id) });
       return;
     case 'restock':
-      // What the player typed into the field, which the button carries (CLAUDE.md T17 2.20).
-      dispatch({ type: 'RESTOCK', sheets: Number(element.dataset.sheets ?? '0') });
+      // What the player typed into the kind's field, which the button carries with its kind
+      // (CLAUDE.md T17 2.20, T32 2.3).
+      dispatch({ type: 'RESTOCK', kind: stockKindOf(element), sheets: Number(element.dataset.sheets ?? '0') });
       return;
     case 'orderForJob':
       dispatch({ type: 'ORDER_FOR_JOB', jobId: id });
-      return;
-    case 'orderGlass':
-      // A window's glass from the glazier: a click of the same kind, no minutes of his day
-      // (CLAUDE.md T28 2.9).
-      dispatch({ type: 'ORDER_GLASS', jobId: id });
       return;
     case 'connectExtraction':
       dispatch({ type: 'CONNECT_EXTRACTION', equipmentId: id });
@@ -2504,8 +2507,8 @@ function runInput(event: Event): void {
   }
   if (field === 'playerName') ui.playerName = target.value;
   if (field === 'companyName') ui.companyName = target.value;
-  if (field === 'stockSheets') {
-    ui.stockSheets = target.value;
+  if (field === 'stockSheets' || field === 'stockBoards' || field === 'stockGlass') {
+    ui[field] = target.value;
     requestRender();
   }
   if (field === 'loanAmount') {

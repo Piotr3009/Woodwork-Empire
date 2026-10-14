@@ -1,6 +1,7 @@
 // The product catalogue: what the workshop can be asked to make, and whether it has the tools.
 
 import {
+  GLASS_RACK_WANTED,
   LOW_REPUTATION_BAND,
   LOW_REPUTATION_PRICE_FACTOR,
   PRICE_ROUNDING,
@@ -48,17 +49,19 @@ export function missingEquipment(state: GameState, entry: ProductTemplate): stri
  *  2.6). The one copy of the list: the tile's `Needs` line prints it whole, owned or not, and the
  *  lock asks it of the hall (CLAUDE.md T29 2.5.4). */
 export function wantedKit(entry: ProductTemplate): string[] {
-  // A window or a door asks for a timber store as it asks for a machine, last of the list
-  // (CLAUDE.md T29 2.11.3).
+  // A window or a door asks for a timber store as it asks for a machine (CLAUDE.md T29 2.11.3),
+  // and a glass rack after it, last of the list (CLAUDE.md T32 2.1) [TUNE: chat].
   return entry.cutters === null
     ? entry.requiredEquipment
-    : [...entry.requiredEquipment, entry.cutters, TIMBER_STORE_WANTED];
+    : [...entry.requiredEquipment, entry.cutters, TIMBER_STORE_WANTED, GLASS_RACK_WANTED];
 }
 
-/** A wanted thing as the board names it: the catalogue's name, and `timber store` for the store,
- *  which either family satisfies (CLAUDE.md T29 2.11.3). */
+/** A wanted thing as the board names it: the catalogue's name, `timber store` for the store and
+ *  `glass rack` for the glass rack, which either family of each satisfies (CLAUDE.md T29 2.11.3,
+ *  T32 2.1). */
 export function wantedName(specId: string): string {
   if (specId === TIMBER_STORE_WANTED) return 'timber store';
+  if (specId === GLASS_RACK_WANTED) return 'glass rack';
   return findSpec(specId)?.name ?? specId;
 }
 

@@ -28,7 +28,7 @@ import { LOAN_FLOOR, PRODUCT_TEMPLATES } from '../../src/engine/constants';
 import {
   MONTH_LINES,
   efficiencyOf,
-  freeSheets,
+  freeFor,
   houseTierFor,
   isLastWorkingDayOfMonth,
   hiringOptions,
@@ -104,9 +104,9 @@ const PLAYTHROUGH: Policy = {
     // takes a number [TUNE].
     if (
       next.contracts.some((contract) => contract.status === 'active') &&
-      freeSheets(next) < RESTOCK_WHEN_UNDER
+      freeFor(next, 'sheets') < RESTOCK_WHEN_UNDER
     ) {
-      next = act(next, { type: 'RESTOCK', sheets: RESTOCK_SHEETS });
+      next = act(next, { type: 'RESTOCK', kind: 'sheets', sheets: RESTOCK_SHEETS });
     }
     // (tt) The agency on from month 2: asked for every working morning until it is on
     // (CLAUDE.md T26 2.13). It is taken on from a standing of 50.

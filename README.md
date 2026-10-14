@@ -12,8 +12,8 @@ archived in `docs`: `docs/turn-1-brief.md`, `docs/turn-2-brief.md`, `docs/turn-3
 `docs/turn-19-brief.md`, `docs/turn-20-brief.md`, `docs/turn-21-brief.md`,
 `docs/turn-22-brief.md`, `docs/turn-23-brief.md`, `docs/turn-24-brief.md`,
 `docs/turn-25-brief.md`, `docs/turn-26-brief.md`, `docs/turn-27-brief.md`,
-`docs/turn-28-brief.md`, `docs/turn-29-brief.md` and `docs/turn-30-brief.md`. The build reports
-are `REPORT-T1.md` to `REPORT-T31.md`.
+`docs/turn-28-brief.md`, `docs/turn-29-brief.md`, `docs/turn-30-brief.md` and
+`docs/turn-31-brief.md`. The build reports are `REPORT-T1.md` to `REPORT-T32.md`.
 
 The sprite contract between the art side and the game is `docs/art/SPRITES.md`; the art Turn 13
 asks for is listed in `docs/art/REQUESTS-T13.md`, the art Turn 14 asks for in
@@ -22,8 +22,9 @@ asks for is listed in `docs/art/REQUESTS-T13.md`, the art Turn 14 asks for in
 `docs/art/REQUESTS-T20.md`, Turn 21's in `docs/art/REQUESTS-T21.md`, Turn 22's in
 `docs/art/REQUESTS-T22.md`, Turn 23's in `docs/art/REQUESTS-T23.md`, Turn 25's in
 `docs/art/REQUESTS-T25.md`, Turn 26's in `docs/art/REQUESTS-T26.md`, Turn 28's in
-`docs/art/REQUESTS-T28.md`, Turn 29's in `docs/art/REQUESTS-T29.md` and Turn 30's in
-`docs/art/REQUESTS-T30.md` (Turns 24 and 27 asked for none).
+`docs/art/REQUESTS-T28.md`, Turn 29's in `docs/art/REQUESTS-T29.md`, Turn 30's in
+`docs/art/REQUESTS-T30.md`, Turn 31's in `docs/art/REQUESTS-T31.md` and Turn 32's in
+`docs/art/REQUESTS-T32.md` (Turns 24 and 27 asked for none).
 
 ## Requirements
 

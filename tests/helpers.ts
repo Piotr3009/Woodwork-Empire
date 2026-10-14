@@ -24,6 +24,7 @@ import {
   unconnectedMachines,
 } from '../src/engine/index';
 import { connectExtraction } from '../src/engine/pipes';
+import { firstFreeCell } from '../src/engine/layout';
 import type {
   Enquiry,
   Equipment,
@@ -364,6 +365,13 @@ export function placeEquipment(
     });
   }
   return item;
+}
+
+/** A glass rack stood on the first cell of the hall it fits on, free, for a test whose window or
+ *  door wants one on the board from Turn 32 as it wants a timber store (CLAUDE.md T32 2.1). */
+export function placeGlassRack(state: GameState, specId = 'glassRack'): Equipment {
+  const cell = firstFreeCell(state, specId);
+  return placeEquipment(state, specId, { x: cell?.x ?? 0, y: cell?.y ?? 0, id: `kit-${specId}` });
 }
 
 /** Extraction enough for whatever this hall is running, for a test that is about something else.

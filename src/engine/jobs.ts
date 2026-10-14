@@ -55,7 +55,7 @@ import {
   nextWorkingDay,
   workingDaysBetween,
 } from './clock';
-import { canAfford, chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
+import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
   OWNER,
@@ -67,12 +67,16 @@ import {
 import {
   boardsCostOf,
   boardsForJob,
+  glassAtHand,
   glassCostOf,
+  glassForJob,
+  glassShortfallOf,
+  jobStockKind,
   materialCostFor,
   orderForJob,
-  orderGlass,
   rackCanSupply,
   releaseReservation,
+  reserveGlassFor,
   reserveSheetsFor,
   sheetsDueFor,
   shortfallOf,
@@ -434,8 +438,9 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
   const price = enquiry.offer ?? enquiry.price;
   const materialCost = materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial);
   const labourValue = labourValueFor(enquiry.basePrice);
-  // A window's or a door's material is boards and glass: the boards are ordered and racked as any
-  // timber is, the glass is ordered from the glazier on its own (CLAUDE.md T28 2.9).
+  // A window's or a door's material is boards and glass, each off its own kit as a sheet job's
+  // sheets are off the racks: the boards off the timber stores, the glass units off the glass racks
+  // (CLAUDE.md T28 2.9, T32 2.4).
   const timber = entry.cutters !== null;
   const job: Job = {
     id: makeId(state, 'job'),
@@ -492,8 +497,11 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     rating: null,
     overdueWarned: false,
     curing: null,
-    glass: timber ? 'toOrder' : 'none',
-    glassDay: null,
+    // Its glass units, out of its glass share at a unit's price; noughts on a sheet job (CLAUDE.md
+    // T32 2.4).
+    glassUnits: glassForJob(materialCost, timber),
+    glassReserved: 0,
+    glassUsed: 0,
   };
   state.jobs.push(job);
   removeEnquiry(state, enquiryId);
@@ -503,8 +511,10 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
   const deposit = Math.round(job.price * DEPOSIT_FRACTION * 100) / 100;
   job.depositPaid = deposit;
   receive(state, 'jobDeposit', `Deposit for ${job.name}`, deposit);
-  // Reserved from the free stock at once; what it could not have is its shortfall (T13 3.3).
+  // Reserved from the free stock at once, a window's boards and glass as a sheet job's sheets; what
+  // it could not have is its shortfall (T13 3.3, T32 2.4).
   reserveSheetsFor(state, job);
+  reserveGlassFor(state, job);
   createJobTasks(state, job);
   return { ok: true, reason: '', job };
 }
@@ -621,8 +631,9 @@ export function refreshJob(state: GameState, job: Job): void {
     job.stage = 'accepted';
     return;
   }
-  // Anything free that has come onto the rack since it was taken is held for it now.
+  // Anything free that has come onto the stores since it was taken is held for it now.
   reserveSheetsFor(state, job);
+  reserveGlassFor(state, job);
   if (shortfallOf(job) === 0) {
     // A big job takes the joiners who are free this minute, as many as it wants, and goes into
     // production with them (CLAUDE.md T26 2.13; v65); with nobody free, and for every other job,
@@ -631,8 +642,16 @@ export function refreshJob(state: GameState, job: Job): void {
     job.stage = job.assignees.length > 0 ? 'inProduction' : 'ready';
     return;
   }
-  const coming = state.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded);
-  job.stage = coming ? 'materialOrdered' : 'materialPending';
+  // A window's two loads may come apart: one at the gate while the other is still on the road says
+  // the road, and all of them at the gate says the gate (CLAUDE.md T32 2.4) [TUNE]. A sheet job's
+  // one load says what it always said.
+  const loads = state.deliveries.filter((delivery) => delivery.jobId === job.id && !delivery.unloaded);
+  job.stage =
+    loads.length === 0
+      ? 'materialPending'
+      : job.timber === true && loads.every((delivery) => delivery.arrived)
+        ? 'materialInYard'
+        : 'materialOrdered';
   // The drawings are done and the job is short of sheets: the office orders them itself
   // (CLAUDE.md T21 2.5.2).
   if (job.stage === 'materialPending') autoOrderMaterial(state, job);
@@ -655,39 +674,13 @@ export const MATERIAL_ORDER_ROLES: ReadonlyArray<WorkerRole> = ['officeAdmin'];
  *  and the job's card asks the owner exactly as it always did. */
 export function autoOrderMaterial(state: GameState, job: Job): boolean {
   if (takeOffOutstanding(state, job)) return false;
-  if (shortfallOf(job) <= 0) return false;
   if (!orderForJobCheck(state, job).ok) return false;
   const admin = firstOnDutyOf(state, MATERIAL_ORDER_ROLES);
   if (admin === null) return false;
-  if (orderForJob(state, job, admin.name) === null) return false;
-  job.stage = 'materialOrdered';
-  // And a window's glass with its boards, the moment she orders them (CLAUDE.md T28 2.9).
-  if (paperworkDone(state, job)) orderGlass(state, job, admin.name);
+  // A window's boards and its glass in the one order, both lines with her name (CLAUDE.md T32 2.4).
+  if (orderForJob(state, job, admin.name).length === 0) return false;
+  if (job.stage === 'materialPending') job.stage = 'materialOrdered';
   return true;
-}
-
-/** Why a window's glass cannot be ordered now, or that it can: it has to be a job with glass to
- *  order, its paperwork done, because the glazier makes it to the drawing's sizes, and the money
- *  there for it (CLAUDE.md T28 2.9). The card asks this before it draws the button and the action
- *  asks it again. */
-export function orderGlassCheck(state: GameState, job: Job): { ok: boolean; reason: string } {
-  if (job.glass === 'none') return { ok: false, reason: 'No glass in this job' };
-  if (job.glass !== 'toOrder') return { ok: false, reason: 'Ordered already' };
-  // The piece of the paperwork still to do, named, so the button never says the drawing is not
-  // finished on the day the strip says it is.
-  if (designOutstanding(state, job)) return { ok: false, reason: 'The drawing is not finished' };
-  if (measureOutstanding(state, job)) return { ok: false, reason: 'The site measure is not done' };
-  if (takeOffOutstanding(state, job)) return { ok: false, reason: 'The material list is not made' };
-  if (!canAfford(state, glassCostOf(job))) return { ok: false, reason: 'Not enough cash' };
-  return { ok: true, reason: '' };
-}
-
-/** The owner's click on the job card: the glass ordered, no minutes of his day (CLAUDE.md T28
- *  2.9). */
-export function orderGlassFor(state: GameState, jobId: string): boolean {
-  const job = findJob(state, jobId);
-  if (job === null || !orderGlassCheck(state, job).ok) return false;
-  return orderGlass(state, job);
 }
 
 /** The site measure costs a taxi while there is no van (CLAUDE.md 8.10), and with one it is a
@@ -798,9 +791,10 @@ export function onTakeOffDone(state: GameState, job: Job): void {
   refreshJob(state, job);
 }
 
-/** Why the shortfall cannot be ordered for this job, or that it can (CLAUDE.md T13 3.3). */
+/** Why the shortfall cannot be ordered for this job, or that it can: a window's boards and glass
+ *  are short together or apart, and either is ordered by the one click (CLAUDE.md T13 3.3, T32 2.4). */
 export function orderForJobCheck(state: GameState, job: Job): { ok: boolean; reason: string } {
-  if (shortfallOf(job) <= 0) return { ok: false, reason: 'Nothing short' };
+  if (shortfallOf(job) <= 0 && glassShortfallOf(job) <= 0) return { ok: false, reason: 'Nothing short' };
   if (state.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded)) {
     return { ok: false, reason: 'On its way already' };
   }
@@ -813,8 +807,7 @@ export function orderShortfall(state: GameState, jobId: string): boolean {
   const job = findJob(state, jobId);
   if (!job) return false;
   if (!orderForJobCheck(state, job).ok) return false;
-  const delivery = orderForJob(state, job);
-  if (delivery === null) return false;
+  if (orderForJob(state, job).length === 0) return false;
   if (job.stage === 'materialPending') job.stage = 'materialOrdered';
   return true;
 }
@@ -841,12 +834,12 @@ export function onDeliveryUnloaded(state: GameState, jobId: string | null): void
 export function refreshMaterial(state: GameState): void {
   for (const job of state.jobs) {
     if (job.stage === 'materialPending') refreshJob(state, job);
-    // A window's glass still to order once the boards are on their way or in: the admin on duty
-    // orders it as she would have with them, when the money is there (CLAUDE.md T28 2.9).
-    if (job.glass === 'toOrder' && job.stage !== 'completed' && paperworkDone(state, job)) {
-      const admin = firstOnDutyOf(state, MATERIAL_ORDER_ROLES);
-      if (admin !== null) orderGlass(state, job, admin.name);
-    }
+    // A window short of its glass alone, its boards in hand: it holds what free glass the racks have
+    // first, and the admin on duty orders the rest as she orders a shortfall, when the money is there
+    // (CLAUDE.md T32 2.4).
+    if (job.stage === 'completed' || job.stage === 'awaitingTransport' || glassShortfallOf(job) <= 0) continue;
+    reserveGlassFor(state, job);
+    if (glassShortfallOf(job) > 0 && paperworkDone(state, job)) autoOrderMaterial(state, job);
   }
 }
 
@@ -868,41 +861,28 @@ export function dropReputationCost(job: { price: number; kind: EnquiryKind }): n
 /** Drops the project. The client has his deposit back, the job is off the plan, the material it
  *  drew from the rack goes back on it and the material that was ordered in for it is written off,
  *  and the company loses what `dropReputationCost` says at once (PIOTR, 13.09: "drastically";
- *  CLAUDE.md T9 3.9, T21 2.4). */
+ *  CLAUDE.md T9 3.9, T21 2.4). A window's boards and glass are dealt with exactly so, each on its
+ *  own counter (CLAUDE.md T32 2.4): the one rule `droppedMaterial` reads, which the drop card reads
+ *  too. */
 export function dropJob(state: GameState, jobId: string): boolean {
   const job = findJob(state, jobId);
   if (!job) return false;
   if (job.stage === 'completed') return false;
   // The deposit goes back whatever the state of the bank: the client is owed it (CLAUDE.md 8.3).
   chargeUnavoidable(state, 'jobDeposit', `Deposit returned: ${job.name}`, job.depositPaid);
-  // What the bench has not cut yet: that is what is left of the material to do anything with. A
-  // job nobody has started has cut nothing, whatever the sheet in hand rule says of one that is
-  // under way (CLAUDE.md T2 3.6).
-  const done = jobProgress(job);
-  const cut = done <= 0 ? 0 : sheetsDueFor(job, done);
-  const left = Math.max(0, job.sheetsUsed - cut);
-  // Ordered in for this job and this job only: the money is gone with it. A job whose material
-  // was never ordered has nothing to write off, whatever mode it was set to.
-  const orderedIn = state.deliveries.some((delivery) => delivery.jobId === job.id);
-  if (orderedIn) {
-    noteLoss(state, 'material', `Material written off: ${job.name}`, boardsCostOf(job.materialCost, job.timber === true));
-  } else {
-    state.stock.sheets += left;
-  }
-  // A window's glass, ordered for it and made to its sizes, is lost with it (CLAUDE.md T28 2.9).
-  if (job.glass === 'ordered' || job.glass === 'in') {
-    noteLoss(state, 'material', `Glass written off: ${job.name}`, glassCostOf(job));
-  }
+  const material = droppedMaterial(state, job);
+  if (material.writtenOff > 0) noteLoss(state, 'material', `Material written off: ${job.name}`, material.writtenOff);
+  state.stock[jobStockKind(job)] += material.back;
   job.sheetsUsed = 0;
-  // A window's boards are written off and leave the workshop with it: off the counter, and every
-  // load of them not yet unloaded, on the road or at the gate, goes with its unloading task (the
-  // tasks of the job go below). They were never free sheets (CLAUDE.md T29 2.11.2).
-  if (job.timber === true) {
-    state.stock.sheets = Math.max(0, state.stock.sheets - job.sheetsReserved);
-    state.deliveries = state.deliveries.filter((delivery) => delivery.jobId !== job.id || delivery.unloaded);
-  }
-  // What it held goes back to the free stock (CLAUDE.md T13 3.3).
+  // What it held goes back to the free stock, each kind on its own counter (CLAUDE.md T13 3.3, T32
+  // 2.4).
   releaseReservation(job);
+  // A load of it at the gate is still a load: its unloading stays on the list, for stock, as a load
+  // still on the road lands when it comes. Two loads to a window from Turn 32 made a load left at the
+  // gate with no unloading likely, for every kind alike (CLAUDE.md T32 2.6) [TUNE].
+  for (const task of state.tasks) {
+    if (task.jobId === job.id && task.kind === 'unload' && task.deliveryId !== null) task.jobId = null;
+  }
   // Nobody is left standing on a job that is not there any more.
   const dropped = new Set(jobTasks(state, job.id).map((task) => task.id));
   state.tasks = state.tasks.filter((task) => task.jobId !== job.id);
@@ -924,6 +904,28 @@ export function dropJob(state: GameState, jobId: string): boolean {
 // ---------------------------------------------------------------------------
 // Production
 // ---------------------------------------------------------------------------
+
+/** What a drop does with a job's material, each kind by the sheets' rule (CLAUDE.md T9 3.9, T32
+ *  2.4): what it took off its stores and the bench has not cut yet goes back on them, free, and what
+ *  was ordered in for it is written off at what that kind of its material is worth, the boards' or
+ *  sheets' share and the glass's apart; a kind whose material was never ordered for it has nothing
+ *  to write off, whatever mode it was set to. A window's glass is taken whole at its Glazing and is
+ *  in the window from then on, so none of it goes back (CLAUDE.md T32 2.4). What it holds goes back
+ *  free with the release. The drop itself and its card read this one answer. */
+export function droppedMaterial(state: GameState, job: Job): { writtenOff: number; back: number } {
+  // What the bench has not cut yet: that is what is left of the material to do anything with. A
+  // job nobody has started has cut nothing, whatever the sheet in hand rule says of one that is
+  // under way (CLAUDE.md T2 3.6).
+  const done = jobProgress(job);
+  const cut = done <= 0 ? 0 : sheetsDueFor(job, done);
+  const left = Math.max(0, job.sheetsUsed - cut);
+  const ordered = (glass: boolean): boolean =>
+    state.deliveries.some((delivery) => delivery.jobId === job.id && (delivery.material === 'glass') === glass);
+  const sheetsIn = ordered(false);
+  const writtenOff =
+    (sheetsIn ? boardsCostOf(job.materialCost, job.timber === true) : 0) + (ordered(true) ? glassCostOf(job) : 0);
+  return { writtenOff: Math.round(writtenOff * 100) / 100, back: sheetsIn ? 0 : left };
+}
 
 /** What the hall says while it has no workbench in it at all: nothing is made without one, by
  *  hand or not (CLAUDE.md T4 3.4). */
@@ -950,8 +952,11 @@ export function hallStops(state: GameState, job: Job): string {
   if (job.finish === 'lacquer' && currentStage(state, job)?.id === 'finishing' && !has(state, 'sprayBooth')) {
     return 'no spray booth';
   }
-  // A window at its Glazing with the glass not in: a stop of the same kind (CLAUDE.md T28 2.9).
-  if (job.glass !== undefined && job.glass !== 'none' && job.glass !== 'in' && currentStage(state, job)?.id === 'assembly') {
+  // A window at its Glazing that the glass racks cannot give its whole glass: a stop of the same
+  // kind, until it can (CLAUDE.md T28 2.9, T32 2.4). Holding it is not having it: what a window
+  // holds may lie in the paid store until the morning's fetch, so the racks are always asked.
+  const owed = job.glassUnits - job.glassUsed;
+  if (job.timber === true && owed > 0 && !glassAtHand(state, job) && currentStage(state, job)?.id === 'assembly') {
     return WAITING_FOR_GLASS;
   }
   return '';

@@ -49,7 +49,7 @@ describe('every action has a handler', () => {
     const jobId = 'nothing';
     const actions: GameAction[] = [
       { type: 'ORDER_FOR_JOB', jobId },
-      { type: 'RESTOCK' },
+      { type: 'RESTOCK', kind: 'sheets' },
       { type: 'TAKE_LOAN', amount: 1000 },
       { type: 'REPAY_LOAN', amount: null },
       { type: 'SET_INSURANCE', cover: 'property', on: true },

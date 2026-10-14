@@ -360,9 +360,11 @@ function pageHead(page: Exclude<LaptopPage, 'home'>): string {
 
 export interface LaptopView {
   page: LaptopPage;
-  /** What the player has typed into the sheet count on the Stock page. Read by nothing since
-   *  Turn 13 (REPORT-T13 section 10); the page has no free form order any more. */
+  /** What the player has typed into the sheets' count on the Stock page, which its Restock buys
+   *  (CLAUDE.md T17 2.20), and from Turn 32 into the boards' and the glass's (CLAUDE.md T32 2.7). */
   stockSheets: string;
+  stockBoards?: string;
+  stockGlass?: string;
   /** Which of the Team's tabs is on top (CLAUDE.md T10 3.6, T15 2.3, T17 2.9). */
   teamTab: TeamTab;
   /** Which trade's people Our team lists under its tiles: the joiners when a caller names none
@@ -379,7 +381,7 @@ function pageBody(state: GameState, page: Exclude<LaptopPage, 'home'>, view: Lap
     case 'tasks':
       return tasksPage(state, view.tickedTasks);
     case 'stock':
-      return renderMaterials(state, view.stockSheets);
+      return renderMaterials(state, view.stockSheets, view.stockBoards ?? '', view.stockGlass ?? '');
     case 'drawings':
       return renderDrawings(state);
     case 'team':

@@ -29,9 +29,8 @@ import {
 } from './constants';
 import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
-import { paperworkDone, takeOffOutstanding } from './jobs';
-import { bagStore, boardRoom, findSpec, lineEngineersOnDuty, lineLevel, lineModules, lineNumbers, standingLines } from './machines';
-import { canUnload, isBoards } from './materials';
+import { takeOffOutstanding } from './jobs';
+import { bagStore, findSpec, lineEngineersOnDuty, lineLevel, lineModules, lineNumbers, standingLines } from './machines';
 import { lineShortOf, runningLineContract } from './lineContract';
 import { andList, inASentence, inWords } from './text';
 import { inTheWayAt, laneTarget, laneTrouble, linePlace, standingInTheWay } from './layout';
@@ -57,11 +56,6 @@ export type WarningKey =
   | 'deadlineAtRisk'
   /** The drawing is finished and the material list is the next thing to do (PIOTR, 03.10; v78). */
   | 'drawingDone'
-  /** A window's paperwork is done and its glass is still to order (CLAUDE.md T28 2.9). */
-  | 'glassNotOrdered'
-  /** A load of boards stands at the gate for want of room on the timber stores (CLAUDE.md T29
-   *  2.11.2). */
-  | 'boardsAtTheGate'
   /** Kit stands on the forklift's lane, or the line stands where its lane cannot be (CLAUDE.md T31
    *  2.6). */
   | 'laneBlocked'
@@ -106,13 +100,8 @@ export const WARNING_ORDER: readonly WarningKey[] = [
   // can be ordered for it until the list is made, where the lines below can stand for weeks and
   // would keep this one from ever being read (v78).
   'drawingDone',
-  // Directly under it: the glass is not ordered and production reaches the Glazing without it
-  // (CLAUDE.md T28 2.9, the glass a day from T29 2.1) [TUNE].
-  'glassNotOrdered',
-  // Directly under it: a window's boards at the gate with nowhere to go, which stops the job as
-  // the glass does (CLAUDE.md T29 2.11.2) [TUNE].
-  'boardsAtTheGate',
-  // Directly under it: the lane the line's pallets go out by is blocked (CLAUDE.md T31 2.6) [TUNE].
+  // Under the drawing's line from Turn 32, where the boards at the gate stood: the lane the line's
+  // pallets go out by is blocked (CLAUDE.md T31 2.6, T32 2.8) [TUNE].
   'laneBlocked',
   'noInsurance',
   'belowZero',
@@ -220,32 +209,6 @@ function drawingDoneWarning(state: GameState): Warning | null {
     key: 'drawingDone',
     text: `${waiting.name}: the drawing is done. Now make the material list and order the material.`,
   };
-}
-
-/** A window or a door whose paperwork is done and whose glass is still to order, the first of them
- *  by name (CLAUDE.md T28 2.9). Said with an admin on the books too: she orders it with the boards,
- *  and a line that stays up says she could not. */
-function glassNotOrderedWarning(state: GameState): Warning | null {
-  const waiting = state.jobs.find(
-    (job) => job.glass === 'toOrder' && job.stage !== 'completed' && paperworkDone(state, job),
-  );
-  if (waiting === undefined) return null;
-  return { key: 'glassNotOrdered', text: `Glass not ordered: ${waiting.name}` };
-}
-
-/** A load of boards at the gate that cannot come in, named by its job: no timber store at all, or
- *  no room on the stores for the whole of it (CLAUDE.md T29 2.11.2). */
-function boardsAtTheGateWarning(state: GameState): Warning | null {
-  const waiting = state.deliveries.find(
-    (delivery) => delivery.arrived && !delivery.unloaded && isBoards(state, delivery) && !canUnload(state, delivery),
-  );
-  if (waiting === undefined) return null;
-  const job = state.jobs.find((entry) => entry.id === waiting.jobId);
-  // A line's own load names the line where a job's names the job (CLAUDE.md T31 2.2; v93).
-  const name = waiting.line !== undefined ? `${lineName(waiting.line).toLowerCase()}'s timber` : (job?.name ?? 'a job');
-  return boardRoom(state) <= 0
-    ? { key: 'boardsAtTheGate', text: `Boards at the gate, no timber store: ${name}` }
-    : { key: 'boardsAtTheGate', text: `Boards at the gate, no room on the stores: ${name}` };
 }
 
 /** A line stands on its contract with both engineers on duty, for want of a window's timber or
@@ -419,8 +382,6 @@ const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   lineNeedsMaterial: lineNeedsMaterialWarning,
   deadlineAtRisk: deadlineWarning,
   drawingDone: drawingDoneWarning,
-  glassNotOrdered: glassNotOrderedWarning,
-  boardsAtTheGate: boardsAtTheGateWarning,
   laneBlocked: laneBlockedWarning,
   noInsurance: noInsuranceWarning,
   belowZero: belowZeroWarning,

@@ -241,6 +241,7 @@ describe('a delivery at the gate (CLAUDE.md T13 3.21)', () => {
       unloaded: false,
       bespoke: false,
       overflowSheets: 0,
+      material: 'sheets' as const,
     });
     const svg = renderHall(state, { files: [] });
     // As what it is: the pallet, through the one placeholder helper, and no lorry.

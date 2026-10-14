@@ -59,6 +59,8 @@ function withLine(at = { x: 2, y: 14 }): GameState {
     windowsMade: 0,
     revenue: 0,
     materialCost: 0,
+    boardsReserved: 0,
+    glassReserved: 0,
   };
   state.speed = 1;
   state.activeEvent = null;

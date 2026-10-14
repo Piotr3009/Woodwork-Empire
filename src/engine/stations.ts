@@ -7,6 +7,7 @@ import {
   GATE_LAYOUT,
   PALLET_LAYOUT,
   SHEETS_PER_TRIP,
+  STARTING_LAYOUT,
   WELFARE_IN_THE_CANTEEN,
   type RoomId,
   roomDoorCell,
@@ -15,18 +16,16 @@ import { isBreak } from './clock';
 import {
   OWNER,
   SPRAY_BOOTH,
-  boardCapacityOf,
-  boardsStrandedBySale,
+  capacityOf,
   isSold,
   itemStandsInTheHall,
   placesOf,
-  sheetCapacityOf,
-  sheetsStrandedBySale,
+  stockKindOf,
+  stockStrandedBySale,
+  stockWords,
 } from './machines';
-import { isBoards } from './materials';
-import { plural } from './text';
 import type { Cell } from './pipes';
-import type { Equipment, GameState, TaskInstance } from './types';
+import type { Equipment, GameState, StockKind, TaskInstance } from './types';
 import { covers, footprintCells, isFree, isWalkable } from './walk';
 
 export const STATION_BENCH = 'bench';
@@ -34,6 +33,9 @@ export const STATION_RACK = 'rack';
 /** The first timber rack on the hall floor, where the man unloading boards walks to (CLAUDE.md
  *  T29 2.11.2). */
 export const STATION_TIMBER_RACK = 'timberRack';
+/** The first glass rack of either family on the hall floor, where the man unloading glass walks
+ *  to (CLAUDE.md T32 2.6) [TUNE]. */
+export const STATION_GLASS_RACK = 'glassRack';
 export const STATION_GATE = 'gate';
 export const STATION_OFFICE = 'office';
 /** At the desk with the phone in his hand. The same cell as the office: what it says is which
@@ -96,21 +98,39 @@ export function unloadStation(task: TaskInstance, sheets: number, far: string = 
 
 /** The far end of an unloading's walk: the sheet rack for a load of sheets, the first timber rack
  *  on the floor for a load of boards, and the gate itself for boards with only a shelter, since
- *  nobody is walked out of the hall to it (CLAUDE.md T29 2.11.2; behind the wall from T31 2.8). */
+ *  nobody is walked out of the hall to it (CLAUDE.md T29 2.11.2; behind the wall from T31 2.8); the
+ *  first glass rack of either family for a load of glass (CLAUDE.md T32 2.6) [TUNE]. */
 export function unloadFarStation(state: GameState, task: TaskInstance): string {
   const delivery = task.deliveryId === null ? null : state.deliveries.find((entry) => entry.id === task.deliveryId);
-  if (!delivery || !isBoards(state, delivery)) return STATION_RACK;
-  return firstTimberRack(state) === null ? STATION_GATE : STATION_TIMBER_RACK;
+  if (!delivery || delivery.material === 'sheets') return STATION_RACK;
+  if (delivery.material === 'glass') return firstStoreOf(state, 'glass') === null ? STATION_GATE : STATION_GLASS_RACK;
+  return firstStoreOf(state, 'boards') === null ? STATION_GATE : STATION_TIMBER_RACK;
 }
 
-/** The first timber rack standing on the hall floor, or null. */
-export function firstTimberRack(state: GameState): Equipment | null {
+/** The first rack of a kind standing on the hall floor, or null: the first sheet rack, the first
+ *  timber rack (the shelter stands behind the rear wall and nobody is walked out to it), the first
+ *  glass rack of either family. The one question for the three kinds (CLAUDE.md T29 2.11.2, T32 2.1,
+ *  2.6). */
+export function firstStoreOf(state: GameState, kind: StockKind): Equipment | null {
   return (
     state.equipment.find(
-      (entry) => entry.specId === 'timberRack' && !isSold(entry) && itemStandsInTheHall(entry),
+      (entry) =>
+        capacityOf(entry, kind) > 0 &&
+        !isSold(entry) &&
+        itemStandsInTheHall(entry) &&
+        STARTING_LAYOUT[entry.specId]?.rear !== true,
     ) ?? null
   );
 }
+
+/** Where the man who stands at a kind's kit stands: the sheet rack, the first timber rack, the
+ *  first glass rack (CLAUDE.md T20 2.10, T29 2.11.2, T32 2.1). */
+export const STATION_OF_KIND: Record<StockKind, string> = {
+  sheets: STATION_RACK,
+  boards: STATION_TIMBER_RACK,
+  glass: STATION_GLASS_RACK,
+};
+
 
 /** The two rooms a man walks into and is off the hall's drawing while he is in: the office he does
  *  his desk work in and the canteen he takes his dinner in (PIOTR, 18.09 and 19.09; CLAUDE.md T20
@@ -192,21 +212,16 @@ export function somebodyAtTheRack(state: GameState, station: string = STATION_RA
   return state.workers.some((worker) => worker.station === station);
 }
 
-/** Why a rack cannot be sold yet, or an empty string. The one sentence: the button on the Owned
- *  tab prints it and the engine's own refusal reads it (CLAUDE.md T20 2.10). Anything that holds
- *  no sheets, a tool cabinet or a machine, is nothing to do with it. */
+/** Why a rack, a timber store or a glass rack cannot be sold yet, or an empty string. The one
+ *  sentence: the button on the Owned tab prints it and the engine's own refusal reads it
+ *  (CLAUDE.md T20 2.10). Each in its kind's own words and by the one rule (CLAUDE.md T29 2.11.2,
+ *  T32 2.1). Anything that keeps nothing, a tool cabinet or a machine, is nothing to do with it. */
 export function storageSaleBlock(state: GameState, item: Equipment): string {
-  // A timber store with boards on it is not sold, in the rack's own words (CLAUDE.md T29 2.11.2).
-  if (boardCapacityOf(item) > 0) {
-    const boards = boardsStrandedBySale(state, item);
-    if (boards > 0) return `Empty it first, ${plural(boards, 'board', 'boards')} on it`;
-    if (somebodyAtTheRack(state, STATION_TIMBER_RACK)) return 'Somebody is standing at it';
-    return '';
-  }
-  if (sheetCapacityOf(item) <= 0) return '';
-  const stranded = sheetsStrandedBySale(state, item);
-  if (stranded > 0) return `Empty it first, ${plural(stranded, 'sheet', 'sheets')} on it`;
-  if (somebodyAtTheRack(state)) return 'Somebody is standing at it';
+  const kind = stockKindOf(item);
+  if (kind === null) return '';
+  const stranded = stockStrandedBySale(state, item);
+  if (stranded > 0) return `Empty it first, ${stockWords(kind, stranded)} on it`;
+  if (somebodyAtTheRack(state, STATION_OF_KIND[kind])) return 'Somebody is standing at it';
   return '';
 }
 
@@ -391,6 +406,9 @@ export const STATION_TABLE: Record<string, StationRow> = {
   sheetRack: { operator: 'freeSide', second: null },
   // The timber rack is stood at the way every rack is (CLAUDE.md T29 2.11.2).
   timberRack: { operator: 'freeSide', second: null },
+  // And the two glass racks (CLAUDE.md T32 2.1).
+  glassRack: { operator: 'freeSide', second: null },
+  glassRackLarge: { operator: 'freeSide', second: null },
   // The high capacity rack is stood at the way every rack is (v69).
   sheetRackHigh: { operator: 'freeSide', second: null },
   extractor: { operator: 'freeSide', second: null },

@@ -73,6 +73,7 @@ function theDay(): { atTen: GameState; evening: GameState } {
     unloaded: false,
     bespoke: false,
     overflowSheets: 0,
+    material: 'sheets' as const,
   });
   // The morning the lorry lands: 08:00, the pallet at the gate and the unloading on the list.
   state = clearEvents(nextDay(state));

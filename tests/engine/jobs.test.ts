@@ -31,7 +31,7 @@ import {
 } from '../../src/engine/jobs';
 import { stagePlanFor } from '../../src/engine/stages';
 import {
-  freeSheets,
+  freeFor,
   materialCostFor,
   sheetPriceFor,
   sheetsForCost,
@@ -229,7 +229,7 @@ describe('the order of the lifecycle', () => {
   it('holds the sheets from the free stock at accept, and orders a shortfall for the job', () => {
     const held = accept(ready());
     expect(firstJob(held).sheetsReserved).toBe(1);
-    expect(freeSheets(held)).toBe(19);
+    expect(freeFor(held, 'sheets')).toBe(19);
     // A bare rack: nothing to hold, and the shortfall is red until it is ordered for the job at
     // the ad hoc price, on a lorry for tomorrow (CLAUDE.md T13 3.3).
     const bare = ready();

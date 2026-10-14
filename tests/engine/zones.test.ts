@@ -168,10 +168,17 @@ describe('the whole catalogue on one floor', () => {
     // Everything the catalogue sells is in the hall, and nothing is standing on anything else; but
     // from Turn 31 the timber shelter stands behind the rear wall with the plant, and the 20 m wall
     // of this unit has no length left for all of it bought twice over: what is missing is only what
-    // the wall refuses (CLAUDE.md T31 2.8).
+    // the wall refuses (CLAUDE.md T31 2.8). And from Turn 32 the two glass racks take their floor
+    // before the CNC in the catalogue's order, and the 200 m2 floor has no 5 m by 4 m left for it,
+    // so the CNC and the head that wants it are the floor's refusal (CLAUDE.md T32 2.1).
+    const floorFull: Record<string, string> = { cnc: 'No free 5 m by 4 m in the hall', cncHead: 'Needs CNC first' };
     for (const spec of forSale) {
       const bought = state.equipment.some((item) => item.specId === spec.id);
-      expect(bought || (standsBehindTheWall(spec.id) && canBuy(state, spec.id).reason === 'No room behind the hall'), spec.id).toBe(true);
+      const refused = canBuy(state, spec.id).reason;
+      expect(
+        bought || (standsBehindTheWall(spec.id) && refused === 'No room behind the hall') || floorFull[spec.id] === refused,
+        spec.id,
+      ).toBe(true);
     }
     for (const item of state.equipment) {
       if (!standsInTheHall(item.specId, item.variantId)) continue;

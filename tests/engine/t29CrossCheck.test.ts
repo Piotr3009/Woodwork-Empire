@@ -16,13 +16,13 @@ import { EQUIPMENT_SPECS, LINE_FACTOR, LINE_MODULES, MACHINE_CAPACITY } from '..
 import type { GameState, Worker } from '../../src/engine/index';
 import { canBuy, placeEquipmentOrder } from '../../src/engine/game';
 import { dropJob, stagedJob } from '../../src/engine/jobs';
-import { boardsHeld, findSpec, lineLevel, lineModules, outputBreakdown, sheetsOnCounter } from '../../src/engine/machines';
+import { findSpec, freeRoomFor, lineLevel, lineModules, outputBreakdown } from '../../src/engine/machines';
 import {
   canUnload,
   createDelivery,
   drawSheetsFor,
+  freeFor,
   rackCapacity,
-  stockFree,
   unloadIntoStock,
 } from '../../src/engine/materials';
 import { migrateState } from '../../src/engine/migrate';
@@ -290,25 +290,26 @@ describe('the counter read two ways, at its edges (CLAUDE.md T29 2.11.2, 2.11.4,
     const job = taken.jobs.find((entry) => entry.templateId === 'sashWindows');
     if (job === undefined) throw new Error('the window is taken');
     taken.deliveries = [];
-    taken.stock.sheets += job.sheets;
+    // Flipped in v96: the boards lie on their own counter (CLAUDE.md T32 2.2).
+    taken.stock.boards += job.sheets;
     job.sheetsReserved = job.sheets;
-    expect(boardsHeld(taken)).toBe(19);
+    expect(taken.stock.boards).toBe(19);
     // The sheet racks' room is the racks less the sheets, the boards not in it.
-    expect(stockFree(taken)).toBe(rackCapacity(taken) - sheetsOnCounter(taken));
+    expect(freeRoomFor(taken, 'sheets')).toBe(rackCapacity(taken) - taken.stock.sheets);
     // The sheet racks full: a load of sheets goes past the stores, which have room, and its
     // overflow to the paid store for the night, as on v83; not one sheet is put on a store.
-    taken.stock.sheets += stockFree(taken);
-    expect(stockFree(taken)).toBe(0);
-    const sheets = createDelivery(taken, null, 5, false);
+    taken.stock.sheets += freeRoomFor(taken, 'sheets');
+    expect(freeRoomFor(taken, 'sheets')).toBe(0);
+    const sheets = createDelivery(taken, null, 5, false, 0, 'sheets');
     expect(canUnload(taken, sheets)).toBe(true);
     sheets.unloaded = true;
     unloadIntoStock(taken, sheets);
     expect(taken.stock.tempStorageSheets).toBe(5);
-    expect(sheetsOnCounter(taken)).toBe(rackCapacity(taken));
-    expect(boardsHeld(taken)).toBe(19);
+    expect(taken.stock.sheets).toBe(rackCapacity(taken));
+    expect(taken.stock.boards).toBe(19);
   });
 
-  it('takes a dropped window s load off the road as well as off the gate', () => {
+  it('leaves a dropped window s load on the road, as a sheet job s is, and it lands as free boards', () => {
     const state = bigUnit({ stores: true });
     const enquiry = placeEnquiry(state, {
       templateId: 'sashWindows',
@@ -323,12 +324,16 @@ describe('the counter read two ways, at its edges (CLAUDE.md T29 2.11.2, 2.11.4,
     const job = taken.jobs.find((entry) => entry.templateId === 'sashWindows');
     if (job === undefined) throw new Error('the window is taken');
     taken.deliveries = [];
-    const onTheRoad = createDelivery(taken, job.id, job.sheets, false, 0, true);
+    const onTheRoad = createDelivery(taken, job.id, job.sheets, false, 0, 'boards');
     expect(onTheRoad.arriveDay).toBeGreaterThan(taken.clock.day);
     const counter = taken.stock.sheets;
     expect(dropJob(taken, job.id)).toBe(true);
-    expect(taken.deliveries.some((delivery) => delivery.id === onTheRoad.id)).toBe(false);
-    expect(taken.stock.sheets).toBe(counter);
+    // Flipped in v96: the Turn 29 branch that called a window's loads off is gone; the load comes on,
+    // its price written off with the job, and lands as the company's own boards (CLAUDE.md T32 2.4).
+    expect(taken.deliveries.some((delivery) => delivery.id === onTheRoad.id)).toBe(true);
+    onTheRoad.unloaded = true;
+    unloadIntoStock(taken, onTheRoad);
+    expect([taken.stock.sheets, taken.stock.boards, freeFor(taken, 'boards')]).toEqual([counter, 19, 19]);
   });
 
   it('opens a v41 save whose window holds its boards with no store, and the window draws them to the last', () => {
@@ -345,21 +350,29 @@ describe('the counter read two ways, at its edges (CLAUDE.md T29 2.11.2, 2.11.4,
     const taken = acceptNow(state, enquiry.id);
     const held = taken.jobs.find((entry) => entry.templateId === 'sashWindows');
     if (held === undefined) throw new Error('the window is taken');
-    // On v83 its boards came in onto the sheet rack, and the job holds them.
+    // On v83 its boards came in onto the sheet rack, and the job holds them: one counter of sheets
+    // and boards, and the glazier's fields, as a v41 save holds them.
     taken.deliveries = [];
-    taken.stock.sheets += 19;
     held.sheetsReserved = 19;
     held.stage = 'inProduction';
-    const raw = JSON.parse(JSON.stringify(taken)) as Record<string, unknown>;
+    const sheets = taken.stock.sheets;
+    const raw = JSON.parse(JSON.stringify(taken)) as Record<string, unknown> & { jobs: Array<Record<string, unknown>> };
     raw.version = 41;
+    raw.stock = { sheets: sheets + 19, tempStorageSheets: 0 };
+    for (const job of raw.jobs) {
+      for (const key of ['glassUnits', 'glassReserved', 'glassUsed']) delete job[key];
+      job.glass = 'toOrder';
+      job.glassDay = null;
+    }
     const opened = migrateState(raw, 41);
     if (opened === null) throw new Error('the save opens');
     expect(opened.equipment.some((item) => item.specId === 'timberRack' || item.specId === 'timberShelter')).toBe(false);
-    expect(boardsHeld(opened)).toBe(19);
+    // Flipped in v96: the lift to 48 splits the one counter (CLAUDE.md T32 section 4).
+    expect([opened.stock.sheets, opened.stock.boards]).toEqual([sheets, 19]);
     const job = opened.jobs.find((entry) => entry.id === held.id);
     if (job === undefined) throw new Error('the window is in the save');
     expect(drawSheetsFor(opened, job, 1)).toBe(true);
     expect(job.sheetsUsed).toBe(19);
-    expect(boardsHeld(opened)).toBe(0);
+    expect(opened.stock.boards).toBe(0);
   });
 });
