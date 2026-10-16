@@ -148,6 +148,8 @@ describe('footprints in metres', () => {
       // The two glass racks, chat's metres until the art side draws them (CLAUDE.md T32 2.1).
       glassRack: [2, 1, 2],
       glassRackLarge: [4, 2, 2.5],
+      // The glass shelter, Piotr's metres, 12 m along the rear wall by 3 m deep (v100).
+      glassShelter: [12, 3, 3],
     };
     // Every line of the catalogue is in one of the two lists: nothing slips in unmeasured.
     expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(

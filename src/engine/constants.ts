@@ -228,7 +228,7 @@ export const STATE_VERSION = 49;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v99';
+export const APP_VERSION = 'v100';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1472,9 +1472,11 @@ export const TIMBER_STAND_INS: Record<string, readonly string[]> = {
   // 2.11.3).
   timberRack: ['timberShelter'],
   timberShelter: ['timberRack'],
-  // And a glass rack, either family (CLAUDE.md T32 2.1) [TUNE: chat].
-  glassRack: ['glassRackLarge'],
-  glassRackLarge: ['glassRack'],
+  // And a glass rack, either family (CLAUDE.md T32 2.1) [TUNE: chat], or the glass shelter behind
+  // the hall (v100).
+  glassRack: ['glassRackLarge', 'glassShelter'],
+  glassRackLarge: ['glassRack', 'glassShelter'],
+  glassShelter: ['glassRack', 'glassRackLarge'],
 };
 
 /** The two timber stores. Boards are kept on a timber store and never on a sheet rack (CLAUDE.md
@@ -1484,7 +1486,7 @@ export const TIMBER_STORES: readonly string[] = ['timberRack', 'timberShelter'];
 export const TIMBER_STORE_WANTED = 'timberRack';
 /** The two glass racks: a window's glass units are kept upright on one and never on a sheet rack or
  *  a timber store (CLAUDE.md T32 2.1). */
-export const GLASS_RACKS: readonly string[] = ['glassRack', 'glassRackLarge'];
+export const GLASS_RACKS: readonly string[] = ['glassRack', 'glassRackLarge', 'glassShelter'];
 /** The one glass rack the board's wanted list names, written `glass rack`, after the timber store
  *  (CLAUDE.md T32 2.1) [TUNE: chat]. */
 export const GLASS_RACK_WANTED = 'glassRack';
@@ -1846,6 +1848,8 @@ export const MACHINE_ENDURANCE_HOURS: Record<string, number> = {
   // Nor do the glass racks (CLAUDE.md T32 2.1).
   glassRack: 100000,
   glassRackLarge: 100000,
+  // Nor does the glass shelter (v100).
+  glassShelter: 100000,
 };
 
 /** The five classes every ladder in this game has, in order: class 5 is always the industrial one
@@ -2404,6 +2408,29 @@ export const GLASS_RACK_LARGE_VARIANTS: EquipmentVariant[] = [
     powerPerDay: 1,
     description:
       'A slotted steel rack holding the sealed units upright in rows, four metres of it on the hall floor.',
+  },
+];
+
+/** The glass shelter's one class: 3,200 glass units outside behind the hall, under a roof, as the
+ *  timber shelter keeps its boards [PIOTR, 16.10: "an outside shelter for glass, 3,200 units";
+ *  "yes" to £60,000, 12 m along the wall by 3 m deep, ten working days] (v100). Its pound a day is
+ *  the timber shelter's [TUNE], its sentence chat's [TUNE wording]. */
+export const GLASS_SHELTER_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Glass shelter',
+    price: 60000,
+    width: 12,
+    depth: 3,
+    height: 3,
+    zoneWidth: 12,
+    zoneDepth: 3,
+    glassCapacity: 3200,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A roof over rows of A frames, the sealed units upright on rubber, standing outside behind the ' +
+      'hall so it takes no floor of the hall.',
   },
 ];
 
@@ -3786,6 +3813,8 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   // The two glass racks, one class each, in the timber stores' shape (CLAUDE.md T32 2.1).
   glassRack: GLASS_RACK_VARIANTS,
   glassRackLarge: GLASS_RACK_LARGE_VARIANTS,
+  // And the glass shelter behind the hall (v100).
+  glassShelter: GLASS_SHELTER_VARIANTS,
   edgebander: EDGEBANDER_VARIANTS,
   extractor: EXTRACTOR_VARIANTS,
   compressor: COMPRESSOR_VARIANTS,
@@ -4213,6 +4242,28 @@ const SPEC_DRAFTS: SpecDraft[] = [
     glassCapacity: 200,
     // [TUNE wording] (CLAUDE.md T32 2.1).
     effect: 'Holds five times a glass rack\u0027s units on twice its floor.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'glassShelter',
+    // Built where it stands, as the timber shelter is [PIOTR, 16.10: ten working days] (v100).
+    deliveryDays: 10,
+    folder: 'Glass shelters',
+    tab: 'storage',
+    name: 'Glass shelter',
+    price: 60000,
+    category: 'storage',
+    width: 12,
+    depth: 3,
+    height: 3,
+    zoneWidth: 12,
+    zoneDepth: 3,
+    // No picture yet [PIOTR, 16.10: "later; give a replacement now"]: the game draws it as it draws
+    // any kit whose picture has not landed, and behind the wall only its top and its plate show.
+    spriteKey: 'glassShelter',
+    glassCapacity: 3200,
+    // [TUNE wording] (v100).
+    effect: 'Holds sixteen times a large glass rack\u0027s units outside behind the hall, and takes no floor of the hall.',
   },
 
   {
@@ -5159,6 +5210,8 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   // of the hall [PIOTR, 11.10: "it hides our hall; rather where the extractors are, or behind them;
   // nothing in the hall may be hidden"] (CLAUDE.md T31 2.8). On the apron the van stands alone.
   timberShelter: { x: 0, y: 1, yard: true, rear: true },
+  // And the glass shelter beside it [PIOTR, 16.10: "outside"] (v100).
+  glassShelter: { x: 0, y: 1, yard: true, rear: true },
 };
 
 /** Bench slots, in order, along the middle of the hall clear of the rooms and the personnel door.

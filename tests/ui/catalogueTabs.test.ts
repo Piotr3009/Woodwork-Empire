@@ -211,6 +211,8 @@ describe('the tabs', () => {
       // 2.1).
       'glassRack',
       'glassRackLarge',
+      // And the glass shelter behind the hall (v100).
+      'glassShelter',
       'toolCabinet',
       'locker',
     ]);
