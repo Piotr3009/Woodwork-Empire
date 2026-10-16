@@ -4,7 +4,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { LIABILITY_BASE_YEARLY, PROPERTY_INSURANCE_RATE_YEARLY, SHEET_VALUE } from '../../src/engine/constants';
-import { setInsurance } from '../../src/engine/insurance';
+import { formatMoney } from '../../src/engine/economy';
+import { premiumYearlyFor, setInsurance } from '../../src/engine/insurance';
 import { renderInsurance } from '../../src/ui/insurance';
 import { renderLaptop } from '../../src/ui/laptop';
 import type { GameState } from '../../src/engine/index';
@@ -43,7 +44,10 @@ describe('the two covers', () => {
     expect(property.textContent).toContain(`£${value.toLocaleString('en-GB')} insured`);
     expect(property.textContent).toContain(`£${(10 * SHEET_VALUE).toLocaleString('en-GB')}`);
     const yearly = figure(property, 'Premium a year');
-    expect(yearly?.textContent).toBe(`-£${Math.round(value * PROPERTY_INSURANCE_RATE_YEARLY).toLocaleString('en-GB')}`);
+    // The rate on the insured value, as the engine works it out and the page prints it (from v99
+    // a half pound, which the page rounds as it rounds every figure).
+    expect(premiumYearlyFor(state, 'property')).toBeCloseTo(value * PROPERTY_INSURANCE_RATE_YEARLY, 2);
+    expect(yearly?.textContent).toBe(formatMoney(-premiumYearlyFor(state, 'property')));
     expect(yearly?.className).toContain('bad');
     const take = property.querySelector('[data-do="setInsurance"]');
     expect(take?.getAttribute('data-cover')).toBe('property');

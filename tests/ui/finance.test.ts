@@ -154,6 +154,6 @@ describe('the binder', () => {
     const summary = parse(renderAccounting(state, 'summary'));
     const coming = rowFigure(summary, 'Monthly bills');
     expect(coming?.textContent).toContain('loan instalment £350');
-    expect(coming?.textContent).toContain('insurance £50');
+    expect(coming?.textContent).toContain('insurance £25');
   });
 });

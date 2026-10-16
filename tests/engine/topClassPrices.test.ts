@@ -81,8 +81,9 @@ describe('the fourteen prices (CLAUDE.md T27 2.5)', () => {
   it('carries the new price into what the game reads off it for a machine bought tonight', () => {
     const saw = findSpec('tableSaw')?.variants.find((variant) => variant.id === 'pro');
     if (saw === undefined) throw new Error('no pro saw');
-    // The insurance line of its card: the property rate on 18,000 and not on 15,000.
-    expect(insuranceForClass(saw)).toBe(360);
+    // The insurance line of its card: the property rate on 18,000 and not on 15,000 (1% from v99,
+    // the insurance halved [PIOTR, 16.10]).
+    expect(insuranceForClass(saw)).toBe(180);
     const bought = buyNow(newGame({ difficulty: 'veryEasy' }), 'tableSaw', 'pro');
     const item = bought.equipment.find((entry) => entry.specId === 'tableSaw');
     if (item === undefined) throw new Error('the saw did not land');

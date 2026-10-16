@@ -434,10 +434,11 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // drawing other work for it, with an experienced manager's pay from day 65 (CLAUDE.md T26 2.11).
     // Re-measured for v80: 5,383, -2,713 and -10,198. v77's wages had the bank close the run on
     // day 89; v79's tenth on the owner's base and its 40 courier have it trade to the end again,
-    // with no manager (above) [measured].
+    // with no manager (above) [measured]. Re-measured for v99: 5,383, -2,611 and -10,039, the
+    // insurance halved [PIOTR, 16.10].
     expect(Math.round(months[0]?.cashClose ?? 0)).toBe(5383);
-    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-2713);
-    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-10198);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-2611);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-10039);
     // Three charges: 7.54 on day 31, 2.07 on day 61 and 38.22 on day 91, for the days each month
     // ran under (CLAUDE.md T23 2.12) [measured on v80; 7.65, 1.01 and 44.74 on v63].
     const overdraft = state.ledger.filter((entry) => entry.category === 'overdraftInterest');

@@ -175,7 +175,7 @@ describe('the tiles inside a folder', () => {
       'Takes 2 m by 1 m, works in 3 m by 3 m',
     ]);
     expect(insuranceAddedYearly(1800)).toBe(1800 * PROPERTY_INSURANCE_RATE_YEARLY);
-    expect(insuranceLine(1800)).toBe('Insurance \u00a336 a year');
+    expect(insuranceLine(1800)).toBe('Insurance \u00a318 a year');
     const industrial = tiles(state, 'tableSaw')[4];
     expect(effects(industrial)).toEqual([
       // Four men kept busy (v55), and the industrial class's pace, +12% from v52

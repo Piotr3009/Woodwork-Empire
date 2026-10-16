@@ -76,7 +76,7 @@ describe('the Premises page s card (CLAUDE.md T31 2.7)', () => {
       '£600,000 · and £2,400 more deposit. Needs £602,400 in the account.',
       'Adds 200 m² along the rear wall: 50 × 20 m, ready the next morning. Room for 40 joiners and ' +
         '30 benches, and 40 lockers in the enlarged canteen. Rent £9,600 → £12,000 a month, rates ' +
-        '£1,800 → £2,250, standing power £16 → £20 a day. Insurance £100 → £125 a month. Security £300 → £375 a month.',
+        '£1,800 → £2,250, standing power £16 → £20 a day. Insurance £50 → £63 a month. Security £300 → £375 a month.',
     ]);
     expect(card?.querySelector('[data-do="extendUnit"]')?.getAttribute('data-stage')).toBe('long');
   });

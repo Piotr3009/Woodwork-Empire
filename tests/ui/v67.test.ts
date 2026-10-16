@@ -304,7 +304,7 @@ describe('the second extension, as the player sees it (v82)', () => {
     covered.insurance.liability = true;
     covered.security.level = 3;
     const text = cardOf(dom(renderPremises(covered)), 'extendSecond').textContent;
-    expect(text).toContain('Insurance £50 → £100 a month.');
+    expect(text).toContain('Insurance £25 → £50 a month.');
     expect(text).toContain('Security £150 → £300 a month.');
   });
 

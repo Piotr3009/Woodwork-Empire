@@ -228,7 +228,7 @@ export const STATE_VERSION = 49;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v98';
+export const APP_VERSION = 'v99';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -3406,7 +3406,7 @@ export const VAN_VARIANTS: EquipmentVariant[] = [
     id: 'used',
     name: 'Used van',
     price: 3500,
-    insuranceYearly: 300,
+    insuranceYearly: 150,
     enduranceFactor: 1,
     powerPerDay: 0,
     description: 'A high mileage panel van with a dent in the side door. It starts, mostly.',
@@ -3415,7 +3415,7 @@ export const VAN_VARIANTS: EquipmentVariant[] = [
     id: 'budget',
     name: 'Small van',
     price: 6000,
-    insuranceYearly: 240,
+    insuranceYearly: 120,
     enduranceFactor: 1,
     powerPerDay: 0,
     description: 'A small new van. One piece at a time and it knows the way.',
@@ -3424,7 +3424,7 @@ export const VAN_VARIANTS: EquipmentVariant[] = [
     id: 'standard',
     name: 'Van',
     price: 9000,
-    insuranceYearly: 180,
+    insuranceYearly: 90,
     enduranceFactor: 1,
     powerPerDay: 0,
     description: 'A medium panel van with racking inside. Two pieces a trip.',
@@ -3433,7 +3433,7 @@ export const VAN_VARIANTS: EquipmentVariant[] = [
     id: 'pro',
     name: 'Large van',
     price: 14000,
-    insuranceYearly: 140,
+    insuranceYearly: 70,
     enduranceFactor: 1,
     powerPerDay: 0,
     description: 'A long wheelbase van with a tail lift. Three pieces a trip, and quicker there and back.',
@@ -3442,7 +3442,7 @@ export const VAN_VARIANTS: EquipmentVariant[] = [
     id: 'industrial',
     name: 'Luton van',
     price: 22000,
-    insuranceYearly: 100,
+    insuranceYearly: 50,
     enduranceFactor: 1,
     powerPerDay: 0,
     description: 'A Luton box van with a lift: a whole kitchen in one trip.',
@@ -6063,10 +6063,11 @@ export const LEDGER_MAX_ENTRIES = 2000;
 /** Property cover: this much of the value of every machine and the stock, a year (PIOTR),
  *  recomputed on every purchase and every stock change, charged as a twelfth each month. Public
  *  liability: a base a year plus this much per hired person [TUNE both], charged monthly
- *  (CLAUDE.md T13 3.15). */
-export const PROPERTY_INSURANCE_RATE_YEARLY = 0.02;
-export const LIABILITY_BASE_YEARLY = 600;
-export const LIABILITY_PER_EMPLOYEE_YEARLY = 180;
+ *  (CLAUDE.md T13 3.15). Every insurance figure halved in v99 [PIOTR, 16.10: "the insurance is a
+ *  bit high, lower it by 50 per cent"]: 2% to 1%, 600 to 300, 180 to 90, and the vans' own covers. */
+export const PROPERTY_INSURANCE_RATE_YEARLY = 0.01;
+export const LIABILITY_BASE_YEARLY = 300;
+export const LIABILITY_PER_EMPLOYEE_YEARLY = 90;
 /** The accident with no liability cover: a claim drawn once in this band [TUNE]. */
 export const UNINSURED_CLAIM_MIN = 8000;
 export const UNINSURED_CLAIM_MAX = 25000;
