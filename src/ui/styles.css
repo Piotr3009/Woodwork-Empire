@@ -1138,10 +1138,19 @@ input.num {
 }
 
 .tile-action {
+  align-items: center;
   display: flex;
+  /* A line upgrade has a Buy for every line, ten at the most: they wrap onto rows inside the card
+     and never run over the next one (PIOTR, 17.10; v102). */
+  flex-wrap: wrap;
+  gap: 6px;
   justify-content: flex-end;
   margin-top: auto;
   padding-top: 8px;
+}
+
+.tile-action .btn {
+  white-space: nowrap;
 }
 
 /* Two or three lines about what a class of machine is (CLAUDE.md T3 3.5). */
