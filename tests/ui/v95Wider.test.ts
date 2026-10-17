@@ -83,7 +83,7 @@ describe('the Premises page s card for the hall made wider (v95)', () => {
       '£840,000 · and £3,360 more deposit. Needs £843,360 in the account.',
       'Adds 280 m² along the front of the hall: 40 × 27 m, ready the next morning. Room for 43 joiners and ' +
         '32 benches, and 43 lockers in the enlarged canteen. Rent £9,600 → £12,960 a month, rates ' +
-        '£1,800 → £2,430, standing power £16 → £22 a day. Insurance £50 → £68 a month. Security £300 → £405 a month.',
+        '£1,800 → £2,430, standing power £16 → £22 a day. Security £300 → £405 a month.',
     ]);
     expect(card?.querySelector('[data-do="extendUnit"]')?.getAttribute('data-stage')).toBe('wide');
   });

@@ -473,7 +473,9 @@ describe('(kkk) the hall extended three times (CLAUDE.md T31 2.7)', () => {
     expect([eight.unit.ratesMonthly, grown.unit.ratesMonthly]).toEqual([1800, 3150]);
     expect([standingPowerPerDay(eight.unit), standingPowerPerDay(grown.unit)]).toEqual([16, 28]);
     expect([unitCostFactor(eight.unit), unitCostFactor(grown.unit)]).toEqual([2, 3.5]);
-    expect(monthlyPremiums(grown)).toBeGreaterThan(monthlyPremiums(eight));
+    // The insurer's factor stops at the 800 m2 unit's two from v101 [PIOTR, 17.10: "the insurance is
+    // still too high"], so the longer hall's covers cost what the 800 m2 unit's do.
+    expect(monthlyPremiums(grown)).toBe(monthlyPremiums(eight));
     expect(securitySubscriptionMonthly(grown, 3)).toBe(525);
     expect(securitySubscriptionParts(grown, 5).areaFactor).toBe(7);
     expect(crewLimit(grown)).toBe(56);

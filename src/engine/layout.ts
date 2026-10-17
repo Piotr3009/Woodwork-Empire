@@ -17,6 +17,8 @@ import {
   M2_PER_PERSON,
   WELFARE_IN_THE_CANTEEN,
   REAR_YARD_GAP_CELLS,
+  REAR_YARD_ROWS,
+  REAR_YARD_ROW_CELLS,
   STARTING_LAYOUT,
   UNIT_AREA_M2,
   UNIT_SECOND_EXTENSION_M2,
@@ -126,11 +128,20 @@ export function outsidePlaceFor(
     : apronPlaceFor(state, specId, variantId, ignoreId);
 }
 
+/** The row behind the rear wall a thing whose front edge is at this y stands in: 0 for the first
+ *  row, a metre back from the wall, then 1 and 2, each a row and a metre further back (v101). */
+export function rearRowOf(front: number): number {
+  return Math.max(0, Math.round((-REAR_YARD_GAP_CELLS - front) / (REAR_YARD_ROW_CELLS + REAR_YARD_GAP_CELLS)));
+}
+
 /** Where the next plant stands behind the rear wall, or null when the wall has no length left for
  *  it: a metre back from the hall's first row, which is the wall's own, the first of them near
  *  the far end of the hall and each one after it a metre nearer the gate. The far end is left
  *  clear by the plant's own width and depth, so that nothing of it is seen past the end of the
- *  wall. What is on its way holds its place like what has landed (v73). */
+ *  wall. What is on its way holds its place like what has landed (v73). When the first row has no
+ *  length left, the second row behind it, and then the third, each its front a metre behind the
+ *  row before; a row behind the first stands no nearer the gate end than it stands back from the
+ *  wall, so that it is never off the top of the picture (PIOTR, 17.10; v101). */
 export function rearYardPlaceFor(
   state: GameState,
   specId: string,
@@ -138,7 +149,6 @@ export function rearYardPlaceFor(
   ignoreId: string | null = null,
 ): { x: number; y: number } | null {
   const own = boxOf(specId, 0, 0, variantId);
-  const y = -REAR_YARD_GAP_CELLS - own.depth;
   const taken: Box[] = [];
   for (const item of state.equipment) {
     if (item.id === ignoreId || item.anchorY >= 0) continue;
@@ -148,15 +158,21 @@ export function rearYardPlaceFor(
     if (held.id === ignoreId || held.anchorY >= 0) continue;
     taken.push(boxOfItem(held, held.anchorX, held.anchorY));
   }
-  // A metre is kept between two of them: a box a metre longer than the plant has to be clear.
-  const clear = (x: number): boolean =>
-    x >= 0 &&
-    !taken.some((other) =>
-      overlaps({ x: x - REAR_YARD_GAP_CELLS, y, width: own.width + 2 * REAR_YARD_GAP_CELLS, depth: own.depth }, other),
-    );
-  const first = state.unit.widthCells - own.width - own.depth - REAR_YARD_GAP_CELLS;
-  for (let x = first; x >= 0; x -= 1) {
-    if (clear(x)) return { x, y };
+  for (let row = 0; row < REAR_YARD_ROWS; row += 1) {
+    const y = -REAR_YARD_GAP_CELLS - row * (REAR_YARD_ROW_CELLS + REAR_YARD_GAP_CELLS) - own.depth;
+    // A metre is kept between two of them: a box a metre longer than the plant has to be clear.
+    const clear = (x: number): boolean =>
+      x >= 0 &&
+      !taken.some((other) =>
+        overlaps({ x: x - REAR_YARD_GAP_CELLS, y, width: own.width + 2 * REAR_YARD_GAP_CELLS, depth: own.depth }, other),
+      );
+    // The far end left clear by the plant's own width and how far back it stands; the first row's
+    // is its depth and a metre, as it always was.
+    const first = state.unit.widthCells - own.width + y;
+    const last = row === 0 ? 0 : -y;
+    for (let x = first; x >= last; x -= 1) {
+      if (clear(x)) return { x, y };
+    }
   }
   return null;
 }

@@ -73,7 +73,7 @@ import {
   VAN_CLASSES,
   bagsToM3,
   lineName,
-  unitCostFactor,
+  insurerUnitFactor,
 } from '../engine/constants';
 import type { LineUpgradeSpec } from '../engine/constants';
 import {
@@ -193,7 +193,7 @@ function atOnceLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
  *  (CLAUDE.md T13 3.1, 3.15), and twice it on the 800 m2 unit, where the insurer charges twice
  *  the premium (v82). */
 function insuranceLine(state: GameState, variant: { price: number; insuranceYearly?: number }): string {
-  const yearly = insuranceForClass(variant) * unitCostFactor(state.unit);
+  const yearly = insuranceForClass(variant) * insurerUnitFactor(state.unit);
   return `Insurance ${money(yearly)} a year`;
 }
 

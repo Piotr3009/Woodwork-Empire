@@ -187,12 +187,13 @@ describe('everything goes up with the floor (v95)', () => {
     expect([crewLimit(twice), canteenLockers(twice)]).toEqual([54, 54]);
   });
 
-  it('the insurer and a flat security level by the area over 400, and a firm s month by the area', () => {
+  it('the insurer at two past the 800 m2 unit, a flat security level by the area over 400, and a firm s month by the area', () => {
     const before = deep();
     const open = wider(before);
     expect(unitCostFactor(before.unit)).toBe(2);
     expect(unitCostFactor(open.unit)).toBeCloseTo(2.7, 9);
-    expect(premiumYearlyFor(open, 'liability')).toBeCloseTo(premiumYearlyFor(before, 'liability') * 1.35, 6);
+    // The insurer's factor stops at two from v101 [PIOTR, 17.10].
+    expect(premiumYearlyFor(open, 'liability')).toBeCloseTo(premiumYearlyFor(before, 'liability'), 6);
     expect(securitySubscriptionMonthly(open, 3)).toBe(405);
     expect(securitySubscriptionMonthly(open, 5)).toBeCloseTo(securitySubscriptionMonthly(before, 5) * 1.35, 6);
   });

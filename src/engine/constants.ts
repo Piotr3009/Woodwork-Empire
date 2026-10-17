@@ -228,7 +228,7 @@ export const STATE_VERSION = 49;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v100';
+export const APP_VERSION = 'v101';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -544,6 +544,12 @@ export function secondExtensionOf(unit: { secondExtension?: UnitExtension }): Un
 export function unitCostFactor(unit: { secondExtension?: UnitExtension; areaM2: number }): number {
   if (secondExtensionOf(unit) !== 'open') return 1;
   return (UNIT_SECOND_EXTENSION_COST_FACTOR * unit.areaM2) / UNIT_SECOND_EXTENSION_M2;
+}
+/** What the insurer multiplies both covers by: the unit's factor, but never more than the 800 m2
+ *  unit's two [PIOTR, 17.10: "the insurance is still too high", A: the factor stopped at 2] (v101).
+ *  A flat security level still reads `unitCostFactor`. */
+export function insurerUnitFactor(unit: { secondExtension?: UnitExtension; areaM2: number }): number {
+  return Math.min(unitCostFactor(unit), UNIT_SECOND_EXTENSION_COST_FACTOR);
 }
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
@@ -5315,6 +5321,11 @@ export const YARD_WIDTH_CELLS = 3;
 /** The metre the rear wall itself takes: the plant behind it stands that far back from the hall's
  *  own first row, and the same metre is left between one plant and the next (v73). */
 export const REAR_YARD_GAP_CELLS = 1;
+/** The rows of plant behind the rear wall, and the depth each row is given: the deepest thing that
+ *  stands there, the two shelters, is 3 m [PIOTR, 17.10: "a second and a third row outside for the
+ *  shelters and the other machines"] (v101). The first row is where everything stood before. */
+export const REAR_YARD_ROWS = 3;
+export const REAR_YARD_ROW_CELLS = 3;
 
 
 /** The families that are a central system: with one in the hall every machine is connected and

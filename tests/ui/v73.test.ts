@@ -70,13 +70,14 @@ describe('the extraction plant behind the rear wall', () => {
     // The van is where it was, on the apron past the end of the hall.
     expect(outsidePlaceFor(state, 'van')).toEqual(apronPlaceFor(state, 'van'));
     expect(outsidePlaceFor(state, 'van')?.x).toBe(width);
-    // Four of them along a twenty metre wall, and then there is no room for a fifth.
+    // Four of them along a twenty metre wall, one more in the second row behind them (v101), and then
+    // there is no room for a sixth.
     let count = 1;
     for (let at = outsidePlaceFor(state, 'flexiSystem'); at !== null; at = outsidePlaceFor(state, 'flexiSystem')) {
       count += 1;
       placeEquipment(state, 'flexiSystem', { x: at.x, y: at.y, id: `kit-flexi-${count}` });
     }
-    expect(count).toBe(4);
+    expect(count).toBe(5);
     expect(canBuy(state, 'flexiSystem')).toEqual({ ok: false, reason: 'No room behind the hall' });
   });
 

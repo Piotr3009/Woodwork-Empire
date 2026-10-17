@@ -159,13 +159,15 @@ describe('everything goes up with the floor (CLAUDE.md T31 2.7)', () => {
     expect(crewLimit(third)).toBe(56);
   });
 
-  it('the insurer and a flat security level by the area over 400, and a firm s month by the area', () => {
+  it('the insurer at two past the 800 m2 unit, a flat security level by the area over 400, and a firm s month by the area', () => {
     const before = deep();
     const open = longer(before);
     expect(unitCostFactor(before.unit)).toBe(2);
     expect(unitCostFactor(open.unit)).toBe(2.5);
-    expect(premiumYearlyFor(open, 'liability')).toBeCloseTo(premiumYearlyFor(before, 'liability') * 1.25, 6);
-    expect(premiumYearlyFor(open, 'property')).toBeCloseTo(premiumYearlyFor(before, 'property') * 1.25, 1);
+    // From v101 the insurer's factor stops at the 800 m2 unit's two [PIOTR, 17.10: "the insurance is
+    // still too high"]: a longer hall is insured as the 800 m2 unit is.
+    expect(premiumYearlyFor(open, 'liability')).toBeCloseTo(premiumYearlyFor(before, 'liability'), 6);
+    expect(premiumYearlyFor(open, 'property')).toBeCloseTo(premiumYearlyFor(before, 'property'), 1);
     // The dogs are 150 a month flat, 300 in the 800 m² unit, and 375 at 1,000 m²; a firm's month is
     // the area's, five times 200.
     expect(securitySubscriptionMonthly(open, 3)).toBe(375);

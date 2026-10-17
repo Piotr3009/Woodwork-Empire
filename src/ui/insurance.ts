@@ -9,7 +9,7 @@ import {
   PROPERTY_INSURANCE_RATE_YEARLY,
   UNINSURED_CLAIM_MAX,
   UNINSURED_CLAIM_MIN,
-  unitCostFactor,
+  insurerUnitFactor,
 } from '../engine/constants';
 import {
   COVER_LABELS,
@@ -38,7 +38,7 @@ function figureRow(label: string, value: number): string {
  *  it: said in the cover's own line, so the premium under it adds up (v82). Nothing for a unit
  *  that is charged the figure itself. */
 function unitLine(state: GameState): string {
-  const factor = unitCostFactor(state.unit);
+  const factor = insurerUnitFactor(state.unit);
   if (factor === 1) return '';
   return ` A unit of ${state.unit.areaM2.toLocaleString('en-GB')} m² is charged ${factor} times that.`;
 }

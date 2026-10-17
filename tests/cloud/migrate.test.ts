@@ -1787,9 +1787,12 @@ describe('a v43 save with its timber shelter on the apron (CLAUDE.md T31 2.8, se
     const equipment = raw.equipment as Array<Record<string, unknown>>;
     const kerb = raw.unit.widthCells as number;
     const like = JSON.parse(JSON.stringify(equipment[0] ?? {})) as Record<string, unknown>;
-    // Plant along the whole of the 40 m wall first, then the shelter on the apron.
-    for (let n = 0; n < 10; n += 1) {
-      equipment.push({ ...like, id: `kit-plant-${n}`, specId: 'flexiSystem', variantId: 'standard', spriteKey: 'flexiSystem', anchorX: n * 4, anchorY: -3, orientation: 0, soldOnDay: null });
+    // Plant along the whole of the 40 m wall first, in each of its three rows (v101), then the shelter
+    // on the apron.
+    for (const y of [-3, -7, -11]) {
+      for (let n = 0; n < 10; n += 1) {
+        equipment.push({ ...like, id: `kit-plant-${y}-${n}`, specId: 'flexiSystem', variantId: 'standard', spriteKey: 'flexiSystem', anchorX: n * 4, anchorY: y, orientation: 0, soldOnDay: null });
+      }
     }
     equipment.push({ ...like, id: 'kit-shelter', specId: 'timberShelter', variantId: 'standard', spriteKey: 'timberShelter', anchorX: kerb, anchorY: 1, orientation: 0, soldOnDay: null });
     const opened = migrateState(raw, 43);

@@ -13,7 +13,7 @@ import {
   SHEET_VALUE,
   UNINSURED_CLAIM_MAX,
   UNINSURED_CLAIM_MIN,
-  unitCostFactor,
+  insurerUnitFactor,
 } from './constants';
 import { dayOfMonth } from './clock';
 import { canAfford, charge, formatMoney } from './economy';
@@ -104,7 +104,7 @@ export function lineValueOf(state: GameState, line: number): number {
 export function propertyPremiumYearly(state: GameState): number {
   return pence(
     (insuredValue(state) * PROPERTY_INSURANCE_RATE_YEARLY + ownFigureCoverYearly(state)) *
-      unitCostFactor(state.unit),
+      insurerUnitFactor(state.unit),
   );
 }
 
@@ -113,7 +113,7 @@ export function propertyPremiumYearly(state: GameState): number {
 export function liabilityPremiumYearly(state: GameState): number {
   return (
     (LIABILITY_BASE_YEARLY + state.workers.length * LIABILITY_PER_EMPLOYEE_YEARLY) *
-    unitCostFactor(state.unit)
+    insurerUnitFactor(state.unit)
   );
 }
 

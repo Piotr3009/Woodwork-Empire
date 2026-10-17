@@ -50,7 +50,7 @@ import {
   WORKING_DAYS_PER_WEEK,
   lineContractName,
   lineName,
-  unitCostFactor,
+  insurerUnitFactor,
 } from './constants';
 import { addWorkingDays, formatCalendarDay, isBreak, isWorkingDay, weekOfDay } from './clock';
 import { canAfford, charge, formatMoney, pay } from './economy';
@@ -96,7 +96,7 @@ export function linePowerPerDay(): number {
  *  cover's rate and the unit's factor, over the days of a year (CLAUDE.md T31 2.5). */
 export function lineCoverPerDay(state: GameState, line: number): number {
   if (!state.insurance.property) return 0;
-  return (lineValueOf(state, line) * PROPERTY_INSURANCE_RATE_YEARLY * unitCostFactor(state.unit)) / DAYS_PER_YEAR;
+  return (lineValueOf(state, line) * PROPERTY_INSURANCE_RATE_YEARLY * insurerUnitFactor(state.unit)) / DAYS_PER_YEAR;
 }
 
 /** True for a day of the book that holds anything: a cost, a window, or a working minute. */

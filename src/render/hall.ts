@@ -3,6 +3,8 @@
 
 import {
   BUBBLE_HEAD_GAP,
+  REAR_YARD_GAP_CELLS,
+  REAR_YARD_ROW_CELLS,
   CNC_TOOL_CHANGER_SPRITE,
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
@@ -154,7 +156,7 @@ import {
   spriteUrl,
 } from './sprites';
 import { lineMakesWindows, palletsAtTheGate, runningLineContract } from '../engine/lineContract';
-import { lineLanes } from '../engine/layout';
+import { lineLanes, rearRowOf } from '../engine/layout';
 import { forkliftArt, forkliftPoints } from './forklift';
 import { engineersArt } from './engineers';
 import { placeholder } from './placeholder';
@@ -1509,9 +1511,11 @@ function rackCount(item: Equipment, sheets: number): string {
   const stands = footprintIn(item);
   // A store behind the rear wall is hidden by it up to its top, so its plate is hung over the
   // wall's top above it, where the player can read and click it (CLAUDE.md T31 2.8) [TUNE: chat].
+  // In the second and third rows (v101) the plate is hung as far back again as the row stands.
+  const back = REAR_WALL.back + rearRowOf(stands.y + stands.depth) * (REAR_YARD_ROW_CELLS + REAR_YARD_GAP_CELLS);
   const at =
     item.anchorY < 0
-      ? tileToScreen(stands.x + stands.width / 2, -REAR_WALL.back, REAR_WALL.top + RACK_COUNT_OVER_WALL)
+      ? tileToScreen(stands.x + stands.width / 2, -back, REAR_WALL.top + RACK_COUNT_OVER_WALL)
       : centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height * RACK_COUNT.up);
   const text = String(Math.max(0, Math.round(sheets)));
   const width = RACK_COUNT.pad * 2 + text.length * RACK_COUNT.digit;
