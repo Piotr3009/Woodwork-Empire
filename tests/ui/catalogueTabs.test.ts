@@ -207,6 +207,8 @@ describe('the tabs', () => {
       // The two timber stores after it, the shelter on the apron (CLAUDE.md T29 2.11.1).
       'timberRack',
       'timberShelter',
+      // And the large timber shelter behind the hall (v103).
+      'timberShelterLarge',
       // And the two glass racks after them, a family each as the timber stores are (CLAUDE.md T32
       // 2.1).
       'glassRack',

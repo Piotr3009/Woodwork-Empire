@@ -228,7 +228,7 @@ export const STATE_VERSION = 49;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v102';
+export const APP_VERSION = 'v103';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1476,8 +1476,10 @@ export const TIMBER_STAND_INS: Record<string, readonly string[]> = {
   framePress: ['windowLine4'],
   // A window or a door asks for a timber store, and either family satisfies it (CLAUDE.md T29
   // 2.11.3).
-  timberRack: ['timberShelter'],
-  timberShelter: ['timberRack'],
+  timberRack: ['timberShelter', 'timberShelterLarge'],
+  timberShelter: ['timberRack', 'timberShelterLarge'],
+  // And the large timber shelter behind the hall (v103).
+  timberShelterLarge: ['timberRack', 'timberShelter'],
   // And a glass rack, either family (CLAUDE.md T32 2.1) [TUNE: chat], or the glass shelter behind
   // the hall (v100).
   glassRack: ['glassRackLarge', 'glassShelter'],
@@ -1487,7 +1489,7 @@ export const TIMBER_STAND_INS: Record<string, readonly string[]> = {
 
 /** The two timber stores. Boards are kept on a timber store and never on a sheet rack (CLAUDE.md
  *  T29 2.11). */
-export const TIMBER_STORES: readonly string[] = ['timberRack', 'timberShelter'];
+export const TIMBER_STORES: readonly string[] = ['timberRack', 'timberShelter', 'timberShelterLarge'];
 /** The one store the board's wanted list names, written `timber store` (CLAUDE.md T29 2.11.3). */
 export const TIMBER_STORE_WANTED = 'timberRack';
 /** The two glass racks: a window's glass units are kept upright on one and never on a sheet rack or
@@ -1854,8 +1856,9 @@ export const MACHINE_ENDURANCE_HOURS: Record<string, number> = {
   // Nor do the glass racks (CLAUDE.md T32 2.1).
   glassRack: 100000,
   glassRackLarge: 100000,
-  // Nor does the glass shelter (v100).
+  // Nor does the glass shelter (v100), nor the large timber shelter (v103).
   glassShelter: 100000,
+  timberShelterLarge: 100000,
 };
 
 /** The five classes every ladder in this game has, in order: class 5 is always the industrial one
@@ -2372,6 +2375,30 @@ export const TIMBER_SHELTER_VARIANTS: EquipmentVariant[] = [
     description:
       'A lean to roof over racks of boards, open at the front, standing outside behind the hall so ' +
       'it takes no floor of the hall.',
+  },
+];
+
+/** The large timber shelter's one class: 3,000 boards outside behind the hall, as the glass shelter
+ *  keeps its glass [PIOTR, 17.10: "a mega timber shelter outside for 500k, for 3,000 timber, like
+ *  the one for glass"] (v103). Its metres and its days are chat's: the depth of a row behind the
+ *  wall, half as long again as the glass shelter, and the timber shelter's fifteen days [TUNE:
+ *  chat]. */
+export const TIMBER_SHELTER_LARGE_VARIANTS: EquipmentVariant[] = [
+  {
+    id: STANDARD_VARIANT,
+    name: 'Large timber shelter',
+    price: 500000,
+    width: 18,
+    depth: 3,
+    height: 4,
+    zoneWidth: 18,
+    zoneDepth: 3,
+    boardCapacity: 3000,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A long roof over cantilever racks four high, the boards laid flat by the forklift, standing ' +
+      'outside behind the hall so it takes no floor of the hall.',
   },
 ];
 
@@ -3816,6 +3843,8 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   // The two timber stores, one class each (CLAUDE.md T29 2.11.1).
   timberRack: TIMBER_RACK_VARIANTS,
   timberShelter: TIMBER_SHELTER_VARIANTS,
+  // And the large one behind the hall (v103).
+  timberShelterLarge: TIMBER_SHELTER_LARGE_VARIANTS,
   // The two glass racks, one class each, in the timber stores' shape (CLAUDE.md T32 2.1).
   glassRack: GLASS_RACK_VARIANTS,
   glassRackLarge: GLASS_RACK_LARGE_VARIANTS,
@@ -4204,6 +4233,28 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'timberShelter',
     boardCapacity: 400,
     effect: 'Holds ten times a rack\u0027s boards outside behind the hall, and takes no floor of the hall.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'timberShelterLarge',
+    // Built where it stands, as the timber shelter is [TUNE: chat] (v103).
+    deliveryDays: 15,
+    folder: 'Large timber shelters',
+    tab: 'storage',
+    name: 'Large timber shelter',
+    price: 500000,
+    category: 'storage',
+    width: 18,
+    depth: 3,
+    height: 4,
+    zoneWidth: 18,
+    zoneDepth: 3,
+    // No picture yet: the game draws it as it draws any kit whose picture has not landed, as the
+    // glass shelter (v100).
+    spriteKey: 'timberShelterLarge',
+    boardCapacity: 3000,
+    // [TUNE wording] (v103).
+    effect: 'Holds 3,000 boards outside behind the hall, seven and a half times a timber shelter, and takes no floor of the hall.',
   },
   {
     ...BASE_SPEC,
@@ -5218,6 +5269,8 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   timberShelter: { x: 0, y: 1, yard: true, rear: true },
   // And the glass shelter beside it [PIOTR, 16.10: "outside"] (v100).
   glassShelter: { x: 0, y: 1, yard: true, rear: true },
+  // And the large timber shelter [PIOTR, 17.10: "outside"] (v103).
+  timberShelterLarge: { x: 0, y: 1, yard: true, rear: true },
 };
 
 /** Bench slots, in order, along the middle of the hall clear of the rooms and the personnel door.
