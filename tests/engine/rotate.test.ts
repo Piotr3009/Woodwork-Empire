@@ -252,11 +252,16 @@ describe('what turning does to the picture', () => {
     // work sheet (`.work.sheet.png`) and a stack overlay (`.stackNN.png`) are neither a class's
     // picture nor a turned one, and none of them is counted here.
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    // One hundred and ten from v98: the two glass racks' turns (docs/art/SPRITES.md 17).
-    expect(turned).toHaveLength(110);
+    // One hundred and ten from v98: the two glass racks' turns (docs/art/SPRITES.md 17). One hundred
+    // and sixteen from v108: the door line's six modules turned, the art side's P3
+    // (docs/art/pack-p3-1810/).
+    expect(turned).toHaveLength(116);
     expect(turned.some((name) => name.includes('.work.sheet') || /\.stack\d\d/.test(name))).toBe(false);
-    // Nor a vehicle's sheet or the line's pallet of Turn 31 (CLAUDE.md T31 2.10).
-    expect(turned.some((name) => name.startsWith('vehicle.') || name.startsWith('windowPallet'))).toBe(false);
+    // Nor a vehicle's sheet or a line's pallet: the window pallet of Turn 31 (CLAUDE.md T31 2.10)
+    // and the door pallet of v108, whose turns stay in their packs as nothing turns a pallet.
+    expect(
+      turned.some((name) => name.startsWith('vehicle.') || name.startsWith('windowPallet') || name.startsWith('doorPallet')),
+    ).toBe(false);
     for (const family of ['cnc', 'cncToolChanger', 'compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'sprayBooth', 'tableSaw', 'toolCabinet', 'workbench']) {
       for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
         expect(turned, `${family}.${tier}`).toContain(`${family}.${tier}.r.png`);

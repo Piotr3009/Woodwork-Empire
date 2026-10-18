@@ -85,13 +85,8 @@ import {
 import { lineBox } from '../engine/layout';
 import { lineUpgradeCheck, lineWindowEvery } from '../engine/lineContract';
 import { andList, inWords } from '../engine/text';
-import { borrowedSprite, spriteUrl } from '../render/sprites';
-import {
-  DOOR_LINE_CARD_FILTER,
-  STORE_EXPANDED_CARD_FILTER,
-  doorLineFilter,
-  expandedStoreFilter,
-} from '../render/hall';
+import { spriteUrl } from '../render/sprites';
+import { STORE_EXPANDED_CARD_FILTER, expandedStoreFilter } from '../render/hall';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import type { LineKind } from '../engine/types';
 import {
@@ -299,13 +294,7 @@ export function pictureKeyOf(spec: { id: string; spriteKey: string }): string {
 /** Where the picture of this class goes: the file the art side delivered for this very class,
  *  through the loader, and a box while there is none (CLAUDE.md T3 3.6, T7 3.7). */
 export function pictureSlot(spriteKey: string, tier: string, small = false, red = false): string {
-  // A door line's module borrows the window line's picture until its own comes, in the door line's
-  // grey on its card as in the hall (v107).
-  const borrowed = borrowedSprite(spriteKey);
-  const url = spriteUrl(borrowed ?? spriteKey, tier);
-  const filtered = (id: string, filter: string): string =>
-    `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" style="filter:url(#${id})" />` +
-    `<svg class="filter-defs" width="0" height="0" aria-hidden="true" style="position:absolute">${filter}</svg>`;
+  const url = spriteUrl(spriteKey, tier);
   // A store made twice the size is red on its card as it is in the hall, through the same filter
   // under the card's own id, written beside the picture so the page has it wherever the card is
   // drawn (v105).
@@ -313,10 +302,11 @@ export function pictureSlot(spriteKey: string, tier: string, small = false, red 
     url === null
       ? '<span class="tile-picture-box"></span>'
       : red
-        ? filtered(STORE_EXPANDED_CARD_FILTER, expandedStoreFilter(STORE_EXPANDED_CARD_FILTER))
-        : borrowed !== null
-          ? filtered(DOOR_LINE_CARD_FILTER, doorLineFilter(DOOR_LINE_CARD_FILTER))
-          : `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" />`;
+        ? `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" ` +
+          `style="filter:url(#${STORE_EXPANDED_CARD_FILTER})" />` +
+          `<svg class="filter-defs" width="0" height="0" aria-hidden="true" style="position:absolute">` +
+          `${expandedStoreFilter(STORE_EXPANDED_CARD_FILTER)}</svg>`
+        : `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" />`;
   // The same slot at a row's height, for a list of what stands in the hall rather than a card of
   // one class of it (CLAUDE.md T20 2.9): one picture in the game, one class beside it.
   return (

@@ -1,0 +1,16 @@
+{
+  "cellWidth": 272,
+  "cellHeight": 256,
+  "anchorX": 136,
+  "anchorY": 192,
+  "frames": 6,
+  "fps": 8,
+  "rows": {
+    "sw": 0,
+    "se": 1,
+    "nw": 2,
+    "ne": 3
+  },
+  "loop": true,
+  "loadCenterAheadM": 1.0
+}

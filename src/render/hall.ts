@@ -148,7 +148,6 @@ import {
 import {
   SPRITE_DIR,
   SPRITE_SCALE,
-  borrowedSprite,
   contactShadow,
   mirrorNeeded,
   pickSprite,
@@ -1800,36 +1799,6 @@ export function rearWallClip(widthCells: number): string {
   );
 }
 
-/** The id of the filter the door line's borrowed pictures are drawn through (v107), and the same
- *  filter under its own id for a card's picture on the page. */
-export const DOOR_LINE_FILTER = 'door-line';
-export const DOOR_LINE_CARD_FILTER = 'door-line-card';
-
-/** The door line drawn from the window line's pictures until its own come [PIOTR, 18.10: "windows
- *  in grey"] (v107): the window line's blue housings, its steel and its glass go to a light grey by
- *  how light each point of them is, the art side's own order for the door line asking for light grey
- *  housings, and the timber and the yellow markings keep their colours, the store's rule for its
- *  wood (`expandedStoreFilter`) [TUNE: the grey, checked on the six modules]. */
-export function doorLineFilter(id: string = DOOR_LINE_FILTER): string {
-  // The light grey: how light each point is, lifted along a curve that keeps black black, so the
-  // shadows and the dark parts stay dark and the blue of a housing comes out a light grey.
-  const curve = 'type="table" tableValues="0 0.55 0.75 0.9 1"';
-  return (
-    `<filter id="${id}" color-interpolation-filters="sRGB">` +
-    '<feColorMatrix in="SourceGraphic" type="matrix" result="light" values="' +
-    '0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0" />' +
-    `<feComponentTransfer in="light" result="grey"><feFuncR ${curve} /><feFuncG ${curve} /><feFuncB ${curve} /></feComponentTransfer>` +
-    // The timber and the yellow: nothing up to a red a fifteenth over the blue, all of it from an
-    // eighth over, as the store's filter keeps its wood.
-    '<feColorMatrix in="SourceGraphic" type="matrix" result="wood" values="' +
-    '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 -12 0 -0.8" />' +
-    '<feComposite in="SourceGraphic" in2="wood" operator="in" result="kept" />' +
-    '<feComposite in="grey" in2="wood" operator="out" result="painted" />' +
-    '<feComposite in="kept" in2="painted" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" />' +
-    '</filter>'
-  );
-}
-
 /** The id of the filter a store made bigger is drawn through (v105). */
 export const STORE_EXPANDED_FILTER = 'store-expanded';
 /** The same filter under its own id for the store's picture on its card, which is drawn on the page
@@ -2037,10 +2006,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       ),
     );
   }
-  // The red a store made bigger is drawn through (v105), and the grey of the door line's borrowed
-  // pictures (v107).
+  // The red a store made bigger is drawn through (v105).
   parts.push(expandedStoreFilter());
-  parts.push(doorLineFilter());
 
   // The grid is the painting's business once the painting is there, except while the player is
   // setting the hall out, when he needs to see the cells he is dropping on.
@@ -2184,8 +2151,6 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const marked = markedMachines.get(item.id);
     const top = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
     const fx = machineFx(state, item, spec);
-    const borrowed = borrowedSprite(item.spriteKey, files);
-    const drawn = borrowed === null ? item : { ...item, spriteKey: borrowed };
     const foot: FloorBox = { x: stands.x, y: stands.y, width: stands.width, depth: stands.depth };
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
@@ -2199,14 +2164,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `class="clickable${fx.className}">` +
         `<title>${escapeText(tooltip)}</title>` +
         (item.expanded === true ? `<g filter="url(#${STORE_EXPANDED_FILTER})">` : '') +
-        // A door line's module borrows the window line's picture, sheet and stacks, in grey, until
-        // its own come (v107).
-        (borrowed === null ? '' : `<g filter="url(#${DOOR_LINE_FILTER})">`) +
-        (isLineModule(item.specId) && moduleWorks(state, item) && workSheetFile(drawn, files) !== null
-          ? workingArt(drawn, stands, files)
+        (isLineModule(item.specId) && moduleWorks(state, item) && workSheetFile(item, files) !== null
+          ? workingArt(item, stands, files)
           : objectArt({
               files,
-              spriteKey: artKeyOf(drawn, headed, files),
+              spriteKey: artKeyOf(item, headed, files),
               tier: item.variantId,
               orientation: item.orientation,
               x: stands.x,
@@ -2219,8 +2181,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
               label: name,
             })) +
         (item.expanded === true ? '</g>' : '') +
-        palletStack(state, drawn, stands, files) +
-        (borrowed === null ? '' : '</g>') +
+        palletStack(state, item, stands, files) +
         (unconnected ? notConnectedLabel(stands) : '') +
         (keeps === null ? '' : rackCount(item, stockOnItem(state, item))) +
         fx.svg +
@@ -2485,8 +2446,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // beside the first along x and two at the most, a part pallet drawn as a full one, and one label
   // hung under the front of their floor so that it does not sit on the finished goods' (CLAUDE.md
   // T30 2.8, T31 2.10; v93) [TUNE: chat]. A line's forklift hides the newest while it is on its forks.
-  // The windows' first and then the doors', a door pallet the window pallet in the door line's grey
-  // until its own comes, and the label naming each kind that waits (v107).
+  // The windows' first and then the doors', each kind's own pallet, and the label naming each kind
+  // that waits (v107; v108: the art side's door pallet).
   const pallets = palletsAtTheGate(state);
   if (pallets > 0) {
     const gate = LINE_PALLET_LAYOUT;
@@ -2499,16 +2460,13 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     shown.forEach((kind, index) => {
       const x = gate.x + index * gate.width;
       const title = `${capitalFirst(LINE_KINDS[kind].units)} for collection`;
-      const own = `${kind}Pallet`;
-      const borrowedPallet = borrowedSprite(own, files);
       drawables.push({
         depth: depthKey(x, gate.y),
         svg:
           `<g data-line-pallet="${index}" data-pallet-kind="${kind}"><title>${title}</title>` +
-          (borrowedPallet === null ? '' : `<g filter="url(#${DOOR_LINE_FILTER})">`) +
           objectArt({
             files,
-            spriteKey: borrowedPallet ?? own,
+            spriteKey: LINE_KINDS[kind].palletSprite,
             tier: 'standard',
             x,
             y: gate.y,
@@ -2519,7 +2477,6 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
             shade: 'var(--kit-stock-dark)',
             label: title,
           }) +
-          (borrowedPallet === null ? '' : '</g>') +
           '</g>',
       });
     });

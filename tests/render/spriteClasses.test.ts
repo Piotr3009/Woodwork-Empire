@@ -215,8 +215,9 @@ describe('the file on disk and the footprint in the engine', () => {
     // canvas of the 1 by 1 by 1 its set declares (CLAUDE.md T30 2.1). A hundred and eleven with
     // the line's six modules of Turn 30, 3 m high, the sixth new (CLAUDE.md T30 2.2); the loop names
     // a class's picture exactly, so a work sheet or a stack overlay is never one of them. A hundred
-    // and thirteen from v98: the two glass racks of G1 (docs/art/SPRITES.md 17).
-    expect(checked).toBe(113);
+    // and thirteen from v98: the two glass racks of G1 (docs/art/SPRITES.md 17). A hundred and
+    // nineteen from v108: the door line's six modules of P3, on the window modules' canvas.
+    expect(checked).toBe(119);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }
@@ -258,18 +259,26 @@ describe('the file on disk and the footprint in the engine', () => {
     // line's five modules and the two timber stores (CLAUDE.md T29 2.4). One hundred and eight
     // from v89, the line's sixth module (CLAUDE.md T30 2.2); the six work sheets and the ten stack
     // overlays are on disk and are neither class pictures nor turned ones. One hundred and ten
-    // from v98: the two glass racks' turns (docs/art/SPRITES.md 17).
-    expect(turnedFiles).toHaveLength(110);
+    // from v98: the two glass racks' turns (docs/art/SPRITES.md 17). One hundred and sixteen from
+    // v108: the door line's six modules turned (P3; its pallet's turn stays in the pack, as the
+    // window pallet's does); and twelve work sheets and twenty stack overlays, the door line's
+    // beside the window line's.
+    expect(turnedFiles).toHaveLength(116);
     const sheets = spriteFiles().filter((name) => name.endsWith('.work.sheet.png'));
     const overlays = spriteFiles().filter((name) => /\.stack\d\d\.png$/.test(name));
-    expect(sheets).toHaveLength(6);
-    expect(overlays).toHaveLength(10);
+    expect(sheets).toHaveLength(12);
+    expect(overlays).toHaveLength(20);
     for (const name of [...sheets, ...overlays]) expect(turnedFiles, name).not.toContain(name);
     // Turn 31's two new kinds of file, the forklift's sheets of four rows and the pallet that is no
     // family's class, are neither class pictures nor turned ones either (CLAUDE.md T31 2.10).
+    // The door pallet's own forklift sheet from v108 (P3).
     const vehicles = spriteFiles().filter((name) => name.startsWith('vehicle.') && name.endsWith('.sheet.png'));
-    expect(vehicles).toEqual(['vehicle.forklift.drive.sheet.png', 'vehicle.forklift.driveLoaded.sheet.png']);
-    for (const name of [...vehicles, 'windowPallet.standard.png']) expect(turnedFiles, name).not.toContain(name);
+    expect(vehicles).toEqual([
+      'vehicle.forklift.drive.sheet.png',
+      'vehicle.forklift.driveLoaded.sheet.png',
+      'vehicle.forklift.driveLoadedDoor.sheet.png',
+    ]);
+    for (const name of [...vehicles, 'windowPallet.standard.png', 'doorPallet.standard.png']) expect(turnedFiles, name).not.toContain(name);
   });
 
   it('draws the CNC with its tool changer on the CNC s own canvas, both ways round (v56)', () => {

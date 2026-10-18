@@ -235,7 +235,7 @@ export const STATE_VERSION = 51;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v107';
+export const APP_VERSION = 'v108';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -6178,8 +6178,10 @@ export interface LineKindSpec {
   /** What one unit takes off the timber stores and the glass racks. */
   boards: number;
   glass: number;
-  /** The units a pallet takes before it goes to the gate. */
+  /** The units a pallet takes before it goes to the gate, and the picture of a full one standing
+   *  alone at the gate. */
   palletUnits: number;
+  palletSprite: string;
   upgrades: readonly LineUpgradeSpec[];
   /** The line's card's sentence, in the place of a class's description. */
   description: string;
@@ -6208,6 +6210,7 @@ export const LINE_KINDS: Readonly<Record<LineKind, LineKindSpec>> = {
     boards: LINE_BOARDS_PER_WINDOW,
     glass: LINE_GLASS_PER_WINDOW,
     palletUnits: LINE_PALLET_WINDOWS,
+    palletSprite: 'windowPallet',
     upgrades: LINE_UPGRADES,
     description: LINE_DESCRIPTION,
     rowTails: LINE_ROW_TAIL,
@@ -6231,6 +6234,7 @@ export const LINE_KINDS: Readonly<Record<LineKind, LineKindSpec>> = {
     boards: LINE_BOARDS_PER_WINDOW * DOOR_LINE_FACTOR,
     glass: LINE_GLASS_PER_WINDOW * DOOR_LINE_FACTOR,
     palletUnits: LINE_PALLET_WINDOWS,
+    palletSprite: 'doorPallet',
     upgrades: DOOR_LINE_UPGRADES,
     description:
       'Six modules of 6 m by 3 m, end to end: a cross cut saw and a planer, a five axis CNC, a through ' +
@@ -6337,8 +6341,8 @@ const LINE_WORK_SHEET: WorkSheetFigures = {
 /** The machines that have a working motion, by family: the line's six, module N starting its loop
  *  at minute `(N - 1) * LINE_SHEET_STAGGER_MINUTES` of the hour (CLAUDE.md T30 2.11; v91). */
 export const MACHINE_WORK_SHEETS: Readonly<Record<string, WorkSheetFigures>> = Object.fromEntries(
-  // Every kind's modules: the door line plays the window line's sheets until its own come, in the
-  // same cells (v107).
+  // Every kind's modules, the door line's sheets the art side's own of P3 in the window line's cells
+  // and figures (docs/art/pack-p3-1810/sheets/; v107, v108).
   ALL_LINE_MODULES.map((id) => [
     id,
     { ...LINE_WORK_SHEET, atMinute: ((LINE_MODULE_INDEX.get(id)?.place ?? 1) - 1) * LINE_SHEET_STAGGER_MINUTES },
@@ -6363,8 +6367,9 @@ export interface VehicleSheetFigures {
 /** The art side's figures for the line's forklift, empty and with the pallet of ten windows on its
  *  forks, written once from the two JSONs of L3 (docs/art/pack-l3-1110/sheets/, not served): six
  *  frames at 8 a second in cells of 272 by 256 anchored at 136, 192, four rows `sw`, `se`, `nw` and
- *  `ne` (PIOTR, 11.10: "akceptacja jest"; CLAUDE.md T31 2.10) [TUNE: the name]. */
-export const FORKLIFT_SHEETS: Readonly<Record<'empty' | 'loaded', VehicleSheetFigures>> = {
+ *  `ne` (PIOTR, 11.10: "akceptacja jest"; CLAUDE.md T31 2.10) [TUNE: the name]. And with the pallet
+ *  of ten doors, the same forklift and cells from the art side's P3 (docs/art/pack-p3-1810/, v108). */
+export const FORKLIFT_SHEETS: Readonly<Record<'empty' | 'loaded' | 'loadedDoor', VehicleSheetFigures>> = {
   empty: {
     file: 'vehicle.forklift.drive.sheet.png',
     cellWidth: 272,
@@ -6387,6 +6392,17 @@ export const FORKLIFT_SHEETS: Readonly<Record<'empty' | 'loaded', VehicleSheetFi
     rows: { sw: 0, se: 1, nw: 2, ne: 3 },
     loop: true,
   },
+  loadedDoor: {
+    file: 'vehicle.forklift.driveLoadedDoor.sheet.png',
+    cellWidth: 272,
+    cellHeight: 256,
+    anchorX: 136,
+    anchorY: 192,
+    frames: 6,
+    fps: 8,
+    rows: { sw: 0, se: 1, nw: 2, ne: 3 },
+    loop: true,
+  },
 };
 
 /** How fast the line's forklift drives, in cells of real time a second, at every speed of the clock
@@ -6398,6 +6414,15 @@ export const FORKLIFT_CELLS_PER_SECOND = 3;
  *  drives: the art side's own figure, `loadCenterXM` in docs/art/pack-l3-1110/reports/
  *  load-contact-QA.json (CLAUDE.md T31 2.10). */
 export const FORKLIFT_LOAD_AHEAD = 1.225;
+
+/** A line's forklift loaded, by what the line makes: the sheet it drives its pallet in and how far
+ *  ahead of its anchor the middle of that pallet is. The door pallet is the art side's new four way
+ *  pallet, carried crosswise with its middle a metre ahead (`loadCenterAheadM` of the P3 forklift
+ *  sheet's JSON, docs/art/pack-p3-1810/) (v108). */
+export const FORKLIFT_LOADED_BY_KIND: Readonly<Record<LineKind, { sheet: VehicleSheetFigures; ahead: number }>> = {
+  window: { sheet: FORKLIFT_SHEETS.loaded, ahead: FORKLIFT_LOAD_AHEAD },
+  door: { sheet: FORKLIFT_SHEETS.loadedDoor, ahead: 1 },
+};
 
 export const HIRING_SPECS: HiringSpec[] = [
   ...tieredSpecs(

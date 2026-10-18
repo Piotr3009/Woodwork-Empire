@@ -2,7 +2,15 @@
 // placeholder box, and the picture beside it when the art side has delivered one. This page is
 // the acceptance tool of docs/art/SPRITES.md item 7 (CLAUDE.md T3 3.6).
 
-import { CNC_TOOL_CHANGER_SPRITE, CUTTER_SETS, EQUIPMENT_SPECS, FORKLIFT_SHEETS, LINE_PALLET_LAYOUT } from '../engine/constants';
+import {
+  CNC_TOOL_CHANGER_SPRITE,
+  CUTTER_SETS,
+  EQUIPMENT_SPECS,
+  FORKLIFT_SHEETS,
+  LINE_KINDS,
+  LINE_KIND_ORDER,
+  LINE_PALLET_LAYOUT,
+} from '../engine/constants';
 import {
   HALL_CANVAS,
   HALL_LAYERS,
@@ -149,20 +157,23 @@ export function spriteTargets(): SpriteTarget[] {
     zoneDepth: PALLET_LAYOUT.depth,
     where: 'at the gate',
   });
-  // The pallet of the line's ten windows standing alone, which is no family's class either: its
-  // size is where it stands at the gate (CLAUDE.md T31 2.10).
-  add({
-    name: 'windowPallet.standard',
-    specId: 'windowPallet',
-    spriteKey: 'windowPallet',
-    tier: 'standard',
-    width: LINE_PALLET_LAYOUT.width,
-    depth: LINE_PALLET_LAYOUT.depth,
-    height: LINE_PALLET_LAYOUT.height,
-    zoneWidth: LINE_PALLET_LAYOUT.width,
-    zoneDepth: LINE_PALLET_LAYOUT.depth,
-    where: "at the gate, the line's",
-  });
+  // The pallet of a line's ten windows or ten doors standing alone, which is no family's class
+  // either: its size is where it stands at the gate (CLAUDE.md T31 2.10; v108: the door line's).
+  for (const kind of LINE_KIND_ORDER) {
+    const key = LINE_KINDS[kind].palletSprite;
+    add({
+      name: `${key}.standard`,
+      specId: key,
+      spriteKey: key,
+      tier: 'standard',
+      width: LINE_PALLET_LAYOUT.width,
+      depth: LINE_PALLET_LAYOUT.depth,
+      height: LINE_PALLET_LAYOUT.height,
+      zoneWidth: LINE_PALLET_LAYOUT.width,
+      zoneDepth: LINE_PALLET_LAYOUT.depth,
+      where: `at the gate, the ${LINE_KINDS[kind].unit} line's`,
+    });
+  }
   return targets;
 }
 
@@ -416,11 +427,12 @@ function characterCell(role: string, animation: Animation): string {
   );
 }
 
-/** The line's forklift, its two sheets whole: four rows, one a direction (`sw`, `se`, `nw`, `ne`
- *  from the top), six frames a row, at 2x like every sprite, the anchor marked in every cell
- *  (CLAUDE.md T31 2.10). A vehicle's sheet is no class's picture and no turn of one. */
+/** The line's forklift, its sheets whole, empty and loaded with each kind's pallet: four rows, one a
+ *  direction (`sw`, `se`, `nw`, `ne` from the top), six frames a row, at 2x like every sprite, the
+ *  anchor marked in every cell (CLAUDE.md T31 2.10; v108). A vehicle's sheet is no class's picture
+ *  and no turn of one. */
 function vehicleSection(): string {
-  const cells = (['empty', 'loaded'] as const).map((load) => {
+  const cells = (['empty', 'loaded', 'loadedDoor'] as const).map((load) => {
     const sheet = FORKLIFT_SHEETS[load];
     const width = (sheet.cellWidth * sheet.frames) / SPRITE_SCALE;
     const height = (sheet.cellHeight * Object.keys(sheet.rows).length) / SPRITE_SCALE;

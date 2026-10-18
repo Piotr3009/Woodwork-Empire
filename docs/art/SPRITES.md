@@ -926,3 +926,36 @@ later pack, or the clock's box may be given a level of its own. The hall's six f
 previewed on the same day (one sheet, not game files) are not in the game: the hall's background is
 one painting a size of hall (section 9), so a finish is a painting a size, and that is a request of
 its own for a later turn.
+
+## 19. The door line, its pallet and its forklift (P3, 18.10.2026; v108)
+
+Piotr asked for a door line on 18.10 ("a door line, two times the windows; only the look of the line
+different"; the game's in v107, drawn until then from the window line's pictures in grey), and the
+art side delivered P3 the same evening, marked PODGLĄD: a preview waiting for his acceptance, with no
+`approval.json`. Piotr: "for now swap in only the door graphics". Its thirty game files went into
+`public/sprites/` byte for byte (each matches its line in `docs/art/pack-p3-1810/checksums.sha256`),
+and the grey stand in went. The handoff, the README, the measurements, the checksums, the seven sheet
+JSONs and the pallet's 90 degree view (which nothing turns and which is not served, as the window
+pallet's) are kept in `docs/art/pack-p3-1810/`; the masters, models, frames, sources, reports and
+previews stay in the delivered ZIP. No agent altered a pixel. A FINAL of P3 is to keep the same
+bytes, and the checksums tell.
+
+| Files in public/sprites/ | What they are | File, px | Anchor |
+|---|---|---|---|
+| `doorLine1.standard.png` to `doorLine6.standard.png` | the six modules, view 0, 6 × 3 × 3 m each, in light grey housings with blue doors: a cross cut saw and a four sided planer; a five axis CNC; brush heads and a sanding belt; a press closing from four sides; a spraying robot in its booth; the Glazing, the hanging and the packing, with a gantry that sets each door set on the pallet | 448 × 376 | 296, 368 |
+| `doorLine1.standard.r.png` to `doorLine6.standard.r.png` | the 90 degree views, in the game's own turn `(x, y, z) -> (y, w - x, z)` | 448 × 376 | 152, 368 |
+| `doorLine1.standard.work.sheet.png` to `doorLine6.standard.work.sheet.png` | the working motion: twelve cells of 448 × 376 in one row, 6 frames a second, a loop of two seconds | 5,376 × 376 | 296, 368 in each cell |
+| `doorLine6.standard.stack01.png` to `stack10.png` | one to ten wrapped door sets on module 6's pallet, view 0 only, the doors alone | 448 × 376 | 296, 368 |
+| `doorPallet.standard.png` | the pallet of ten door sets standing alone, view 0, 2 × 1 × 1.75 m | 160 × 172 | 104, 164 |
+| `vehicle.forklift.driveLoadedDoor.sheet.png` | the line's forklift of section 16 with the door pallet on its forks | 1,632 × 1,024, cells 272 × 256 | 136, 192 in every cell |
+
+**How the game uses them.** Every canvas, cell and anchor is the window line's of sections 15.2 and
+16, so the code that draws a window line draws a door line with no figure of its own: the modules and
+their sheets by the module's own key (one entry of `MACHINE_WORK_SHEETS` serves both kinds), module 6
+with one to nine door sets on its pallet drawn with the one overlay of that many, and `stack10` on
+disk and not drawn; the full pallet at the gate by the line's kind (`palletSprite` in `LINE_KINDS`);
+and the forklift, on its way out, with its own kind's pallet (`FORKLIFT_LOADED_BY_KIND`). The door
+pallet is the art side's new four way pallet (2 × 1 × 0.228 m, its deck's underside at 0.18 m, so
+that the forks of L3 take it unchanged), carried crosswise with its middle 1.0 m ahead of the anchor
+(`loadCenterAheadM` of its JSON), where the window pallet's is 1.225 m. The Sprite check page lists
+the door pallet beside the window pallet and the loaded door sheet beside the other two.

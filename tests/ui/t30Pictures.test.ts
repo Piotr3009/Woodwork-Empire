@@ -16,7 +16,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { LINE_MODULES } from '../../src/engine/constants';
+import { ALL_LINE_MODULES, LINE_MODULES } from '../../src/engine/constants';
 import { footprintOf } from '../../src/engine/machines';
 import { spriteFileSize, spriteFiles } from '../../src/render/sprites';
 
@@ -63,13 +63,16 @@ describe('the pictures of the line (CLAUDE.md T30 2.2, section 7)', () => {
     }
   });
 
-  it('holds six work sheets of twelve cells and ten overlays, none of them a class picture or a turn', () => {
+  it('holds six work sheets of twelve cells and ten overlays a line, none of them a class picture or a turn', () => {
+    // The window line's and, from v108, the door line's of P3 beside them (flipped).
     const sheets = spriteFiles().filter((name) => name.endsWith('.work.sheet.png'));
-    expect(sheets).toEqual(LINE_MODULES.map((id) => `${id}.standard.work.sheet.png`).sort());
+    expect(sheets).toEqual(ALL_LINE_MODULES.map((id) => `${id}.standard.work.sheet.png`).sort());
     for (const sheet of sheets) expect(pngSize(sheet), sheet).toEqual({ width: 12 * 448, height: 376 });
     const overlays = spriteFiles().filter((name) => /\.stack\d\d\.png$/.test(name));
     expect(overlays).toEqual(
-      Array.from({ length: 10 }, (_, index) => `windowLine6.standard.stack${String(index + 1).padStart(2, '0')}.png`),
+      ['doorLine6', 'windowLine6'].flatMap((module) =>
+        Array.from({ length: 10 }, (_, index) => `${module}.standard.stack${String(index + 1).padStart(2, '0')}.png`),
+      ),
     );
     for (const name of [...sheets, ...overlays]) expect(name.endsWith('.r.png'), name).toBe(false);
   });

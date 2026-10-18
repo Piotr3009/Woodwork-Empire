@@ -1,0 +1,2270 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "file": "overlays/doorLine6.standard.stack01.png",
+      "kind": "overlay",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 49,
+      "exactProjectionVerified": true,
+      "sha256": "a3dfe6ceb18921d9da1d1d98246d22a58d7c0210cdd4e3b665ab76d517c1e0dc",
+      "contactPoints": []
+    },
+    {
+      "file": "overlays/doorLine6.standard.stack02.png",
+      "kind": "overlay",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 49,
+      "exactProjectionVerified": true,
+      "sha256": "efabd633d31fe023143c36fdce39e4551c28519f6bcddcb718ce9d498f3471e3",
+      "contactPoints": []
+    },
+    {
+      "file": "overlays/doorLine6.standard.stack03.png",
+      "kind": "overlay",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 49,
+      "exactProjectionVerified": true,
+      "sha256": "7114534dbbeba317469be8a4e6add643b63086b850870fa424ef6ae6a30ad460",
+      "contactPoints": []
+    },
+    {
+      "file": "overlays/doorLine6.standard.stack04.png",
+      "kind": "overlay",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 49,
+      "exactProjectionVerified": true,
+      "sha256": "d0de00214b5c81d6604ac1ba9f66d10c387291616db42ee283ab86a00fd3f455",
+      "contactPoints": []
+    },
+    {
+      "file": "overlays/doorLine6.standard.stack05.png",
+      "kind": "overlay",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 49,
+      "exactProjectionVerified": true,
+      "sha256": "625606b3e5fdc74cd12011387704943221ac727c81820b793d66e693ae43b8f6",
+      "contactPoints": []
+    },
+    {
+      "file": "overlays/doorLine6.standard.stack06.png",
+      "kind": "overlay",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 49,
+      "exactProjectionVerified": true,
+      "sha256": "4dd15878ac938f7bff07f4984aba1b1a9aed950e1cfb3a637ea4ffb0ceb50b6c",
+      "contactPoints": []
+    },
+    {
+      "file": "overlays/doorLine6.standard.stack07.png",
+      "kind": "overlay",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 49,
+      "exactProjectionVerified": true,
+      "sha256": "5dc03b6d70644acd5de8a86da8b1c1f83db53456e9c6c3680176a56c6f7c3b67",
+      "contactPoints": []
+    },
+    {
+      "file": "overlays/doorLine6.standard.stack08.png",
+      "kind": "overlay",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 49,
+      "exactProjectionVerified": true,
+      "sha256": "8ff0d7a784f8ae2c4b4d242f71345f21de2e621af47b7468e2cce7bb0681f716",
+      "contactPoints": []
+    },
+    {
+      "file": "overlays/doorLine6.standard.stack09.png",
+      "kind": "overlay",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 49,
+      "exactProjectionVerified": true,
+      "sha256": "fe958e2269aedbba4f357adc95943a50723af9796fc902051b0e15c47e714411",
+      "contactPoints": []
+    },
+    {
+      "file": "overlays/doorLine6.standard.stack10.png",
+      "kind": "overlay",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 49,
+      "exactProjectionVerified": true,
+      "sha256": "a0a743816401843bf76d91ac8d2279c1cd5eaf6bb5f629e86160db4f034eecce",
+      "contactPoints": []
+    },
+    {
+      "file": "sheets/doorLine1.standard.work.sheet.png",
+      "kind": "sheet",
+      "canvasPx": [
+        5376,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48,
+          -48,
+          0,
+          152
+        ],
+        [
+          24,
+          24,
+          -48,
+          152
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 18,
+      "exactProjectionVerified": true,
+      "sha256": "82cf90846ebd483068f360b651c8186f2cea724292017f1f8a2b0cbde1e84561",
+      "frames": 12,
+      "fps": 6,
+      "cellPx": [
+        448,
+        376
+      ],
+      "contactPoints": [
+        {
+          "module": 1,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sheets/doorLine2.standard.work.sheet.png",
+      "kind": "sheet",
+      "canvasPx": [
+        5376,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48,
+          -48,
+          0,
+          152
+        ],
+        [
+          24,
+          24,
+          -48,
+          152
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 25,
+      "exactProjectionVerified": true,
+      "sha256": "c70309fc73e0f49bd0962d5cbaf553d1767d399747b18fd3009312b099fdb21e",
+      "frames": 12,
+      "fps": 6,
+      "cellPx": [
+        448,
+        376
+      ],
+      "contactPoints": [
+        {
+          "module": 2,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 2,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sheets/doorLine3.standard.work.sheet.png",
+      "kind": "sheet",
+      "canvasPx": [
+        5376,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48,
+          -48,
+          0,
+          152
+        ],
+        [
+          24,
+          24,
+          -48,
+          152
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 28,
+      "exactProjectionVerified": true,
+      "sha256": "da9b1e3d75976546a195ce15b33421f4f91d7499d36d57d85b63ee0da18ef347",
+      "frames": 12,
+      "fps": 6,
+      "cellPx": [
+        448,
+        376
+      ],
+      "contactPoints": [
+        {
+          "module": 3,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 3,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sheets/doorLine4.standard.work.sheet.png",
+      "kind": "sheet",
+      "canvasPx": [
+        5376,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48,
+          -48,
+          0,
+          152
+        ],
+        [
+          24,
+          24,
+          -48,
+          152
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 17,
+      "exactProjectionVerified": true,
+      "sha256": "aba9a4a0d9a878cc5a8585a98cd9104f053159c56dcdbb7744f12e98e9e5bae5",
+      "frames": 12,
+      "fps": 6,
+      "cellPx": [
+        448,
+        376
+      ],
+      "contactPoints": [
+        {
+          "module": 4,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 4,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sheets/doorLine5.standard.work.sheet.png",
+      "kind": "sheet",
+      "canvasPx": [
+        5376,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48,
+          -48,
+          0,
+          152
+        ],
+        [
+          24,
+          24,
+          -48,
+          152
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 19,
+      "exactProjectionVerified": true,
+      "sha256": "608cd72e4a5deb8af60c0b02a167d3026bf83e4bf93b13c366698801d755007e",
+      "frames": 12,
+      "fps": 6,
+      "cellPx": [
+        448,
+        376
+      ],
+      "contactPoints": [
+        {
+          "module": 5,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 5,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        },
+        {
+          "module": 5,
+          "kind": "rail",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            17666,
+            17798
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              53.60000000000002
+            ],
+            "90": [
+              80.0,
+              197.60000000000002
+            ]
+          }
+        },
+        {
+          "module": 5,
+          "kind": "rail",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            17666,
+            17798
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              197.60000000000002
+            ],
+            "90": [
+              368.0,
+              53.60000000000002
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sheets/doorLine6.standard.work.sheet.png",
+      "kind": "sheet",
+      "canvasPx": [
+        5376,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48,
+          -48,
+          0,
+          152
+        ],
+        [
+          24,
+          24,
+          -48,
+          152
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 18,
+      "exactProjectionVerified": true,
+      "sha256": "3c67649268a0c7dd7f4a9b092886c904b5c07acee5f475001391efcfa3b9a201",
+      "frames": 12,
+      "fps": 6,
+      "cellPx": [
+        448,
+        376
+      ],
+      "contactPoints": [
+        {
+          "module": 6,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            1588
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 6,
+          "kind": "rail",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            4280,
+            4412
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              53.60000000000002
+            ],
+            "90": [
+              80.0,
+              197.60000000000002
+            ]
+          }
+        },
+        {
+          "module": 6,
+          "kind": "rail",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            4280,
+            4412
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              197.60000000000002
+            ],
+            "90": [
+              368.0,
+              53.60000000000002
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sheets/vehicle.forklift.driveLoadedDoor.sheet.png",
+      "kind": "vehicleSheet",
+      "canvasPx": [
+        1632,
+        1024
+      ],
+      "envelopeMeters": [
+        3.89,
+        2.0,
+        2.224844210801631
+      ],
+      "anchorPx": [
+        136,
+        192
+      ],
+      "matrix": {
+        "sw": [
+          [
+            -48.0,
+            -48.0,
+            0.0,
+            136.0
+          ],
+          [
+            24.0,
+            -24.0,
+            -48.0,
+            192.0
+          ]
+        ],
+        "se": [
+          [
+            48.0,
+            -48.0,
+            0.0,
+            136.0
+          ],
+          [
+            24.0,
+            24.0,
+            -48.0,
+            192.0
+          ]
+        ],
+        "nw": [
+          [
+            -48.0,
+            48.0,
+            0.0,
+            136.0
+          ],
+          [
+            -24.0,
+            -24.0,
+            -48.0,
+            192.0
+          ]
+        ],
+        "ne": [
+          [
+            48.0,
+            48.0,
+            0.0,
+            136.0
+          ],
+          [
+            -24.0,
+            24.0,
+            -48.0,
+            192.0
+          ]
+        ]
+      },
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 11,
+      "exactProjectionVerified": true,
+      "sha256": "2546b90b33628650dfe1df9322127028e360bb89899e8885196453459438399b",
+      "frames": 6,
+      "fps": 8,
+      "cellPx": [
+        272,
+        256
+      ],
+      "rows": {
+        "sw": 0,
+        "se": 1,
+        "nw": 2,
+        "ne": 3
+      },
+      "contactPoints": []
+    },
+    {
+      "file": "sprites-2x/0/doorLine1.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 18,
+      "exactProjectionVerified": true,
+      "sha256": "01451dc21aeaf3ccc94056caf26367cade947991670c4cc47f8a850ff16d5b80",
+      "contactPoints": [
+        {
+          "module": 1,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/0/doorLine2.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 25,
+      "exactProjectionVerified": true,
+      "sha256": "7debdf9208b9d29318fd6dca2ee98e11e131f38e3d3ed95cc540f92601af9632",
+      "contactPoints": [
+        {
+          "module": 2,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 2,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/0/doorLine3.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 28,
+      "exactProjectionVerified": true,
+      "sha256": "433614ed2ee400d10d8360ce14af9f58964eedd2fc1c2c488bece816ccbe836b",
+      "contactPoints": [
+        {
+          "module": 3,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 3,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/0/doorLine4.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 17,
+      "exactProjectionVerified": true,
+      "sha256": "8edd9d993c886bdab0e28a2aafdf9c6d3cc9da5ddebc7c830f6fddf2fd99c986",
+      "contactPoints": [
+        {
+          "module": 4,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 4,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/0/doorLine5.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 19,
+      "exactProjectionVerified": true,
+      "sha256": "310e5b0988504a3ae56d2dbf2f57798f86487d96bc9137a9f4e7c14cd17a7db0",
+      "contactPoints": [
+        {
+          "module": 5,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 5,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        },
+        {
+          "module": 5,
+          "kind": "rail",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            17666,
+            17798
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              53.60000000000002
+            ],
+            "90": [
+              80.0,
+              197.60000000000002
+            ]
+          }
+        },
+        {
+          "module": 5,
+          "kind": "rail",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            17666,
+            17798
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              197.60000000000002
+            ],
+            "90": [
+              368.0,
+              53.60000000000002
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/0/doorLine6.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        296,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 18,
+      "exactProjectionVerified": true,
+      "sha256": "96204f095aef2a273096214c5d0ef539e6c7891fa1367440bc7919b84101dd7b",
+      "contactPoints": [
+        {
+          "module": 6,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            1588
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 6,
+          "kind": "rail",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            4280,
+            4412
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              53.60000000000002
+            ],
+            "90": [
+              80.0,
+              197.60000000000002
+            ]
+          }
+        },
+        {
+          "module": 6,
+          "kind": "rail",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            4280,
+            4412
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              197.60000000000002
+            ],
+            "90": [
+              368.0,
+              53.60000000000002
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/0/doorPallet.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        160,
+        172
+      ],
+      "envelopeMeters": [
+        2,
+        1,
+        1.75
+      ],
+      "anchorPx": [
+        104,
+        164
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          56.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          92.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 8,
+      "exactProjectionVerified": true,
+      "sha256": "fe149d9ee11d68e884bab2e69d1f93ae2915495dfcac3ac5fe704767d80dfbb2",
+      "contactPoints": []
+    },
+    {
+      "file": "sprites-2x/90/doorLine1.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        152,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          48.0,
+          0.0,
+          8.0
+        ],
+        [
+          -24.0,
+          24.0,
+          -48.0,
+          296.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 25,
+      "exactProjectionVerified": true,
+      "sha256": "04676950151407837f7e5f5c92100c3e3b3bb941427549acea3ebbe3ca6e4a18",
+      "contactPoints": [
+        {
+          "module": 1,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/90/doorLine2.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        152,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          48.0,
+          0.0,
+          8.0
+        ],
+        [
+          -24.0,
+          24.0,
+          -48.0,
+          296.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 24,
+      "exactProjectionVerified": true,
+      "sha256": "b99db2cf713f4df13ff28ab85e95fd39d481c73fb3d75bee8d947eb86d8df9e4",
+      "contactPoints": [
+        {
+          "module": 2,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 2,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/90/doorLine3.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        152,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          48.0,
+          0.0,
+          8.0
+        ],
+        [
+          -24.0,
+          24.0,
+          -48.0,
+          296.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 33,
+      "exactProjectionVerified": true,
+      "sha256": "6e854940ea1f585bd9880761b690a4f1228752fcd900df3d72fbc79fbc534f97",
+      "contactPoints": [
+        {
+          "module": 3,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 3,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/90/doorLine4.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        152,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          48.0,
+          0.0,
+          8.0
+        ],
+        [
+          -24.0,
+          24.0,
+          -48.0,
+          296.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 24,
+      "exactProjectionVerified": true,
+      "sha256": "f02be9d14f79a626ff37784eb67fec96dabc5a8b1eafd51a5a8b1261c0bec78a",
+      "contactPoints": [
+        {
+          "module": 4,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 4,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/90/doorLine5.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        152,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          48.0,
+          0.0,
+          8.0
+        ],
+        [
+          -24.0,
+          24.0,
+          -48.0,
+          296.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 19,
+      "exactProjectionVerified": true,
+      "sha256": "fdd111175c644372e54736c36c91951b12a9f743548b2859f82f6bf9e5922a84",
+      "contactPoints": [
+        {
+          "module": 5,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 5,
+          "kind": "conveyor",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            2784
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              288.8
+            ],
+            "90": [
+              368.0,
+              144.8
+            ]
+          }
+        },
+        {
+          "module": 5,
+          "kind": "rail",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            17666,
+            17798
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              53.60000000000002
+            ],
+            "90": [
+              80.0,
+              197.60000000000002
+            ]
+          }
+        },
+        {
+          "module": 5,
+          "kind": "rail",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            17666,
+            17798
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              197.60000000000002
+            ],
+            "90": [
+              368.0,
+              53.60000000000002
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/90/doorLine6.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        448,
+        376
+      ],
+      "envelopeMeters": [
+        6,
+        3,
+        3
+      ],
+      "anchorPx": [
+        152,
+        368
+      ],
+      "matrix": [
+        [
+          48.0,
+          48.0,
+          0.0,
+          8.0
+        ],
+        [
+          -24.0,
+          24.0,
+          -48.0,
+          296.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 18,
+      "exactProjectionVerified": true,
+      "sha256": "15c404665c4326c155666d301a33b0c4b8ebd91164cf4e5eec901fc1ab6ae293",
+      "contactPoints": [
+        {
+          "module": 6,
+          "kind": "conveyor",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            0.9
+          ],
+          "triangleRange": [
+            0,
+            1588
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              144.8
+            ],
+            "90": [
+              80.0,
+              288.8
+            ]
+          }
+        },
+        {
+          "module": 6,
+          "kind": "rail",
+          "end": "in",
+          "pointM": [
+            0,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            4280,
+            4412
+          ],
+          "pixels": {
+            "0": [
+              80.0,
+              53.60000000000002
+            ],
+            "90": [
+              80.0,
+              197.60000000000002
+            ]
+          }
+        },
+        {
+          "module": 6,
+          "kind": "rail",
+          "end": "out",
+          "pointM": [
+            6,
+            1.5,
+            2.8
+          ],
+          "triangleRange": [
+            4280,
+            4412
+          ],
+          "pixels": {
+            "0": [
+              368.0,
+              197.60000000000002
+            ],
+            "90": [
+              368.0,
+              53.60000000000002
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "sprites-2x/90/doorPallet.standard.png",
+      "kind": "static",
+      "canvasPx": [
+        160,
+        172
+      ],
+      "envelopeMeters": [
+        2,
+        1,
+        1.75
+      ],
+      "anchorPx": [
+        56,
+        164
+      ],
+      "matrix": [
+        [
+          48.0,
+          48.0,
+          0.0,
+          8.0
+        ],
+        [
+          -24.0,
+          24.0,
+          -48.0,
+          140.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 8,
+      "exactProjectionVerified": true,
+      "sha256": "04631f23b4819df662a0a3bad1ae73ab97988e379e6ec7bf6f9997149b6134e0",
+      "contactPoints": []
+    }
+  ]
+}

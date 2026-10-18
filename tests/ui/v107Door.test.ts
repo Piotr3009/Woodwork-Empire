@@ -9,16 +9,19 @@
 
 // @vitest-environment jsdom
 // v107: the door line on the game's own screens [PIOTR, 18.10: "a door line, two times the windows;
-// only the look of the line different"; "windows in grey" until the art side draws its own]. Its
-// folder beside the window line's in the catalogue, its card and its upgrades, its running block,
-// its books, and in the hall the window line's pictures in a light grey, its four engineers and its
-// pallet at the gate.
+// only the look of the line different"]. Its folder beside the window line's in the catalogue, its
+// card and its upgrades, its running block, its books, and in the hall its four engineers and its
+// pallet at the gate. From v108 its pictures are the art side's own of P3 [PIOTR, 18.10: "swap the
+// door graphics"], its pallet and its forklift loaded with it among them, in place of the window
+// line's in grey (flipped).
 
 import { describe, expect, it } from 'vitest';
 import { WINDOW_LINE_ORIGIN, lineModulesOf } from '../../src/engine/constants';
 import type { GameState, Worker } from '../../src/engine/index';
 import { lineState } from '../../src/engine/lineContract';
-import { DOOR_LINE_FILTER, renderHall } from '../../src/render/hall';
+import { FORKLIFT_LOADED_BY_KIND, FORKLIFT_SHEETS } from '../../src/engine/constants';
+import { forkliftNow, forkliftPoints, resetForklift, stepForklift, syncForklift } from '../../src/render/forklift';
+import { renderHall } from '../../src/render/hall';
 import { engineersArt } from '../../src/render/engineers';
 import { renderAccounting } from '../../src/ui/accounting';
 import { catalogueTabFrom, renderCatalogue } from '../../src/ui/catalogue';
@@ -100,10 +103,10 @@ describe('the catalogue (v107)', () => {
       expect(text, row).toContain(row);
     }
     expect(text).not.toContain('timber work goes');
-    // Until the art side draws it, the window line's module 1 in the door line's grey.
+    // The art side's own door line module 1 (flipped in v108: the window line's in grey before).
     const picture = card?.querySelector('.tile-picture img');
-    expect(picture?.getAttribute('src')).toContain('windowLine1.standard');
-    expect(picture?.getAttribute('style')).toContain('door-line-card');
+    expect(picture?.getAttribute('src')).toContain('doorLine1.standard');
+    expect(picture?.hasAttribute('style')).toBe(false);
     const upgrades = Array.from(folder.querySelectorAll('[data-upgrade]'));
     expect(upgrades.map((node) => node.getAttribute('data-upgrade'))).toEqual(['doorTooling', 'doorSoftware', 'doorPress', 'doorSprayRobot']);
     expect(upgrades[0]?.textContent).toContain('£800,000');
@@ -154,15 +157,23 @@ describe('the running block and the books (v107)', () => {
 });
 
 describe('the hall (v107)', () => {
-  it('draws the door line from the window line s pictures in the door line s grey', () => {
+  it('draws the door line from the art side s own pictures, and the window line as it always was', () => {
     const state = windowAndDoor();
     const hall = page(renderHall(state));
-    expect(hall.querySelector(`filter#${DOOR_LINE_FILTER}`)).not.toBeNull();
     const module3 = hall.querySelector('[data-kit="kit-line-2-3"]');
     expect(module3?.getAttribute('data-sprite')).toBe('doorLine3');
-    expect(module3?.querySelector(`g[filter="url(#${DOOR_LINE_FILTER})"] image`)?.getAttribute('href')).toContain('windowLine3.standard');
-    // The window line is drawn as it always was.
-    expect(hall.querySelector('[data-kit="kit-line-1-3"]')?.querySelector(`g[filter="url(#${DOOR_LINE_FILTER})"]`)).toBeNull();
+    expect(module3?.querySelector('image')?.getAttribute('href')).toContain('doorLine3.standard');
+    expect(hall.querySelector('[data-kit="kit-line-1-3"] image')?.getAttribute('href')).toContain('windowLine3.standard');
+    // No grey of the window line's pictures left anywhere (flipped in v108).
+    expect(hall.querySelector('filter#door-line, [filter="url(#door-line)"]')).toBeNull();
+  });
+
+  it('stacks the doors on module 6 s pallet from the art side s overlays', () => {
+    const state = windowAndDoor();
+    lineState(state, 2).onPallet = 6;
+    const stack = page(renderHall(state)).querySelector('[data-kit="kit-line-2-6"] .pallet-stack');
+    expect(stack?.getAttribute('data-stack')).toBe('6');
+    expect(stack?.getAttribute('href')).toContain('doorLine6.standard.stack06');
   });
 
   it('walks the door line s four engineers along it and the window line s two', () => {
@@ -178,6 +189,7 @@ describe('the hall (v107)', () => {
     lineState(state, 2).palletsAtGate = 1;
     const doorsOnly = page(renderHall(state));
     expect(doorsOnly.querySelector('[data-line-pallet="0"]')?.getAttribute('data-pallet-kind')).toBe('door');
+    expect(doorsOnly.querySelector('[data-line-pallet="0"] image')?.getAttribute('href')).toContain('doorPallet.standard');
     expect(doorsOnly.textContent).toContain('Doors for collection: 1 pallet');
     lineState(state, 1).palletsAtGate = 1;
     const both = page(renderHall(state));
@@ -186,5 +198,39 @@ describe('the hall (v107)', () => {
       'door',
     ]);
     expect(both.textContent).toContain('For collection: 1 pallet of windows and 1 of doors');
+  });
+});
+
+describe('the door line s forklift (v108)', () => {
+  it('drives the door pallet to the gate in its own sheet, a metre ahead of it, and leaves that pallet out of the gate', () => {
+    resetForklift();
+    const state = windowAndDoor();
+    state.speed = 1;
+    state.activeEvent = null;
+    state.eventQueue = [];
+    const points = forkliftPoints(state, 2);
+    if (points === null) throw new Error('the door line s forklift is wanted');
+    // The pallets' row is at y 10 to 11; the door line's lane comes to it from below, so it stops a
+    // metre short of the middle on that side.
+    expect(Math.abs(points.drop.y - 10.5)).toBeCloseTo(FORKLIFT_LOADED_BY_KIND.door.ahead, 6);
+    expect(FORKLIFT_LOADED_BY_KIND.door.ahead).toBe(1);
+    // A window pallet already waits at the gate when the forklifts are first seen; then the door line
+    // sends one and its forklift takes it.
+    lineState(state, 1).palletsAtGate = 1;
+    const holder = page(renderHall(state));
+    syncForklift(holder, state, 0);
+    expect(forkliftNow(1)?.leg).toBe('wait');
+    lineState(state, 2).palletsAtGate = 1;
+    stepForklift(holder, state, 100);
+    expect(forkliftNow(2)?.leg).toBe('out');
+    const written = page(renderHall(state));
+    syncForklift(written, state, 100);
+    for (let at = 200; at <= 600; at += 100) stepForklift(written, state, at);
+    const art = written.querySelector('[data-forklift-line="2"] [data-forklift-art]');
+    expect(art?.querySelector('image')?.getAttribute('href')).toBe(`/sprites/${FORKLIFT_SHEETS.loadedDoor.file}`);
+    // The door pallet is the second drawn, after the window pallet, and it is the one on the forks.
+    expect(written.querySelector('[data-line-pallet="1"]')?.getAttribute('data-pallet-kind')).toBe('door');
+    expect(written.querySelector('[data-line-pallet="1"]')?.getAttribute('visibility')).toBe('hidden');
+    expect(written.querySelector('[data-line-pallet="0"]')?.hasAttribute('visibility')).toBe(false);
   });
 });
