@@ -235,7 +235,7 @@ export const STATE_VERSION = 51;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v108';
+export const APP_VERSION = 'v109';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -6913,6 +6913,12 @@ export const CONTRACT_SHORT_WEEK_REPUTATION = 1;
 export const CONTRACT_SHORT_WEEKS_ALLOWED = 2;
 export const CONTRACT_RENEW_FULL_WEEK = 0.01;
 export const CONTRACT_RENEW_SHORT_WEEK = 0.02;
+/** [PIOTR, 18.10: "no more than 15 negotiations of one contract, or it grows for ever"] A standing
+ *  contract renewed this many times is renewed with no rise from then on: its client's offer is
+ *  never above the price a piece it had, and short weeks and the market's cut still lower it
+ *  (v109). Every standing contract, sheet or timber; the lines' contracts have their own fixed
+ *  price and are not renewed. */
+export const CONTRACT_PRICE_RISES_MAX = 15;
 /** [PIOTR, 11.10: "yes" to 3 per cent] At each week's close of a running contract for sheet pieces,
  *  the chance that the client goes elsewhere and ends it, with no other term (CLAUDE.md T31 2.9). */
 export const CONTRACT_CLIENT_LEAVES_CHANCE = 0.03;

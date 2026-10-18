@@ -142,8 +142,8 @@ describe('a fresh game in this build', () => {
     // v94 is state 46: a line given its lane. v95 is state 47: the hall made wider (PIOTR, 12.10).
     // v96 is Turn 32 and state 48: one store for every material (CLAUDE.md T32 section 4). v107 is
     // state 51: a line's kind, the door line (PIOTR, 18.10). v108 is state 51 too: the door line's
-    // own pictures.
-    expect(APP_VERSION).toBe('v108');
+    // own pictures. v109 is state 51 too: a contract's price rises at fifteen renewals at most.
+    expect(APP_VERSION).toBe('v109');
     expect(STATE_VERSION).toBe(51);
   });
 

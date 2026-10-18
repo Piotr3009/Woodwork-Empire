@@ -16,6 +16,7 @@ import {
   CONTRACT_QUANTITY_BANDS,
   CONTRACT_REFERENCE_CLASS,
   CONTRACT_REFERENCE_TIER,
+  CONTRACT_PRICE_RISES_MAX,
   CONTRACT_RENEW_FULL_WEEK,
   CONTRACT_RENEW_SHORT_WEEK,
   CONTRACT_SHORT_WEEKS_ALLOWED,
@@ -1314,13 +1315,33 @@ export function shortWeeksOf(contract: Contract): number {
   return contract.weeks.length - fullWeeksOf(contract);
 }
 
+/** How many times this contract has been renewed: every renewal is its term before with `-r`
+ *  added to the id (`renewContract`), so the count is in every save already (v109). */
+export function renewalsOf(contract: Contract): number {
+  let renewals = 0;
+  let id = contract.id;
+  while (id.endsWith('-r')) {
+    renewals += 1;
+    id = id.slice(0, -2);
+  }
+  return renewals;
+}
+
+/** True when the client will not raise this contract's price again: it has been renewed
+ *  `CONTRACT_PRICE_RISES_MAX` times [PIOTR, 18.10] (v109). */
+export function priceRisesUsedUp(contract: Contract): boolean {
+  return renewalsOf(contract) >= CONTRACT_PRICE_RISES_MAX;
+}
+
 /** What the client offers for another term: a percent up for every week delivered in full, two
- *  down for every short one (CLAUDE.md T13 3.16). A price a piece is whole pounds, the way the
- *  one money formatter prints it, so the offer is rounded to the pound. */
+ *  down for every short one (CLAUDE.md T13 3.16), and never up once the price has risen at as many
+ *  renewals as it may [PIOTR, 18.10] (v109). A price a piece is whole pounds, the way the one money
+ *  formatter prints it, so the offer is rounded to the pound. */
 export function renegotiatedPriceFor(contract: Contract): number {
   const factor =
     1 + fullWeeksOf(contract) * CONTRACT_RENEW_FULL_WEEK - shortWeeksOf(contract) * CONTRACT_RENEW_SHORT_WEEK;
-  return Math.round(contract.pricePerPiece * Math.max(0, factor));
+  const offered = Math.round(contract.pricePerPiece * Math.max(0, factor));
+  return priceRisesUsedUp(contract) ? Math.min(offered, contract.pricePerPiece) : offered;
 }
 
 export interface ClosingReport {
@@ -1394,13 +1415,21 @@ export function endedLine(contract: Contract): string {
 function offerSentence(contract: Contract, cut: number | null): string {
   if (contract.endedBy === 'lost') return 'The client has found another supplier: there is no other term.';
   const offered = contract.renegotiatedPrice ?? contract.pricePerPiece;
+  // Once the price has risen at as many renewals as it may, the card says why it no longer does
+  // [PIOTR, 18.10: the sentence "yes"] (v109).
+  const noHigher = priceRisesUsedUp(contract)
+    ? ` The client has raised his price ${CONTRACT_PRICE_RISES_MAX} times and will go no higher.`
+    : '';
   if (cut !== null) {
     return (
       `The client offers ${formatMoney(offered)} a piece for another term, ${cut}% less than now: ` +
-      'the market has turned.'
+      `the market has turned.${noHigher}`
     );
   }
-  return `The client offers ${formatMoney(offered)} a piece for another term. Renew or let it go on the Contracts tab.`;
+  return (
+    `The client offers ${formatMoney(offered)} a piece for another term.${noHigher} ` +
+    'Renew or let it go on the Contracts tab.'
+  );
 }
 
 function closingBody(state: GameState, contract: Contract, cut: number | null): string {
