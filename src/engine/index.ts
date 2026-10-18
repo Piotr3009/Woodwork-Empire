@@ -570,6 +570,21 @@ export {
 } from './orders';
 export type { DayOneItem, OrderLine } from './orders';
 
+// A store behind the wall made bigger, and a machine at the end of its life replaced (v105)
+export {
+  expandStoreCheck,
+  expansionPrice,
+  isExpandableStore,
+  isReplaceable,
+  lifeIsLow,
+  replaceCheck,
+  replacementDueDay,
+  replacementLine,
+  replacementPrice,
+  replacementWords,
+} from './renewal';
+export type { RenewalCheck } from './renewal';
+
 // Material and deliveries
 export {
   canUnload,

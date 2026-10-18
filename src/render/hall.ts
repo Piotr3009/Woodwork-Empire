@@ -1793,6 +1793,35 @@ export function rearWallClip(widthCells: number): string {
   );
 }
 
+/** The id of the filter a store made bigger is drawn through (v105). */
+export const STORE_EXPANDED_FILTER = 'store-expanded';
+/** The same filter under its own id for the store's picture on its card, which is drawn on the page
+ *  and not in the hall's picture (v105). */
+export const STORE_EXPANDED_CARD_FILTER = 'store-expanded-card';
+
+/** A store made twice the size is drawn red [PIOTR, 18.10: "the easiest, the colour just changes
+ *  to red"] (v105): its steel and its paint go to the game's red by how light each point of them
+ *  is, and the timber on its shelves keeps its own colour, since the wood is what is warm in the
+ *  picture, red well over blue [TUNE: the matrix and the threshold, checked on both views of the
+ *  timber shelter]. A store with no picture yet is drawn in the red itself (its box's fill), which
+ *  the same rule keeps. */
+export function expandedStoreFilter(id: string = STORE_EXPANDED_FILTER): string {
+  return (
+    `<filter id="${id}" color-interpolation-filters="sRGB">` +
+    // The red: about nine tenths of how light the point is on the red, a fifth of it on the green
+    // and the blue.
+    '<feColorMatrix in="SourceGraphic" type="matrix" result="red" values="' +
+    '0.27 0.53 0.1 0 0.08 0.06 0.118 0.022 0 0 0.06 0.118 0.022 0 0 0 0 0 1 0" />' +
+    // The wood: nothing up to a red a fifteenth over the blue, all of it from an eighth over.
+    '<feColorMatrix in="SourceGraphic" type="matrix" result="wood" values="' +
+    '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12 0 -12 0 -0.8" />' +
+    '<feComposite in="SourceGraphic" in2="wood" operator="in" result="kept" />' +
+    '<feComposite in="red" in2="wood" operator="out" result="painted" />' +
+    '<feComposite in="kept" in2="painted" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" />' +
+    '</filter>'
+  );
+}
+
 /** The forklift's lane of every line that stands or is on order and has one: the outline of each
  *  L, from the pallets at the gate along the left wall and along the front strip to the line's end,
  *  in the one token for it, marked with its line's number. Nothing for a line with no lane
@@ -1971,6 +2000,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       ),
     );
   }
+  // The red a store made bigger is drawn through (v105).
+  parts.push(expandedStoreFilter());
 
   // The grid is the painting's business once the painting is there, except while the player is
   // setting the hall out, when he needs to see the cells he is dropping on.
@@ -2080,8 +2111,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // the class reserves (CLAUDE.md T7 3.3).
     const stands = footprintIn(item);
     const broken = item.broken;
-    const fill = broken ? 'var(--stopped)' : CATEGORY_FILL[spec.category] ?? 'var(--kit-machine)';
-    const shade = broken
+    // A store made bigger is red, the box of one with no picture yet too (v105).
+    const red = broken || item.expanded === true;
+    const fill = red ? 'var(--stopped)' : CATEGORY_FILL[spec.category] ?? 'var(--kit-machine)';
+    const shade = red
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
     const bagLine = item.specId === 'extractor' && store.full ? ' (bags full)' : '';
@@ -2124,6 +2157,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
         `class="clickable${fx.className}">` +
         `<title>${escapeText(tooltip)}</title>` +
+        (item.expanded === true ? `<g filter="url(#${STORE_EXPANDED_FILTER})">` : '') +
         (isLineModule(item.specId) && moduleWorks(state, item) && workSheetFile(item, files) !== null
           ? workingArt(item, stands, files)
           : objectArt({
@@ -2140,6 +2174,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
               shade,
               label: name,
             })) +
+        (item.expanded === true ? '</g>' : '') +
         palletStack(state, item, stands, files) +
         (unconnected ? notConnectedLabel(stands) : '') +
         (keeps === null ? '' : rackCount(item, stockOnItem(state, item))) +

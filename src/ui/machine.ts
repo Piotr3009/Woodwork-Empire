@@ -89,6 +89,7 @@ import { lineBox } from '../engine/layout';
 import { lineUpgradeCheck, lineWindowEvery } from '../engine/lineContract';
 import { andList, inWords } from '../engine/text';
 import { spriteUrl } from '../render/sprites';
+import { STORE_EXPANDED_CARD_FILTER, expandedStoreFilter } from '../render/hall';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import {
   escapeHtml,
@@ -294,12 +295,20 @@ export function pictureKeyOf(spec: { id: string; spriteKey: string }): string {
 
 /** Where the picture of this class goes: the file the art side delivered for this very class,
  *  through the loader, and a box while there is none (CLAUDE.md T3 3.6, T7 3.7). */
-export function pictureSlot(spriteKey: string, tier: string, small = false): string {
+export function pictureSlot(spriteKey: string, tier: string, small = false, red = false): string {
   const url = spriteUrl(spriteKey, tier);
+  // A store made twice the size is red on its card as it is in the hall, through the same filter
+  // under the card's own id, written beside the picture so the page has it wherever the card is
+  // drawn (v105).
   const inside =
     url === null
       ? '<span class="tile-picture-box"></span>'
-      : `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" />`;
+      : red
+        ? `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" ` +
+          `style="filter:url(#${STORE_EXPANDED_CARD_FILTER})" />` +
+          `<svg class="filter-defs" width="0" height="0" aria-hidden="true" style="position:absolute">` +
+          `${expandedStoreFilter(STORE_EXPANDED_CARD_FILTER)}</svg>`
+        : `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" />`;
   // The same slot at a row's height, for a list of what stands in the hall rather than a card of
   // one class of it (CLAUDE.md T20 2.9): one picture in the game, one class beside it.
   return (

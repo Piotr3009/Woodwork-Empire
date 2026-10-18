@@ -57,6 +57,7 @@ import {
   SERVICE_INTERVAL_DAYS,
   SERVICE_INTERVAL_MONTHS,
   SERVICE_LIFE_EXTENSION,
+  STORE_EXPANSION_FACTOR,
   TIER_WORDS,
   TIMBER_FAMILIES,
   TOOL_CABINET,
@@ -285,32 +286,41 @@ export function itemStandsInTheHall(item: { specId: string; variantId: string })
   return standsInTheHall(item.specId, item.variantId);
 }
 
+/** A thing of a class, and whether it is a store made bigger where it stands (v105). */
+type StoreLike = { specId: string; variantId: string; expanded?: boolean };
+
+/** What a store's room is multiplied by: twice for one made bigger behind the wall, once for
+ *  everything else [PIOTR, 18.10] (v105). */
+function expansionOf(item: StoreLike): number {
+  return item.expanded === true ? STORE_EXPANSION_FACTOR : 1;
+}
+
 /** Sheets this one holds: its class, or the family's own figure. */
-export function sheetCapacityOf(item: { specId: string; variantId: string }): number {
+export function sheetCapacityOf(item: StoreLike): number {
   const spec = findSpec(item.specId);
   if (!spec) return 0;
-  return variantOf(spec, item.variantId).sheetCapacity ?? spec.sheetCapacity;
+  return (variantOf(spec, item.variantId).sheetCapacity ?? spec.sheetCapacity) * expansionOf(item);
 }
 
 /** Boards this item holds: a timber store's figure, nought for everything else (CLAUDE.md T29
  *  2.11.1). */
-export function boardCapacityOf(item: { specId: string; variantId: string }): number {
+export function boardCapacityOf(item: StoreLike): number {
   const spec = findSpec(item.specId);
   if (!spec) return 0;
-  return variantOf(spec, item.variantId).boardCapacity ?? spec.boardCapacity ?? 0;
+  return (variantOf(spec, item.variantId).boardCapacity ?? spec.boardCapacity ?? 0) * expansionOf(item);
 }
 
 /** Glass units this item holds: a glass rack's figure, nought for everything else (CLAUDE.md T32
  *  2.1). */
-export function glassCapacityOf(item: { specId: string; variantId: string }): number {
+export function glassCapacityOf(item: StoreLike): number {
   const spec = findSpec(item.specId);
   if (!spec) return 0;
-  return variantOf(spec, item.variantId).glassCapacity ?? spec.glassCapacity ?? 0;
+  return (variantOf(spec, item.variantId).glassCapacity ?? spec.glassCapacity ?? 0) * expansionOf(item);
 }
 
 /** What this item holds of a kind: the one question every rack, store and glass rack is asked,
  *  through its kind's own figure (CLAUDE.md T32 2.1, 2.2). */
-export function capacityOf(item: { specId: string; variantId: string }, kind: StockKind): number {
+export function capacityOf(item: StoreLike, kind: StockKind): number {
   if (kind === 'sheets') return sheetCapacityOf(item);
   if (kind === 'boards') return boardCapacityOf(item);
   return glassCapacityOf(item);

@@ -94,6 +94,7 @@ import {
   standsOutside,
 } from './layout';
 import { enlargeCanteen, extendUnit, openExtension, openOfficeRefit, refitOffice } from './premises';
+import { arriveReplacements, expandStore, forgetOpenTasksOf, replaceMachine } from './renewal';
 import { raiseTaxWarning } from './tax';
 import { backFromTitle, raiseClosureWarning } from './closures';
 import {
@@ -689,6 +690,8 @@ function startDay(state: GameState): void {
   }
   const arriving = arriveDeliveries(state);
   const kit = arriveEquipmentOrders(state);
+  // A new machine for one at the end of its life stands where the old one stood (v105).
+  arriveReplacements(state);
   collectSoldMachines(state);
   runBookedTransport(state);
   checkOverdueJobs(state);
@@ -852,18 +855,7 @@ function collectSoldMachines(state: GameState): void {
 function takeAway(state: GameState, item: Equipment): void {
   state.equipment = state.equipment.filter((entry) => entry.id !== item.id);
   // Nobody services or repairs a machine that is on the back of somebody else's lorry.
-  const orphaned = new Set(
-    state.tasks
-      .filter((task) => task.equipmentId === item.id && !task.done)
-      .map((task) => task.id),
-  );
-  state.tasks = state.tasks.filter((task) => !orphaned.has(task.id));
-  if (state.owner.currentTaskId !== null && orphaned.has(state.owner.currentTaskId)) {
-    state.owner.currentTaskId = null;
-  }
-  for (const worker of state.workers) {
-    if (worker.taskId !== null && orphaned.has(worker.taskId)) worker.taskId = null;
-  }
+  forgetOpenTasksOf(state, item.id);
 }
 
 /** The same question the sheets ask: unload it now, or leave it standing at the gate
@@ -966,6 +958,8 @@ function callServiceIn(state: GameState, equipmentId: string): void {
 function runServiceDue(state: GameState): void {
   for (const machine of machinesDueService(state)) {
     if (machine.broken) continue;
+    // Nobody is asked to service one a new one is on its way for (v105).
+    if (machine.replacementDay !== undefined && machine.replacementDay !== null) continue;
     const name = findSpec(machine.specId)?.name ?? machine.specId;
     const open = state.tasks.some(
       (task) => task.kind === 'service' && task.equipmentId === machine.id && !task.done,
@@ -2626,6 +2620,14 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'BUY_GATE':
       buyGate(next, action.equipmentId);
+      break;
+    case 'EXPAND_STORE':
+      // A store behind the wall made twice the size where it stands, at once (v105).
+      expandStore(next, action.equipmentId);
+      break;
+    case 'REPLACE_MACHINE':
+      // A new one of the class ordered for one at the end of its life, paid at the click (v105).
+      replaceMachine(next, action.equipmentId);
       break;
     case 'SET_SECURITY_LEVEL':
       setSecurityLevel(next, action.level);

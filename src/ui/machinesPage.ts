@@ -10,22 +10,26 @@
 // prints it.
 
 import {
-  LIFE_LOW_FRACTION,
   findSpec,
   isLineModule,
   isServiced,
   isSold,
   itemStandsInTheHall,
   lifeAfterServices,
+  lifeIsLow,
   machineIsOut,
   originalLifeOf,
   pastEndurance,
+  replaceCheck,
+  replacementLine,
+  replacementPrice,
+  replacementWords,
   serviceCallCheck,
   serviceCostFor,
   serviceIsDue,
 } from '../engine/index';
 import type { Equipment, EquipmentSpec, GameState } from '../engine/index';
-import { button, emptyLine, escapeHtml, money, reasonLabel } from './modal';
+import { button, emptyLine, escapeHtml, lockedButton, money, reasonLabel } from './modal';
 import { lifeFigures, pictureKeyOf, pictureSlot } from './machine';
 
 /** What stands on the floor and has a life to run out: the machines and the extraction kit. The
@@ -44,12 +48,6 @@ export function machinesInTheHall(state: GameState): Equipment[] {
 function lifeUsedShare(item: Equipment): number {
   if (item.enduranceHours <= 0) return 0;
   return Math.min(1, item.hoursUsed / item.enduranceHours);
-}
-
-/** True while there is less than a tenth of the life left, which is when the bar turns red. */
-export function lifeIsLow(item: Equipment): boolean {
-  if (item.enduranceHours <= 0) return false;
-  return 1 - lifeUsedShare(item) < LIFE_LOW_FRACTION;
 }
 
 /** What the row says about the state the machine is in, or nothing while it is simply running.
@@ -72,18 +70,37 @@ export function serviceGainLine(item: Equipment): string {
   return `${gain.toLocaleString('en-GB')} more hours of life`;
 }
 
+/** The machine's Replace control, once its bar is red [PIOTR, 18.10: "when it is already red, a
+ *  button to replace the equipment"] (v105): the button with the new one's price, greyed with the
+ *  engine's own reason while it would be refused; nothing while the bar is not red. The one drawing
+ *  for the row here and for the machine's own card. */
+export function replaceAction(state: GameState, item: Equipment): string {
+  if (replacementWords(item) !== '' || !lifeIsLow(item) || isSold(item)) return '';
+  const text = `Replace · ${money(replacementPrice(item))}`;
+  const check = replaceCheck(state, item.id);
+  return check.ok
+    ? button('replaceMachine', text, `data-id="${escapeHtml(item.id)}" title="${escapeHtml(replacementLine(state, item))}"`)
+    : lockedButton(text, check.reason);
+}
+
 function machineRow(state: GameState, item: Equipment, spec: EquipmentSpec): string {
   const variant = spec.variants.find((entry) => entry.id === item.variantId);
   const className = variant?.name ?? item.variantId;
   const label = stateLabel(state, item);
   const check = serviceCallCheck(state, item.id);
-  const action = check.ok
-    ? button(
-        'serviceMachine',
-        `Service · ${money(serviceCostFor(item))}`,
-        `data-id="${escapeHtml(item.id)}" title="${escapeHtml(serviceGainLine(item))}"`,
-      )
-    : reasonLabel(check.reason);
+  // With a new one on order the old one is only worked until it comes: the row says when, and
+  // offers no service for it [TUNE: chat] (v105).
+  const waiting = replacementWords(item);
+  const action =
+    waiting !== ''
+      ? reasonLabel(waiting)
+      : (check.ok
+          ? button(
+              'serviceMachine',
+              `Service · ${money(serviceCostFor(item))}`,
+              `data-id="${escapeHtml(item.id)}" title="${escapeHtml(serviceGainLine(item))}"`,
+            )
+          : reasonLabel(check.reason)) + replaceAction(state, item);
   const share = Math.round(lifeUsedShare(item) * 100);
   return (
     `<div class="row" data-machine="${escapeHtml(item.id)}">` +
@@ -105,7 +122,7 @@ export function renderMachinesPage(state: GameState): string {
   if (rows.length === 0) return emptyLine('Nothing stands in the hall yet.');
   return (
     '<p class="hint">A service buys the machine more life and takes it out for the working ' +
-    'day.</p>' +
+    'day. Once the bar is red a new one can replace it, in the same place.</p>' +
     rows
       .map((item) => {
         const spec = findSpec(item.specId);

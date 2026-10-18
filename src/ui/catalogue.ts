@@ -57,6 +57,8 @@ import {
   serviceIsDue,
 } from '../engine/index';
 import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/index';
+import { expandStoreCheck, expansionPrice, isExpandableStore, replacementWords } from '../engine/index';
+import { capacityOf, stockKindOf, stockWords } from '../engine/machines';
 import {
   crewAtFamily,
   hallPlaces,
@@ -77,6 +79,7 @@ import { cancelFields, orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
 import { classBadge, classFrame, isMachineFamily, pictureKeyOf, pictureSlot, renderMachine } from './machine';
 import { arrivalLine, cancelButton, progressBar } from './shopping';
+import { replaceAction } from './machinesPage';
 import {
   emptyLine,
   escapeHtml,
@@ -411,6 +414,25 @@ function cabinetLine(state: GameState, item: Equipment): string {
   return `${holds} \u00b7 ${slotsInUseIn(state, item)} in use`;
 }
 
+/** A store behind the wall made twice the size where it stands, on its own card [PIOTR, 18.10:
+ *  "for the same again, more shelves and twice the room in one shelter"] (v105): the button with
+ *  its class's price, greyed with the engine's own reason while it would be refused, and nothing
+ *  once it is made bigger, when the card says what it holds now. */
+function expandAction(state: GameState, item: Equipment): string {
+  if (!isExpandableStore(item.specId) || item.expanded === true || isSold(item)) return '';
+  const text = `Make it twice the size · ${money(expansionPrice(item))}`;
+  const check = expandStoreCheck(state, item.id);
+  return check.ok ? button('expandStore', text, `data-id="${item.id}"`) : lockedButton(text, check.reason);
+}
+
+/** What a store made bigger holds now, in its kind's words: `Made twice the size: holds 800
+ *  boards` (v105). Empty for everything else. */
+function expandedLine(item: Equipment): string {
+  if (item.expanded !== true) return '';
+  const kind = stockKindOf(item);
+  return kind === null ? '' : `Made twice the size: holds ${stockWords(kind, capacityOf(item, kind))}`;
+}
+
 /** The automatic gate on the card of a machine standing in the hall: bought once, for machines
  *  with an extraction demand, greyed as fitted once it is (CLAUDE.md T13 3.11). */
 export function gateAction(state: GameState, item: Equipment): string {
@@ -643,9 +665,11 @@ export function ownedTile(
       : '';
   // A service is called in and paid for, and the machine goes out for the working day, so the
   // card offers it only while the engine would take the call (CLAUDE.md T4 3.2, T20 2.9).
+  // With a new one on order the old one is only worked until it comes, and is not serviced
+  // [TUNE: chat] (v105), as on its row of the Machines page.
   const action = item.broken
     ? button('repairMachine', 'Repair', `data-id="${item.id}"`)
-    : machine && serviceIsDue(item, state.clock.day) && serviceCallCheck(state, item.id).ok
+    : machine && serviceIsDue(item, state.clock.day) && serviceCallCheck(state, item.id).ok && replacementWords(item) === ''
       ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
       : '';
   // Shifting it is setting the hall out, which is the one way anything moves (CLAUDE.md T4 3.5):
@@ -662,8 +686,11 @@ export function ownedTile(
   const lines = [
     className,
     spec.effect,
+    expandedLine(item),
     life,
     service,
+    // A new one on order for it, and the day it comes (v105).
+    replacementWords(item),
     cabinetLine(state, item),
     ownedState(state, item),
     // Its places and who is in them, the short form on the Owned tab's tile and the long one on
@@ -684,14 +711,16 @@ export function ownedTile(
     `<div class="tile is-owned${frame.className}"${frame.style} data-owned="${item.id}">` +
     `<h3 class="tile-name">${escapeHtml(itemName(item))} ${badge}` +
     '<span class="badge badge-owned">Owned</span></h3>' +
-    pictureSlot(pictureKeyOf(spec), item.variantId) +
+    // A store made twice the size is red here as it is in the hall (v105).
+    pictureSlot(pictureKeyOf(spec), item.variantId, false, item.expanded === true) +
     lines +
     specBlock(state, item) +
     bagStoreBlock(state, item) +
     gateLine(state, item) +
     airAssign(state, item) +
     '<div class="tile-action">' +
-    `${action}${bags}${connectAction(state, item)}${gateAction(state, item)}${move}</div>` +
+    `${action}${replaceAction(state, item)}${bags}${connectAction(state, item)}${gateAction(state, item)}` +
+    `${expandAction(state, item)}${move}</div>` +
     // Turn and Sell are the two rows at the bottom of every card of a thing on the hall, drawn by
     // the one function (CLAUDE.md T22 2.13). The sale was in the row above until tonight; it has
     // moved rather than been doubled, because there is one Sell in the game.

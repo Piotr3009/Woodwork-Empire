@@ -228,7 +228,7 @@ export const STATE_VERSION = 49;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v104';
+export const APP_VERSION = 'v105';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -5376,10 +5376,17 @@ export const YARD_WIDTH_CELLS = 3;
 export const REAR_YARD_GAP_CELLS = 1;
 /** The rows of plant behind the rear wall, and the depth each row is given: the deepest thing that
  *  stands there, the two shelters, is 3 m [PIOTR, 17.10: "a second and a third row outside for the
- *  shelters and the other machines"] (v101). The first row is where everything stood before. */
-export const REAR_YARD_ROWS = 3;
+ *  shelters and the other machines"] (v101), five of them from v105 [PIOTR, 18.10: "add up to 5
+ *  rows behind the hall"]. The first row is where everything stood before. */
+export const REAR_YARD_ROWS = 5;
 export const REAR_YARD_ROW_CELLS = 3;
 
+/** [PIOTR, 18.10: "for the same again, more shelves and twice the room in one shelter; the easiest,
+ *  the colour just changes to red"] The stores behind the rear wall that can be made bigger where
+ *  they stand, once, for their class's price again, and what their room is multiplied by (v105).
+ *  An expanded store is drawn red. */
+export const EXPANDABLE_STORES: readonly string[] = ['timberShelter', 'glassShelter', 'timberShelterLarge'];
+export const STORE_EXPANSION_FACTOR = 2;
 
 /** The families that are a central system: with one in the hall every machine is connected and
  *  the drawing says so with a drop to each (CLAUDE.md T16 2.3). */

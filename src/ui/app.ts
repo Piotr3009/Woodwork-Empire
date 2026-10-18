@@ -12,6 +12,7 @@ import {
   monthName,
   formatTime,
   gameMinutesPerRealSecond,
+  isExpandableStore,
   moveConfirmPending,
   movePending,
   movingMachines,
@@ -2074,6 +2075,15 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'serviceMachine':
       dispatch({ type: 'SERVICE_MACHINE', equipmentId: id });
       return;
+    // A new one of the class for a machine at the end of its life, from its row on the Machines
+    // page and from its own card (v105).
+    case 'replaceMachine':
+      dispatch({ type: 'REPLACE_MACHINE', equipmentId: id });
+      return;
+    // A store behind the wall made twice the size, from its own card (v105).
+    case 'expandStore':
+      dispatch({ type: 'EXPAND_STORE', equipmentId: id });
+      return;
     case 'resolveEvent': {
       ui.eventPosition = null;
       const kind = game().activeEvent?.kind;
@@ -2379,11 +2389,14 @@ function handleSceneClick(element: DataElement): boolean {
     // men's tools it holds and how many are in use, and it can be turned and sold like anything
     // else on the floor [PIOTR, 19.09: "click it and a modal shows"] (CLAUDE.md T22 2.13). The rest
     // of the storage keeps its note: 2.13 names the cabinet and nothing else.
+    // A store behind the wall has its card from v105: it is where it is made twice the size
+    // [PIOTR, 18.10].
     if (
       category === 'machine' ||
       category === 'extraction' ||
       category === 'bench' ||
-      item.specId === TOOL_CABINET
+      item.specId === TOOL_CABINET ||
+      isExpandableStore(item.specId)
     ) {
       openMachineCard(item.id);
       requestRender();

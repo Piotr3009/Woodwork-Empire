@@ -392,6 +392,13 @@ export interface Equipment {
    *  line carry its number (PIOTR, 12.10). A module with no number written is line 1's, as every
    *  module was before v93; the lift writes it. */
   line?: number;
+  /** True for a store behind the rear wall made bigger where it stands: twice its class's room,
+   *  drawn red [PIOTR, 18.10] (v105). Left out on everything else. */
+  expanded?: boolean;
+  /** The working day a new one of the same class takes this machine's place, while one is on its
+   *  way: the old one works until then [PIOTR, 18.10: "the old one disappears and the new one
+   *  appears in exactly the same place"] (v105). Left out, or null, while none is ordered. */
+  replacementDay?: number | null;
 }
 
 /** Something bought and paid for that is not here yet: the cash left at the click, the item is
@@ -1053,7 +1060,9 @@ export type GameEventKind =
   | 'lineContractOffered'
   /** The first settle of a save whose line stood where it had no lane: it was moved by the lift to
    *  where it has one, and this says so (v94). */
-  | 'lineMoved';
+  | 'lineMoved'
+  /** The morning a new machine took the place of one at the end of its life (v105). */
+  | 'machineReplaced';
 
 export interface GameEventChoice {
   id: string;
@@ -1742,6 +1751,10 @@ export type GameAction =
   /** Enlarges the canteen to four by four metres, once the floor beside it is clear (v67). */
   | { type: 'ENLARGE_CANTEEN' }
   | { type: 'REFIT_OFFICE' }
+  /** A store behind the rear wall made twice its room where it stands (v105). */
+  | { type: 'EXPAND_STORE'; equipmentId: string }
+  /** A machine at the end of its life replaced by a new one of its class, in its place (v105). */
+  | { type: 'REPLACE_MACHINE'; equipmentId: string }
   // Machines and the hall:
   | { type: 'CONNECT_EXTRACTION'; equipmentId: string }
   | { type: 'BUY_GATE'; equipmentId: string }
