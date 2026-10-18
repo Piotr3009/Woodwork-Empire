@@ -230,12 +230,16 @@ import type {
  *  Every v12 to v49 save loads.
  *
  *  Bumped in v107: a line's record says what the line makes (PIOTR, 18.10: "a door line"), and
- *  every line of an older save is a window line. Every v12 to v50 save loads. */
-export const STATE_VERSION = 51;
+ *  every line of an older save is a window line. Every v12 to v50 save loads.
+ *
+ *  Bumped in v111: the yard behind the hall is laid out in its standing order (PIOTR, 18.10:
+ *  "arrange those shelters"), and an older save's yard is laid out so when it opens. Every v12 to
+ *  v51 save loads. */
+export const STATE_VERSION = 52;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v109';
+export const APP_VERSION = 'v111';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -4346,8 +4350,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     height: 4,
     zoneWidth: 18,
     zoneDepth: 3,
-    // No picture yet: the game draws it as it draws any kit whose picture has not landed, as the
-    // glass shelter (v100).
+    // The art side's picture of P1, both ways round (docs/art/pack-p1-1810/; v110); drawn as kit
+    // with no picture until then (v103).
     spriteKey: 'timberShelterLarge',
     boardCapacity: 3000,
     // [TUNE wording] (v103).
@@ -4412,8 +4416,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     height: 3,
     zoneWidth: 12,
     zoneDepth: 3,
-    // No picture yet [PIOTR, 16.10: "later; give a replacement now"]: the game draws it as it draws
-    // any kit whose picture has not landed, and behind the wall only its top and its plate show.
+    // The art side's picture of P1, both ways round (docs/art/pack-p1-1810/; v110); until then drawn
+    // as any kit whose picture has not landed [PIOTR, 16.10: "later; give a replacement now"]. Behind
+    // the wall only its top and its plate show.
     spriteKey: 'glassShelter',
     glassCapacity: 3200,
     // [TUNE wording] (v100).
@@ -5719,6 +5724,18 @@ export const REAR_YARD_GAP_CELLS = 1;
  *  rows behind the hall"]. The first row is where everything stood before. */
 export const REAR_YARD_ROWS = 5;
 export const REAR_YARD_ROW_CELLS = 3;
+/** [PIOTR, 18.10: "arrange those shelters somehow", then "koduj" to chat's order] The order the
+ *  yard behind the hall is laid out in, from the far end of the hall towards the gate and row
+ *  after row, each kind in the order it was bought: the plant first, the central systems and then
+ *  the pelletiser after them as the lift of v83 stood it, then the timber shelters, the glass
+ *  shelters and the large timber shelters, the tallest last and so at the back (v111). */
+export const YARD_PLANT: readonly string[] = ['dustSystem', 'flexiSystem', 'pelletiser'];
+export const YARD_SHELTERS: readonly string[] = ['timberShelter', 'glassShelter', 'timberShelterLarge'];
+export const YARD_ORDER: readonly string[] = [...YARD_PLANT, ...YARD_SHELTERS];
+/** And where that order does not fit the wall, the rows behind the first being shorter: the large
+ *  shelters first after the plant, then the glass shelters and the timber shelters, still each kind
+ *  together [TUNE: chat] (v111). */
+export const YARD_ORDER_LARGE_FIRST: readonly string[] = [...YARD_PLANT, ...[...YARD_SHELTERS].reverse()];
 
 /** [PIOTR, 18.10: "for the same again, more shelves and twice the room in one shelter; the easiest,
  *  the colour just changes to red"] The stores behind the rear wall that can be made bigger where

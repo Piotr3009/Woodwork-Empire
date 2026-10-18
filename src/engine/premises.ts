@@ -27,6 +27,8 @@ import {
   UNIT_SECOND_EXTENSION_PRICE,
   UNIT_WIDE_EXTENSION_CELLS,
   UNIT_WIDTH_CELLS,
+  YARD_ORDER,
+  YARD_ORDER_LARGE_FIRST,
   canteenGrowthBox,
   canteenLevelSpec,
   officeLevelSpec,
@@ -40,13 +42,14 @@ import { canAfford, pay, standingPowerPerDay } from './economy';
 import { queueEvent } from './events';
 import type { EventDraft } from './events';
 import { monthlyPremiums } from './insurance';
-import { canteenLockers, crewLimit, standingOn } from './layout';
+import { canteenLockers, crewLimit, standingOn, yardBoxOf, yardPlaceAmong } from './layout';
+import type { Box } from './layout';
 import { findSpec, has } from './machines';
 import { routePipe } from './pipes';
 import { changeReputation, formatReputation } from './reputation';
 import { securitySubscriptionMonthly } from './security';
 import { andList, inASentence, inWords } from './text';
-import type { ExtensionStage, GameState, UnitExtension, UnitState } from './types';
+import type { Equipment, ExtensionStage, GameState, OnOrderItem, UnitExtension, UnitState } from './types';
 
 export interface PremisesCheck {
   ok: boolean;
@@ -264,6 +267,61 @@ function moveTheApron(state: GameState, kerb: number, by: number): void {
     if (worker.anchorX >= kerb) worker.anchorX += by;
   }
   layRunsAgain(state, moved);
+}
+
+/** The yard behind the hall laid out again in its standing order [PIOTR, 18.10: "arrange those
+ *  shelters somehow"] (v111): everything that stands there, landed or on its way, put one after
+ *  another by the yard's own rule, from the far end of the hall towards the gate and row after row,
+ *  the plant first and then the timber shelters, the glass shelters and the large timber shelters
+ *  (`YARD_ORDER`), each kind in the order it was bought; where the wall is too short for that, the
+ *  large shelters first after the plant (`YARD_ORDER_LARGE_FIRST`). Asked after what changes what
+ *  stands there: a thing bought or ordered for it, sold and collected, or called off; and once when
+ *  an older save opens. A longer wall moves nothing, as it never did (CLAUDE.md T31 2.7): the next
+ *  change lays the yard out from its new far end. All or nothing: a yard neither order fits stays
+ *  as it stands [TUNE]. A pipe run to plant that moved is laid again at no charge, as when the
+ *  hall grows. */
+export function tidyYard(state: GameState): void {
+  const things: Array<Equipment | OnOrderItem> = [
+    ...state.equipment.filter((item) => item.anchorY < 0),
+    ...state.onOrder.filter((held) => held.anchorY < 0),
+  ];
+  const places = yardLaidOut(state, things, YARD_ORDER) ?? yardLaidOut(state, things, YARD_ORDER_LARGE_FIRST);
+  if (places === null) return;
+  const moved = new Set<string>();
+  for (const { thing, x, y } of places) {
+    if (thing.anchorX === x && thing.anchorY === y) continue;
+    thing.anchorX = x;
+    thing.anchorY = y;
+    moved.add(thing.id);
+  }
+  if (moved.size === 0) return;
+  // Nothing in the yard is dragged by the player, so no drag of one can be waiting; and the runs to
+  // the plant that moved are laid again.
+  if (Array.isArray(state.movedItems)) state.movedItems = state.movedItems.filter((entry) => !moved.has(entry.itemId));
+  layRunsAgain(state, moved);
+}
+
+/** Where each thing of the yard stands laid out in this order of kinds, anything the order does not
+ *  name first [TUNE], or null when the wall has no room for all of them so (v111). */
+function yardLaidOut(
+  state: GameState,
+  things: ReadonlyArray<Equipment | OnOrderItem>,
+  kinds: readonly string[],
+): Array<{ thing: Equipment | OnOrderItem; x: number; y: number }> | null {
+  const rank = (specId: string): number => Math.max(0, kinds.indexOf(specId));
+  const order = things
+    .map((thing, index) => ({ thing, index }))
+    .sort((left, right) => rank(left.thing.specId) - rank(right.thing.specId) || left.index - right.index)
+    .map((entry) => entry.thing);
+  const taken: Box[] = [];
+  const places: Array<{ thing: Equipment | OnOrderItem; x: number; y: number }> = [];
+  for (const thing of order) {
+    const at = yardPlaceAmong(state.unit.widthCells, taken, thing.specId, thing.variantId);
+    if (at === null) return null;
+    places.push({ thing, ...at });
+    taken.push(yardBoxOf(thing, at.x, at.y));
+  }
+  return places;
 }
 
 /** Lays every pipe run to or from a thing that has been moved again, at no charge and under the

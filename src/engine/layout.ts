@@ -159,7 +159,6 @@ export function rearYardPlaceFor(
   variantId?: string,
   ignoreId: string | null = null,
 ): { x: number; y: number } | null {
-  const own = boxOf(specId, 0, 0, variantId);
   const taken: Box[] = [];
   for (const item of state.equipment) {
     if (item.id === ignoreId || item.anchorY >= 0) continue;
@@ -169,6 +168,24 @@ export function rearYardPlaceFor(
     if (held.id === ignoreId || held.anchorY >= 0) continue;
     taken.push(boxOfItem(held, held.anchorX, held.anchorY));
   }
+  return yardPlaceAmong(state.unit.widthCells, taken, specId, variantId);
+}
+
+/** The floor a thing in the yard takes where it is put: its footprint turned the way it stands. */
+export function yardBoxOf(thing: { specId: string; variantId: string; orientation: Orientation }, x: number, y: number): Box {
+  return boxOfItem(thing, x, y);
+}
+
+/** The yard's own rule, with what already stands there given: the first clear length of the first
+ *  row that has one, from the far end of a wall this long, as `rearYardPlaceFor` reads it; the
+ *  yard laid out whole asks it a thing at a time (v111). */
+export function yardPlaceAmong(
+  widthCells: number,
+  taken: readonly Box[],
+  specId: string,
+  variantId?: string,
+): { x: number; y: number } | null {
+  const own = boxOf(specId, 0, 0, variantId);
   for (let row = 0; row < REAR_YARD_ROWS; row += 1) {
     const y = -REAR_YARD_GAP_CELLS - row * (REAR_YARD_ROW_CELLS + REAR_YARD_GAP_CELLS) - own.depth;
     // A metre is kept between two of them: a box a metre longer than the plant has to be clear.
@@ -179,7 +196,7 @@ export function rearYardPlaceFor(
       );
     // The far end left clear by the plant's own width and how far back it stands; the first row's
     // is its depth and a metre, as it always was.
-    const first = state.unit.widthCells - own.width + y;
+    const first = widthCells - own.width + y;
     const last = row === 0 ? 0 : -y;
     for (let x = first; x >= last; x -= 1) {
       if (clear(x)) return { x, y };

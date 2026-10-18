@@ -27,7 +27,7 @@ import {
 import { nextWorkingDay } from './clock';
 import { formatMoney, receive } from './economy';
 import { andList, inWords } from './text';
-import { layRunsAgain } from './premises';
+import { layRunsAgain, tidyYard } from './premises';
 import { standsOutsideTheHall } from './walk';
 import {
   apronPlaceFor,
@@ -1577,6 +1577,12 @@ function liftToVersion51(state: Raw): void {
   state.version = 51;
 }
 
+/** v111 (PIOTR, 18.10: "arrange those shelters"): nothing of the raw save changes; the yard is laid
+ *  out in its standing order by the whole state step, once the whole state is there. */
+function liftToVersion52(state: Raw): void {
+  state.version = 52;
+}
+
 /** The whole state step of the lift to 48: a window whose glass was in and whose Glazing had begun,
  *  its current stage the Glazing, has its glass in the window, used and off the counter (CLAUDE.md
  *  T32 section 4); one past production had it set so by the raw lift. Every other window keeps it
@@ -1639,6 +1645,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   48: liftToVersion49,
   49: liftToVersion50,
   50: liftToVersion51,
+  51: liftToVersion52,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -1741,6 +1748,15 @@ export function migrateState(raw: unknown, version: number): GameState | null {
     }
   }
   if (version < 48) forgetTheLiftsMarks(state);
+  // The yard behind the hall laid out in its standing order (v111). After every move of the plant
+  // and the shelters above, so it has the last word on where they stand.
+  if (version < 52 && Array.isArray(lifted.equipment) && Array.isArray(lifted.onOrder) && lifted.unit) {
+    try {
+      tidyYard(lifted);
+    } catch {
+      // Not a whole hall: no yard to lay out.
+    }
+  }
   // Who has a place, worked out the moment the save is open rather than left for the first
   // minute: an old save opens with the right men working (CLAUDE.md T25 section 4). A fragment of
   // a state that is not a whole hall cannot be planned, and is lifted as it is: its first minute

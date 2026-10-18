@@ -350,7 +350,8 @@ describe('a v50 save in this build (v107)', () => {
     const opened = migrateState(raw, 50);
     if (opened === null) throw new Error('the lift refused a version 50 state');
     expect(opened.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(51);
+    // 52 from v111: the yard laid out in its order.
+    expect(STATE_VERSION).toBe(52);
     expect(opened.windowLines.map((record) => record.kind)).toEqual(['window', 'window']);
     expect(opened.windowLines.map((record) => ({ ...record, kind: undefined }))).toEqual(
       state.windowLines.map((record) => ({ ...record, kind: undefined })),

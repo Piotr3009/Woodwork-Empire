@@ -66,8 +66,9 @@ describe('the version in the corner', () => {
     // wider (PIOTR, 12.10). v96 is Turn 32: one store for every material, the glass racks, and the
     // line fed from the stores (PIOTR, 12.10 and 13.10). v107 is the door line (PIOTR, 18.10). v108
     // is the door line's own pictures (PIOTR, 18.10). v109 is a contract's price risen at fifteen
-    // renewals at most (PIOTR, 18.10).
-    expect(APP_VERSION).toBe('v109');
+    // renewals at most (PIOTR, 18.10). v110 is the glass shelter's and the large timber shelter's
+    // pictures (PIOTR, 18.10). v111 is the yard behind the hall laid out in its order (PIOTR, 18.10).
+    expect(APP_VERSION).toBe('v111');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -83,7 +84,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v109'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v111'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

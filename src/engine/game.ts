@@ -101,6 +101,7 @@ import {
   openOfficeRefit,
   refitCanteen,
   refitOffice,
+  tidyYard,
 } from './premises';
 import { arriveReplacements, expandStore, forgetOpenTasksOf, replaceMachine } from './renewal';
 import { raiseTaxWarning } from './tax';
@@ -876,6 +877,8 @@ function takeAway(state: GameState, item: Equipment): void {
   state.equipment = state.equipment.filter((entry) => entry.id !== item.id);
   // Nobody services or repairs a machine that is on the back of somebody else's lorry.
   forgetOpenTasksOf(state, item.id);
+  // The yard closes up behind a thing that stood there (v111).
+  if (item.anchorY < 0) tidyYard(state);
 }
 
 /** The same question the sheets ask: unload it now, or leave it standing at the gate
@@ -2971,6 +2974,8 @@ export function buyEquipment(
   const spec = specOf(specId);
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   standItem(state, specId, variant.id, anchorFor(state, specId, variant.id), prepaid);
+  // The yard laid out again with it in its place (v111).
+  if (standsBehindTheWall(specId)) tidyYard(state);
   return OK;
 }
 
@@ -3119,6 +3124,8 @@ export function placeEquipmentOrder(
     anchorX: at.x,
     anchorY: at.y,
   });
+  // Its place in the yard held in the yard's order, the yard laid out again with it (v111).
+  if (standsBehindTheWall(specId)) tidyYard(state);
   return OK;
 }
 
@@ -3197,6 +3204,8 @@ export function cancelOrder(state: GameState, orderId: string): BuyCheck {
     if (timeIsPaused(state)) state.speed = 1;
     receive(state, 'equipment', `Order cancelled: ${orderName(item)}`, item.pricePaid);
     removeOnOrder(state, item.id);
+    // And the yard closes up behind a place held there (v111).
+    if (item.anchorY < 0) tidyYard(state);
     return OK;
   }
   // A load of sheets goes the same way: called off until the morning it lands, in full
