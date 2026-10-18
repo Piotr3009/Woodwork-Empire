@@ -1555,6 +1555,16 @@ function liftToVersion49(state: Raw): void {
   state.version = 49;
 }
 
+/** Version 49 to 50 (v106). The unit carries the canteen's level and the refit being done: a save
+ *  from before has the canteen as it was built or enlarged and no fitters in (PIOTR, 18.10). */
+function liftToVersion50(state: Raw): void {
+  if (isRecord(state.unit)) {
+    if (typeof state.unit.canteenLevel !== 'number') state.unit.canteenLevel = 0;
+    if (!isRecord(state.unit.canteenRefit)) state.unit.canteenRefit = null;
+  }
+  state.version = 50;
+}
+
 /** The whole state step of the lift to 48: a window whose glass was in and whose Glazing had begun,
  *  its current stage the Glazing, has its glass in the window, used and off the counter (CLAUDE.md
  *  T32 section 4); one past production had it set so by the raw lift. Every other window keeps it
@@ -1615,6 +1625,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   46: liftToVersion47,
   47: liftToVersion48,
   48: liftToVersion49,
+  49: liftToVersion50,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

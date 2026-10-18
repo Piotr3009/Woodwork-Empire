@@ -1781,6 +1781,47 @@ input.num {
   justify-content: center;
 }
 
+/* A refit's plates are too small to letter: each is a spot round the plate, and the man's name
+   comes up over it on the paper of the game while the pointer is there, in CSS alone (PIOTR,
+   18.10; v106). The spot is the lockers' click, so it takes the pointer. */
+.canteen-plate-spot {
+  cursor: pointer;
+  pointer-events: auto;
+  position: absolute;
+}
+
+.canteen-plate-name {
+  background: var(--cream);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  bottom: 100%;
+  color: var(--page);
+  font-size: var(--fs-title);
+  left: 50%;
+  padding: 2px 12px;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.canteen-plate-spot:hover {
+  z-index: 3;
+}
+
+.canteen-plate-spot:hover .canteen-plate-name {
+  visibility: visible;
+}
+
+/* A refit's picture leaves no blank strip of wall for the line over the lockers: it is written on
+   a label of the same paper (v106). */
+.canteen-counter.is-label {
+  background: var(--cream);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+}
+
 /* The office layers are full width pictures, not sprites on a tile (CLAUDE.md T4 4). */
 .sprite-wide-grid {
   display: flex;

@@ -556,6 +556,11 @@ export interface UnitState {
    *  (PIOTR, 15.10; v98). */
   officeLevel: number;
   officeRefit: { level: number } | null;
+  /** The canteen's refit level, 0 for the room as it was built or enlarged with its layers and 1
+   *  to 6 for the pictures of `CANTEEN_LEVELS`, and the refit paid for and being done, open the
+   *  next morning (PIOTR, 18.10; v106). */
+  canteenLevel: number;
+  canteenRefit: { level: number } | null;
 }
 
 export interface Worker {
@@ -1037,6 +1042,7 @@ export type GameEventKind =
   /** The morning the extension of the unit opens (v67). */
   | 'unitExtended'
   | 'officeRefitted'
+  | 'canteenRefitted'
   /** The first working day of December: the taxman comes on the 30th (CLAUDE.md T27 2.3). */
   | 'taxComing'
   /** The open of 30 December took a quarter of the account (CLAUDE.md T27 2.2). */
@@ -1751,6 +1757,7 @@ export type GameAction =
   /** Enlarges the canteen to four by four metres, once the floor beside it is clear (v67). */
   | { type: 'ENLARGE_CANTEEN' }
   | { type: 'REFIT_OFFICE' }
+  | { type: 'REFIT_CANTEEN' }
   /** A store behind the rear wall made twice its room where it stands (v105). */
   | { type: 'EXPAND_STORE'; equipmentId: string }
   /** A machine at the end of its life replaced by a new one of its class, in its place (v105). */

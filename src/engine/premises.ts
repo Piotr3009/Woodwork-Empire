@@ -18,6 +18,7 @@
 // holds none of its own.
 
 import {
+  CANTEEN_LEVEL_WIDE_FROM,
   UNIT_DEPTH_CELLS,
   UNIT_EXTENSION_PRICE,
   UNIT_EXTENSION_PRICE_PER_M2,
@@ -27,13 +28,14 @@ import {
   UNIT_WIDE_EXTENSION_CELLS,
   UNIT_WIDTH_CELLS,
   canteenGrowthBox,
+  canteenLevelSpec,
   officeLevelSpec,
   roomById,
   roomsOf,
   secondExtensionOf,
   unitDepositFor,
 } from './constants';
-import type { OfficeLevelSpec } from './constants';
+import type { CanteenLevelSpec, OfficeLevelSpec } from './constants';
 import { canAfford, pay, standingPowerPerDay } from './economy';
 import { queueEvent } from './events';
 import type { EventDraft } from './events';
@@ -404,6 +406,86 @@ export function openOfficeRefit(state: GameState): void {
       (next === null
         ? 'There is no better office to be had.'
         : `The next refit, ${next.name.toLowerCase()}, is on the Premises page at ${next.price.toLocaleString('en-GB')}.`),
+    data: { level: spec.level },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The canteen's refits [PIOTR, 18.10: "the canteens, with a purchase of course"; "dearer, twice"]
+// (v106): six levels, each a picture of the whole room, bought one after the other on the Premises
+// page as the office's are. Levels 1 and 2 are the room as it was built and 3 to 6 the enlarged
+// one, so an enlarged canteen's next refit is level 3 and a small one stops at 2 until it is
+// enlarged.
+// ---------------------------------------------------------------------------
+
+/** The level the canteen is at, 0 for the room with its layers: read here, so a save from before
+ *  v106 with no figure on its unit is that room. */
+export function canteenLevelOf(state: GameState): number {
+  return typeof state.unit.canteenLevel === 'number' ? state.unit.canteenLevel : 0;
+}
+
+/** The refit on offer next: the level after the one the canteen is at, and in an enlarged canteen
+ *  never one of the two pictures of the small room [TUNE: chat]; null at the top. */
+export function nextCanteenLevel(state: GameState): CanteenLevelSpec | null {
+  const after = canteenLevelOf(state) + 1;
+  const firstWide = CANTEEN_LEVEL_WIDE_FROM;
+  return canteenLevelSpec(state.unit.canteenWide ? Math.max(after, firstWide) : after);
+}
+
+/** The level whose picture the room shows: the canteen's own where its picture is of the room the
+ *  canteen is, and 0 otherwise, which is the room's layers: a canteen enlarged after a refit of the
+ *  small room shows the enlarged room until its next refit (v106). */
+export function canteenPictureLevel(state: GameState): number {
+  const spec = canteenLevelSpec(canteenLevelOf(state));
+  if (spec === null) return 0;
+  return spec.wide === state.unit.canteenWide ? spec.level : 0;
+}
+
+/** Whether the next refit can be bought, in the order its card's locked button reads: the top
+ *  reached, one being done, the canteen to enlarge first, the cash (v106). */
+export function refitCanteenCheck(state: GameState): PremisesCheck {
+  const next = nextCanteenLevel(state);
+  if (next === null) return { ok: false, reason: 'The canteen is at its best' };
+  if (state.unit.canteenRefit !== null && state.unit.canteenRefit !== undefined) {
+    return { ok: false, reason: 'The fitters are in' };
+  }
+  if (next.wide && !state.unit.canteenWide) return { ok: false, reason: 'Enlarge the canteen first' };
+  if (!canAfford(state, next.price)) return { ok: false, reason: 'Not enough cash' };
+  return OK;
+}
+
+/** The click: the next level paid for on a line of its own, the fitters in until the morning. */
+export function refitCanteen(state: GameState): PremisesCheck {
+  const check = refitCanteenCheck(state);
+  if (!check.ok) return check;
+  const next = nextCanteenLevel(state);
+  if (next === null) return check;
+  pay(state, 'unitExtension', `Canteen refit: ${next.name}`, next.price);
+  state.unit.canteenRefit = { level: next.level };
+  return OK;
+}
+
+/** The morning after the click: the canteen is the new picture, the company a little better
+ *  thought of, and a card says so (v106). */
+export function openCanteenRefit(state: GameState): void {
+  const refit = state.unit.canteenRefit;
+  if (refit === null || refit === undefined) return;
+  const spec = canteenLevelSpec(refit.level);
+  state.unit.canteenRefit = null;
+  if (spec === null) return;
+  state.unit.canteenLevel = spec.level;
+  const gained = changeReputation(state, spec.reputation, `Canteen refit: ${spec.name}`);
+  const next = nextCanteenLevel(state);
+  queueEvent(state, {
+    kind: 'canteenRefitted',
+    title: 'The canteen is refitted',
+    body:
+      `The fitters are out: ${spec.name.toLowerCase()}. ${spec.sentence} ` +
+      `The men notice, and so does everybody they talk to: reputation ${gained >= 0 ? '+' : ''}${formatReputation(gained)}. ` +
+      (next === null
+        ? 'There is no better canteen to be had.'
+        : `The next refit, ${next.name.toLowerCase()}, is on the Premises page at ${next.price.toLocaleString('en-GB')}` +
+          `${next.wide && !state.unit.canteenWide ? ', once the canteen is enlarged.' : '.'}`),
     data: { level: spec.level },
   });
 }

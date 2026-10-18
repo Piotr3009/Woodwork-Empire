@@ -28,10 +28,14 @@ import {
   CANTEEN_PLATE_TEXT,
   CANTEEN_REGIONS,
   CANTEEN_REGIONS_WIDE,
+  type CanteenLevelSpec,
   type RoomRect,
+  canteenLevelSpec,
+  canteenLevelSprite,
 } from '../engine/constants';
 import { canteenLockers } from '../engine/layout';
 import { countOf } from '../engine/machines';
+import { canteenPictureLevel } from '../engine/premises';
 import { lockerMen } from '../engine/staff';
 import type { GameState } from '../engine/types';
 import { type Scene, escapeText } from './hall';
@@ -92,13 +96,25 @@ export const CANTEEN_LIT_LAYERS_WIDE: RoomLitLayer[] = [
   },
 ];
 
-/** The layers of this unit's canteen: the room as it was built, or the enlarged one. */
+/** The refit whose picture this canteen is, or null for the room's own layers (v106). */
+function pictureOf(state: GameState): CanteenLevelSpec | null {
+  return canteenLevelSpec(canteenPictureLevel(state));
+}
+
+/** The layers of this unit's canteen: the room as it was built, or the enlarged one; from a refit
+ *  the one picture of its level (v106). */
 export function canteenLayersOf(state: GameState): RoomLayer[] {
+  const level = pictureOf(state);
+  if (level !== null) {
+    return [{ key: canteenLevelSprite(level.level), name: `Canteen: ${level.name}`, needs: null }];
+  }
   return state.unit.canteenWide ? CANTEEN_LAYERS_WIDE : CANTEEN_LAYERS;
 }
 
-/** The lit overlays the art side has delivered, of this unit's canteen. */
+/** The lit overlays the art side has delivered, of this unit's canteen. A refit's picture has none:
+ *  its regions get the soft light spot every region without one gets (v106). */
 export function canteenLitLayersOf(state: GameState, files: readonly string[]): RoomLitLayer[] {
+  if (pictureOf(state) !== null) return [];
   const lit = state.unit.canteenWide ? CANTEEN_LIT_LAYERS_WIDE : CANTEEN_LIT_LAYERS;
   return lit.filter((layer) => pickSprite(files, layer.key) !== null);
 }
@@ -129,13 +145,17 @@ export const CANTEEN_ROOM_REGIONS_WIDE: RoomRegion[] = roomRegions(CANTEEN_REGIO
 export const CANTEEN_PAGE_REGION = 'lockerPage';
 
 /** The door plates of this unit's canteen: the eight of the room as it was built, or the sixteen
- *  of the enlarged one (v80). */
+ *  of the enlarged one (v80); from a refit its picture's own (v106). */
 export function canteenPlatesOf(state: GameState): readonly RoomRect[] {
+  const level = pictureOf(state);
+  if (level !== null) return level.plates;
   return state.unit.canteenWide ? CANTEEN_PLATES_WIDE : CANTEEN_PLATES;
 }
 
-/** The strip of wall the room's one line is written on. */
+/** The strip of wall the room's one line is written on, or a refit's label for it (v106). */
 function counterOf(state: GameState): RoomRect {
+  const level = pictureOf(state);
+  if (level !== null) return level.counter;
   return state.unit.canteenWide ? CANTEEN_COUNTER_WIDE : CANTEEN_COUNTER;
 }
 
@@ -153,7 +173,13 @@ function pageOf(state: GameState, page: number): number {
 /** The regions of this unit's canteen: the four, where its picture has them, and the line that
  *  turns the page where there is more than one. */
 export function canteenRegionsOf(state: GameState): RoomRegion[] {
-  const regions = state.unit.canteenWide ? CANTEEN_ROOM_REGIONS_WIDE : CANTEEN_ROOM_REGIONS;
+  const level = pictureOf(state);
+  const regions =
+    level !== null
+      ? roomRegions(level.regions)
+      : state.unit.canteenWide
+        ? CANTEEN_ROOM_REGIONS_WIDE
+        : CANTEEN_ROOM_REGIONS;
   if (canteenPages(state) <= 1) return regions;
   return [
     ...regions,
@@ -212,10 +238,45 @@ function onAPlate(name: string): string {
     : name.slice(0, CANTEEN_PLATE_TEXT.maxCharacters);
 }
 
+/** A refit's plates are too small to letter [PIOTR, 18.10: the mockup approved]: each is a spot
+ *  the pointer finds it by, a box round the plate, and the man's name comes up over it while the
+ *  pointer is there, in CSS. A spot is the lockers' own click, so a click on a plate opens the team
+ *  page as a click on the lockers does; a plate with nobody behind it is a spot with no name. The
+ *  counter is on a label of its own, since a refit's picture leaves no blank strip of wall for it
+ *  (v106). */
+function refitLiveText(state: GameState, level: CanteenLevelSpec, page: number): string {
+  const names = canteenPlateNames(state, page);
+  const spots = level.plates
+    .map((plate, index) => {
+      const name = names[index] ?? '';
+      const spot = {
+        x: Math.round(plate.x + plate.w / 2 - level.plateSpot.w / 2),
+        y: Math.round(plate.y + plate.h / 2 - level.plateSpot.h / 2),
+        width: level.plateSpot.w,
+        height: level.plateSpot.h,
+      };
+      return (
+        `<span class="canteen-plate-spot" data-canteen-plate="${index}" data-do="officeRegion" ` +
+        `data-office="lockers" style="${boxStyle(spot)}">` +
+        (name === '' ? '' : `<span class="canteen-plate-name">${escapeText(name)}</span>`) +
+        '</span>'
+      );
+    })
+    .join('');
+  return (
+    spots +
+    `<span class="canteen-counter is-centred is-label" data-canteen-text="counter" ` +
+    `style="${boxStyle(onTheCanvas(level.counter))};font-size:${CANTEEN_COUNTER_TEXT.fontSize}px">` +
+    `${escapeText(canteenCounterLine(state, page))}</span>`
+  );
+}
+
 /** The names and the counter, drawn by the game over the blank plates and the blank strip of wall
  *  the artwork leaves for them. A plate with nobody behind it is still drawn, empty: the
  *  compartment is there whether or not it has been bought. */
 function liveText(state: GameState, page: number): string {
+  const level = pictureOf(state);
+  if (level !== null) return refitLiveText(state, level, page);
   const names = canteenPlateNames(state, page);
   const plates = canteenPlatesOf(state).map((plate, index) => {
     const name = onAPlate(names[index] ?? '');

@@ -141,8 +141,8 @@ describe('a fresh game in this build', () => {
     // made longer, the quiet weeks (CLAUDE.md T31 section 4). v93 is state 45: more lines than one.
     // v94 is state 46: a line given its lane. v95 is state 47: the hall made wider (PIOTR, 12.10).
     // v96 is Turn 32 and state 48: one store for every material (CLAUDE.md T32 section 4).
-    expect(APP_VERSION).toBe('v105');
-    expect(STATE_VERSION).toBe(49);
+    expect(APP_VERSION).toBe('v106');
+    expect(STATE_VERSION).toBe(50);
   });
 
   it('saves through the store, the file and the cloud row on day 1, and loads back three ways', async () => {

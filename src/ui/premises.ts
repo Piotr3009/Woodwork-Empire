@@ -10,17 +10,20 @@
 //
 // Every figure on the page is the engine's (`src/engine/premises.ts`): the page holds none.
 
-import { OFFICE_LEVELS, officeLevelSpec, secondExtensionOf } from '../engine/constants';
+import { CANTEEN_LEVELS, OFFICE_LEVELS, canteenLevelSpec, officeLevelSpec, secondExtensionOf } from '../engine/constants';
 import { crewLimit } from '../engine/layout';
 import {
   type ExtensionTerms,
+  canteenLevelOf,
   canteenTerms,
   enlargeCanteenCheck,
   extendUnitCheck,
   extensionStatus,
   extensionTerms,
+  nextCanteenLevel,
   nextOfficeLevel,
   officeLevelOf,
+  refitCanteenCheck,
   refitOfficeCheck,
   secondExtensionAreaM2,
 } from '../engine/premises';
@@ -207,6 +210,47 @@ function canteenCard(state: GameState): string {
   );
 }
 
+/** The canteen's refit card, under its Enlarge card: the next refit offered with its price and its
+ *  picture's words, the one being done, or the top level reached. The office's card, of the six
+ *  levels of `CANTEEN_LEVELS` [PIOTR, 18.10: the mockup approved] (v106). */
+function canteenRefitCard(state: GameState): string {
+  const level = canteenLevelOf(state);
+  const refit = state.unit.canteenRefit ?? null;
+  if (refit !== null) {
+    const spec = canteenLevelSpec(refit.level);
+    return card(
+      'canteen-refit',
+      `Refit the canteen: ${spec?.name ?? 'the next level'}`,
+      'Being refitted',
+      ' · paid for. The fitters are out in the morning.',
+      spec?.sentence ?? '',
+      '<span class="badge badge-held">Paid</span>',
+    );
+  }
+  const next = nextCanteenLevel(state);
+  if (next === null) {
+    const top = canteenLevelSpec(level);
+    return card(
+      'canteen-refit',
+      `The canteen: ${top?.name ?? 'the best there is'}`,
+      'Refitted',
+      ` · level ${level} of ${CANTEEN_LEVELS.length}`,
+      top?.sentence ?? '',
+      DONE,
+    );
+  }
+  const check = refitCanteenCheck(state);
+  const now = level === 0 ? 'The canteen as it was built' : (canteenLevelSpec(level)?.name ?? `Level ${level}`);
+  return card(
+    'canteen-refit',
+    `Refit the canteen: ${next.name}`,
+    money(next.price),
+    ` · level ${next.level} of ${CANTEEN_LEVELS.length}, ready the next morning. Today: ${now.toLowerCase()}.`,
+    `${next.sentence} The men notice a better canteen: a few points of reputation the morning it opens.`,
+    check.ok ? button('refitCanteen', 'Refit') : greyed('Refit', check.reason),
+  );
+}
+
 /** The office's card: the next refit offered with its price and its picture's words, the one being
  *  done, or the top level reached. One card, as the canteen has one, for the six levels of
  *  `OFFICE_LEVELS` taken one after the other (PIOTR, 15.10; v98). */
@@ -262,6 +306,8 @@ export function renderPremises(state: GameState): string {
     (secondExtensionOf(unit) === 'open' ? extendCard(state, 'long') + extendCard(state, 'wide') : '') +
     '<h3>Canteen</h3>' +
     canteenCard(state) +
+    // The canteen's six refits, one after the other (v106).
+    canteenRefitCard(state) +
     // The office's six refits, one after the other (v98).
     '<h3>Office</h3>' +
     officeCard(state)

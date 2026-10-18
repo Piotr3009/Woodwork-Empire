@@ -223,12 +223,15 @@ import type {
  *  counter, its price already paid (CLAUDE.md T32 section 4). Every v12 to v47 save loads.
  *
  *  Bumped in v98: the unit carries the office's level and the refit being done (PIOTR, 15.10).
- *  Every v12 to v48 save loads. */
-export const STATE_VERSION = 49;
+ *  Every v12 to v48 save loads.
+ *
+ *  Bumped in v106: the unit carries the canteen's level and the refit being done (PIOTR, 18.10).
+ *  Every v12 to v49 save loads. */
+export const STATE_VERSION = 50;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v105';
+export const APP_VERSION = 'v106';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -426,6 +429,11 @@ export const SPEND_WARNING_CATEGORIES = [
  *  nothing else: not the profit, the stock, the machines, the loan or the deposits clients have
  *  paid, which is what makes December a decision (CLAUDE.md T27 2.2). */
 export const TAX_RATE = 0.25;
+/** [PIOTR, 18.10: "when you have cash over 20 million on the account, give a tax of 50 per cent";
+ *  asked whether of the part over or of the whole: "of the whole"] An account over this much on
+ *  the taxman's day pays this share of all of it, and not the quarter (v106). */
+export const TAX_HIGH_FROM = 20000000;
+export const TAX_HIGH_RATE = 0.5;
 /** The month the taxman comes in, as an index into `MONTH_NAMES`: December [PIOTR]. His day is the
  *  month's last, which is the 30th, because the game's months have thirty days [PIOTR said the
  *  31st; the calendar has none] (CLAUDE.md T27 2.2). */
@@ -5226,6 +5234,239 @@ export const CANTEEN_PLATE_TEXT = { fontSize: 18, maxCharacters: 8, align: 'cent
 
 /** The counter's hand: 24 px [PIOTR]. */
 export const CANTEEN_COUNTER_TEXT = { fontSize: 24 } as const;
+
+/** The canteen's six refits [PIOTR, 18.10: "the canteens, with a purchase of course"; "dearer,
+ *  twice" the office's], bought one after the other on the Premises page as the office's are, paid
+ *  at the click and open the next morning (v106). Each level is one picture of the whole room on
+ *  the room's canvas (`canteenLevelN`, 1672 by 941, the art side's pack of 14.10), with its own
+ *  regions, plates and counter, every figure of them the art side's own measurement
+ *  (`regions.json` of its level) but the counter's, which is chat's [TUNE: chat]. Levels 1 and 2
+ *  are the room as it was built, eight doors; 3 to 6 are the enlarged room, sixteen, and want the
+ *  canteen enlarged first. The plates are too small to letter, so a man's name is on his plate
+ *  under the pointer [PIOTR, 18.10: the mockup approved] [TUNE: chat: the names, the sentences,
+ *  the reputation]. */
+export interface CanteenLevelSpec {
+  level: number;
+  name: string;
+  price: number;
+  sentence: string;
+  /** Reputation asked for the morning it opens, booked at the gain factor as every gain is. */
+  reputation: number;
+  /** True for a picture of the enlarged room: wanted the canteen enlarged first. */
+  wide: boolean;
+  regions: Record<'door' | 'lockers' | 'kitchen' | 'table', RoomRect>;
+  /** The door plates, the top row from the left and then the bottom row from the left. */
+  plates: readonly RoomRect[];
+  /** Where the room's one line is written, on a label of its own [TUNE: chat]. */
+  counter: RoomRect;
+  /** The box round a plate the pointer finds it by, centred on the plate [TUNE: chat: within the
+   *  narrowest gap between two plates of its row]. */
+  plateSpot: { w: number; h: number };
+}
+
+export const CANTEEN_LEVELS: readonly CanteenLevelSpec[] = [
+  {
+    level: 1,
+    name: 'A first workshop',
+    price: 10000,
+    sentence: 'Painted block walls, a plain worktop and metal stools: the canteen of a small workshop, tidied up.',
+    reputation: 2,
+    wide: false,
+    regions: {
+      door: { x: 1412, y: 0, w: 260, h: 941 },
+      lockers: { x: 374, y: 70, w: 283, h: 444 },
+      kitchen: { x: 650, y: 95, w: 195, h: 565 },
+      table: { x: 53, y: 519, w: 512, h: 422 },
+    },
+    plates: [
+      { x: 411, y: 146, w: 28, h: 28 },
+      { x: 498, y: 174, w: 21, h: 24 },
+      { x: 574, y: 194, w: 17, h: 21 },
+      { x: 626, y: 210, w: 15, h: 21 },
+      { x: 410, y: 482, w: 29, h: 25 },
+      { x: 497, y: 468, w: 22, h: 23 },
+      { x: 574, y: 450, w: 17, h: 21 },
+      { x: 626, y: 442, w: 15, h: 20 },
+    ],
+    counter: { x: 830, y: 235, w: 330, h: 56 },
+    plateSpot: { w: 48, h: 64 },
+  },
+  {
+    level: 2,
+    name: 'A tidy small firm',
+    price: 30000,
+    sentence: 'Fresh walls with a sage stripe, lighter wood and kit that is looked after.',
+    reputation: 2,
+    wide: false,
+    regions: {
+      door: { x: 1412, y: 0, w: 260, h: 941 },
+      lockers: { x: 374, y: 70, w: 283, h: 444 },
+      kitchen: { x: 650, y: 95, w: 195, h: 565 },
+      table: { x: 53, y: 519, w: 512, h: 422 },
+    },
+    plates: [
+      { x: 411, y: 146, w: 28, h: 28 },
+      { x: 498, y: 174, w: 21, h: 24 },
+      { x: 574, y: 194, w: 17, h: 21 },
+      { x: 626, y: 210, w: 15, h: 21 },
+      { x: 410, y: 482, w: 29, h: 25 },
+      { x: 497, y: 468, w: 22, h: 23 },
+      { x: 574, y: 450, w: 17, h: 21 },
+      { x: 626, y: 442, w: 15, h: 20 },
+    ],
+    counter: { x: 830, y: 235, w: 330, h: 56 },
+    plateSpot: { w: 48, h: 64 },
+  },
+  {
+    level: 3,
+    name: 'A growing joinery',
+    price: 80000,
+    sentence: 'A bigger canteen in light oak: one long table, comfortable chairs and a wall of sixteen lockers.',
+    reputation: 2,
+    wide: true,
+    regions: {
+      door: { x: 1412, y: 0, w: 260, h: 941 },
+      lockers: { x: 496, y: 184, w: 867, h: 271 },
+      kitchen: { x: 0, y: 42, w: 436, h: 444 },
+      table: { x: 0, y: 487, w: 863, h: 454 },
+    },
+    plates: [
+      { x: 533, y: 230, w: 26, h: 13 },
+      { x: 630, y: 226, w: 26, h: 14 },
+      { x: 728, y: 223, w: 27, h: 14 },
+      { x: 832, y: 219, w: 28, h: 14 },
+      { x: 940, y: 216, w: 29, h: 15 },
+      { x: 1050, y: 212, w: 30, h: 15 },
+      { x: 1166, y: 209, w: 31, h: 16 },
+      { x: 1284, y: 206, w: 32, h: 16 },
+      { x: 533, y: 416, w: 26, h: 13 },
+      { x: 630, y: 417, w: 26, h: 14 },
+      { x: 728, y: 418, w: 27, h: 14 },
+      { x: 832, y: 419, w: 28, h: 14 },
+      { x: 940, y: 420, w: 29, h: 15 },
+      { x: 1050, y: 422, w: 30, h: 15 },
+      { x: 1166, y: 422, w: 31, h: 16 },
+      { x: 1284, y: 423, w: 32, h: 16 },
+    ],
+    counter: { x: 640, y: 96, w: 580, h: 56 },
+    plateSpot: { w: 90, h: 90 },
+  },
+  {
+    level: 4,
+    name: 'A big works',
+    price: 200000,
+    sentence: 'Joinery of its own: oak trim round the lockers, an acoustic ceiling and upholstered chairs.',
+    reputation: 2,
+    wide: true,
+    regions: {
+      door: { x: 1412, y: 0, w: 260, h: 941 },
+      lockers: { x: 496, y: 184, w: 867, h: 271 },
+      kitchen: { x: 0, y: 42, w: 436, h: 444 },
+      table: { x: 0, y: 487, w: 863, h: 454 },
+    },
+    plates: [
+      { x: 531, y: 228, w: 28, h: 15 },
+      { x: 628, y: 224, w: 29, h: 15 },
+      { x: 726, y: 222, w: 29, h: 15 },
+      { x: 830, y: 218, w: 30, h: 16 },
+      { x: 936, y: 215, w: 31, h: 16 },
+      { x: 1047, y: 212, w: 32, h: 16 },
+      { x: 1162, y: 208, w: 33, h: 17 },
+      { x: 1283, y: 206, w: 34, h: 17 },
+      { x: 531, y: 414, w: 28, h: 15 },
+      { x: 628, y: 416, w: 29, h: 15 },
+      { x: 726, y: 418, w: 29, h: 15 },
+      { x: 830, y: 418, w: 30, h: 16 },
+      { x: 936, y: 419, w: 31, h: 16 },
+      { x: 1047, y: 421, w: 32, h: 16 },
+      { x: 1162, y: 422, w: 33, h: 17 },
+      { x: 1283, y: 422, w: 34, h: 17 },
+    ],
+    counter: { x: 640, y: 96, w: 580, h: 56 },
+    plateSpot: { w: 90, h: 90 },
+  },
+  {
+    level: 5,
+    name: 'A premium employer',
+    price: 500000,
+    sentence: 'A bright premium canteen: terrazzo, soft armchairs and a warm light along the lockers.',
+    reputation: 2,
+    wide: true,
+    regions: {
+      door: { x: 1412, y: 0, w: 260, h: 941 },
+      lockers: { x: 496, y: 184, w: 867, h: 271 },
+      kitchen: { x: 0, y: 42, w: 436, h: 444 },
+      table: { x: 0, y: 487, w: 863, h: 454 },
+    },
+    plates: [
+      { x: 534, y: 238, w: 28, h: 16 },
+      { x: 630, y: 236, w: 28, h: 16 },
+      { x: 728, y: 233, w: 30, h: 16 },
+      { x: 831, y: 230, w: 30, h: 16 },
+      { x: 937, y: 226, w: 32, h: 17 },
+      { x: 1045, y: 224, w: 32, h: 17 },
+      { x: 1159, y: 220, w: 34, h: 18 },
+      { x: 1270, y: 218, w: 34, h: 18 },
+      { x: 534, y: 414, w: 28, h: 16 },
+      { x: 630, y: 416, w: 28, h: 16 },
+      { x: 728, y: 417, w: 30, h: 16 },
+      { x: 831, y: 419, w: 30, h: 16 },
+      { x: 937, y: 420, w: 32, h: 17 },
+      { x: 1045, y: 420, w: 32, h: 17 },
+      { x: 1159, y: 420, w: 34, h: 18 },
+      { x: 1270, y: 421, w: 34, h: 18 },
+    ],
+    counter: { x: 640, y: 96, w: 580, h: 56 },
+    plateSpot: { w: 90, h: 90 },
+  },
+  {
+    level: 6,
+    name: 'The flagship canteen',
+    price: 1200000,
+    sentence: 'The flagship: a carved oak table, stone, cream upholstery and plants, the best canteen in the trade.',
+    reputation: 2,
+    wide: true,
+    regions: {
+      door: { x: 1412, y: 0, w: 260, h: 941 },
+      lockers: { x: 496, y: 184, w: 867, h: 271 },
+      kitchen: { x: 0, y: 42, w: 436, h: 444 },
+      table: { x: 0, y: 487, w: 863, h: 454 },
+    },
+    plates: [
+      { x: 533, y: 238, w: 28, h: 15 },
+      { x: 628, y: 235, w: 30, h: 16 },
+      { x: 727, y: 233, w: 30, h: 16 },
+      { x: 830, y: 228, w: 31, h: 17 },
+      { x: 937, y: 226, w: 32, h: 17 },
+      { x: 1046, y: 223, w: 33, h: 18 },
+      { x: 1158, y: 220, w: 34, h: 18 },
+      { x: 1269, y: 218, w: 34, h: 18 },
+      { x: 533, y: 414, w: 28, h: 16 },
+      { x: 628, y: 416, w: 30, h: 16 },
+      { x: 727, y: 417, w: 30, h: 16 },
+      { x: 830, y: 418, w: 31, h: 17 },
+      { x: 937, y: 420, w: 32, h: 17 },
+      { x: 1046, y: 420, w: 33, h: 18 },
+      { x: 1158, y: 420, w: 34, h: 18 },
+      { x: 1269, y: 421, w: 34, h: 18 },
+    ],
+    counter: { x: 640, y: 96, w: 580, h: 56 },
+    plateSpot: { w: 90, h: 90 },
+  },
+];
+
+/** The first level whose picture is the enlarged room, read off the levels themselves (v106). */
+export const CANTEEN_LEVEL_WIDE_FROM = CANTEEN_LEVELS.find((spec) => spec.wide)?.level ?? CANTEEN_LEVELS.length + 1;
+
+/** The refit of this level, or null for a level there is none of. */
+export function canteenLevelSpec(level: number): CanteenLevelSpec | null {
+  return CANTEEN_LEVELS.find((spec) => spec.level === level) ?? null;
+}
+
+/** The sprite key of a level's picture: the file in public/sprites. */
+export function canteenLevelSprite(level: number): string {
+  return `canteenLevel${level}`;
+}
 
 /** The roller shutter, in the left wall: 3 m of wall from y 6, 3 m high (docs/art/SPRITES.md 9.3).
  *  It is a far wall from where the camera stands, so a vehicle is only ever seen once it is
