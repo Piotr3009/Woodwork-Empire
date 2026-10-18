@@ -62,6 +62,7 @@ import { buyStock, freeFor, pendingStockSheets, reserveWindowsShortfalls, restoc
 import { crewHasGoneHome, lineEngineers } from './staff';
 import { firstOnDutyOf, movingMachines } from './tasks';
 import { inWords, plural } from './text';
+import { pinned } from './pinned';
 import { emptyLineDay } from './machines';
 import type { GameState, LineContract, LineDay, LineLostMinutes, Worker } from './types';
 
@@ -459,15 +460,19 @@ export function endLineContract(state: GameState, line: number): void {
  *  while it is being moved. Not on the second shift: the line's minute runs only from the day's
  *  clock, and the engineers work by day (CLAUDE.md T30 2.7) [TUNE: chat]. */
 export function lineMakesWindows(state: GameState, line: number): boolean {
-  if (runningLineContract(state, line) === null) return false;
-  if (!isWorkingDay(state.clock.day)) return false;
-  if (isBreak(state.clock.minute)) return false;
-  if (crewHasGoneHome(state)) return false;
-  if (movingMachines(state) !== null) return false;
-  if (lineLevel(state, line) < LINE_MODULES.length) return false;
-  // And a window's boards and glass: a minute with too little is a minute the line stands (CLAUDE.md
-  // T31 2.1).
-  return lineShortOf(state, line) === null;
+  // Kept for as long as the state is pinned: the hall asks it of each of a line's six modules
+  // (v104).
+  return pinned(state, `lineMakesWindows:${line}`, () => {
+    if (runningLineContract(state, line) === null) return false;
+    if (!isWorkingDay(state.clock.day)) return false;
+    if (isBreak(state.clock.minute)) return false;
+    if (crewHasGoneHome(state)) return false;
+    if (movingMachines(state) !== null) return false;
+    if (lineLevel(state, line) < LINE_MODULES.length) return false;
+    // And a window's boards and glass: a minute with too little is a minute the line stands
+    // (CLAUDE.md T31 2.1).
+    return lineShortOf(state, line) === null;
+  });
 }
 
 /** Every line's own minute, beside the men's: the window in hand moves on by one, and at its

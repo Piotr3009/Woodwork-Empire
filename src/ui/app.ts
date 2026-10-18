@@ -112,7 +112,7 @@ import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
 import { OWNER, hasCentralExtraction, isLineModule } from '../engine/machines';
-import { pinState } from '../engine/pinned';
+import { whilePinned } from '../engine/pinned';
 import { nextSpriteOrientation, playSheets } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
@@ -1262,12 +1262,8 @@ export function render(): void {
   // The state the page is drawn from, pinned for this one writing of the page: what is worked out
   // of it once is kept for every question the page asks, and thrown away with the page
   // (src/engine/pinned.ts; v97).
-  pinState(state);
-  try {
-    writePage();
-  } finally {
-    pinState(null);
-  }
+  if (state === null) writePage();
+  else whilePinned(state, writePage);
 }
 
 function writePage(): void {
@@ -2959,13 +2955,11 @@ function driveSound(now: number): void {
   }
   // One frame's two questions of the hall, pinned together: the loops and the one shots ask where
   // every man is drawn once a machine each, and this makes it once a frame (v97).
-  pinState(state);
-  try {
-    setLoops(hallLoops(state));
-    for (const name of hallOneShots(state)) soundPlay(name, now);
-  } finally {
-    pinState(null);
-  }
+  const hall = state;
+  whilePinned(hall, () => {
+    setLoops(hallLoops(hall));
+    for (const name of hallOneShots(hall)) soundPlay(name, now);
+  });
 }
 
 function frame(now: number): void {
@@ -2981,6 +2975,27 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 
+/** One frame of what moves in real time: the figures along the floor and on to their animation's
+ *  frame, the forklifts, the engineers, the doors, the machines' sheets and the hall's sound. */
+function stepFrame(hall: HTMLElement, now: number): void {
+  // The floor's pace is the game's speed this frame (PIOTR, 21.09; v44). On the start screen
+  // there is no game to ask, and asking threw in every frame until one was started (v88).
+  if (state !== null) setWalkPace(state.speed);
+  stepWalkers(hall, now);
+  // The line's forklift drives on in real time beside them, whatever page is open and whether
+  // the clock runs or stands (CLAUDE.md T31 2.10).
+  if (state !== null) stepForklift(hall, state, now);
+  // And the engineers walk along their lines beside it, on the same real time (v94).
+  if (state !== null) stepEngineers(hall, state, now);
+  // The doors swing on the renderer's own clock, beside the figures and for the same reason:
+  // the page is written again under them and the swing is not game state (CLAUDE.md T19 2.3).
+  stepDoors(hall, now);
+  playCharacters(hall, now);
+  // The machines' sheets beside the figures, on the same real time (CLAUDE.md T30 2.11).
+  playSheets(hall, now, runningClock());
+  driveSound(now);
+}
+
 function runFrame(now: number): void {
   const elapsed = Math.min(MAX_CATCH_UP_MS, now - lastFrame);
   lastFrame = now;
@@ -2988,27 +3003,19 @@ function runFrame(now: number): void {
   // else the frame does and whatever the clock is at (CLAUDE.md T9 3.13; T16 2.2): first along
   // the floor, then on to the frame of their animation.
   if (root !== null) {
-    // The floor's pace is the game's speed this frame (PIOTR, 21.09; v44). On the start screen
-    // there is no game to ask, and asking threw in every frame until one was started (v88).
-    if (state !== null) setWalkPace(state.speed);
-    stepWalkers(root, now);
-    // The line's forklift drives on in real time beside them, whatever page is open and whether
-    // the clock runs or stands (CLAUDE.md T31 2.10).
-    if (state !== null) stepForklift(root, state, now);
-    // And the engineers walk along their lines beside it, on the same real time (v94).
-    if (state !== null) stepEngineers(root, state, now);
-    // The doors swing on the renderer's own clock, beside the figures and for the same reason:
-    // the page is written again under them and the swing is not game state (CLAUDE.md T19 2.3).
-    stepDoors(root, now);
-    playCharacters(root, now);
-    // The machines' sheets beside the figures, on the same real time (CLAUDE.md T30 2.11).
-    playSheets(root, now, runningClock());
-    driveSound(now);
+    const hall = root;
+    // The frame's questions of the hall pinned together: the forklifts and the engineers ask which
+    // lines stand and where each one is tens of times a frame, and this makes it once (v104).
+    if (state === null) stepFrame(hall, now);
+    else whilePinned(state, () => stepFrame(hall, now));
   }
   // One frame, one writing of the page, whatever the clock did inside it: ten game minutes at
   // 10x used to be ten pages (CLAUDE.md T9 3.8, 3.11).
   batched(() => {
     if (state === null || ui.screen !== 'game') return;
+    // A page owed by the minutes of a frame before this one.
+    const owedBefore = clockRenderOwed;
+    let ranNow = false;
     if (state.gameOver === null) {
       const perSecond = gameMinutesPerRealSecond(state.speed);
       if (perSecond > 0 && state.activeEvent === null) {
@@ -3016,7 +3023,10 @@ function runFrame(now: number): void {
         const whole = Math.floor(accumulator);
         if (whole > 0) {
           const ran = advanceMinutes(whole, false);
-          if (ran > 0) clockRenderOwed = true;
+          if (ran > 0) {
+            clockRenderOwed = true;
+            ranNow = true;
+          }
           // Only what the engine actually ran leaves the accumulator: the rest waits for the modal.
           accumulator -= ran;
         }
@@ -3029,7 +3039,13 @@ function runFrame(now: number): void {
       state.activeEvent !== null ||
       state.gameOver !== null ||
       now - lastClockRender >= CLOCK_RENDER_GAP_MS;
-    if (clockRenderOwed && writeNow) {
+    // The page of a minute is written in the frame after the one the minute ran in, so the
+    // engine's minute and the page are two frames and not one long one [PIOTR, 18.10: "the whole
+    // program stutters every second"] (v104). A page owed since a frame before is written now, so a
+    // clock that runs minutes in every frame still has its page, and an event or the end of the
+    // game is written at once.
+    const nextFrame = ranNow && !owedBefore && state.activeEvent === null && state.gameOver === null;
+    if (clockRenderOwed && writeNow && !nextFrame) {
       clockRenderOwed = false;
       lastClockRender = now;
       requestRender();

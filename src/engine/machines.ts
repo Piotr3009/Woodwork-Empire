@@ -101,7 +101,7 @@ import { jobHeldBy } from './jobs';
 import { stageOfMan } from './production';
 import { contractFamiliesOf, contractOfWorker, contractPiece, contractPieceSpeed } from './contracts';
 import { jobPace, stageDoing, stagePlanFor } from './stages';
-import { pinned } from './pinned';
+import { pinned, whilePinned } from './pinned';
 import { isWorkingToday, managerPaceFor, nightCrew } from './staff';
 import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
@@ -262,15 +262,21 @@ export function itemIsHeavy(item: { specId: string; variantId: string }): boolea
  *  the floor plan, the painting, the stations and the ducting all read it. */
 export function standsInTheHall(specId: string, variantId?: string): boolean {
   // The answer is the catalogue's and never changes, so each class is worked out once and kept on
-  // the function, as `specsById` keeps its table (v88).
-  const holder = standsInTheHall as unknown as { known?: Map<string, boolean> };
-  if (holder.known === undefined) holder.known = new Map<string, boolean>();
-  const key = `${specId}|${variantId ?? ''}`;
-  const known = holder.known.get(key);
+  // the function, as `specsById` keeps its table (v88): by family and then by class, so asking it
+  // writes no key (v104).
+  const holder = standsInTheHall as unknown as { known?: Map<string, Map<string, boolean>> };
+  if (holder.known === undefined) holder.known = new Map<string, Map<string, boolean>>();
+  let classes = holder.known.get(specId);
+  if (classes === undefined) {
+    classes = new Map<string, boolean>();
+    holder.known.set(specId, classes);
+  }
+  const variant = variantId ?? '';
+  const known = classes.get(variant);
   if (known !== undefined) return known;
   const zone = zoneOf(specId, variantId);
   const stands = zone.width > 0 && zone.depth > 0;
-  holder.known.set(key, stands);
+  classes.set(variant, stands);
   return stands;
 }
 
@@ -506,13 +512,18 @@ export function lineEngineersOnDuty(state: GameState, line: number): number {
 }
 
 /** True for a line engineer on duty in a company with a module that stands: he is at the line,
- *  never a man standing about, and his week is a full week (CLAUDE.md T29 2.8). */
-export function engineerAtTheLine(state: GameState, worker: Worker): boolean {
+ *  never a man standing about, and his week is a full week (CLAUDE.md T29 2.8). A caller that asks
+ *  it of every man says whether a line stands, once (v104). */
+export function engineerAtTheLine(
+  state: GameState,
+  worker: Worker,
+  aLineStands: boolean | null = null,
+): boolean {
   return (
     worker.role === 'lineEngineer' &&
     worker.startDay <= state.clock.day &&
     worker.absentDaysRemaining === 0 &&
-    standingLines(state).length > 0
+    (aLineStands ?? standingLines(state).length > 0)
   );
 }
 
@@ -521,8 +532,11 @@ export function engineerAtTheLine(state: GameState, worker: Worker): boolean {
  *  still, and its stages go back to the machines that did them before (CLAUDE.md T29 2.9.4, T30
  *  2.3.6). What the engineers' tile, the strip, `familyRuns` and the line's contract read. */
 export function lineLevel(state: GameState, line: number): number {
-  const kept = LINE_MODULES_KEPT[Math.min(LINE_MODULES_KEPT.length - 1, lineEngineersOnDuty(state, line))] ?? 0;
-  return Math.min(lineModules(state, line), kept);
+  // Its two questions of which modules stand asked once between them (v104).
+  return whilePinned(state, () => {
+    const kept = LINE_MODULES_KEPT[Math.min(LINE_MODULES_KEPT.length - 1, lineEngineersOnDuty(state, line))] ?? 0;
+    return Math.min(lineModules(state, line), kept);
+  });
 }
 
 /** A day of a line's day book with nothing in it yet (CLAUDE.md T31 2.5). */
@@ -608,8 +622,11 @@ export function jobsLine(state: GameState): number | null {
  *  level the jobs' line runs at otherwise. The one answer `lineModuleFor` and `lineFactor` read
  *  (CLAUDE.md T30 2.5). */
 export function lineLevelForJobs(state: GameState): number {
-  const line = jobsLine(state);
-  return line === null ? 0 : lineLevel(state, line);
+  // Kept for as long as the state is pinned: every stage of every plan asks it (v104).
+  return pinned(state, 'lineLevelForJobs', () => {
+    const line = jobsLine(state);
+    return line === null ? 0 : lineLevel(state, line);
+  });
 }
 
 /** What the line gives every stage of a timber job at the level the jobs get today, 1 with no
@@ -949,6 +966,13 @@ export function crewAtFamily(state: GameState, family: string, shift: 'day' | 'n
  *  nothing else. A hall of a hundred things and twenty six men read the plans thousands of times
  *  a picture and stuttered [PIOTR, 10.10: "with lots of things bought the game stutters"] (v87). */
 export function crewByFamily(state: GameState, shift: 'day' | 'night' = 'day'): Map<string, number> {
+  // The hall pinned while the crew is counted, and each contract's plan read once however many
+  // men are on it, as each job's is: forty men on three contracts read their piece's plan forty
+  // times a count, twice a minute (v104).
+  return whilePinned(state, () => crewCount(state, shift));
+}
+
+function crewCount(state: GameState, shift: 'day' | 'night'): Map<string, number> {
   const men: Array<{ id: string; working: boolean }> =
     shift === 'night'
       ? nightCrew(state).map((worker) => ({ id: worker.id, working: true }))
@@ -958,6 +982,7 @@ export function crewByFamily(state: GameState, shift: 'day' | 'night' = 'day'): 
         ];
   const counts = new Map<string, number>();
   const plans = new Map<string, Set<string>>();
+  const pieces = new Map<string, Set<string>>();
   const countOn = (families: ReadonlySet<string>): void => {
     for (const family of families) counts.set(family, (counts.get(family) ?? 0) + 1);
   };
@@ -979,7 +1004,12 @@ export function crewByFamily(state: GameState, shift: 'day' | 'night' = 'day'): 
     if (contract === null) continue;
     // A sheet piece's one family, or every family of a window's or a door's plan, as a timber
     // job's men are counted (CLAUDE.md T29 2.12.3).
-    countOn(familiesIn(contractFamiliesOf(state, contractPiece(contract))));
+    let families = pieces.get(contract.id);
+    if (families === undefined) {
+      families = familiesIn(contractFamiliesOf(state, contractPiece(contract)));
+      pieces.set(contract.id, families);
+    }
+    countOn(families);
   }
   return counts;
 }
@@ -1376,43 +1406,52 @@ function manWords(worker: { name: string; tier: WorkerTier | null; role: string 
   return `${worker.name}, ${tradeWords(worker)}`;
 }
 
+/** The hall's own lines of the Output sheet and what they come to: the factor every minute of
+ *  production is multiplied by. Points, added and never multiplied: a line is worth what its
+ *  factor takes off one, and the hall's number is one plus the lot, floored (PIOTR, 30.09; v60).
+ *  Until v60 the lines were the steps of a running product, so a second thing wrong cost less than
+ *  the first. The factor reads these and nothing else of the sheet, twice a minute, and from v104
+ *  asks for nothing else, with the hall pinned while they are read. */
+function hallLinesOf(state: GameState, shift: 'day' | 'night'): { lines: OutputLine[]; total: number } {
+  return whilePinned(state, () => {
+    const lines: OutputLine[] = [];
+    let running = 1;
+    const hallLine = (label: string, factor: number): void => {
+      lines.push({ label, points: factor - 1, hall: true, where: '' });
+      running += factor - 1;
+    };
+    const band = dustBand(state.dust);
+    hallLine(band.label === 'clean' ? 'Hall clean' : `Hall ${band.label}`, band.factor);
+    if (labourerMissing(state)) hallLine('Five joiners and no labourer', NO_LABOURER_PRODUCTIVITY_FACTOR);
+    // Nowhere to put anything down with four finished pieces in the way (CLAUDE.md T2 3.7).
+    if (gateIsCrowded(state)) hallLine('No room at the gate', GATE_CROWD_FACTOR);
+    // The extraction is down: the hall crawls rather than stopping dead (CLAUDE.md T2 3.9).
+    if (extractorBroken(state)) {
+      hallLine('Extraction down', EXTRACTOR_BROKEN_OUTPUT_FACTOR);
+    } else {
+      hallLine('Extraction working', 1);
+    }
+    // The fans are there and they are too small for what is running: nothing stops, the hall just
+    // turns out less of everything and fills with dust (PIOTR, CLAUDE.md T10 3.1).
+    const extraction = extractionCheck(state);
+    if (extraction.short) {
+      hallLine(extraction.line, 1 - UNDER_EXTRACTION_OUTPUT_PENALTY);
+    }
+    // Too few places at a family for the crew: the men past them work elsewhere at the by hand
+    // pace, and the sheet says what that costs the whole hall (PIOTR, 24.09: "it has to be shown
+    // clearly what the penalty is and how many percent the saw slows the whole production"; v53).
+    for (const short of placeShortages(state, shift)) {
+      hallLine(`Too few ${machinesWord(short.family)}: capacity ${short.capacity}, ${short.men} men`, short.factor);
+    }
+    return { lines, total: Math.max(PACE_FLOOR, running) };
+  });
+}
+
 /** What the hall is turning out and why, line by line. The one selector for it: the number the
  *  engine multiplies production by is this list's total, so the board and the bench cannot
  *  disagree about the state of the hall (CLAUDE.md T9 3.10). */
 export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'): OutputBreakdown {
-  const lines: OutputLine[] = [];
-  // Points, added and never multiplied: a line is worth what its factor takes off one, and the
-  // hall's number is one plus the lot, floored (PIOTR, 30.09; v60). Until v60 the lines were the
-  // steps of a running product, so a second thing wrong cost less than the first.
-  let running = 1;
-  const hallLine = (label: string, factor: number): void => {
-    lines.push({ label, points: factor - 1, hall: true, where: '' });
-    running += factor - 1;
-  };
-  const band = dustBand(state.dust);
-  hallLine(band.label === 'clean' ? 'Hall clean' : `Hall ${band.label}`, band.factor);
-  if (labourerMissing(state)) hallLine('Five joiners and no labourer', NO_LABOURER_PRODUCTIVITY_FACTOR);
-  // Nowhere to put anything down with four finished pieces in the way (CLAUDE.md T2 3.7).
-  if (gateIsCrowded(state)) hallLine('No room at the gate', GATE_CROWD_FACTOR);
-  // The extraction is down: the hall crawls rather than stopping dead (CLAUDE.md T2 3.9).
-  if (extractorBroken(state)) {
-    hallLine('Extraction down', EXTRACTOR_BROKEN_OUTPUT_FACTOR);
-  } else {
-    hallLine('Extraction working', 1);
-  }
-  // The fans are there and they are too small for what is running: nothing stops, the hall just
-  // turns out less of everything and fills with dust (PIOTR, CLAUDE.md T10 3.1).
-  const extraction = extractionCheck(state);
-  if (extraction.short) {
-    hallLine(extraction.line, 1 - UNDER_EXTRACTION_OUTPUT_PENALTY);
-  }
-  // Too few places at a family for the crew: the men past them work elsewhere at the by hand
-  // pace, and the sheet says what that costs the whole hall (PIOTR, 24.09: "it has to be shown
-  // clearly what the penalty is and how many percent the saw slows the whole production"; v53).
-  for (const short of placeShortages(state, shift)) {
-    hallLine(`Too few ${machinesWord(short.family)}: capacity ${short.capacity}, ${short.men} men`, short.factor);
-  }
-  const total = Math.max(PACE_FLOOR, running);
+  const { lines, total } = hallLinesOf(state, shift);
   let plus = 0;
   let minus = 0;
   for (const line of lines) {
@@ -1497,7 +1536,7 @@ export function outputBreakdown(state: GameState, shift: 'day' | 'night' = 'day'
 /** What the state of the hall does to every minute of production: the total of the lines the
  *  board shows, and nothing else (CLAUDE.md T9 3.10). */
 export function hallProductivityFactor(state: GameState, shift: 'day' | 'night' = 'day'): number {
-  return outputBreakdown(state, shift).total;
+  return hallLinesOf(state, shift).total;
 }
 
 /** Books one production minute's multiplier for the workshop's average output (v40): the jobs

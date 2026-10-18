@@ -344,11 +344,29 @@ function placeFigures(drawables: Drawable[]): void {
 }
 
 /** Writes the depth a drawable was sorted at on to its own element, so the live layer says what
- *  the painter's order is and the walker's re-sort can read a neighbour (CLAUDE.md T20 2.11). A
- *  drawable is one element with everything else inside it, and it is its first tag that is
- *  written on. */
+ *  the painter's order is and the walker's re-sort can read a neighbour (CLAUDE.md T20 2.11), and
+ *  beside it the mark of its own markup (`data-sig`), so the page can leave everything inside a
+ *  drawable that has not changed since the last page alone (v104). A drawable is one element with
+ *  everything else inside it, and it is its first tag that is written on. */
 function withDepth(svg: string, depth: number): string {
-  return svg.replace(/^<([a-zA-Z]+)/, `<$1 data-depth="${Math.round(depth * 1000) / 1000}"`);
+  return svg.replace(/^<([a-zA-Z]+)/, `<$1 data-depth="${Math.round(depth * 1000) / 1000}" data-sig="${markOf(svg)}"`);
+}
+
+/** A mark of a piece of markup: the same for the same markup, and as good as never the same for
+ *  two different pieces, 53 bits of hash (cyrb53) written in base 36 (v104). */
+function markOf(text: string): string {
+  let first = 0xdeadbeef;
+  let second = 0x41c6ce57;
+  for (let at = 0; at < text.length; at += 1) {
+    const code = text.charCodeAt(at);
+    first = Math.imul(first ^ code, 2654435761);
+    second = Math.imul(second ^ code, 1597334677);
+  }
+  first = Math.imul(first ^ (first >>> 16), 2246822507);
+  first ^= Math.imul(second ^ (second >>> 13), 3266489909);
+  second = Math.imul(second ^ (second >>> 16), 2246822507);
+  second ^= Math.imul(first ^ (first >>> 13), 3266489909);
+  return (4294967296 * (2097151 & second) + (first >>> 0)).toString(36);
 }
 
 // ---------------------------------------------------------------------------

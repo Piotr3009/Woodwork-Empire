@@ -35,6 +35,7 @@ import {
   lineModuleFor,
   sprayRobotRuns,
 } from './machines';
+import { whilePinned } from './pinned';
 import type {
   Finish,
   GameState,
@@ -258,30 +259,34 @@ export function stagesOf(state: GameState, job: StagedJob, options: StageOptions
 }
 
 /** The plan for a job as the hall stands now. It is read every minute, so buying a machine speeds
- *  up work already on the books and selling one slows it down again. */
+ *  up work already on the books and selling one slows it down again. Asked with the state pinned,
+ *  so its stages ask the hall which line the jobs get once between them and not three times a
+ *  stage (v104). */
 export function stagePlanFor(
   state: GameState,
   job: StagedJob,
   options: StageOptions = {},
 ): StagePlan[] {
-  const plans: StagePlan[] = [];
-  let from = 0;
-  for (const stage of stagesOf(state, job, options)) {
-    const to = from + stage.share * job.labourValue;
-    const { speed, byHand } = stageSpeed(state, job, stage.id, options);
-    plans.push({
-      id: stage.id,
-      label: stage.label,
-      share: stage.share,
-      from,
-      to,
-      family: stageFamilyIn(state, job, stage.id),
-      speed,
-      byHand,
-    });
-    from = to;
-  }
-  return plans;
+  return whilePinned(state, () => {
+    const plans: StagePlan[] = [];
+    let from = 0;
+    for (const stage of stagesOf(state, job, options)) {
+      const to = from + stage.share * job.labourValue;
+      const { speed, byHand } = stageSpeed(state, job, stage.id, options);
+      plans.push({
+        id: stage.id,
+        label: stage.label,
+        share: stage.share,
+        from,
+        to,
+        family: stageFamilyIn(state, job, stage.id),
+        speed,
+        byHand,
+      });
+      from = to;
+    }
+    return plans;
+  });
 }
 
 /** The minutes a man of this rate needs to work this much labour off at this speed. */

@@ -112,6 +112,15 @@ function depthAt(at: Point): number {
   return depthKey(Math.floor(at.x), Math.floor(at.y)) + FIGURE_DEPTH_OFFSET;
 }
 
+/** The feet an engineer is put among the drawables by: the middle of the cell he is on, as a man
+ *  walking between stations is (v104). Against the whole metres every thing on the floor stands
+ *  on, the middle of his cell puts him where his own feet would, and he is put again only when he
+ *  steps on to the next cell and not in every frame he walks: thirty four engineers on seventeen
+ *  lines were a fifth of a second of every second at 1x. */
+function feetAt(at: Point): Point {
+  return { x: Math.floor(at.x) + 0.5, y: Math.floor(at.y) + 0.5 };
+}
+
 /** A new walk: the first engineer at module 1's end going down the line, the second at module 6's
  *  coming up it. */
 function startOf(key: string, index: number, length: number): EngineerWalk {
@@ -141,7 +150,7 @@ export function engineersArt(
       const at = pointOf(path, index, walk.along);
       drawn.push({
         depth: depthAt(at),
-        feet: at,
+        feet: feetAt(at),
         svg:
           `<g data-engineer="${line}:${index}" transform="${screenAt(at)}" pointer-events="none">${art}</g>`,
       });
@@ -150,14 +159,20 @@ export function engineersArt(
   return drawn;
 }
 
+/** The path of a line its engineers walk, by line, as `follow` read them for this frame. */
+type Paths = Map<number, { from: Point; length: number; key: string }>;
+
 /** Reads the state for this frame: forgets the walks of engineers no longer walking, starts the
  *  ones that are, and walks each on by the real time since his last step when `drive` is set,
- *  turning at each end of the line. */
-function follow(state: GameState, nowMs: number, drive: boolean): void {
+ *  turning at each end of the line. Hands back the paths it read, so the drawing asks the state
+ *  nothing again (v104). */
+function follow(state: GameState, nowMs: number, drive: boolean): Paths {
   const wanted = new Set<string>();
+  const paths: Paths = new Map();
   for (const line of standingLines(state)) {
     const path = engineerPath(state, line);
     if (path === null) continue;
+    paths.set(line, path);
     const count = engineersWalking(state, line);
     for (let index = 0; index < count; index += 1) {
       const id = `${line}:${index}`;
@@ -177,6 +192,7 @@ function follow(state: GameState, nowMs: number, drive: boolean): void {
   for (const id of Array.from(walks.keys())) {
     if (!wanted.has(id)) walks.delete(id);
   }
+  return paths;
 }
 
 /** Walks this far along the line and back, turning at each end. */
@@ -198,32 +214,30 @@ function walkOn(walk: EngineerWalk, metres: number, length: number): void {
 /** Writes every engineer where his walk has got to onto the page: his place, the way he faces and
  *  his depth among the drawables. Nothing it set before survives a page written, so all of it is
  *  written each time; the frame of his walk is `playCharacters`'s. */
-function draw(root: ParentNode, state: GameState): void {
+function draw(root: ParentNode, paths: Paths): void {
   for (const node of Array.from(root.querySelectorAll('[data-engineer]'))) {
     const [lineText, indexText] = (node.getAttribute('data-engineer') ?? '').split(':');
     const line = Number(lineText);
     const index = Number(indexText);
     const walk = walks.get(`${line}:${index}`);
-    const path = engineerPath(state, line);
-    if (walk === undefined || path === null) continue;
+    const path = paths.get(line);
+    if (walk === undefined || path === undefined) continue;
     const at = pointOf(path, index, walk.along);
     // Written only when it changes: an engineer who stands writes nothing in a frame (v97).
     writeAttribute(node, 'transform', screenAt(at));
     const art = node.querySelector('[data-character]');
     if (art !== null) faceCharacter(art, facingOf(walk.direction));
-    placeAmongDrawables(node, depthAt(at), at);
+    placeAmongDrawables(node, depthAt(at), feetAt(at));
   }
 }
 
 /** The frame's step: in every frame with the state, whatever page is open and whether the clock runs
  *  or stands, every engineer walks on in real time and is drawn where he has got to (v94). */
 export function stepEngineers(root: ParentNode, state: GameState, nowMs: number): void {
-  follow(state, nowMs, true);
-  draw(root, state);
+  draw(root, follow(state, nowMs, true));
 }
 
 /** After every page written: every engineer is put back where his walk had got to (v94). */
 export function syncEngineers(root: ParentNode, state: GameState, nowMs: number): void {
-  follow(state, nowMs, false);
-  draw(root, state);
+  draw(root, follow(state, nowMs, false));
 }

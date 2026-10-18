@@ -73,6 +73,7 @@ import { managerOnDuty, managerOnDutyNow, managerTier } from './owner';
 import { effectiveReputation } from './reputation';
 import { hands, machineWantedFor, planPlaces, workMinute } from './production';
 import { chance, int, makeId } from './rng';
+import { pinned } from './pinned';
 import { STATION_IDLE, placeCellsAt } from './stations';
 import type {
   Equipment,
@@ -283,6 +284,13 @@ export function labourerOnDuty(state: GameState): boolean {
  *  bags and the van are his. Both are on the painted floor: (1, 1), where every man who is not a
  *  joiner used to be put, is inside the office block (CLAUDE.md T11 3.4). */
 export function homeCellOf(state: GameState, worker: Worker): { x: number; y: number } {
+  // Kept for as long as the state is pinned: the hall asks it twice a man every page, and a
+  // bench's places are a walk round the floor (v104).
+  const home = pinned(state, `homeCell:${worker.id}`, () => homeCellFor(state, worker));
+  return { x: home.x, y: home.y };
+}
+
+function homeCellFor(state: GameState, worker: Worker): { x: number; y: number } {
   // A joiner's home is the bench he has now, asked of the benches as they stand, and not the one
   // written down the day he was hired: benches are bought, sold and moved, and from Turn 23 one
   // holds two or three men, so the anchor of the hiring day drew Eddie beside a rack where a bench

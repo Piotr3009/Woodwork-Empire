@@ -228,7 +228,7 @@ export const STATE_VERSION = 49;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v103';
+export const APP_VERSION = 'v104';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -6165,6 +6165,10 @@ export const DAY_SUMMARIES_MAX = 90;
 /** How many days of the owner's day log the state carries. A week is what the company board
  *  shows, and the brief asks for no more (CLAUDE.md T11 3.1). */
 export const DAY_LOGS_KEPT = 7;
+/** [TUNE: chat] The days a finished job of work and an unloaded lorry are kept behind the day in
+ *  hand when no open job is theirs: nothing reads them after the day they were done, and the whole
+ *  state is copied every game minute (v104). */
+export const HISTORY_KEPT_DAYS = 30;
 /** The state keeps this many ledger lines [TUNE]. It was 200, which a busy month outran; the month
  *  end report and the house tier are sums over dated lines and want the whole month and the
  *  thirty days before it in the state (CLAUDE.md T13 3.18, 3.20). */

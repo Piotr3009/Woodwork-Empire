@@ -1226,6 +1226,7 @@ export function runContractMinute(
     // minute a machine however many of its men stood at it (CLAUDE.md T24 2.4, T26 2.1).
     const atMachines = new Set<string>();
     const piece = contractPiece(contract);
+    let speed: number | null = null;
     // The contract has the whole day of every man on it (PIOTR, 21.09; v42): its hands are its
     // own this minute, first to last, with no job of work to give them back to.
     const wanted = contractHands(state, contract);
@@ -1252,8 +1253,10 @@ export function runContractMinute(
       if (place === undefined || !place.working) continue;
       // The hall's pace at his piece's stage, or the by hand penalty with no machine of the family
       // in the hall, through the one reading the stages give (CLAUDE.md T7 3.4, T25 2.4); for a
-      // window or a door the whole timber plan's pace (T29 2.12.3). The card reads the same.
-      const speed = contractPieceSpeed(state, piece);
+      // window or a door the whole timber plan's pace (T29 2.12.3). The card reads the same. Read
+      // once a contract a minute and not once a man: a finished piece takes its sheets and books
+      // its money, and nothing of the hall it is read off (v104).
+      speed ??= contractPieceSpeed(state, piece);
       hall ??= hallProductivityFactor(state);
       // His grade times the points, as the job minute is (v61), the manager's among them: a man on
       // a contract is carried by the manager like any other, and until v70 his row printed the

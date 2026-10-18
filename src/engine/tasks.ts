@@ -49,11 +49,12 @@ import {
 } from './constants';
 import { DAY_END_MINUTE } from './constants';
 import { isBreak, nextWorkingDay, weekOfDay } from './clock';
-import { OWNER, engineerAtTheLine, has } from './machines';
+import { OWNER, engineerAtTheLine, has, standingLines } from './machines';
 import { canUnload } from './materials';
 import { ownerIsAvailable } from './owner';
 import { bookOwnerIdleMinute, bookWorkerIdleMinute } from './production';
 import { makeId } from './rng';
+import { pinned } from './pinned';
 import { plural } from './text';
 import {
   crewHasGoneHome,
@@ -506,12 +507,11 @@ export function movePending(state: GameState): TaskInstance | null {
 }
 
 /** The move of the hall somebody is actually doing this minute, or null. While one is running
- *  the clock is forced to 4x and every bench waits (CLAUDE.md T4 3.5). */
+ *  the clock is forced to 4x and every bench waits (CLAUDE.md T4 3.5). Kept for as long as the
+ *  state is pinned: the hall asks it of every module of every line (v104). */
 export function movingMachines(state: GameState): TaskInstance | null {
-  return (
-    state.tasks.find(
-      (task) => task.kind === 'moveMachines' && !task.done && task.doneBy !== null,
-    ) ?? null
+  return pinned(state, 'movingMachines', () =>
+    state.tasks.find((task) => task.kind === 'moveMachines' && !task.done && task.doneBy !== null) ?? null,
   );
 }
 
@@ -849,6 +849,8 @@ export function bookWeekMinutes(state: GameState): void {
   // Five o'clock and the men have gone home. The clock runs on for the owner and for nobody else,
   // so nobody else is paid for the evening or counted through it (CLAUDE.md T17 2.12).
   if (!crewHasGoneHome(state)) {
+    // Asked once a minute and not once an engineer (v104).
+    const aLineStands = standingLines(state).length > 0;
     for (const worker of state.workers) {
       // The day shift, and only the day shift: the night runs its own minute loop and never
       // settles, so a man on it is left out of the meters rather than sampled through a day he
@@ -857,7 +859,7 @@ export function bookWeekMinutes(state: GameState): void {
       // A line engineer's minute at the line is booked under the desk's band, the band of the work
       // of a man who makes nothing with his hands; only the bands' sum is ever read (CLAUDE.md T29
       // 2.8) [TUNE].
-      const atTheLine = engineerAtTheLine(state, worker);
+      const atTheLine = engineerAtTheLine(state, worker, aLineStands);
       const band = atTheLine ? 'desk' : bandOf(state, worker.taskId, worker.jobId);
       const sample = bookOne(state, worker, week, band, jobNameOf(state, worker.jobId), atTheLine);
       // And the other half of his day, the same way the owner's is taken above: a minute he put

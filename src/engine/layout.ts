@@ -30,6 +30,7 @@ import {
 import type { LayoutSlot } from './constants';
 import { findSpec, isLineModule, isSold, itemStandsInTheHall, lineNumbers, lineOf, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
+import { pinned } from './pinned';
 import { metresBy } from './text';
 import { standsOutsideTheHall } from './walk';
 import type { Equipment, GameState, OnOrderItem, Orientation } from './types';
@@ -359,11 +360,28 @@ export function canBeMoved(state: GameState, itemId: string): boolean {
 /** Where module 1 of a line stands, not sold, or is held on order: the line's place, from which
  *  its ground is worked out. Null with no such line (CLAUDE.md T31 2.6; v93). */
 export function linePlace(state: GameState, line: number): { x: number; y: number } | null {
-  const first = LINE_MODULES[0];
-  const standing = hallItems(state).find((item) => item.specId === first && lineOf(item) === line && !isSold(item));
-  if (standing !== undefined) return { x: standing.anchorX, y: standing.anchorY };
-  const ordered = reservedItems(state).find((item) => item.specId === first && lineOf(item) === line);
-  return ordered === undefined ? null : { x: ordered.anchorX, y: ordered.anchorY };
+  const at = linePlaces(state).get(line);
+  return at === undefined ? null : { x: at.x, y: at.y };
+}
+
+/** Where module 1 of every line stands or is held on order, by line, the one standing first: one
+ *  pass over the kit for every line, kept for as long as the state is pinned (v104). The hall's
+ *  frame asked it of the kit once a line for each forklift and twice for each engineer, sixty
+ *  times a second. */
+function linePlaces(state: GameState): Map<number, { x: number; y: number }> {
+  return pinned(state, 'linePlaces', () => {
+    const first = LINE_MODULES[0];
+    const places = new Map<number, { x: number; y: number }>();
+    for (const item of hallItems(state)) {
+      if (item.specId !== first || isSold(item) || places.has(lineOf(item))) continue;
+      places.set(lineOf(item), { x: item.anchorX, y: item.anchorY });
+    }
+    for (const item of reservedItems(state)) {
+      if (item.specId !== first || places.has(lineOf(item))) continue;
+      places.set(lineOf(item), { x: item.anchorX, y: item.anchorY });
+    }
+    return places;
+  });
 }
 
 /** The lanes of every line that stands or is on order and has one, by line: for the hall's yellow
@@ -382,6 +400,12 @@ export function lineLanes(state: GameState): { line: number; front: Box; left: B
  *  line and kind: what refuses other kit, and what the strip names kit standing on (v93). The
  *  lines named by `except` are left out. */
 export function claimedGround(state: GameState, except: ReadonlySet<number> = new Set()): GroundBox[] {
+  // Every line's, kept for as long as the state is pinned: the strip asks it once a line (v104).
+  if (except.size === 0) return pinned(state, 'claimedGround', () => groundOf(state, except));
+  return groundOf(state, except);
+}
+
+function groundOf(state: GameState, except: ReadonlySet<number>): GroundBox[] {
   const boxes: GroundBox[] = [];
   for (const line of lineNumbers(state)) {
     if (except.has(line)) continue;
@@ -835,11 +859,23 @@ export function lockerSlots(state: GameState): readonly LayoutSlot[] {
  *  anything else can have the floor (v67). */
 export function standingOn(state: GameState, box: Box): string[] {
   const found: string[] = [];
-  for (const item of [...hallItems(state), ...reservedItems(state)]) {
-    if (!overlaps(box, boxOfItem(item, item.anchorX, item.anchorY))) continue;
-    if (!found.includes(item.specId)) found.push(item.specId);
+  for (const thing of floorTakenBy(state)) {
+    if (!overlaps(box, thing.box)) continue;
+    if (!found.includes(thing.specId)) found.push(thing.specId);
   }
   return found;
+}
+
+/** Everything standing in the hall and everything held for a delivery, with the floor each takes,
+ *  in the order they stand: kept for as long as the state is pinned, which the strip asks of every
+ *  line's ground (v104). */
+function floorTakenBy(state: GameState): Array<{ specId: string; box: Box }> {
+  return pinned(state, 'floorTakenBy', () =>
+    [...hallItems(state), ...reservedItems(state)].map((item) => ({
+      specId: item.specId,
+      box: boxOfItem(item, item.anchorX, item.anchorY),
+    })),
+  );
 }
 
 /** The first cell, reading along each row in turn, where a thing of this kind fits. */

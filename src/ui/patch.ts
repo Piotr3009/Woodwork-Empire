@@ -70,13 +70,133 @@ function patchNode(old: Node, fresh: Node): void {
   const before = old as Element;
   // The scene is built once and carried from page to page: it is not this function's business.
   if (before.hasAttribute('data-scene-slot')) return;
+  // A drawable of the hall whose markup carries the mark it carried last time is the same inside:
+  // its own attributes are brought into line, and nothing inside it is read or written (v104).
+  // What the frame has moved in it since, a man's step or a machine's frame, stays where it is.
+  const mark = before.getAttribute('data-sig');
+  const same = mark !== null && mark === (fresh as Element).getAttribute('data-sig');
   patchAttributes(before, fresh as Element);
-  patchChildren(before, fresh as Element);
+  if (!same) patchChildren(before, fresh as Element);
+}
+
+/** The attributes that say which thing of the hall an element is drawn for, first that it carries
+ *  wins: a piece of kit, an engineer, a line's forklift, a man, a canteen's kit, a line's yellow
+ *  lane, a pallet at the gate, a room, the buyer's van and a room's door (v104). */
+const IDENTITY = [
+  'data-kit',
+  'data-engineer',
+  'data-forklift-line',
+  'data-figure',
+  'data-canteen-kit',
+  'data-lane',
+  'data-line-pallet',
+  'data-room',
+  'data-van',
+  'data-door-room',
+];
+
+/** Which thing this node is drawn for, or null for a node that says none. */
+function identityOf(node: Node): string | null {
+  if (node.nodeType !== ELEMENT_NODE) return null;
+  const element = node as Element;
+  if (element.attributes.length === 0) return null;
+  for (const name of IDENTITY) {
+    const value = element.getAttribute(name);
+    if (value !== null) return `${name}=${value}`;
+  }
+  return null;
+}
+
+/** The identity of every node of a list, a second node of the same identity told apart from the
+ *  first by its count, so two drawn for one thing are matched in their order. */
+function identitiesOf(nodes: readonly Node[]): Array<string | null> {
+  const seen = new Map<string, number>();
+  return nodes.map((node) => {
+    const identity = identityOf(node);
+    if (identity === null) return null;
+    const count = seen.get(identity) ?? 0;
+    seen.set(identity, count + 1);
+    return count === 0 ? identity : `${identity}#${count}`;
+  });
+}
+
+/** The places in `from` of the longest run of old places that rise, the old places being the
+ *  order the nodes stand in now and -1 for a node that is new: the nodes already in the right
+ *  order among themselves, which are left where they are. */
+function longestRising(from: readonly number[]): Set<number> {
+  const tails: number[] = [];
+  const previous = new Array<number>(from.length).fill(-1);
+  from.forEach((value, index) => {
+    if (value < 0) return;
+    let low = 0;
+    let high = tails.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if ((from[tails[middle] as number] as number) < value) low = middle + 1;
+      else high = middle;
+    }
+    if (low > 0) previous[index] = tails[low - 1] as number;
+    tails[low] = index;
+  });
+  const stay = new Set<number>();
+  for (let at = tails[tails.length - 1] ?? -1; at >= 0; at = previous[at] as number) stay.add(at);
+  return stay;
+}
+
+/** The children of a list whose nodes say what they are drawn for: each is matched to the old node
+ *  drawn for the same thing wherever it stands, and moved there when the order has changed, never
+ *  turned into its neighbour (v104). The hall's live layer is the list: its kit, men, engineers
+ *  and forklifts are sorted by depth, and a man walking past a machine changes the order. Matched
+ *  by place, as the rest of the page is, a module of a line became the machine that had stood
+ *  before it and its picture was fetched again, and the line blinked out of the hall [PIOTR,
+ *  18.10: "every now and then our production lines disappear"]. A node that says nothing is matched
+ *  to the next old node that says nothing, as before. */
+function patchByIdentity(target: Element, olds: readonly Node[], news: readonly Node[], identities: Array<string | null>): void {
+  const oldIdentities = identitiesOf(olds);
+  const byIdentity = new Map<string, number>();
+  const loose: number[] = [];
+  oldIdentities.forEach((identity, index) => {
+    if (identity === null) loose.push(index);
+    else byIdentity.set(identity, index);
+  });
+  let looseAt = 0;
+  const final: Node[] = [];
+  const from: number[] = [];
+  const kept = new Set<number>();
+  news.forEach((next, index) => {
+    const identity = identities[index] ?? null;
+    const at = identity === null ? loose[looseAt++] : byIdentity.get(identity);
+    const old = at === undefined ? undefined : olds[at];
+    if (old !== undefined && at !== undefined && !kept.has(at) && isSame(old, next)) {
+      patchNode(old, next);
+      kept.add(at);
+      final.push(old);
+      from.push(at);
+    } else {
+      final.push(next);
+      from.push(-1);
+    }
+  });
+  olds.forEach((old, index) => {
+    if (!kept.has(index)) target.removeChild(old);
+  });
+  const stay = longestRising(from);
+  let after: Node | null = null;
+  for (let index = final.length - 1; index >= 0; index -= 1) {
+    const node = final[index] as Node;
+    if (!stay.has(index)) target.insertBefore(node, after);
+    after = node;
+  }
 }
 
 function patchChildren(target: Element, fresh: Element): void {
   const olds = Array.from(target.childNodes);
   const news = Array.from(fresh.childNodes);
+  const identities = identitiesOf(news);
+  if (identities.some((identity) => identity !== null) || olds.some((old) => identityOf(old) !== null)) {
+    patchByIdentity(target, olds, news, identities);
+    return;
+  }
   const count = Math.max(olds.length, news.length);
   for (let index = 0; index < count; index += 1) {
     const old = olds[index];

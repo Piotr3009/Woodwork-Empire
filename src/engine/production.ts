@@ -42,6 +42,7 @@ import {
 } from './machines';
 import { drawGlassFor, drawSheetsFor, rackCanSupply } from './materials';
 import { movingMachines, openTasks } from './tasks';
+import { whilePinned } from './pinned';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -362,6 +363,15 @@ export function dayPlan(
   shift: Shift = 'day',
   given: readonly Hand[] | null = null,
 ): PlaceEntry[] {
+  // A reading and nothing else, so the hall is pinned while it is read, and the round of each job
+  // and of each contract's piece is worked out once however many men go it: forty men on three
+  // contracts read their piece's plan forty times a plan, twice a minute (v104).
+  return whilePinned(state, () => planOf(state, shift, given));
+}
+
+function planOf(state: GameState, shift: Shift, given: readonly Hand[] | null): PlaceEntry[] {
+  const jobRounds = new Map<string, string[]>();
+  const pieceRounds = new Map<string, { round: string[]; tool: Equipment | null }>();
   const left = new Map<string, number>();
   const placedSoFar = new Map<string, number>();
   const placesLeft = (family: string): number => {
@@ -382,11 +392,25 @@ export function dayPlan(
       // A job the hall has stopped, or the rack cannot feed, has nothing for him to do this
       // minute: he wants no place, and the minute says why (`placeHand`).
       if (hallStops(state, job) !== '' || !rackCanSupply(state, job, jobProgress(job))) continue;
-      families = familiesFor(state, job, candidate.who);
+      let round = jobRounds.get(job.id);
+      if (round === undefined) {
+        round = roundFor(state, job);
+        jobRounds.set(job.id, round);
+      }
+      families = familiesOfRound(state, round, candidate.who);
     } else if (candidate.contract !== null) {
-      const piece = contractPiece(candidate.contract);
-      tool = sharedTool(state, contractStageFamilyOf(state, piece, true));
-      families = familiesForContract(state, candidate.contract, candidate.who);
+      const contract = candidate.contract;
+      let piece = pieceRounds.get(contract.id);
+      if (piece === undefined) {
+        const spec = contractPiece(contract);
+        piece = {
+          round: contractRoundOf(state, spec),
+          tool: sharedTool(state, contractStageFamilyOf(state, spec, true)),
+        };
+        pieceRounds.set(contract.id, piece);
+      }
+      tool = piece.tool;
+      families = familiesOfRound(state, piece.round, candidate.who);
     } else {
       continue;
     }

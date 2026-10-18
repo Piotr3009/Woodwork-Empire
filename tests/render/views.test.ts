@@ -107,7 +107,11 @@ describe('the hall on day 1', () => {
     dirty.dust = 75;
     expect(hallProblems(dirty)[0]?.text).toContain('The hall is dirty');
     const drawn = renderHall(dirty, { files: [], characters: {} });
-    expect(drawn).not.toContain('75');
+    // Flipped in v104: the words the hall shows and not its markup, whose marks of each drawable
+    // are numbers nobody reads.
+    const holder = document.createElement('div');
+    holder.innerHTML = drawn;
+    expect(holder.textContent).not.toContain('75');
   });
 
   it('grows a sawdust pile for every ten points of dust', () => {

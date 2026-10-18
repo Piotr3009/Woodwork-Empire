@@ -97,6 +97,10 @@ interface WindowRun {
   steps: Array<{ day: number; minute: number; curing: string | null; blocked: string; stage: string; glassUsed: number }>;
   /** The day the owner pressed Order for this job for the glass alone, in the late run. */
   glassOrderedOn: number | null;
+  /** The job's own lorries as they stood the last minute it was open. Flipped in v104: a lorry
+   *  unloaded for a finished job is left behind at the morning thirty days on, and the job takes
+   *  longer than that. */
+  loads: Delivery[];
 }
 
 /** Played by the script. `late` takes the job with its boards in hand and leaves its glass until
@@ -105,7 +109,7 @@ interface WindowRun {
  *  T29 2.1, T32 2.4). */
 function playTheWindow(late = false): WindowRun {
   let state = windowCompany(late);
-  const run: WindowRun = { state, seen: [], steps: [], glassOrderedOn: null };
+  const run: WindowRun = { state, seen: [], steps: [], glassOrderedOn: null, loads: [] };
   const job = (now: GameState): Job | undefined => now.jobs.find((entry) => entry.templateId === 'sashWindows');
   const policy: Policy = {
     ...CAREFUL,
@@ -124,6 +128,9 @@ function playTheWindow(late = false): WindowRun {
   };
   const watch = (now: GameState): void => {
     const window = job(now);
+    if (window !== undefined && window.stage !== 'completed') {
+      run.loads = now.deliveries.filter((delivery) => delivery.jobId === window.id);
+    }
     run.steps.push({
       day: now.clock.day,
       minute: now.clock.minute,
@@ -145,8 +152,8 @@ function playTheWindow(late = false): WindowRun {
 }
 
 /** The job's own loads, of one kind. */
-function loadsOf(state: GameState, job: Job | undefined, material: Delivery['material']): Delivery[] {
-  return state.deliveries.filter((delivery) => delivery.jobId === job?.id && delivery.material === material);
+function loadsOf(run: WindowRun, material: Delivery['material']): Delivery[] {
+  return run.loads.filter((delivery) => delivery.material === material);
 }
 
 describe('(vv) a sash window job through the timber department (CLAUDE.md T28 2.6 to 2.10, T32 2.4)', () => {
@@ -170,8 +177,8 @@ describe('(vv) a sash window job through the timber department (CLAUDE.md T28 2.
     expect(glass[0]?.amount).toBeCloseTo(-(window?.glassUnits ?? 0) * glassUnitPrice(), 2);
     expect(run.state.ledger.some((entry) => entry.label === 'Glass for Sash windows')).toBe(false);
     const ordered = boards[0]?.day ?? Number.NaN;
-    const boardLoads = loadsOf(run.state, window, 'boards');
-    const glassLoads = loadsOf(run.state, window, 'glass');
+    const boardLoads = loadsOf(run, 'boards');
+    const glassLoads = loadsOf(run, 'glass');
     expect(boardLoads.map((load) => [load.sheets, load.arriveDay, load.unloaded])).toEqual([
       [window?.sheets, addWorkingDays(ordered, 1), true],
     ]);
@@ -220,7 +227,7 @@ describe('(vv) the same job with the glass left until the Glazing (CLAUDE.md T28
     expect(run.state.gameOver).toBeNull();
     // Its boards were in hand at the click, so only its glass was ever ordered (CLAUDE.md T32 2.4).
     expect(run.state.ledger.some((entry) => entry.label === 'Material for Sash windows: boards')).toBe(false);
-    expect(loadsOf(run.state, window, 'boards')).toEqual([]);
+    expect(loadsOf(run, 'boards')).toEqual([]);
     const waited = [...new Set(run.steps.filter((step) => step.blocked === WAITING_FOR_GLASS).map((step) => step.day))];
     expect(waited.length).toBeGreaterThan(0);
     for (const step of run.steps.filter((entry) => entry.blocked === WAITING_FOR_GLASS)) expect(step.stage).toBe('assembly');
@@ -230,7 +237,7 @@ describe('(vv) the same job with the glass left until the Glazing (CLAUDE.md T28
     // One working day, on a lorry, as the glazier's was from v84 (CLAUDE.md T29 2.1, T32 2.6).
     // Flipped in v96: the job waits until the lorry is unloaded, so it may stand the morning it
     // lands as well.
-    const glass = loadsOf(run.state, window, 'glass');
+    const glass = loadsOf(run, 'glass');
     expect(glass.map((load) => [load.sheets, load.orderedDay, load.arriveDay])).toEqual([[window?.glassUnits, ordered, addWorkingDays(ordered, 1)]]);
     for (const day of waited) expect(day).toBeLessThanOrEqual(glass[0]?.arriveDay ?? 0);
     expect(window?.glassUsed).toBe(window?.glassUnits);

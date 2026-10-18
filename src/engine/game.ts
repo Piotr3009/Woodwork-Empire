@@ -14,6 +14,7 @@ import {
   DAY_LOGS_KEPT,
   DAY_SUMMARIES_MAX,
   DIFFICULTIES,
+  HISTORY_KEPT_DAYS,
   CUTTER_SETS,
   DRYING_RACKS,
   SPRAY_ROBOT,
@@ -205,6 +206,7 @@ import {
   findJob,
   oldestReadyJob,
   onDeliveryArrived,
+  openJobs,
   orderTransport,
   ownerJob,
   onDeliveryUnloaded,
@@ -381,8 +383,37 @@ export interface NewGameOptions {
   showWhy: boolean;
 }
 
+/** A copy of the state that shares nothing with it: what `JSON.parse(JSON.stringify(state))` gives,
+ *  value for value, since the state is plain JSON (types.ts), made by walking it once instead of
+ *  writing it out as text and reading the text back, which took three times as long. Every game
+ *  minute and every action copies the whole state, on Piotr's save of 18.10 four megabytes of it
+ *  [PIOTR, 18.10: "the whole program stutters every second"] (v104). */
 export function clone(state: GameState): GameState {
-  return JSON.parse(JSON.stringify(state)) as GameState;
+  return copyOfJson(state) as GameState;
+}
+
+/** JSON's copy of a value: a number JSON cannot write is null and minus nought is nought, a key
+ *  whose value JSON leaves out is left out, and in an array it keeps its place as null. */
+function copyOfJson(value: unknown): unknown {
+  if (typeof value === 'number') return Number.isFinite(value) ? value + 0 : null;
+  if (typeof value !== 'object' || value === null) return value;
+  if (Array.isArray(value)) {
+    const copy: unknown[] = [];
+    for (const entry of value as unknown[]) copy.push(leftOutByJson(entry) ? null : copyOfJson(entry));
+    return copy;
+  }
+  const source = value as Record<string, unknown>;
+  const copy: Record<string, unknown> = {};
+  for (const key of Object.keys(source)) {
+    const entry = source[key];
+    if (!leftOutByJson(entry)) copy[key] = copyOfJson(entry);
+  }
+  return copy;
+}
+
+/** What JSON writes no value for. */
+function leftOutByJson(value: unknown): boolean {
+  return value === undefined || typeof value === 'function' || typeof value === 'symbol';
 }
 
 export function difficultySpec(difficulty: Difficulty) {
@@ -663,6 +694,7 @@ function startDay(state: GameState): void {
   checkOverdueJobs(state);
   for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
   createDailyTasks(state);
+  forgetOldHistory(state);
   runExtractorBreakdown(state);
   runServiceDue(state);
   runOverdueBreakdowns(state);
@@ -678,6 +710,35 @@ function startDay(state: GameState): void {
   // that lands with two engineers already hired is offered its contract that morning (CLAUDE.md
   // T30 2.6, 2.8).
   runLineDay(state);
+}
+
+/** What nothing reads any more goes at the day's open: a job of work finished, and a lorry
+ *  unloaded, more than `HISTORY_KEPT_DAYS` ago and for no job still open, nobody's in hand and no
+ *  unloading's (v104). The whole state is copied every game minute, and on Piotr's save of day
+ *  4,300 [PIOTR, 18.10: "the whole program stutters every second"] every task and every lorry since
+ *  day 2 were still in it, 5,396 tasks and 834 lorries, a third of what was copied. */
+function forgetOldHistory(state: GameState): void {
+  const before = state.clock.day - HISTORY_KEPT_DAYS;
+  const open = new Set(openJobs(state).map((job) => job.id));
+  const ofAnOpenJob = (jobId: string | null): boolean => jobId !== null && open.has(jobId);
+  const inHand = new Set<string | null>([
+    state.owner.currentTaskId,
+    state.owner.resumeTaskId,
+    state.skipTaskId,
+    ...state.workers.map((worker) => worker.taskId),
+  ]);
+  state.tasks = state.tasks.filter(
+    (task) => !task.done || (task.doneDay ?? task.day) > before || ofAnOpenJob(task.jobId) || inHand.has(task.id),
+  );
+  const unloading = new Set(state.tasks.map((task) => task.deliveryId));
+  state.deliveries = state.deliveries.filter(
+    (delivery) =>
+      !delivery.unloaded ||
+      delivery.overflowSheets > 0 ||
+      delivery.arriveDay > before ||
+      ofAnOpenJob(delivery.jobId) ||
+      unloading.has(delivery.id),
+  );
 }
 
 /** The first working day of the month, before the board: the month's report, once per month

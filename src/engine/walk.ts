@@ -16,7 +16,8 @@ import { PALLET_LAYOUT, PICTURE_COVER_SHARE, roomsOf } from './constants';
 import { findSpec, isSold, itemStandsInTheHall } from './machines';
 import { footprintOrigin } from './pipes';
 import type { Cell } from './pipes';
-import type { GameState, Orientation } from './types';
+import { keptWhilePinned } from './pinned';
+import type { Equipment, GameState, Orientation } from './types';
 
 export type { Cell };
 
@@ -61,6 +62,12 @@ export function insideUnit(state: GameState, cell: Cell): boolean {
   return cell.x >= 0 && cell.y >= 0 && cell.x < state.unit.widthCells && cell.y < state.unit.depthCells;
 }
 
+/** True for a thing that stands on the hall's floor: not sold, a thing with a footprint, and not
+ *  outside the hall. What a man cannot stand on or walk across. */
+function onTheFloor(state: GameState, item: Equipment): boolean {
+  return !isSold(item) && itemStandsInTheHall(item) && !standsOutsideTheHall(state, item);
+}
+
 /** Can a man stand here: inside the unit, on no footprint, in no room, not on the pallet. */
 export function isFree(state: GameState, cell: Cell): boolean {
   if (!insideUnit(state, cell)) return false;
@@ -68,12 +75,43 @@ export function isFree(state: GameState, cell: Cell): boolean {
   for (const room of roomsOf(state.unit)) {
     if (covers(room, cell)) return false;
   }
+  const map = floorMap(state);
+  if (map !== null) return !map.footprints.has(keyOf(cell));
   for (const item of state.equipment) {
-    if (isSold(item) || !itemStandsInTheHall(item)) continue;
-    if (standsOutsideTheHall(state, item)) continue;
+    if (!onTheFloor(state, item)) continue;
     if (covers(footprintCells(item), cell)) return false;
   }
   return true;
+}
+
+/** The floor, cell by cell: the cells a footprint stands on, and the machines whose pictures cover
+ *  each cell, worked out once while the state is pinned and null while it is not (v104). The page
+ *  asks a cell of every machine on the floor thousands of times while it puts the men where they
+ *  stand: on Piotr's hall of 251 things a third of the hall's drawing. */
+function floorMap(state: GameState): { footprints: Set<string>; pictures: Map<string, string[]> } | null {
+  return keptWhilePinned(state, 'floorMap', () => {
+    const footprints = new Set<string>();
+    const pictures = new Map<string, string[]>();
+    for (const item of state.equipment) {
+      if (!onTheFloor(state, item)) continue;
+      const box = footprintCells(item);
+      for (let x = box.x; x < box.x + box.width; x += 1) {
+        for (let y = box.y; y < box.y + box.depth; y += 1) footprints.add(keyOf({ x, y }));
+      }
+      if (!isAMachine(item)) continue;
+      const drawn = footprintOrigin(item);
+      for (let x = Math.floor(drawn.x); x < drawn.x + drawn.width; x += 1) {
+        for (let y = Math.floor(drawn.y); y < drawn.y + drawn.depth; y += 1) {
+          if (!pictureCovers(item, { x, y })) continue;
+          const key = keyOf({ x, y });
+          const over = pictures.get(key);
+          if (over === undefined) pictures.set(key, [item.id]);
+          else over.push(item.id);
+        }
+      }
+    }
+    return { footprints, pictures };
+  });
 }
 
 /** Whether a machine's picture covers this cell on the floor: its drawn footprint over at least
@@ -99,9 +137,10 @@ export function pictureCovers(
  *  the two ends of a walk are taken as they are. */
 export function isWalkable(state: GameState, cell: Cell, own: ReadonlySet<string> = new Set<string>()): boolean {
   if (!isFree(state, cell)) return false;
+  const map = floorMap(state);
+  if (map !== null) return (map.pictures.get(keyOf(cell)) ?? []).every((id) => own.has(id));
   for (const item of state.equipment) {
-    if (isSold(item) || !itemStandsInTheHall(item)) continue;
-    if (standsOutsideTheHall(state, item)) continue;
+    if (!onTheFloor(state, item)) continue;
     if (own.has(item.id) || !isAMachine(item)) continue;
     if (pictureCovers(item, cell)) return false;
   }

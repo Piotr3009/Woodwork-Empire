@@ -119,13 +119,23 @@ function depthOf(node: Element): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+/** What each drawable's `data-foot` was read as, with the text it was read from (v104): a man is
+ *  put among three hundred drawables every time he steps on to another cell, and the floors they
+ *  stand on change only with the page. */
+const feetRead = new WeakMap<Element, { raw: string; box: FloorBox | null }>();
+
 /** The floor a drawable stands on, as the scene wrote it, or null for one with no footprint. */
 function footOf(node: Element): FloorBox | null {
   const raw = node.getAttribute('data-foot');
   if (raw === null) return null;
+  const read = feetRead.get(node);
+  if (read !== undefined && read.raw === raw) return read.box;
   const [x, y, width, depth] = raw.split(',').map(Number);
-  if ([x, y, width, depth].some((value) => value === undefined || !Number.isFinite(value))) return null;
-  return { x: x as number, y: y as number, width: width as number, depth: depth as number };
+  const box = [x, y, width, depth].some((value) => value === undefined || !Number.isFinite(value))
+    ? null
+    : { x: x as number, y: y as number, width: width as number, depth: depth as number };
+  feetRead.set(node, { raw, box });
+  return box;
 }
 
 /** The drawables round a figure that carry a depth, in document order and without him, and how
