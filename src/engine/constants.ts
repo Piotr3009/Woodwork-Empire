@@ -239,7 +239,7 @@ export const STATE_VERSION = 52;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v112';
+export const APP_VERSION = 'v111';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -6967,16 +6967,14 @@ export interface SecurityLevelSpec {
 }
 
 /** From nothing to a firm that takes the risk to zero, so the player feels fixed costs (PIOTR:
- *  the alarm at 500 once, level 5 at zero risk; the rest [TUNE]; CLAUDE.md T13 3.17). The two firms'
- *  base halved in v112 [PIOTR, 18.10: "security is too dear against the whole, cut it by at least
- *  half"]: 250 and 600 until then, so every month of a firm is half what it was. */
+ *  the alarm at 500 once, level 5 at zero risk; the rest [TUNE]; CLAUDE.md T13 3.17). */
 export const SECURITY_LEVELS: readonly SecurityLevelSpec[] = [
   { level: 0, name: 'Nothing', price: 0, monthly: 0, scaled: false, risk: 0.04 },
   { level: 1, name: 'Alarm', price: 500, monthly: 0, scaled: false, risk: 0.02 },
   { level: 2, name: 'Bars', price: 1500, monthly: 0, scaled: false, risk: 0.012 },
   { level: 3, name: 'Bars and dogs', price: 2500, monthly: 150, scaled: false, risk: 0.006 },
-  { level: 4, name: 'Security firm, basic', price: 0, monthly: 125, scaled: true, risk: 0.002 },
-  { level: 5, name: 'Security firm, good', price: 0, monthly: 300, scaled: true, risk: 0 },
+  { level: 4, name: 'Security firm, basic', price: 0, monthly: 250, scaled: true, risk: 0.002 },
+  { level: 5, name: 'Security firm, good', price: 0, monthly: 600, scaled: true, risk: 0 },
 ];
 /** The subscription of a scaled level: base times area over this, times one plus the insured
  *  value over this [TUNE] (CLAUDE.md T13 3.17). */

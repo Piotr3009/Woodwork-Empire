@@ -144,8 +144,7 @@ describe('a fresh game in this build', () => {
     // state 51: a line's kind, the door line (PIOTR, 18.10). v108 is state 51 too: the door line's
     // own pictures. v109 is state 51 too: a contract's price rises at fifteen renewals at most. v110
     // is state 51 too: the two shelters' pictures. v111 is state 52: the yard laid out in its order.
-    // v112 is state 52 too: the security firms at half the price.
-    expect(APP_VERSION).toBe('v112');
+    expect(APP_VERSION).toBe('v111');
     expect(STATE_VERSION).toBe(52);
   });
 
