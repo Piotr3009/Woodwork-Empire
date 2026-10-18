@@ -25,12 +25,13 @@ import {
   RATE_WEEK_DAYS,
   SPEND_WARNING_CATEGORIES,
   SPEND_WARNING_FROM_CLOSED_DAYS,
+  LINE_KINDS,
   lineName,
 } from './constants';
 import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
 import { takeOffOutstanding } from './jobs';
-import { bagStore, findSpec, lineEngineersOnDuty, lineLevel, lineModules, lineNumbers, standingLines } from './machines';
+import { bagStore, findSpec, lineEngineersOnDuty, lineKindOf, lineLevel, lineModules, lineNumbers, standingLines } from './machines';
 import { lineShortOf, runningLineContract } from './lineContract';
 import { andList, inASentence, inWords } from './text';
 import { inTheWayAt, laneTarget, laneTrouble, linePlace, standingInTheWay } from './layout';
@@ -157,9 +158,11 @@ function lineNeedsEngineerWarning(state: GameState): Warning | null {
     const level = lineLevel(state, line);
     if (level >= standing) continue;
     if (level === 0) return { key: 'lineNeedsEngineer', text: `${lineName(line)} stands still: no engineer on duty` };
+    // A door line runs short with one, two or three of its four on duty (v107).
+    const onDuty = lineEngineersOnDuty(state, line);
     return {
       key: 'lineNeedsEngineer',
-      text: `${lineName(line)} runs as ${inWords(level)} modules: ${inWords(lineEngineersOnDuty(state, line))} engineer on duty`,
+      text: `${lineName(line)} runs as ${inWords(level)} modules: ${inWords(onDuty)} ${onDuty === 1 ? 'engineer' : 'engineers'} on duty`,
     };
   }
   return null;
@@ -222,7 +225,10 @@ function lineNeedsMaterialWarning(state: GameState): Warning | null {
     if (lineLevel(state, line) < lineModules(state, line)) continue;
     const short = lineShortOf(state, line);
     if (short === null) continue;
-    return { key: 'lineNeedsMaterial', text: `${lineName(line)} stands: no ${short} for its next window` };
+    return {
+      key: 'lineNeedsMaterial',
+      text: `${lineName(line)} stands: no ${short} for its next ${LINE_KINDS[lineKindOf(state, line)].unit}`,
+    };
   }
   return null;
 }

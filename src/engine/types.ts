@@ -888,10 +888,18 @@ export interface LineSince {
  *  own day book (CLAUDE.md T31 2.5). From v93 one record a line, by the line's number, in
  *  `GameState.windowLines` (PIOTR, 12.10). From v96 it keeps no timber or glass of its own: its
  *  contract holds them on the company's stores (CLAUDE.md T32 2.5). */
+/** What a production line makes [PIOTR, 18.10: "a line of doors, two times the windows"] (v107):
+ *  the window line of Turn 29 and the door line. The names of the record and its counts stay the
+ *  window line's (`windowLines`, `windows`) and count a line's units of whatever kind. */
+export type LineKind = 'window' | 'door';
+
 export interface WindowLineState {
   /** The line's number, 1 for the first bought and one more for each after it: what its modules
    *  carry, what every tile, card, strip line and ledger line names it by, never given twice. */
   number: number;
+  /** What the line makes, written once when it is bought and kept after its sale for its books;
+   *  every line of a save before v107 is a window line (v107). */
+  kind: LineKind;
   contract: LineContract | null;
   /** Null until the first offer; a week on whenever an offer is turned down or a contract ends. */
   nextOfferDay: number | null;

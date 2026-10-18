@@ -91,10 +91,10 @@ export function engineersWalking(state: GameState, line: number): number {
   return lineEngineersOnDuty(state, line);
 }
 
-/** Where an engineer is on the floor for this far along his path: the second keeps the far side of
- *  the metre. */
+/** Where an engineer is on the floor for this far along his path: the second of each pair keeps the
+ *  far side of the metre (v94; v107: a door line's four in two pairs). */
 function pointOf(path: { from: Point }, index: number, along: number): Point {
-  return { x: path.from.x + along, y: path.from.y + (index === 0 ? -ACROSS_THE_PATH : ACROSS_THE_PATH) };
+  return { x: path.from.x + along, y: path.from.y + (index % 2 === 0 ? -ACROSS_THE_PATH : ACROSS_THE_PATH) };
 }
 
 /** The way a man walking along x faces: down the line `se`, back up it `nw`. */
@@ -121,12 +121,16 @@ function feetAt(at: Point): Point {
   return { x: Math.floor(at.x) + 0.5, y: Math.floor(at.y) + 0.5 };
 }
 
-/** A new walk: the first engineer at module 1's end going down the line, the second at module 6's
- *  coming up it. */
-function startOf(key: string, index: number, length: number): EngineerWalk {
-  return index === 0
-    ? { key, along: 0, direction: 1, lastMs: null }
-    : { key, along: length, direction: -1, lastMs: null };
+/** A new walk: the engineers walk in pairs, the first of a pair going down the line and the second
+ *  as far from its far end coming up it, each pair starting its share of the way along, so a door
+ *  line's four are spread along it; two are the first at module 1's end and the second at module
+ *  6's, as v94 had them (v107) [TUNE]. */
+function startOf(key: string, index: number, length: number, count: number): EngineerWalk {
+  const pairs = Math.max(1, Math.ceil(count / 2));
+  const into = (Math.floor(index / 2) / pairs) * length;
+  return index % 2 === 0
+    ? { key, along: into, direction: 1, lastMs: null }
+    : { key, along: length - into, direction: -1, lastMs: null };
 }
 
 /** The engineers as the hall draws them, one drawable each: his walk sheet clipped to one cell,
@@ -144,7 +148,7 @@ export function engineersArt(
     const count = engineersWalking(state, line);
     for (let index = 0; index < count; index += 1) {
       const known = walks.get(`${line}:${index}`);
-      const walk = known !== undefined && known.key === path.key ? known : startOf(path.key, index, path.length);
+      const walk = known !== undefined && known.key === path.key ? known : startOf(path.key, index, path.length, count);
       const art = characterArt(ENGINEER_ROLE, 'walk', facingOf(walk.direction), options);
       if (art === null) continue;
       const at = pointOf(path, index, walk.along);
@@ -179,7 +183,7 @@ function follow(state: GameState, nowMs: number, drive: boolean): Paths {
       wanted.add(id);
       let walk = walks.get(id);
       if (walk === undefined || walk.key !== path.key) {
-        walk = startOf(path.key, index, path.length);
+        walk = startOf(path.key, index, path.length, count);
         walks.set(id, walk);
       }
       if (drive && walk.lastMs !== null) {

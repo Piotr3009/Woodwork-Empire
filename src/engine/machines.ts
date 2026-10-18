@@ -68,10 +68,12 @@ import {
   bagsToM3,
   SPRAY_ROBOT,
   LINE_COVERS,
-  LINE_ENGINEERS_MAX,
   LINE_FACTOR,
+  LINE_KINDS,
+  LINE_MODULE_INDEX,
   LINE_MODULES,
-  LINE_MODULES_KEPT,
+  lineModulesKept,
+  lineModulesOf,
   lineName,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
@@ -114,6 +116,7 @@ import type {
   GameState,
   Orientation,
   LineDay,
+  LineKind,
   LineSince,
   StageId,
   StockKind,
@@ -412,14 +415,20 @@ export function floorMachines(state: GameState, specId: string): Equipment[] {
   return owned(state, specId).filter((item) => itemStandsInTheHall(item) && !isSold(item));
 }
 
-/** True for a module of the production line (CLAUDE.md T29 2.9). */
+/** True for a module of a production line of any kind (CLAUDE.md T29 2.9; v107). */
 export function isLineModule(specId: string): boolean {
-  return LINE_MODULES.includes(specId);
+  return LINE_MODULE_INDEX.has(specId);
 }
 
-/** A module's place in the line, 1 to 6, and 0 for anything that is not one. */
+/** A module's place in its line, 1 to 6, and 0 for anything that is not one. */
 export function lineModuleIndex(specId: string): number {
-  return LINE_MODULES.indexOf(specId) + 1;
+  return LINE_MODULE_INDEX.get(specId)?.place ?? 0;
+}
+
+/** The kind of line a module is of, by its family, and null for anything that is not one: a
+ *  module's kind is its catalogue id, so it can never disagree with its spec (v107). */
+export function moduleKind(specId: string): LineKind | null {
+  return LINE_MODULE_INDEX.get(specId)?.kind ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -459,18 +468,19 @@ function standingModuleMasks(state: GameState): Map<number, number> {
 function moduleMasksOf(state: GameState): Map<number, number> {
   const masks = new Map<number, number>();
   for (const item of state.equipment) {
-    const index = LINE_MODULES.indexOf(item.specId);
-    if (index < 0 || isSold(item) || !itemStandsInTheHall(item)) continue;
+    const place = lineModuleIndex(item.specId);
+    if (place === 0 || isSold(item) || !itemStandsInTheHall(item)) continue;
     const line = item.line ?? 1;
-    masks.set(line, (masks.get(line) ?? 0) | (1 << index));
+    masks.set(line, (masks.get(line) ?? 0) | (1 << (place - 1)));
   }
   return masks;
 }
 
-/** The unbroken run from module 1 of the places a mask holds. */
+/** The unbroken run from module 1 of the places a mask holds: a mask holds only the places of its
+ *  kind's modules, so the run never passes the last (v107). */
 function runOf(mask: number): number {
   let run = 0;
-  while (run < LINE_MODULES.length && (mask & (1 << run)) !== 0) run += 1;
+  while ((mask & (1 << run)) !== 0) run += 1;
   return run;
 }
 
@@ -511,14 +521,33 @@ function engineersOnDuty(state: GameState): Worker[] {
   );
 }
 
-/** How many of the engineers on duty keep this line: they are shared out along the lines that
- *  stand in their order, two to a line, line 1 first (PIOTR, 12.10: "hired engineers staff the
- *  lines in order"), so a line that stands behind another runs only once the first has its two. A
- *  line that does not stand has none (v93). */
+/** Where a line's own engineers stand in the list of the line engineers, and how many it takes:
+ *  the lines that stand take theirs in their order, line 1 first, each as many as its kind wants,
+ *  two a window line and four a door line (PIOTR, 12.10: "hired engineers staff the lines in order";
+ *  18.10: four to a door line), so a line that stands behind another has its own only once those
+ *  before it have theirs. Null for a line that does not stand. One walk of the lines for the state
+ *  the page is drawing (v93; v107). */
+export function lineEngineerSlot(state: GameState, line: number): { from: number; need: number } | null {
+  return (
+    pinned(state, 'lineEngineerSlots', () => {
+      const slots = new Map<number, { from: number; need: number }>();
+      let from = 0;
+      for (const standing of standingLines(state)) {
+        const need = LINE_KINDS[lineKindOf(state, standing)].engineers;
+        slots.set(standing, { from, need });
+        from += need;
+      }
+      return slots;
+    }).get(line) ?? null
+  );
+}
+
+/** How many of the engineers on duty keep this line: its own share of them, in the order the lines
+ *  take them (`lineEngineerSlot`). A line that does not stand has none (v93; v107). */
 export function lineEngineersOnDuty(state: GameState, line: number): number {
-  const before = standingLines(state).indexOf(line);
-  if (before < 0) return 0;
-  return Math.max(0, Math.min(LINE_ENGINEERS_MAX, engineersOnDuty(state).length - before * LINE_ENGINEERS_MAX));
+  const slot = lineEngineerSlot(state, line);
+  if (slot === null) return 0;
+  return Math.max(0, Math.min(slot.need, engineersOnDuty(state).length - slot.from));
 }
 
 /** True for a line engineer on duty in a company with a module that stands: he is at the line,
@@ -542,9 +571,10 @@ export function engineerAtTheLine(
  *  still, and its stages go back to the machines that did them before (CLAUDE.md T29 2.9.4, T30
  *  2.3.6). What the engineers' tile, the strip, `familyRuns` and the line's contract read. */
 export function lineLevel(state: GameState, line: number): number {
-  // Its two questions of which modules stand asked once between them (v104).
+  // Its two questions of which modules stand asked once between them (v104). A door line's four
+  // keep its modules by the same share (v107).
   return whilePinned(state, () => {
-    const kept = LINE_MODULES_KEPT[Math.min(LINE_MODULES_KEPT.length - 1, lineEngineersOnDuty(state, line))] ?? 0;
+    const kept = lineModulesKept(lineKindOf(state, line), lineEngineersOnDuty(state, line));
     return Math.min(lineModules(state, line), kept);
   });
 }
@@ -574,9 +604,10 @@ export function emptyLineSince(): LineSince {
  *  pallet, nothing at the gate and no upgrade (CLAUDE.md T30 section 4), and an empty day book
  *  (CLAUDE.md T31 section 4); its timber and glass are the stores' from Turn 32 (CLAUDE.md T32 2.5). The day in hand is the day given, the save's own when
  *  a save is lifted. */
-export function emptyWindowLine(number: number, day = 0): WindowLineState {
+export function emptyWindowLine(number: number, day = 0, kind: LineKind = 'window'): WindowLineState {
   return {
     number,
+    kind,
     contract: null,
     nextOfferDay: null,
     minutes: 0,
@@ -595,21 +626,45 @@ export function lineRecord(state: GameState, line: number): WindowLineState | nu
   return state.windowLines.find((record) => record.number === line) ?? null;
 }
 
-/** A new line's record, the moment it is bought: written fresh, in the place of an unused record
- *  of the same number a line bought and sold before it ever ran left behind (`nextLineNumber` gives
- *  a number again only then) (v93). */
-export function newLineRecord(state: GameState, line: number): WindowLineState {
+/** The kind of the kit of a line, standing, sold and waiting for its van, or on order, and null for
+ *  a line with none (v107). */
+function kindOfLineKit(state: GameState, line: number): LineKind | null {
+  for (const item of state.equipment) {
+    const kind = moduleKind(item.specId);
+    if (kind !== null && lineOf(item) === line) return kind;
+  }
+  for (const item of state.onOrder) {
+    const kind = moduleKind(item.specId);
+    if (kind !== null && lineOf(item) === line) return kind;
+  }
+  return null;
+}
+
+/** What a line makes: its record's kind, written when it was bought; for a line with no record yet
+ *  the kind of its kit; and a window line for neither (v107). */
+export function lineKindOf(state: GameState, line: number): LineKind {
+  return lineRecord(state, line)?.kind ?? kindOfLineKit(state, line) ?? 'window';
+}
+
+/** A new line's record, the moment it is bought: written fresh with its kind, in the place of an
+ *  unused record of the same number a line bought and sold before it ever ran left behind
+ *  (`nextLineNumber` gives a number again only then) (v93; v107). */
+export function newLineRecord(state: GameState, line: number, kind: LineKind): WindowLineState {
   state.windowLines = state.windowLines.filter((record) => record.number !== line);
-  return lineState(state, line);
+  const record = emptyWindowLine(line, state.clock.day, kind);
+  state.windowLines.push(record);
+  state.windowLines.sort((left, right) => left.number - right.number);
+  return record;
 }
 
 /** A line's own record, written whole with every part's default the first time the line is asked
- *  for, and the same record from then on, kept in the lines' order (CLAUDE.md T30 section 4; v93:
- *  one a line). What writes to a line reads this; what only reads asks `lineRecord`. */
+ *  for, of the kind of its kit, and the same record from then on, kept in the lines' order
+ *  (CLAUDE.md T30 section 4; v93: one a line; v107: its kind). What writes to a line reads this;
+ *  what only reads asks `lineRecord`. */
 export function lineState(state: GameState, line: number): WindowLineState {
   const found = lineRecord(state, line);
   if (found !== null) return found;
-  const record = emptyWindowLine(line, state.clock.day);
+  const record = emptyWindowLine(line, state.clock.day, kindOfLineKit(state, line) ?? 'window');
   state.windowLines.push(record);
   state.windowLines.sort((left, right) => left.number - right.number);
   return record;
@@ -625,7 +680,11 @@ export function lineContractRuns(state: GameState, line: number): boolean {
  *  (v93) [TUNE: chat: the first by number]. The one answer `lineLevelForJobs`, `lineModuleFor`
  *  and the places at a module read. */
 export function jobsLine(state: GameState): number | null {
-  return standingLines(state).find((line) => !lineContractRuns(state, line)) ?? null;
+  // Only a window line serves the timber jobs: a door line off its contract stands still (v107).
+  return (
+    standingLines(state).find((line) => LINE_KINDS[lineKindOf(state, line)].servesJobs && !lineContractRuns(state, line)) ??
+    null
+  );
 }
 
 /** What of the line the jobs get: nothing while every line that stands runs its contract, and the
@@ -654,10 +713,10 @@ export function lineModuleFor(state: GameState, stage: StageId): string | null {
   return LINE_MODULES[index - 1] ?? null;
 }
 
-/** True while the whole line of six stands, not sold, whatever the engineers keep today (CLAUDE.md
- *  T30 2.5). */
+/** True while the whole line of its kind stands, not sold, whatever the engineers keep today
+ *  (CLAUDE.md T30 2.5; v107). */
 export function lineStandsWhole(state: GameState, line: number): boolean {
-  return lineModules(state, line) === LINE_MODULES.length;
+  return lineModules(state, line) === lineModulesOf(lineKindOf(state, line)).length;
 }
 
 /** True while any line stands whole: what the board's stand ins ask, and the Materials page
@@ -669,7 +728,9 @@ export function anyLineStandsWhole(state: GameState): boolean {
 /** The modules of a line the company holds, standing or sold and waiting for the van, in their
  *  order along it (CLAUDE.md T30 2.3.5). */
 export function lineItems(state: GameState, line: number): Equipment[] {
-  return LINE_MODULES.flatMap((id) => state.equipment.filter((item) => item.specId === id && lineOf(item) === line));
+  return lineModulesOf(lineKindOf(state, line)).flatMap((id) =>
+    state.equipment.filter((item) => item.specId === id && lineOf(item) === line),
+  );
 }
 
 /** What the buyer pays for a whole line: half of what its six cost, each module's half summed

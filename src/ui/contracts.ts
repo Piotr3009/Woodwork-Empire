@@ -52,15 +52,13 @@ import {
 } from '../engine/contracts';
 import { OWNER, lineEngineersOnDuty, lineLevel, lineRecord } from '../engine/machines';
 import {
-  LINE_BOARDS_PER_WINDOW,
-  LINE_GLASS_PER_WINDOW,
-  LINE_MODULES,
-  LINE_PALLET_WINDOWS,
-  LINE_WINDOW_PRICE,
+  LINE_KINDS,
   lineContractName,
+  lineMaterialPerUnitOf,
+  lineModulesOf,
+  lineUnitPriceOf,
 } from '../engine/constants';
 import {
-  lineMaterialPerWindow,
   lineShortOf,
   lineWindowEvery,
   lineWindowMinutes,
@@ -71,7 +69,7 @@ import {
 import { inWords } from '../engine/text';
 import { ROLE_WORDS } from './team';
 import type { Contract, GameState, Worker } from '../engine/index';
-import type { LineContract } from '../engine/types';
+import type { LineContract, LineKind } from '../engine/types';
 import {
   button,
   closeButton,
@@ -291,42 +289,46 @@ function lineContractBlock(state: GameState, line: number): string {
   const contract = runningLineContract(state, line);
   const record = lineRecord(state, line);
   if (contract === null || record === null) return '';
+  // In its kind's words and figures: a window line's windows, a door line's doors (v107).
+  const kind = LINE_KINDS[record.kind];
   const minutesEach = lineWindowMinutes(state, line);
   const level = lineLevel(state, line);
   const onDuty = lineEngineersOnDuty(state, line);
-  // Short of the two that keep it whole there is one engineer on duty, or none; with both on duty
-  // it is the timber or the glass that stops it (CLAUDE.md T31 2.4). The engineer is said first.
+  // Short of the crew that keeps it whole there are fewer engineers on duty, or none; with all on
+  // duty it is the timber or the glass that stops it (CLAUDE.md T31 2.4). The engineer is said
+  // first.
   const short = lineShortOf(state, line);
   const still =
-    level < LINE_MODULES.length
-      ? countRow('Standing still', `${onDuty === 0 ? 'no' : inWords(onDuty)} engineer on duty`, 'bad')
+    level < lineModulesOf(record.kind).length
+      ? countRow('Standing still', `${onDuty === 0 ? 'no' : inWords(onDuty)} ${onDuty === 1 || onDuty === 0 ? 'engineer' : 'engineers'} on duty`, 'bad')
       : short !== null
         ? countRow('Standing still', `no ${short}`, 'bad')
         : '';
   return (
     `<div class="contract-active" data-line-contract="${line}">` +
-    `<div class="row"><span class="row-main"><h3>${escapeHtml(lineContractName(line))}</h3></span>` +
+    `<div class="row"><span class="row-main"><h3>${escapeHtml(lineContractName(line, record.kind))}</h3></span>` +
     `<span class="row-action">${button('endLineContract', 'End it', `data-line="${line}"`)}</span></div>` +
-    `<p class="figures"><strong class="contract-count">This week: ${plural(contract.windowsThisWeek, 'window', 'windows')}. ` +
-    `In all: ${contract.windowsMade}</strong> · ${money(LINE_WINDOW_PRICE)} a window; the timber and the glass ` +
-    `${money(lineMaterialPerWindow())} a window, from the stores</p>` +
-    `<p class="hint">One window every ${escapeHtml(lineWindowEvery(minutesEach))}: about ${lineWindowsAWeek(state, line)} a week</p>` +
-    countRow('On the pallet', `${record.onPallet} of ${LINE_PALLET_WINDOWS}`) +
+    `<p class="figures"><strong class="contract-count">This week: ${plural(contract.windowsThisWeek, kind.unit, kind.units)}. ` +
+    `In all: ${contract.windowsMade}</strong> · ${money(lineUnitPriceOf(record.kind))} a ${kind.unit}; the timber and the glass ` +
+    `${money(lineMaterialPerUnitOf(record.kind))} a ${kind.unit}, from the stores</p>` +
+    `<p class="hint">One ${kind.unit} every ${escapeHtml(lineWindowEvery(minutesEach))}: about ${lineWindowsAWeek(state, line)} a week</p>` +
+    countRow('On the pallet', `${record.onPallet} of ${kind.palletUnits}`) +
     (record.palletsAtGate > 0 ? countRow('At the gate for collection', plural(record.palletsAtGate, 'pallet', 'pallets')) : '') +
     still +
-    lineMaterialRows(contract) +
+    lineMaterialRows(contract, record.kind) +
     '</div>'
   );
 }
 
 /** What a line's contract holds of the stores under its running block's rows: the boards and the
- *  windows they are for, and the windows its glass units are for (CLAUDE.md T32 2.5). No buttons:
- *  the stores are restocked on the Materials page, or by the office. */
-function lineMaterialRows(contract: LineContract): string {
-  const windows = (units: number, each: number): string => plural(Math.floor(units / each), 'window', 'windows');
+ *  units they are for, and the units its glass is for (CLAUDE.md T32 2.5; v107). No buttons: the
+ *  stores are restocked on the Materials page, or by the office. */
+function lineMaterialRows(contract: LineContract, kindId: LineKind): string {
+  const kind = LINE_KINDS[kindId];
+  const units = (held: number, each: number): string => plural(Math.floor(held / each), kind.unit, kind.units);
   return (
-    countRow('Timber held', `${plural(contract.boardsReserved, 'board', 'boards')}, for ${windows(contract.boardsReserved, LINE_BOARDS_PER_WINDOW)}`) +
-    countRow('Glass held', `for ${windows(contract.glassReserved, LINE_GLASS_PER_WINDOW)}`)
+    countRow('Timber held', `${plural(contract.boardsReserved, 'board', 'boards')}, for ${units(contract.boardsReserved, kind.boards)}`) +
+    countRow('Glass held', `for ${units(contract.glassReserved, kind.glass)}`)
   );
 }
 

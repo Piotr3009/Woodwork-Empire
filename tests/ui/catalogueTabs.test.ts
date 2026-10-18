@@ -6,13 +6,12 @@ import { describe, expect, it } from 'vitest';
 import {
   EQUIPMENT_SPECS,
   EQUIPMENT_TABS,
-  LINE_MODULES,
   GATE_OUTPUT_BONUS,
   GATE_PRICE,
   SERVICE_INTERVAL_DAYS,
 } from '../../src/engine/constants';
 import { catalogueTabFrom, ownedState, renderCatalogue } from '../../src/ui/catalogue';
-import { findSpec } from '../../src/engine/machines';
+import { findSpec, isLineModule, lineModuleIndex } from '../../src/engine/machines';
 import { extractionDemandOf } from '../../src/engine/media';
 import { formatCalendarDay } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
@@ -237,14 +236,15 @@ describe('the tabs', () => {
     // Every line of the catalogue is in exactly one folder of exactly one tab, except the shared
     // spindle moulder, which is in both machine tabs (CLAUDE.md T13 3.13), and the line's modules 2
     // to 6, which come with the line and have no folder: its one folder is module 1's (flipped in
-    // v89, CLAUDE.md T30 2.3.3).
+    // v89, CLAUDE.md T30 2.3.3). From v107 a folder a kind of line, the window line's and the door
+    // line's (flipped).
     const all = EQUIPMENT_TABS.flatMap((tab) => folders(tab.id));
     expect(all.filter((id) => id === 'spindleMoulder')).toHaveLength(2);
     const once = all.filter((id) => id !== 'spindleMoulder');
     expect(new Set(once).size).toBe(once.length);
-    expect(folders('line')).toEqual([LINE_MODULES[0]]);
+    expect(folders('line')).toEqual(['windowLine1', 'doorLine1']);
     expect(new Set(all)).toEqual(
-      new Set(EQUIPMENT_SPECS.map((spec) => spec.id).filter((id) => !LINE_MODULES.slice(1).includes(id))),
+      new Set(EQUIPMENT_SPECS.map((spec) => spec.id).filter((id) => !isLineModule(id) || lineModuleIndex(id) === 1)),
     );
   });
 

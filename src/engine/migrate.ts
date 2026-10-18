@@ -1565,6 +1565,18 @@ function liftToVersion50(state: Raw): void {
   state.version = 50;
 }
 
+/** v107 (PIOTR, 18.10: "a door line"): a line's record says what the line makes, and every line of
+ *  a v50 save is a window line, sold or standing; nothing else of a line, its kit or its orders is
+ *  touched. */
+function liftToVersion51(state: Raw): void {
+  if (Array.isArray(state.windowLines)) {
+    for (const record of state.windowLines) {
+      if (isRecord(record) && typeof record.kind !== 'string') record.kind = 'window';
+    }
+  }
+  state.version = 51;
+}
+
 /** The whole state step of the lift to 48: a window whose glass was in and whose Glazing had begun,
  *  its current stage the Glazing, has its glass in the window, used and off the counter (CLAUDE.md
  *  T32 section 4); one past production had it set so by the raw lift. Every other window keeps it
@@ -1626,6 +1638,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   47: liftToVersion48,
   48: liftToVersion49,
   49: liftToVersion50,
+  50: liftToVersion51,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

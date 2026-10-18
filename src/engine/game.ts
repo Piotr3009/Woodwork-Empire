@@ -46,10 +46,10 @@ import {
   WEBSITE_START_LEVEL,
   WELFARE_IN_THE_CANTEEN,
   WET_AIR_FINISH_FACTOR,
-  LINE_MODULES,
-  LINE_NAME,
-  LINE_PRICE,
+  LINE_KINDS,
+  lineModulesOf,
   lineName,
+  linePriceOf,
   STANDARD_VARIANT,
 } from './constants';
 import { arriveBigJob, setAgency } from './agency';
@@ -195,8 +195,11 @@ import {
   variantOf,
   isLineModule,
   lineItems,
+  lineKindOf,
+  lineModuleIndex,
   lineNumbers,
   lineOf,
+  moduleKind,
   newLineRecord,
   nextLineNumber,
   findVariant,
@@ -369,6 +372,7 @@ import type {
   Job,
   GameAction,
   GameState,
+  LineKind,
   LostMinuteCause,
   OnOrderItem,
   Orientation,
@@ -834,18 +838,21 @@ function collectSoldMachines(state: GameState): void {
   const wholeLines = new Set<number>();
   for (const line of lineNumbers(state)) {
     const modules = going.filter((item) => isLineModule(item.specId) && lineOf(item) === line);
-    if (modules.length !== LINE_MODULES.length) continue;
+    // A line of any kind goes whole, its kind's modules on its van (v107).
+    const kind = lineKindOf(state, line);
+    const ids = lineModulesOf(kind);
+    if (modules.length !== ids.length) continue;
     wholeLines.add(line);
     const price = modules.reduce((total, item) => total + salePriceFor(item), 0);
     for (const item of modules) takeAway(state, item);
-    const name = `${LINE_NAME}, ${lineName(line).toLowerCase()}`;
+    const name = `${LINE_KINDS[kind].name}, ${lineName(line).toLowerCase()}`;
     receive(state, 'equipment', `Sold: ${name}`, price);
     queueEvent(state, {
       kind: 'machineCollected',
       title: `${name} collected`,
       body: `The buyer took it away this morning. ${formatMoney(price)} in.`,
       choices: [{ id: 'ok', label: 'Gone' }],
-      data: { specId: LINE_MODULES[0] ?? '', line, price },
+      data: { specId: ids[0] ?? '', line, price },
     });
   }
   for (const item of going.filter((entry) => !isLineModule(entry.specId) || !wholeLines.has(lineOf(entry)))) {
@@ -2746,8 +2753,9 @@ export function canBuy(
   if (!spec) return { ok: false, reason: 'Not in the catalogue' };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   if (spec.locked) return { ok: false, reason: spec.lockReason };
-  // Modules 2 to 6 come with the line and are never bought alone (CLAUDE.md T30 2.3.4).
-  if (isLineModule(specId) && specId !== LINE_MODULES[0]) return { ok: false, reason: 'It comes with the line' };
+  // Modules 2 to 6 come with the line and are never bought alone, a door line's as a window line's
+  // (CLAUDE.md T30 2.3.4; v107).
+  if (isLineModule(specId) && lineModuleIndex(specId) !== 1) return { ok: false, reason: 'It comes with the line' };
   if (state.reputation < spec.minReputation) {
     return { ok: false, reason: `Needs reputation ${spec.minReputation}` };
   }
@@ -2758,7 +2766,8 @@ export function canBuy(
   }
   // The line is bought whole, through module 1's family, and asked its own questions from here
   // (CLAUDE.md T30 2.3.4).
-  if (isLineModule(specId)) return lineBuyCheck(state, prepaid);
+  const kind = moduleKind(specId);
+  if (kind !== null) return lineBuyCheck(state, prepaid, kind);
   // A class may want something the family does not: a floor edgebander wants extraction where a
   // hand one wants a tool cabinet (CLAUDE.md T7 3.6).
   for (const required of requiresFor(spec, variant)) {
@@ -2842,11 +2851,11 @@ export function canBuy(
 
 /** A line's own questions, asked of module 1's family, which stands for it in the catalogue;
  *  modules 2 to 6 come with it and are never bought alone. In order, after the reputation's and the
- *  unit's: the cash for the whole of it; nothing half shifted; and a clear 36 m by 3 m with its
- *  ground. As many lines as the hall holds, each for the whole price (PIOTR, 12.10: "the next line
- *  costs 10 million as always"; CLAUDE.md T30 2.3.4; v93) [TUNE: chat]. */
-function lineBuyCheck(state: GameState, prepaid: boolean): BuyCheck {
-  if (!prepaid && !canAfford(state, LINE_PRICE)) return { ok: false, reason: 'Not enough cash' };
+ *  unit's: the cash for the whole of it, its kind's price; nothing half shifted; and a clear 36 m by
+ *  3 m with its ground. As many lines as the hall holds, each for the whole price (PIOTR, 12.10:
+ *  "the next line costs 10 million as always"; CLAUDE.md T30 2.3.4; v93; v107) [TUNE: chat]. */
+function lineBuyCheck(state: GameState, prepaid: boolean, kind: LineKind): BuyCheck {
+  if (!prepaid && !canAfford(state, linePriceOf(kind))) return { ok: false, reason: 'Not enough cash' };
   if (state.movedItems.length > 0) return { ok: false, reason: 'The kit is half shifted. Finish the move first' };
   if (lineSite(state) === null) return { ok: false, reason: LINE_NO_ROOM };
   return OK;
@@ -2949,13 +2958,14 @@ export function buyEquipment(
   if (!check.ok) return check;
   // A line stands whole at once, in the place its order would take, for the same price, paid
   // once, under the next number (CLAUDE.md T30 2.3.4; v93).
-  if (isLineModule(specId)) {
+  const kind = moduleKind(specId);
+  if (kind !== null) {
     const site = lineSite(state);
     if (site === null) return { ok: false, reason: LINE_NO_ROOM };
     const line = nextLineNumber(state);
-    if (!prepaid) pay(state, 'equipment', `${LINE_NAME}, ${lineName(line).toLowerCase()}`, LINE_PRICE);
-    for (const id of LINE_MODULES) standItem(state, id, STANDARD_VARIANT, lineModuleCell(site, id), true, line);
-    newLineRecord(state, line);
+    if (!prepaid) pay(state, 'equipment', `${LINE_KINDS[kind].name}, ${lineName(line).toLowerCase()}`, linePriceOf(kind));
+    for (const id of lineModulesOf(kind)) standItem(state, id, STANDARD_VARIANT, lineModuleCell(site, id), true, line);
+    newLineRecord(state, line, kind);
     return OK;
   }
   const spec = specOf(specId);
@@ -3096,7 +3106,8 @@ export function placeEquipmentOrder(
   // An order starts the clock if it was stopped: nothing happens in stopped time, and the player
   // asked for the clock to run rather than for a refusal (PIOTR, 13.09).
   if (timeIsPaused(state)) state.speed = 1;
-  if (isLineModule(specId)) return placeLineOrder(state);
+  const kind = moduleKind(specId);
+  if (kind !== null) return placeLineOrder(state, kind);
   const spec = specOf(specId);
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   pay(state, 'equipment', variant.name, variant.price);
@@ -3115,18 +3126,19 @@ export function placeEquipmentOrder(
  *  six modules go on order on one due day, each at its cell of the first clear 36 m by 3 m and each
  *  with its share as the price paid, for the insurance, the books and the sale. Built to order, so
  *  no module's order is called off (CLAUDE.md T30 2.3.4) [TUNE: chat: the words]. */
-function placeLineOrder(state: GameState): BuyCheck {
+function placeLineOrder(state: GameState, kind: LineKind): BuyCheck {
   const site = lineSite(state);
   if (site === null) return { ok: false, reason: LINE_NO_ROOM };
-  // Under the next number, which its six outlines carry and its record is written for (v93).
+  // Under the next number, which its six outlines carry and its record is written for, with its
+  // kind (v93; v107).
   const line = nextLineNumber(state);
-  pay(state, 'equipment', `${LINE_NAME}, ${lineName(line).toLowerCase()}, ordered`, LINE_PRICE);
-  for (const id of LINE_MODULES) {
+  pay(state, 'equipment', `${LINE_KINDS[kind].name}, ${lineName(line).toLowerCase()}, ordered`, linePriceOf(kind));
+  for (const id of lineModulesOf(kind)) {
     const at = lineModuleCell(site, id);
     const share = findVariant(id, STANDARD_VARIANT)?.price ?? 0;
     createOnOrder(state, { specId: id, variantId: STANDARD_VARIANT, pricePaid: share, anchorX: at.x, anchorY: at.y, line });
   }
-  newLineRecord(state, line);
+  newLineRecord(state, line, kind);
   return OK;
 }
 

@@ -10,7 +10,7 @@ import {
   TIMBER_STAND_INS,
   TIMBER_STORE_WANTED,
 } from './constants';
-import { findSpec, has, isLineModule, lineContractRuns, lineStandsWhole, standingLines } from './machines';
+import { findSpec, has, isLineModule, lineContractRuns, lineKindOf, lineStandsWhole, moduleKind, standingLines } from './machines';
 import type { Finish, GameState, ProductTemplate } from './types';
 
 export function findTemplate(templateId: string): ProductTemplate | null {
@@ -72,8 +72,14 @@ export function wantedName(specId: string): string {
  *  keep today, so a day off never locks the board, and not while the line works its own contract,
  *  when a window wants the company's own machines (CLAUDE.md T30 2.5, 2.6). */
 function stoodInFor(state: GameState, specId: string): boolean {
+  // Only a window line stands in for the machines: a door line never does the timber jobs (v107).
   return (TIMBER_STAND_INS[specId] ?? []).some((id) =>
-    isLineModule(id) ? standingLines(state).some((line) => lineStandsWhole(state, line) && !lineContractRuns(state, line)) : has(state, id),
+    isLineModule(id)
+      ? standingLines(state).some(
+          (line) =>
+            lineKindOf(state, line) === moduleKind(id) && lineStandsWhole(state, line) && !lineContractRuns(state, line),
+        )
+      : has(state, id),
   );
 }
 

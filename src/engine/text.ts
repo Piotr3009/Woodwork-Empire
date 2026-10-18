@@ -6,6 +6,11 @@ export function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+/** The words with their first letter a capital: "windows" to "Windows" (v107). */
+export function capitalFirst(words: string): string {
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+}
+
 /** More than one of a thing the game names itself: "drawer boxes", "cut sheet packs", "wardrobe
  *  fronts", "sash windows". Not a dictionary and not meant to be [TUNE]: a name that ends in a hiss
  *  takes "es" and everything else takes "s", which is right for every name in the game. A standing

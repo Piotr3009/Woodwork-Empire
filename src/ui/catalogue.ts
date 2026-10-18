@@ -64,15 +64,17 @@ import {
   hallPlaces,
   isLineModule,
   itemName,
+  lineModuleIndex,
   lineOf,
   lineSalePrice,
   machineShortWord,
+  moduleKind,
   placeShortages,
   serviceCallCheck,
   serviceDueIn,
   toolSlotsLine,
 } from '../engine/machines';
-import { BY_HAND_DURATION_FACTOR, CAPACITY_FAMILIES, LINE_MODULES, LINE_PRICE, VAN_CLASSES, lineName } from '../engine/constants';
+import { BY_HAND_DURATION_FACTOR, CAPACITY_FAMILIES, VAN_CLASSES, lineName, linePriceOf } from '../engine/constants';
 import { slotsInUseIn } from '../engine/staff';
 import { nextSpriteOrientation } from '../render/sprites';
 import { cancelFields, orderName, orderProgress } from '../engine/orders';
@@ -183,8 +185,9 @@ function renderFolders(state: GameState, filter: string, tab: CatalogueTab): str
   const needle = filter.trim().toLowerCase();
   // A family two trades share is a folder under both tabs (CLAUDE.md T13 3.13). The line is one
   // folder, module 1's: modules 2 to 6 come with it and have none (CLAUDE.md T30 2.3.3).
+  // Every kind of line has its folder, its module 1's (v107).
   const inTab = EQUIPMENT_SPECS.filter(
-    (spec) => (spec.tab === tab || spec.sharedTab === tab) && (!isLineModule(spec.id) || spec.id === LINE_MODULES[0]),
+    (spec) => (spec.tab === tab || spec.sharedTab === tab) && (!isLineModule(spec.id) || lineModuleIndex(spec.id) === 1),
   );
   if (inTab.length === 0) return emptyLine('Nothing here yet.');
   const rows = inTab
@@ -199,7 +202,8 @@ function renderFolders(state: GameState, filter: string, tab: CatalogueTab): str
       const owned = count > 0 ? `<span class="badge badge-owned">Owned ${count}</span>` : '';
       // The line's folder is priced whole, its module 1's own price being only its share
       // (CLAUDE.md T30 2.3.3).
-      const from = isLineModule(spec.id) ? LINE_PRICE : spec.price;
+      const kind = moduleKind(spec.id);
+      const from = kind === null ? spec.price : linePriceOf(kind);
       return (
         `<div class="card folder" data-folder="${spec.id}">` +
         `<div class="card-main"><h3>${escapeHtml(spec.folder)} ${owned}</h3>` +

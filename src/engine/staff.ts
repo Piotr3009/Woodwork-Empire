@@ -31,8 +31,7 @@ import {
   WORKER_HOURS_PER_MONTH,
   WORKER_NAMES,
   WORKER_RATES,
-  LINE_ENGINEERS_MAX,
-  LINE_MODULES,
+  LINE_KINDS,
 } from './constants';
 import {
   addWorkingDays,
@@ -65,10 +64,12 @@ import {
   BENCH,
   benchAtPlace,
   benchPlacesOwnedOrOnOrder,
+  lineKindOf,
+  lineModuleIndex,
   lineNumbers,
   toolSlotsOf,
 } from './machines';
-import { countOwnedOrOnOrder, onOrderCount } from './orders';
+import { countOwnedOrOnOrder } from './orders';
 import { managerOnDuty, managerOnDutyNow, managerTier } from './owner';
 import { effectiveReputation } from './reputation';
 import { hands, machineWantedFor, planPlaces, workMinute } from './production';
@@ -762,14 +763,18 @@ export function lineEngineers(state: GameState): Worker[] {
  *  2.3). An order counts, since the interview is checked again against the hall as it stands when
  *  it is over. */
 export function hasALine(state: GameState): boolean {
-  const first = LINE_MODULES[0] ?? '';
-  return state.equipment.some((item) => item.specId === first && !isSold(item)) || onOrderCount(state, first) > 0;
+  // Module 1 of a line of any kind (v107).
+  return (
+    state.equipment.some((item) => lineModuleIndex(item.specId) === 1 && !isSold(item)) ||
+    state.onOrder.some((item) => lineModuleIndex(item.specId) === 1)
+  );
 }
 
-/** The line engineers the company can have on the books: two for every line it has, standing or
- *  on order (PIOTR, 12.10: "its own two engineers"; v93). */
+/** The line engineers the company can have on the books: every line's crew, standing or on order,
+ *  two a window line and four a door line (PIOTR, 12.10: "its own two engineers"; 18.10: four to a
+ *  door line; v93; v107). */
 export function lineEngineersWanted(state: GameState): number {
-  return LINE_ENGINEERS_MAX * lineNumbers(state).length;
+  return lineNumbers(state).reduce((total, line) => total + LINE_KINDS[lineKindOf(state, line)].engineers, 0);
 }
 
 /** The hiring card's reason when the lines have their engineers: `Two engineers keep the whole

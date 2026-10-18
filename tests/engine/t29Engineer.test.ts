@@ -18,8 +18,8 @@ import {
   HIRING_SPECS,
   LINE_ENGINEER_MONTHLY_WAGE,
   LINE_ENGINEERS_MAX,
-  LINE_MODULES_KEPT,
   REPUTATION_MIN,
+  lineModulesKept,
 } from '../../src/engine/constants';
 import type { GameState, OnOrderItem, Worker } from '../../src/engine/index';
 import {
@@ -71,12 +71,15 @@ describe('the line engineer (CLAUDE.md T29 2.8)', () => {
       label: 'Line engineer',
       monthlyWage: 15000,
       minReputation: REPUTATION_MIN,
-      duties: 'Keeps the production line running. One keeps up to three modules, two keep all six.',
+      duties:
+        'Keeps a production line running. A window line takes two: one keeps up to three modules, two ' +
+        'keep all six. A door line takes four.',
     });
     expect(LINE_ENGINEER_MONTHLY_WAGE).toBe(15000);
-    // The sentence is the table in words: one keeps three, two keep all six (flipped in v89, the
-    // line of six; CLAUDE.md T30 2.3.6).
-    expect(LINE_MODULES_KEPT).toEqual([0, 3, 6]);
+    // The sentence is the rule in words: of a window line one keeps three and two keep all six
+    // (flipped in v89, the line of six; CLAUDE.md T30 2.3.6), and a door line takes four (flipped
+    // in v107: the kept modules are the kind's rule and not a table of the window line's).
+    expect([0, 1, 2].map((onDuty) => lineModulesKept('window', onDuty))).toEqual([0, 3, 6]);
     expect(LINE_ENGINEERS_MAX).toBe(2);
     expect(ROLE_WORDS.lineEngineer).toBe('line engineer');
     expect(ROLE_WORDS_MANY.lineEngineer).toBe('line engineers');
@@ -91,7 +94,7 @@ describe('the line engineer (CLAUDE.md T29 2.8)', () => {
     const tile = tab.querySelector('[data-candidate="lineEngineer."]');
     expect(tile).not.toBeNull();
     expect(tile?.textContent).toContain('The company has no production line');
-    expect(tile?.textContent).toContain('Keeps the production line running.');
+    expect(tile?.textContent).toContain('Keeps a production line running.');
     expect(tile?.querySelector('[data-do="hire"]')).toBeNull();
   });
 

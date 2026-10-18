@@ -28,7 +28,17 @@ import {
   secondExtensionOf,
 } from './constants';
 import type { LayoutSlot } from './constants';
-import { findSpec, isLineModule, isSold, itemStandsInTheHall, lineNumbers, lineOf, standsInTheHall, zoneOf } from './machines';
+import {
+  findSpec,
+  isLineModule,
+  isSold,
+  itemStandsInTheHall,
+  lineModuleIndex,
+  lineNumbers,
+  lineOf,
+  standsInTheHall,
+  zoneOf,
+} from './machines';
 import { reservedItems } from './orders';
 import { pinned } from './pinned';
 import { metresBy } from './text';
@@ -370,14 +380,14 @@ export function linePlace(state: GameState, line: number): { x: number; y: numbe
  *  times a second. */
 function linePlaces(state: GameState): Map<number, { x: number; y: number }> {
   return pinned(state, 'linePlaces', () => {
-    const first = LINE_MODULES[0];
+    // Module 1 of a line of any kind (v107).
     const places = new Map<number, { x: number; y: number }>();
     for (const item of hallItems(state)) {
-      if (item.specId !== first || isSold(item) || places.has(lineOf(item))) continue;
+      if (lineModuleIndex(item.specId) !== 1 || isSold(item) || places.has(lineOf(item))) continue;
       places.set(lineOf(item), { x: item.anchorX, y: item.anchorY });
     }
     for (const item of reservedItems(state)) {
-      if (item.specId !== first || places.has(lineOf(item))) continue;
+      if (lineModuleIndex(item.specId) !== 1 || places.has(lineOf(item))) continue;
       places.set(lineOf(item), { x: item.anchorX, y: item.anchorY });
     }
     return places;
@@ -586,10 +596,10 @@ export function lineBox(at: { x: number; y: number }): Box {
 }
 
 /** Where module N of a line stands whose module 1 is at this cell: six cells along x from the one
- *  before (CLAUDE.md T30 2.4). */
+ *  before, a door line's modules as a window line's (CLAUDE.md T30 2.4; v107). */
 export function lineModuleCell(at: { x: number; y: number }, specId: string): { x: number; y: number } {
   const width = findSpec(LINE_MODULES[0] ?? '')?.width ?? 0;
-  return { x: at.x + width * Math.max(0, LINE_MODULES.indexOf(specId)), y: at.y };
+  return { x: at.x + width * Math.max(0, lineModuleIndex(specId) - 1), y: at.y };
 }
 
 /** The depth a line takes with its ground: the metre behind it, its three, its engineers' metre and

@@ -238,7 +238,7 @@ describe('a v49 save in this build (v106)', () => {
     const opened = migrateState(raw, 49);
     if (opened === null) throw new Error('the lift refused a whole version 49 state');
     expect(opened.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(50);
+    expect(STATE_VERSION).toBe(51);
     expect(opened.unit).toEqual({ ...state.unit, canteenLevel: 0, canteenRefit: null });
     expect(canteenLayersOf(opened)).toEqual(CANTEEN_LAYERS_WIDE);
   });

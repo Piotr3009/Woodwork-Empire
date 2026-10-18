@@ -475,6 +475,8 @@ export {
   lineNumbers,
   lineOf,
   lineRecord,
+  lineKindOf,
+  moduleKind,
   lineStandsWhole,
   anyLineStandsWhole,
   nextLineNumber,

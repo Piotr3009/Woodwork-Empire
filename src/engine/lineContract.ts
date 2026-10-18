@@ -31,25 +31,22 @@ import {
   DAYS_PER_YEAR,
   LINE_BOARDS_PER_WINDOW,
   LINE_DAYS_KEPT,
-  LINE_ENGINEERS_MAX,
-  LINE_GLASS_PER_WINDOW,
-  LINE_MATERIAL_SHARE,
+  LINE_KINDS,
   LINE_MODULE_POWER_PER_DAY,
-  LINE_MODULES,
-  LINE_PALLET_WINDOWS,
   LINE_REORDER_DAYS,
   LINE_UPGRADE_DAYS,
   LINE_UPGRADE_MINUTES,
-  LINE_UPGRADES,
   LINE_WINDOW_MINUTES,
   LINE_WINDOW_MINUTES_MIN,
-  LINE_WINDOW_PRICE,
   MINUTES_PER_WORKING_DAY,
   PROPERTY_INSURANCE_RATE_YEARLY,
   SHEET_VALUE,
   WORKING_DAYS_PER_WEEK,
   lineContractName,
+  lineMaterialPerUnitOf,
+  lineModulesOf,
   lineName,
+  lineUnitPriceOf,
   insurerUnitFactor,
 } from './constants';
 import { addWorkingDays, formatCalendarDay, isBreak, isWorkingDay, weekOfDay } from './clock';
@@ -57,29 +54,29 @@ import { canAfford, charge, formatMoney, pay } from './economy';
 import { queueEvent } from './events';
 import { lineValueOf } from './insurance';
 import { MATERIAL_ORDER_ROLES } from './jobs';
-import { lineLevel, lineRecord, lineState, lineStandsWhole, standingLines } from './machines';
+import { lineEngineerSlot, lineKindOf, lineLevel, lineRecord, lineState, lineStandsWhole, standingLines } from './machines';
 import { buyStock, freeFor, pendingStockSheets, reserveWindowsShortfalls, restockCheck, restockSheets } from './materials';
 import { crewHasGoneHome, lineEngineers } from './staff';
 import { firstOnDutyOf, movingMachines } from './tasks';
 import { inWords, plural } from './text';
 import { pinned } from './pinned';
 import { emptyLineDay } from './machines';
-import type { GameState, LineContract, LineDay, LineLostMinutes, Worker } from './types';
+import type { GameState, LineContract, LineDay, LineKind, LineLostMinutes, Worker } from './types';
 
 // The empty record and the one road to a line's record live in machines.ts, which every layer
 // reads; they are the line's and are read from here as well (v93).
 export { emptyLineDay, emptyLineSince, emptyWindowLine, lineState } from './machines';
 
 /** The line engineers on the books on this day, started, in the order they were taken on, shared
- *  out along the lines that stand two to a line, line 1 first, as the engineers on duty are
- *  (`lineEngineersOnDuty`): the ones this line pays for in its books (v93) [TUNE: chat]. */
+ *  out along the lines that stand as the engineers on duty are, each line its kind's crew in line
+ *  order (`lineEngineerSlot`): the ones this line pays for in its books (v93; v107) [TUNE: chat]. */
 function lineEngineersOf(state: GameState, line: number, day: number): Worker[] {
-  const index = standingLines(state).indexOf(line);
-  if (index < 0) return [];
+  const slot = lineEngineerSlot(state, line);
+  if (slot === null) return [];
   const onTheBooks = lineEngineers(state).filter(
     (worker) => worker.startDay <= day && (worker.leavesOnDay === null || worker.leavesOnDay >= day),
   );
-  return onTheBooks.slice(index * LINE_ENGINEERS_MAX, (index + 1) * LINE_ENGINEERS_MAX);
+  return onTheBooks.slice(slot.from, slot.from + slot.need);
 }
 
 /** The day's share of a line's engineers on the books that day: each one's month over the days of
@@ -88,9 +85,10 @@ export function lineEngineersPerDay(state: GameState, line: number, day: number)
   return lineEngineersOf(state, line, day).reduce((total, worker) => total + worker.monthlyWage / DAYS_PER_MONTH, 0);
 }
 
-/** The day's power of a line's six modules (CLAUDE.md T31 2.5). */
-export function linePowerPerDay(): number {
-  return LINE_MODULES.length * LINE_MODULE_POWER_PER_DAY;
+/** The day's power of a line's six modules, its kind's: 360 a window line, 720 a door line
+ *  (CLAUDE.md T31 2.5; v107). */
+export function linePowerPerDay(kind: LineKind): number {
+  return lineModulesOf(kind).length * LINE_MODULE_POWER_PER_DAY * LINE_KINDS[kind].factor;
 }
 
 /** The day's share of the property cover on a line, while the cover is held: its value at the
@@ -132,7 +130,7 @@ export function openLineDay(state: GameState): void {
     if (today.power > 0) continue;
     const since = lineState(state, line).since;
     today.engineers = lineEngineersPerDay(state, line, today.day);
-    today.power = linePowerPerDay();
+    today.power = linePowerPerDay(lineKindOf(state, line));
     today.cover = lineCoverPerDay(state, line);
     if (since.firstDay === null) since.firstDay = today.day;
     since.engineers += today.engineers;
@@ -144,7 +142,7 @@ export function openLineDay(state: GameState): void {
 /** Why a line cannot use a working minute of its contract, or null when it can: no two engineers
  *  on duty, the line being moved, or the timber, the glass or both short (CLAUDE.md T31 2.5). */
 function lineLostTo(state: GameState, line: number): keyof LineLostMinutes | null {
-  if (lineLevel(state, line) < LINE_MODULES.length) return 'engineer';
+  if (lineLevel(state, line) < lineModulesOf(lineKindOf(state, line)).length) return 'engineer';
   if (movingMachines(state) !== null) return 'move';
   const short = lineShortOf(state, line);
   if (short === 'timber') return 'timber';
@@ -167,9 +165,10 @@ function bookLineMinute(state: GameState, line: number): void {
 }
 
 /** What the timber and the glass of one window cost, written from the price and the share and
- *  never as a figure of its own: 600 (CLAUDE.md T30 2.6). */
+ *  never as a figure of its own: 600 (CLAUDE.md T30 2.6). The window line's kind's, which the glass
+ *  unit's price is written from (v107). */
 export function lineMaterialPerWindow(): number {
-  return LINE_WINDOW_PRICE * LINE_MATERIAL_SHARE;
+  return lineMaterialPerUnitOf('window');
 }
 
 /** The boards of a window at what a board is worth: 400 of its 600 (CLAUDE.md T31 2.1) [TUNE:
@@ -178,12 +177,12 @@ export function lineBoardsPerWindowCost(): number {
   return LINE_BOARDS_PER_WINDOW * SHEET_VALUE;
 }
 
-/** What a window takes of each kind, and the contract's hold of it: two boards and a glass unit
- *  (CLAUDE.md T31 2.1, T32 2.5). */
-const PER_WINDOW: Record<'boards' | 'glass', number> = {
-  boards: LINE_BOARDS_PER_WINDOW,
-  glass: LINE_GLASS_PER_WINDOW,
-};
+/** What a unit of a line's kind takes of each kind of stock, and the contract's hold of it: two
+ *  boards and a glass unit a window (CLAUDE.md T31 2.1, T32 2.5), four and two a door (v107). */
+function perUnit(state: GameState, line: number, stock: 'boards' | 'glass'): number {
+  const kind = LINE_KINDS[lineKindOf(state, line)];
+  return stock === 'boards' ? kind.boards : kind.glass;
+}
 
 /** What a line could take of a kind for its windows this minute: what its contract holds, and the
  *  free stock nobody has a claim on, as a sheet contract may take what it holds and the free sheets
@@ -200,8 +199,8 @@ function openTo(state: GameState, line: number, kind: 'boards' | 'glass'): numbe
  *  answer the line's minute, the strip and the `Standing still` row read (CLAUDE.md T31 2.1, 2.4,
  *  T32 2.5). */
 export function lineShortOf(state: GameState, line: number): 'timber' | 'glass' | 'timber or glass' | null {
-  const timber = openTo(state, line, 'boards') < LINE_BOARDS_PER_WINDOW;
-  const glass = openTo(state, line, 'glass') < LINE_GLASS_PER_WINDOW;
+  const timber = openTo(state, line, 'boards') < perUnit(state, line, 'boards');
+  const glass = openTo(state, line, 'glass') < perUnit(state, line, 'glass');
   if (timber && glass) return 'timber or glass';
   if (timber) return 'timber';
   if (glass) return 'glass';
@@ -218,7 +217,7 @@ export function reserveLineMaterial(state: GameState, line: number): void {
   const left = Math.max(0, lineWindowsAWeek(state, line) - contract.windowsThisWeek);
   for (const kind of ['boards', 'glass'] as const) {
     const held = kind === 'boards' ? contract.boardsReserved : contract.glassReserved;
-    const more = Math.min(Math.max(0, left * PER_WINDOW[kind] - held), freeFor(state, kind));
+    const more = Math.min(Math.max(0, left * perUnit(state, line, kind) - held), freeFor(state, kind));
     if (more <= 0) continue;
     if (kind === 'boards') contract.boardsReserved += more;
     else contract.glassReserved += more;
@@ -230,10 +229,10 @@ export function reserveEveryLinesMaterial(state: GameState): void {
   for (const record of state.windowLines) reserveLineMaterial(state, record.number);
 }
 
-/** A window's boards or its glass unit taken off the counter: out of what the contract holds
- *  first, then the free stock, as a sheet contract draws its sheets (CLAUDE.md T32 2.5). */
-function takeForWindow(state: GameState, contract: LineContract, kind: 'boards' | 'glass'): void {
-  const due = PER_WINDOW[kind];
+/** A unit's boards or its glass taken off the counter: out of what the contract holds first, then
+ *  the free stock, as a sheet contract draws its sheets (CLAUDE.md T32 2.5). */
+function takeForUnit(state: GameState, line: number, contract: LineContract, kind: 'boards' | 'glass'): void {
+  const due = perUnit(state, line, kind);
   state.stock[kind] = Math.max(0, state.stock[kind] - due);
   if (kind === 'boards') contract.boardsReserved = Math.max(0, contract.boardsReserved - due);
   else contract.glassReserved = Math.max(0, contract.glassReserved - due);
@@ -260,7 +259,7 @@ export function officeOrdersLineMaterial(state: GameState, line: number): void {
   const windows = lineReorderWindows(state, line);
   for (const kind of ['boards', 'glass'] as const) {
     const could = openTo(state, line, kind) + pendingStockSheets(state, kind);
-    if (could >= windows * PER_WINDOW[kind]) continue;
+    if (could >= windows * perUnit(state, line, kind)) continue;
     const count = restockSheets(state, kind);
     if (count <= 0 || !restockCheck(state, kind).ok) continue;
     buyStock(state, kind, count, admin.name);
@@ -272,12 +271,14 @@ function officeOrdersEveryLinesMaterial(state: GameState): void {
   for (const record of state.windowLines) officeOrdersLineMaterial(state, record.number);
 }
 
-/** The minutes a window takes on a line's contract: the one answer the offer card, the running
+/** The minutes a unit takes on a line's contract: the one answer the offer card, the running
  *  block and the line's minute read. Each upgrade fitted takes its ten minutes off, and never
- *  below one window every twenty minutes (CLAUDE.md T30 2.7, 2.10; v97). */
+ *  below one window every twenty minutes (CLAUDE.md T30 2.7, 2.10; v97); a unit of another kind the
+ *  window's minutes times its kind's factor, a door the window's own (v107). */
 export function lineWindowMinutes(state: GameState, line: number): number {
   const fitted = (lineRecord(state, line)?.upgrades ?? []).filter((upgrade) => upgradeIsFitted(state, upgrade.fittedOnDay)).length;
-  return Math.max(LINE_WINDOW_MINUTES_MIN, LINE_WINDOW_MINUTES - LINE_UPGRADE_MINUTES * fitted);
+  const factor = LINE_KINDS[lineKindOf(state, line)].minutesFactor;
+  return factor * Math.max(LINE_WINDOW_MINUTES_MIN, LINE_WINDOW_MINUTES - LINE_UPGRADE_MINUTES * fitted);
 }
 
 /** True from the open of the day an upgrade is fitted on. */
@@ -289,7 +290,8 @@ function upgradeIsFitted(state: GameState, fittedOnDay: number): boolean {
  *  line first, then the one already on the list (on its way or fitted), then the cash. One of each
  *  a line (CLAUDE.md T30 2.10; v93). */
 export function lineUpgradeCheck(state: GameState, line: number, upgradeId: string): { ok: boolean; reason: string } {
-  const spec = LINE_UPGRADES.find((entry) => entry.id === upgradeId);
+  // A line's own kind's upgrades: a door line's are not a window line's (v107).
+  const spec = LINE_KINDS[lineKindOf(state, line)].upgrades.find((entry) => entry.id === upgradeId);
   if (spec === undefined) return { ok: false, reason: 'Not in the catalogue' };
   if (!lineStandsWhole(state, line)) return { ok: false, reason: 'Needs the production line' };
   const held = (lineRecord(state, line)?.upgrades ?? []).find((upgrade) => upgrade.id === upgradeId);
@@ -308,7 +310,7 @@ export function lineUpgradeCheck(state: GameState, line: number, upgradeId: stri
 export function buyLineUpgrade(state: GameState, line: number, upgradeId: string): { ok: boolean; reason: string } {
   const check = lineUpgradeCheck(state, line, upgradeId);
   if (!check.ok) return check;
-  const spec = LINE_UPGRADES.find((entry) => entry.id === upgradeId);
+  const spec = LINE_KINDS[lineKindOf(state, line)].upgrades.find((entry) => entry.id === upgradeId);
   if (spec === undefined) return check;
   pay(state, 'equipment', `${lineName(line)} upgrade: ${spec.name}`, spec.price);
   lineState(state, line).upgrades.push({ id: spec.id, fittedOnDay: addWorkingDays(state.clock.day, LINE_UPGRADE_DAYS) });
@@ -345,21 +347,23 @@ export function linesOnContract(state: GameState): number[] {
 }
 
 /** The line engineers on the books for this line, hired and started, whether in today or not:
- *  what its offer asks for, two (CLAUDE.md T30 2.6; v93: the line's own pair) [TUNE: on the books is
- *  started, in today or not]. */
+ *  what its offer asks for, its kind's crew (CLAUDE.md T30 2.6; v93: the line's own pair; v107: a
+ *  door line's four) [TUNE: on the books is started, in today or not]. */
 function engineersOnTheBooks(state: GameState, line: number): number {
   return lineEngineersOf(state, line, state.clock.day).length;
 }
 
-/** The offer card's words, every figure from the constants and the line's own pace (CLAUDE.md T30
- *  2.6). */
+/** The offer card's words, every figure from the constants, the line's kind and its own pace
+ *  (CLAUDE.md T30 2.6; v107). */
 export function lineOfferBody(state: GameState, line: number): string {
+  const kind = lineKindOf(state, line);
+  const spec = LINE_KINDS[kind];
   return (
-    `A window company will take every window ${lineName(line).toLowerCase()} makes, at ${formatMoney(LINE_WINDOW_PRICE)} a ` +
-    `window. The timber and the glass cost ${formatMoney(lineMaterialPerWindow())} a window, taken from your ` +
+    `${spec.client} will take every ${spec.unit} ${lineName(line).toLowerCase()} makes, at ${formatMoney(lineUnitPriceOf(kind))} a ` +
+    `${spec.unit}. The timber and the glass cost ${formatMoney(lineMaterialPerUnitOf(kind))} a ${spec.unit}, taken from your ` +
     'timber stores and glass racks: restock them on the Materials page, or the office does. The line makes one every ' +
     `${lineWindowEvery(lineWindowMinutes(state, line))}, about ${lineWindowsAWeek(state, line)} a week, and the client ` +
-    `collects each pallet of ${inWords(LINE_PALLET_WINDOWS)} the next working day. It runs until you end it.`
+    `collects each pallet of ${inWords(spec.palletUnits)} the next working day. It runs until you end it.`
   );
 }
 
@@ -386,16 +390,16 @@ export function runLineDay(state: GameState): void {
   for (const record of state.windowLines) offerLineContract(state, record.number);
 }
 
-/** Offered by a card when all six modules of the line stand, its two line engineers are on the
+/** Offered by a card when all six modules of the line stand, its kind's line engineers are on the
  *  books, no contract of the line is offered or running, and the day is not before its next offer
- *  day (CLAUDE.md T30 2.6). The card carries the line's number. */
+ *  day (CLAUDE.md T30 2.6; v107). The card carries the line's number. */
 function offerLineContract(state: GameState, line: number): void {
   const record = lineState(state, line);
   const day = state.clock.day;
   if (record.contract !== null) return;
   if (record.nextOfferDay !== null && day < record.nextOfferDay) return;
   if (!lineStandsWhole(state, line)) return;
-  if (engineersOnTheBooks(state, line) < LINE_ENGINEERS_MAX) return;
+  if (engineersOnTheBooks(state, line) < LINE_KINDS[record.kind].engineers) return;
   record.contract = {
     status: 'offered',
     startDay: day,
@@ -409,7 +413,7 @@ function offerLineContract(state: GameState, line: number): void {
   };
   queueEvent(state, {
     kind: 'lineContractOffered',
-    title: lineContractName(line),
+    title: lineContractName(line, record.kind),
     body: lineOfferBody(state, line),
     choices: [
       { id: 'take', label: 'Take it' },
@@ -468,7 +472,7 @@ export function lineMakesWindows(state: GameState, line: number): boolean {
     if (isBreak(state.clock.minute)) return false;
     if (crewHasGoneHome(state)) return false;
     if (movingMachines(state) !== null) return false;
-    if (lineLevel(state, line) < LINE_MODULES.length) return false;
+    if (lineLevel(state, line) < lineModulesOf(lineKindOf(state, line)).length) return false;
     // And a window's boards and glass: a minute with too little is a minute the line stands
     // (CLAUDE.md T31 2.1).
     return lineShortOf(state, line) === null;
@@ -488,47 +492,52 @@ export function runLineMinute(state: GameState): void {
     const each = lineWindowMinutes(state, line);
     while (record.minutes >= each && lineShortOf(state, line) === null) {
       record.minutes -= each;
-      makeWindow(state, line);
+      makeUnit(state, line);
     }
   }
 }
 
-/** One window made on a line: its price in on the contract line, one growing line a day, and its
- *  two boards and its glass unit taken off the counters, out of what its contract holds first and
- *  then the free stock (CLAUDE.md T32 2.5). The material was paid when it was bought, so nothing of
- *  it is booked here (CLAUDE.md T31 2.1); its books count the £600 a window used, as before. It stands on the pallet, and the tenth sends the pallet to the gate
- *  (CLAUDE.md T30 2.7, 2.8). Then the office looks at what is left (CLAUDE.md T31 2.3). */
-function makeWindow(state: GameState, line: number): void {
+/** One unit made on a line, a window or a door by its kind: its price in on the contract line, one
+ *  growing line a day, and its boards and its glass taken off the counters, out of what its contract
+ *  holds first and then the free stock (CLAUDE.md T32 2.5). The material was paid when it was bought,
+ *  so nothing of it is booked here (CLAUDE.md T31 2.1); its books count the material a unit used,
+ *  £600 a window and £1,200 a door. It stands on the pallet, and the tenth sends the pallet to the
+ *  gate (CLAUDE.md T30 2.7, 2.8). Then the office looks at what is left (CLAUDE.md T31 2.3). */
+function makeUnit(state: GameState, line: number): void {
   const contract = runningLineContract(state, line);
   if (contract === null) return;
-  const material = lineMaterialPerWindow();
   const record = lineState(state, line);
-  charge(state, 'contract', `${lineContractName(line)}: windows`, LINE_WINDOW_PRICE, { merge: true });
-  takeForWindow(state, contract, 'boards');
-  takeForWindow(state, contract, 'glass');
+  const spec = LINE_KINDS[record.kind];
+  const price = lineUnitPriceOf(record.kind);
+  const material = lineMaterialPerUnitOf(record.kind);
+  charge(state, 'contract', `${lineContractName(line, record.kind)}: ${spec.units}`, price, { merge: true });
+  takeForUnit(state, line, contract, 'boards');
+  takeForUnit(state, line, contract, 'glass');
   contract.windowsMade += 1;
   contract.windowsThisWeek += 1;
-  contract.revenue += LINE_WINDOW_PRICE;
-  // The material the windows used, not what was bought (CLAUDE.md T31 2.5).
+  contract.revenue += price;
+  // The material the units used, not what was bought (CLAUDE.md T31 2.5).
   contract.materialCost += material;
   // And in the line's own day book, the day in hand and since it first stood (CLAUDE.md T31 2.5).
   const today = lineToday(state, line);
   today.windows += 1;
-  today.turnover += LINE_WINDOW_PRICE;
+  today.turnover += price;
   today.material += material;
   record.since.windows += 1;
-  record.since.turnover += LINE_WINDOW_PRICE;
+  record.since.turnover += price;
   record.since.material += material;
   record.onPallet += 1;
-  if (record.onPallet >= LINE_PALLET_WINDOWS) {
+  if (record.onPallet >= spec.palletUnits) {
     record.onPallet = 0;
     record.palletsAtGate += 1;
   }
   officeOrdersLineMaterial(state, line);
 }
 
-/** The pallets waiting at the gate for the client, every line's together: what the hall draws
- *  there (CLAUDE.md T30 2.8; v93). */
-export function palletsAtTheGate(state: GameState): number {
-  return state.windowLines.reduce((total, record) => total + record.palletsAtGate, 0);
+/** The pallets waiting at the gate for the client, every line's together, or every line's of one
+ *  kind: what the hall draws there (CLAUDE.md T30 2.8; v93; v107). */
+export function palletsAtTheGate(state: GameState, kind: LineKind | null = null): number {
+  return state.windowLines
+    .filter((record) => kind === null || record.kind === kind)
+    .reduce((total, record) => total + record.palletsAtGate, 0);
 }

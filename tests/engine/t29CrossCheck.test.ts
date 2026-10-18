@@ -12,7 +12,7 @@
 // or not at all, each asserted here as section 7 words it (CLAUDE.md T29 section 7).
 
 import { describe, expect, it } from 'vitest';
-import { EQUIPMENT_SPECS, LINE_FACTOR, LINE_MODULES, MACHINE_CAPACITY } from '../../src/engine/constants';
+import { ALL_LINE_MODULES, EQUIPMENT_SPECS, LINE_FACTOR, LINE_MODULES, MACHINE_CAPACITY } from '../../src/engine/constants';
 import type { GameState, Worker } from '../../src/engine/index';
 import { canBuy, placeEquipmentOrder } from '../../src/engine/game';
 import { dropJob, stagedJob } from '../../src/engine/jobs';
@@ -137,9 +137,10 @@ describe('the big kit and the smaller units (CLAUDE.md T29 2.5.1, section 7)', (
     }
   });
 
-  it('names a unit for the five axis CNC and the six modules and no other family, so the catalogue tests pass over those seven only', () => {
+  it('names a unit for the five axis CNC and the modules of every line and no other family, so the catalogue tests pass over those only', () => {
+    // The door line's six ask the 800 m2 unit as the window line's do (flipped in v107).
     const named = EQUIPMENT_SPECS.filter((spec) => spec.minUnitM2 !== undefined).map((spec) => spec.id);
-    expect(named.sort()).toEqual(['cnc5', ...LINE_MODULES].sort());
+    expect(named.sort()).toEqual(['cnc5', ...ALL_LINE_MODULES].sort());
     for (const id of named) expect(findSpec(id)?.minUnitM2, id).toBe(800);
   });
 

@@ -23,11 +23,13 @@ import {
 } from '../engine/index';
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
 import { monthlyPremiums, nextInstalmentFor } from '../engine/index';
-import { AGENCY_MONTHLY_FEE, lineName } from '../engine/constants';
+import { AGENCY_MONTHLY_FEE, LINE_KINDS, LINE_KIND_ORDER, lineName } from '../engine/constants';
 import { allLinesBooks, lineBooks, lineBooksShown, lineMonthPace, linePaidBack, linesWithBooks } from '../engine/lineBooks';
 import type { LineBooks, LineColumn } from '../engine/lineBooks';
-import { lineStandsWhole, standingLines } from '../engine/machines';
+import { lineKindOf, lineStandsWhole, standingLines } from '../engine/machines';
 import type { LineLostMinutes } from '../engine/index';
+import type { LineKind } from '../engine/types';
+import { capitalFirst } from '../engine/text';
 import { renderFinance } from './finance';
 import { button, escapeHtml, money, plural, tabBar, whyLink } from './modal';
 
@@ -272,11 +274,19 @@ function efficiencyWords(column: LineColumn): string {
   return `${column.windows} of ${possible}, ${share}%`;
 }
 
-/** One column of the Production line tab, in the Summary's classes (CLAUDE.md T31 2.5). */
-function lineColumn(title: string, column: LineColumn): string {
+/** One column of the Production line tab, in the Summary's classes (CLAUDE.md T31 2.5): the units
+ *  made, one row a kind of the lines it adds up, `Windows made` and `Doors made` (v107). */
+function lineColumn(title: string, column: LineColumn, kinds: readonly LineKind[]): string {
+  const made = kinds
+    .map(
+      (kind) =>
+        `<div class="row"><span class="row-main">${escapeHtml(capitalFirst(LINE_KINDS[kind].units))} made</span>` +
+        `<span class="row-figure">${column.made[kind] ?? 0}</span></div>`,
+    )
+    .join('');
   return (
     `<div class="col"><h3>${escapeHtml(title)}</h3>` +
-    `<div class="row"><span class="row-main">Windows made</span><span class="row-figure">${column.windows}</span></div>` +
+    made +
     lineMoneyRow('Turnover', column.turnover) +
     lineMoneyRow('Timber and glass', -column.material) +
     lineMoneyRow('Engineers', -column.engineers) +
@@ -304,16 +314,16 @@ const LOST_WORDS: Record<keyof LineLostMinutes, string> = {
 };
 
 /** The four columns of a set of books, and what the month's efficiency lost, when it lost any. */
-function lineColumns(books: LineBooks): string {
+function lineColumns(books: LineBooks, kinds: readonly LineKind[]): string {
   const lost = (Object.keys(LOST_WORDS) as Array<keyof LineLostMinutes>)
     .filter((cause) => books.month.lost[cause] > 0)
     .map((cause) => `${lostWords(books.month.lost[cause])} ${LOST_WORDS[cause]}`);
   return (
     '<div class="cols">' +
-    lineColumn('Today', books.today) +
-    lineColumn('This week', books.week) +
-    lineColumn('This month', books.month) +
-    lineColumn('This year', books.year) +
+    lineColumn('Today', books.today, kinds) +
+    lineColumn('This week', books.week, kinds) +
+    lineColumn('This month', books.month, kinds) +
+    lineColumn('This year', books.year, kinds) +
     '</div>' +
     (lost.length === 0 ? '' : `<p class="hint">Lost this month: ${escapeHtml(lost.join(', '))}</p>`)
   );
@@ -325,15 +335,17 @@ function lineBlock(state: GameState, line: number, named: boolean): string {
   const books = lineBooks(state, line);
   const pace = lineMonthPace(state, line);
   const back = linePaidBack(state, line);
+  const kind = lineKindOf(state, line);
   const cost = back.line + back.upgrades;
   const share = cost > 0 ? Math.round((back.net / cost) * 100) : 0;
   return (
     `<div class="line-books" data-line-books="${line}">` +
     (named ? `<h3>${escapeHtml(lineName(line))}</h3>` : '') +
-    lineColumns(books) +
+    lineColumns(books, [kind]) +
     (pace === null
       ? ''
-      : `<p class="figures">A working day on average this month: ${plural(Math.round(pace.windowsPerDay), 'window', 'windows')}, ` +
+      : `<p class="figures">A working day on average this month: ` +
+        `${plural(Math.round(pace.windowsPerDay), LINE_KINDS[kind].unit, LINE_KINDS[kind].units)}, ` +
         `${money(pace.netPerDay)} net</p>` +
         `<p class="figures">A year at this month's pace: ${money(pace.yearNet)} net</p>`) +
     `<p class="figures">Paid back: ${money(back.net)} of ${money(back.line)}` +
@@ -352,7 +364,11 @@ function lineTab(state: GameState): string {
   const named = lines.length > 1;
   const blocks = lines.map((line) => lineBlock(state, line, named)).join('');
   if (!named) return blocks;
-  return blocks + '<div class="line-books" data-line-books="all"><h3>All lines</h3>' + lineColumns(allLinesBooks(state)) + '</div>';
+  // The units of each kind the tab's lines make, the window line's first (v107).
+  const kinds = LINE_KIND_ORDER.filter((kind) => lines.some((line) => lineKindOf(state, line) === kind));
+  return (
+    blocks + '<div class="line-books" data-line-books="all"><h3>All lines</h3>' + lineColumns(allLinesBooks(state), kinds) + '</div>'
+  );
 }
 
 /** What the workshop earns for an hour of somebody's time, machines and all (CLAUDE.md T6 3.8). */

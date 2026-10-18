@@ -140,6 +140,13 @@ describe('footprints in metres', () => {
       windowLine4: [6, 3, 3],
       windowLine5: [6, 3, 3],
       windowLine6: [6, 3, 3],
+      // The door line's six, the window line's metres (v107).
+      doorLine1: [6, 3, 3],
+      doorLine2: [6, 3, 3],
+      doorLine3: [6, 3, 3],
+      doorLine4: [6, 3, 3],
+      doorLine5: [6, 3, 3],
+      doorLine6: [6, 3, 3],
       // The two timber stores, the art side's metres; the shelter declared as the art side drew it,
       // 6 m along the rear wall by 3 m deep, since it stands behind the wall from Turn 31 (CLAUDE.md
       // T29 2.4, 2.11.1; T31 2.8).

@@ -28,6 +28,28 @@ const DELIVERED: readonly string[] = deliveredFiles();
  *  always drawn. */
 export const PLACEHOLDER_SPRITES: readonly string[] = ['spindleMoulder'];
 
+/** The pictures a family borrows until the art side draws its own [PIOTR, 18.10: "windows in grey"]
+ *  (v107): the door line's six modules, their sheets and stacks, and its pallet at the gate are the
+ *  window line's, drawn through the door line's grey (`doorLineFilter`). The art side was asked for
+ *  the door line's own (order P3); the day its files land they are drawn and nothing is borrowed. */
+const BORROWED_SPRITES: Readonly<Record<string, string>> = {
+  doorLine1: 'windowLine1',
+  doorLine2: 'windowLine2',
+  doorLine3: 'windowLine3',
+  doorLine4: 'windowLine4',
+  doorLine5: 'windowLine5',
+  doorLine6: 'windowLine6',
+  doorPallet: 'windowPallet',
+};
+
+/** The picture key a family borrows while none of its own files has landed, or null when it has
+ *  its own or borrows none. */
+export function borrowedSprite(spriteKey: string, files: readonly string[] = DELIVERED): string | null {
+  const borrowed = BORROWED_SPRITES[spriteKey];
+  if (borrowed === undefined) return null;
+  return files.some((file) => file.startsWith(`${spriteKey}.`)) ? null : borrowed;
+}
+
 /** The placeholder kind for a sprite key and its class, `spindleMoulder.used`, or null when the
  *  family is not one the placeholder function draws. */
 export function placeholderKindFor(spriteKey: string, tier?: string | null): string | null {

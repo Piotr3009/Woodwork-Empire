@@ -48,17 +48,13 @@ import {
   GLUE_TABLE_PLACES,
   CNC5_STAGE_FACTOR,
   LINE_COVERS,
-  LINE_DESCRIPTION,
   LINE_FACTOR,
-  LINE_MODULES,
-  LINE_MODULES_KEPT,
-  LINE_NAME,
-  LINE_PRICE,
-  LINE_ROW_TAIL,
+  LINE_KINDS,
   LINE_UPGRADE_DAYS,
   LINE_UPGRADE_MINUTES,
-  LINE_UPGRADES,
   LINE_WINDOW_MINUTES,
+  lineModulesOf,
+  linePriceOf,
   SALE_FRACTION,
   SPRAY_ROBOT,
   SPRAY_ROBOT_FINISH_FACTOR,
@@ -80,17 +76,24 @@ import {
   capacityOf,
   findVariant,
   insuranceForClass,
-  isLineModule,
+  lineKindOf,
   lineNumbers,
+  moduleKind,
   stockKindOf,
   stockWords,
 } from '../engine/machines';
 import { lineBox } from '../engine/layout';
 import { lineUpgradeCheck, lineWindowEvery } from '../engine/lineContract';
 import { andList, inWords } from '../engine/text';
-import { spriteUrl } from '../render/sprites';
-import { STORE_EXPANDED_CARD_FILTER, expandedStoreFilter } from '../render/hall';
+import { borrowedSprite, spriteUrl } from '../render/sprites';
+import {
+  DOOR_LINE_CARD_FILTER,
+  STORE_EXPANDED_CARD_FILTER,
+  doorLineFilter,
+  expandedStoreFilter,
+} from '../render/hall';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
+import type { LineKind } from '../engine/types';
 import {
   escapeHtml,
   lockedButton,
@@ -296,7 +299,13 @@ export function pictureKeyOf(spec: { id: string; spriteKey: string }): string {
 /** Where the picture of this class goes: the file the art side delivered for this very class,
  *  through the loader, and a box while there is none (CLAUDE.md T3 3.6, T7 3.7). */
 export function pictureSlot(spriteKey: string, tier: string, small = false, red = false): string {
-  const url = spriteUrl(spriteKey, tier);
+  // A door line's module borrows the window line's picture until its own comes, in the door line's
+  // grey on its card as in the hall (v107).
+  const borrowed = borrowedSprite(spriteKey);
+  const url = spriteUrl(borrowed ?? spriteKey, tier);
+  const filtered = (id: string, filter: string): string =>
+    `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" style="filter:url(#${id})" />` +
+    `<svg class="filter-defs" width="0" height="0" aria-hidden="true" style="position:absolute">${filter}</svg>`;
   // A store made twice the size is red on its card as it is in the hall, through the same filter
   // under the card's own id, written beside the picture so the page has it wherever the card is
   // drawn (v105).
@@ -304,11 +313,10 @@ export function pictureSlot(spriteKey: string, tier: string, small = false, red 
     url === null
       ? '<span class="tile-picture-box"></span>'
       : red
-        ? `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" ` +
-          `style="filter:url(#${STORE_EXPANDED_CARD_FILTER})" />` +
-          `<svg class="filter-defs" width="0" height="0" aria-hidden="true" style="position:absolute">` +
-          `${expandedStoreFilter(STORE_EXPANDED_CARD_FILTER)}</svg>`
-        : `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" />`;
+        ? filtered(STORE_EXPANDED_CARD_FILTER, expandedStoreFilter(STORE_EXPANDED_CARD_FILTER))
+        : borrowed !== null
+          ? filtered(DOOR_LINE_CARD_FILTER, doorLineFilter(DOOR_LINE_CARD_FILTER))
+          : `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" />`;
   // The same slot at a row's height, for a list of what stands in the hall rather than a card of
   // one class of it (CLAUDE.md T20 2.9): one picture in the game, one class beside it.
   return (
@@ -389,25 +397,31 @@ function figureLines(lines: Line[]): string {
 }
 
 /** The line's own lines on its card, from the constants and never in written figures: a row a
- *  module with the stages it does (`LINE_COVERS`), what the line gives the window jobs with its two
- *  engineers, what a new line makes a window in, and how it is sold (CLAUDE.md T30 2.3.3). */
-function lineLines(): Line[] {
-  const rows = LINE_MODULES.map((_, index) => {
+ *  module with the stages it does (`LINE_COVERS`), what the window line gives the window jobs with
+ *  its two engineers and what a new line makes a window in, or what a door line makes with its four,
+ *  and how it is sold (CLAUDE.md T30 2.3.3; v107). */
+function lineLines(kindId: LineKind): Line[] {
+  const kind = LINE_KINDS[kindId];
+  const rows = lineModulesOf(kindId).map((_, index) => {
     const place = index + 1;
     const stages = TIMBER_STAGES.filter((stage) => LINE_COVERS[stage.id] === place);
     const words = stages.map((stage) => {
-      const tail = LINE_ROW_TAIL[stage.id];
+      const tail = kind.rowTails[stage.id];
       return tail === undefined ? stage.label.toLowerCase() : `the ${stage.label}, ${tail}`;
     });
     return line(`Module ${place}: ${andList(words)}`);
   });
-  // The engineers that keep all six: the last entry of the table, two.
-  const engineers = LINE_MODULES_KEPT.length - 1;
-  const factor = LINE_FACTOR[LINE_MODULES.length] ?? 1;
+  const every = lineWindowEvery(LINE_WINDOW_MINUTES * kind.minutesFactor);
+  // The window line's two lines of Turn 30, and a door line's one: it serves no timber job (v107).
+  const what = kind.servesJobs
+    ? [
+        line(`With ${inWords(kind.engineers)} engineers, timber work goes ${LINE_FACTOR[lineModulesOf(kindId).length] ?? 1} times as fast`),
+        line(`It can make ${kind.units} on a contract of its own: one every ${every}`),
+      ]
+    : [line(`With ${inWords(kind.engineers)} engineers it makes a ${kind.unit} every ${every} on a contract of its own`)];
   return [
     ...rows,
-    line(`With ${inWords(engineers)} engineers, timber work goes ${factor} times as fast`),
-    line(`It can make windows on a contract of its own: one every ${lineWindowEvery(LINE_WINDOW_MINUTES)}`),
+    ...what,
     line(
       `Sold whole, for ${SALE_FRACTION === 0.5 ? 'half' : `${Math.round(SALE_FRACTION * 100)} per cent of`} its ` +
         'price; the upgrades go with it',
@@ -416,14 +430,15 @@ function lineLines(): Line[] {
 }
 
 /** What every card prints of its costs, for the line whole: the wait, the power of the six, the
- *  insurance of the whole and the floor of the six end to end (CLAUDE.md T30 2.3.3). */
-function lineCostLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
-  const power = LINE_MODULES.reduce((total, id) => total + (findVariant(id, variant.id)?.powerPerDay ?? 0), 0);
+ *  insurance of the whole and the floor of the six end to end, at its kind's figures (CLAUDE.md T30
+ *  2.3.3; v107). */
+function lineCostLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant, kind: LineKind): Line[] {
+  const power = lineModulesOf(kind).reduce((total, id) => total + (findVariant(id, variant.id)?.powerPerDay ?? 0), 0);
   const floor = lineBox({ x: 0, y: 0 });
   return [
     line(deliveryLine(spec, variant)),
     line(`Power ${money(power)} a day`),
-    line(insuranceLine(state, { price: LINE_PRICE })),
+    line(insuranceLine(state, { price: linePriceOf(kind) })),
     line(`Takes ${metresBy(floor)}, works in ${metresBy(floor)}`),
   ];
 }
@@ -550,10 +565,12 @@ export function recommendedVariant(state: GameState, spec: EquipmentSpec): strin
  *  class card: a line is bought whole and one Buy orders the six; the next line for the same price
  *  while the hall has room, `Buy another` once one is owned (CLAUDE.md T30 2.3.3; v93, PIOTR
  *  12.10). A line on its way is said on the card, and does not stop the next. */
-function lineCard(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): string {
+function lineCard(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant, kindId: LineKind): string {
   const check = orderEquipmentCheck(state, spec.id, variant.id);
-  const onTheList = state.onOrder.find((order) => isLineModule(order.specId) && !order.arrived);
-  const lines = lineNumbers(state).length;
+  // A line of this card's kind on its way, and the lines of its kind owned (v107).
+  const onTheList = state.onOrder.find((order) => moduleKind(order.specId) === kindId && !order.arrived);
+  const lines = linesOfKind(state, kindId).length;
+  const kind = LINE_KINDS[kindId];
   const owned = lines > 0 ? `<span class="badge badge-owned">Owned${lines > 1 ? ` ${lines}` : ''}</span>` : '';
   const label = lines > 0 ? 'Buy another' : 'Buy';
   const waiting = onTheList
@@ -565,12 +582,12 @@ function lineCard(state: GameState, spec: EquipmentSpec, variant: EquipmentVaria
   return (
     `<div class="tile${check.ok ? '' : ' is-locked'}${owned === '' ? '' : ' is-owned'}` +
     `${onTheList ? ' is-ordered' : ''}" data-variant="${variant.id}" data-line="1">` +
-    `<h3 class="tile-name">${escapeHtml(LINE_NAME)} ${owned}</h3>` +
+    `<h3 class="tile-name">${escapeHtml(kind.name)} ${owned}</h3>` +
     pictureSlot(pictureKeyOf(spec), variant.id) +
-    `<div class="card-effects">${figureLines(lineLines())}</div>` +
-    `<div class="card-costs"><p class="tile-price">${money(LINE_PRICE)}</p>` +
-    `${figureLines(lineCostLines(state, spec, variant))}</div>` +
-    `<p class="tile-text card-description">${escapeHtml(LINE_DESCRIPTION)}</p>` +
+    `<div class="card-effects">${figureLines(lineLines(kindId))}</div>` +
+    `<div class="card-costs"><p class="tile-price">${money(linePriceOf(kindId))}</p>` +
+    `${figureLines(lineCostLines(state, spec, variant, kindId))}</div>` +
+    `<p class="tile-text card-description">${escapeHtml(kind.description)}</p>` +
     (check.ok ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
     `<div class="tile-action">${waiting}${buy}</div>` +
     '</div>'
@@ -582,8 +599,10 @@ function lineCard(state: GameState, spec: EquipmentSpec, variant: EquipmentVaria
  *  one Buy a line the company has, `Buy for line 2`, or the locked Buy with its reason under it as
  *  for kit (CLAUDE.md T30 2.10; v93). With no line, one locked Buy. No picture: the upgrades are
  *  not drawn. */
-function upgradeCard(state: GameState, upgrade: LineUpgradeSpec): string {
-  const lines = lineNumbers(state);
+function upgradeCard(state: GameState, upgrade: LineUpgradeSpec, kindId: LineKind): string {
+  // The lines of the upgrade's own kind (v107).
+  const lines = linesOfKind(state, kindId);
+  const kind = LINE_KINDS[kindId];
   const checks = (lines.length === 0 ? [1] : lines).map((number) => ({ number, check: lineUpgradeCheck(state, number, upgrade.id) }));
   const any = checks.some((entry) => entry.check.ok);
   const buttons = checks
@@ -598,7 +617,7 @@ function upgradeCard(state: GameState, upgrade: LineUpgradeSpec): string {
     .filter(({ check }) => !check.ok)
     .map(({ number, check }) => (lines.length <= 1 ? check.reason : `${lineName(number)}: ${check.reason}`));
   const effects = [
-    line(`Takes ${LINE_UPGRADE_MINUTES} minutes off each window of the line's contract`),
+    line(`Takes ${LINE_UPGRADE_MINUTES * kind.minutesFactor} minutes off each ${kind.unit} of the line's contract`),
     line(`Fitted ${LINE_UPGRADE_DAYS} working days after the order`),
   ];
   return (
@@ -613,23 +632,31 @@ function upgradeCard(state: GameState, upgrade: LineUpgradeSpec): string {
   );
 }
 
-/** The inside of the line's folder: the line's one card, and the four upgrades under it (CLAUDE.md
- *  T30 2.3.3, 2.10). Every module's family opens on it, though only module 1's has a folder. */
-function renderLine(state: GameState, filter: string): string {
-  const spec = findSpec(LINE_MODULES[0] ?? '');
+/** The lines the company has of one kind, standing or on order, by number (v107). */
+function linesOfKind(state: GameState, kind: LineKind): number[] {
+  return lineNumbers(state).filter((line) => lineKindOf(state, line) === kind);
+}
+
+/** The inside of a line's folder: its kind's one card, and its four upgrades under it (CLAUDE.md
+ *  T30 2.3.3, 2.10; v107). Every module's family opens on its kind's, though only module 1's has a
+ *  folder. */
+function renderLine(state: GameState, filter: string, kindId: LineKind): string {
+  const spec = findSpec(lineModulesOf(kindId)[0] ?? '');
   const variant = spec?.variants[0];
   if (!spec || !variant) return '<p class="empty">Not in the catalogue.</p>';
+  const kind = LINE_KINDS[kindId];
   const head = `<p class="hint">${escapeHtml(spec.effect)}</p>`;
   const needle = filter.trim().toLowerCase();
-  if (needle !== '' && !LINE_NAME.toLowerCase().includes(needle)) return `${head}<p class="empty">Nothing matches that.</p>`;
-  const upgrades = LINE_UPGRADES.map((upgrade) => upgradeCard(state, upgrade)).join('');
-  return `${head}<div class="tile-grid">${lineCard(state, spec, variant)}${upgrades}</div>`;
+  if (needle !== '' && !kind.name.toLowerCase().includes(needle)) return `${head}<p class="empty">Nothing matches that.</p>`;
+  const upgrades = kind.upgrades.map((upgrade) => upgradeCard(state, upgrade, kindId)).join('');
+  return `${head}<div class="tile-grid">${lineCard(state, spec, variant, kindId)}${upgrades}</div>`;
 }
 
 /** The inside of a folder: one card per class of the family, filtered by whatever is in the
  *  filter field (CLAUDE.md T7 3.7). */
 export function renderMachine(state: GameState, specId: string, filter = ''): string {
-  if (isLineModule(specId)) return renderLine(state, filter);
+  const kind = moduleKind(specId);
+  if (kind !== null) return renderLine(state, filter, kind);
   const spec = findSpec(specId);
   if (!spec) return '<p class="empty">Not in the catalogue.</p>';
   const owned = countOf(state, specId);

@@ -67,7 +67,7 @@ import {
 import {
   APP_VERSION,
   HOUSE_CARD_SECONDS,
-  LINE_MODULES,
+  lineModulesOf,
   type RoomId,
   TOOL_CABINET,
   roomById,
@@ -112,7 +112,7 @@ import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockS
 import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
-import { OWNER, hasCentralExtraction, isLineModule } from '../engine/machines';
+import { OWNER, hasCentralExtraction, moduleKind } from '../engine/machines';
 import { whilePinned } from '../engine/pinned';
 import { nextSpriteOrientation, playSheets } from '../render/sprites';
 import { patchInto } from './patch';
@@ -618,7 +618,8 @@ function ghostFor(current: GameState): Ghost | null {
   const check = canPlace(current, drag.itemId, drag.x, drag.y, ui.rotate);
   // A line is taken by any of its modules and its six go together: its ghost is the whole 36 m
   // by 3 m, each module's 6 m by 3 m drawn in it (CLAUDE.md T30 2.4).
-  if (isLineModule(kit.specId)) {
+  const kind = moduleKind(kit.specId);
+  if (kind !== null) {
     const offset = lineModuleCell({ x: 0, y: 0 }, kit.specId);
     const first = { x: drag.x - offset.x, y: drag.y - offset.y };
     const whole = lineBox(first);
@@ -627,7 +628,8 @@ function ghostFor(current: GameState): Ghost | null {
       ok: check.ok,
       reason: check.reason,
       orientation: ui.rotate,
-      parts: LINE_MODULES.map((id) => ({ ...boxOf(id, lineModuleCell(first, id).x, first.y) })),
+      // The modules of its own kind (v107).
+      parts: lineModulesOf(kind).map((id) => ({ ...boxOf(id, lineModuleCell(first, id).x, first.y) })),
     };
   }
   const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId, ui.rotate);
