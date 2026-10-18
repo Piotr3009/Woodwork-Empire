@@ -84,26 +84,27 @@ describe('the subscription of a firm', () => {
     state.stock.sheets = 0;
     expect(insuredValue(state)).toBe(0);
     state.unit.areaM2 = SECURITY_SCALE_AREA_M2;
-    expect(securitySubscriptionMonthly(state, 4)).toBe(250);
-    expect(securitySubscriptionMonthly(state, 5)).toBe(600);
+    // The two bases halved in v112 [PIOTR, 18.10]: 125 and 300, from 250 and 600 (flipped).
+    expect(securitySubscriptionMonthly(state, 4)).toBe(125);
+    expect(securitySubscriptionMonthly(state, 5)).toBe(300);
     state.unit.areaM2 = SECURITY_SCALE_AREA_M2 * 2;
-    expect(securitySubscriptionMonthly(state, 4)).toBe(500);
+    expect(securitySubscriptionMonthly(state, 4)).toBe(250);
     // Kit worth the reference value doubles it again.
     placeEquipment(state, 'tableSaw', { variantId: 'industrial', x: 2, y: 1, id: 'kit-a' });
     const saw = state.equipment.find((item) => item.id === 'kit-a');
     if (!saw) throw new Error('no saw');
     saw.purchasePrice = SECURITY_SCALE_VALUE;
     expect(insuredValue(state)).toBe(SECURITY_SCALE_VALUE);
-    expect(securitySubscriptionMonthly(state, 4)).toBe(1000);
-    expect(securitySubscriptionMonthly(state, 5)).toBe(2400);
+    expect(securitySubscriptionMonthly(state, 4)).toBe(500);
+    expect(securitySubscriptionMonthly(state, 5)).toBe(1200);
     const parts = securitySubscriptionParts(state, 5);
     expect(parts).toEqual({
-      base: 600,
+      base: 300,
       areaM2: 400,
       areaFactor: 2,
       insured: SECURITY_SCALE_VALUE,
       valueFactor: 2,
-      monthly: 2400,
+      monthly: 1200,
     });
     // The one off levels never scale.
     expect(securitySubscriptionMonthly(state, 3)).toBe(150);
