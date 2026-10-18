@@ -28,10 +28,12 @@ import {
   UNIT_WIDTH_CELLS,
   WELFARE_IN_THE_CANTEEN,
   YARD_WIDTH_CELLS,
+  hallLevelTier,
   roomById,
   roomDoorCell,
   roomsOf,
 } from '../engine/constants';
+import { hallLevelOf } from '../engine/premises';
 import {
   bagStore,
   bagStoreLine,
@@ -1947,7 +1949,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const unit = state.unit;
   const ghost = options.ghost ?? null;
   const files = options.files ?? spriteFiles();
-  const layerUrl = (key: string): string | null => pickSprite(files, key);
+  // Each layer at the hall's level, today's file where its level has none (v113).
+  const tier = hallLevelTier(hallLevelOf(state));
+  const layerUrl = (key: string): string | null => pickSprite(files, key, tier);
   // The layers this unit is painted with: the first three, or the extended background and the
   // enlarged canteen block once the unit has grown (v67).
   const layers = hallLayersOf(unit);

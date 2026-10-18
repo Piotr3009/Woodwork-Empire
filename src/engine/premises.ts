@@ -19,6 +19,7 @@
 
 import {
   CANTEEN_LEVEL_WIDE_FROM,
+  HALL_LEVEL_BUILT,
   UNIT_DEPTH_CELLS,
   UNIT_EXTENSION_PRICE,
   UNIT_EXTENSION_PRICE_PER_M2,
@@ -31,13 +32,14 @@ import {
   YARD_ORDER_LARGE_FIRST,
   canteenGrowthBox,
   canteenLevelSpec,
+  hallLevelSpec,
   officeLevelSpec,
   roomById,
   roomsOf,
   secondExtensionOf,
   unitDepositFor,
 } from './constants';
-import type { CanteenLevelSpec, OfficeLevelSpec } from './constants';
+import type { CanteenLevelSpec, HallLevelSpec, OfficeLevelSpec } from './constants';
 import { canAfford, pay, standingPowerPerDay } from './economy';
 import { queueEvent } from './events';
 import type { EventDraft } from './events';
@@ -621,4 +623,68 @@ export function enlargeCanteen(state: GameState): PremisesCheck {
   if (!check.ok) return check;
   state.unit.canteenWide = true;
   return OK;
+}
+
+// ---------------------------------------------------------------------------
+// The hall's refits (PIOTR, 18.10; v113): the art side's levels 2 to 6 of the hall, bought one
+// after the other on the Premises page, paid at the click and open the next morning as the office's
+// are, with a card and a few points of reputation for the better hall.
+// ---------------------------------------------------------------------------
+
+/** The level the hall is at, 1 for the hall as it was built: read here, so a save from before v113
+ *  with no figure on its unit is that hall. */
+export function hallLevelOf(state: GameState): number {
+  return typeof state.unit.hallLevel === 'number' ? state.unit.hallLevel : HALL_LEVEL_BUILT;
+}
+
+/** The refit on offer next: the level after the one the hall is at, or null at the top. */
+export function nextHallLevel(state: GameState): HallLevelSpec | null {
+  return hallLevelSpec(hallLevelOf(state) + 1);
+}
+
+/** Whether the next refit can be bought, in the order its card's locked button reads: the top
+ *  reached, one being done, the cash (v113). */
+export function refitHallCheck(state: GameState): PremisesCheck {
+  const next = nextHallLevel(state);
+  if (next === null) return { ok: false, reason: 'The hall is at its best' };
+  if (state.unit.hallRefit !== null && state.unit.hallRefit !== undefined) {
+    return { ok: false, reason: 'The fitters are in' };
+  }
+  if (!canAfford(state, next.price)) return { ok: false, reason: 'Not enough cash' };
+  return OK;
+}
+
+/** The click: the next level paid for on a line of its own, the fitters in until the morning. */
+export function refitHall(state: GameState): PremisesCheck {
+  const check = refitHallCheck(state);
+  if (!check.ok) return check;
+  const next = nextHallLevel(state);
+  if (next === null) return check;
+  pay(state, 'unitExtension', `Hall refit: ${next.name}`, next.price);
+  state.unit.hallRefit = { level: next.level };
+  return OK;
+}
+
+/** The morning after the click: the hall is painted in its new level, the company a little better
+ *  thought of, and a card says so (v113). */
+export function openHallRefit(state: GameState): void {
+  const refit = state.unit.hallRefit;
+  if (refit === null || refit === undefined) return;
+  const spec = hallLevelSpec(refit.level);
+  state.unit.hallRefit = null;
+  if (spec === null) return;
+  state.unit.hallLevel = spec.level;
+  const gained = changeReputation(state, spec.reputation, `Hall refit: ${spec.name}`);
+  const next = hallLevelSpec(spec.level + 1);
+  queueEvent(state, {
+    kind: 'hallRefitted',
+    title: 'The hall is refitted',
+    body:
+      `The fitters are out: ${spec.name.toLowerCase()}. ${spec.sentence} ` +
+      `Clients who walk the floor notice: reputation ${gained >= 0 ? '+' : ''}${formatReputation(gained)}. ` +
+      (next === null
+        ? 'There is no better hall to be had.'
+        : `The next refit, ${next.name.toLowerCase()}, is on the Premises page at ${next.price.toLocaleString('en-GB')}.`),
+    data: { level: spec.level },
+  });
 }

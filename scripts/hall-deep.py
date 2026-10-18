@@ -13,11 +13,32 @@
 #   python3 scripts/hall-deep.py        (needs Pillow)
 #   npm run sprites:manifest
 
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageOps, ImageStat
 
 SPRITES = Path(__file__).resolve().parent.parent / 'public' / 'sprites'
+
+# The hall's level (v113): today's hall is level 1 and its files keep their names; the art side's
+# levels 2 to 6 (P2) are cut from their own three layers into files named `<layer>.levelN.png`, so
+#
+#   python3 scripts/hall-deep.py 3
+#
+# cuts level 3. With no level given, level 1, as it always was.
+LEVEL = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+
+
+def named(name):
+    """The file of a layer at the hall's level."""
+    return SPRITES / (f'{name}.png' if LEVEL == 1 else f'{name}.level{LEVEL}.png')
+
+# The art side's fix of P2 for the levels 2 to 6 [PIOTR, 18.10: "yes" to it, level 1 left as it is]:
+# the floor beside the left wall painted out by the floor three metres along rather than two and a
+# half, so a floor jointed every metre keeps its joints in place; and the left wall's tone taken from
+# the same height on both walls, 1.2 to 2.2 m, above every plinth and below the LED, the left one
+# between the WC and the personnel door over one whole metre of wall.
+FIXED = LEVEL >= 2
 
 LENGTH, DEPTH_BUILT, DEPTH = 40, 10, 20
 # The projection of docs/art/SPRITES.md 9.2 on the 2x canvas, with the origin ten metres along.
@@ -69,7 +90,7 @@ def floor_from(edge, x_from=0.0, x_to=LENGTH, depth=DEPTH_BUILT):
 
 
 def hall_background_deep():
-    wide = Image.open(SPRITES / 'hallBackgroundWide.png').convert('RGB')
+    wide = Image.open(named('hallBackgroundWide')).convert('RGB')
     ground = wide.getpixel((4, 4))
     width = int(screen(LENGTH, 0)[0]) + 120
     height = int(screen(LENGTH, DEPTH)[1]) + 120
@@ -95,7 +116,7 @@ def hall_background_deep():
         2.2,
         0.3,
     )
-    clean.paste(shifted(base, -2.5, 0), (0, 0), ImageChops.darker(along, down))
+    clean.paste(shifted(base, -3.0 if FIXED else -2.5, 0), (0, 0), ImageChops.darker(along, down))
     # The yellow line at the near side of the shutter lies on the last of the painted floor, where
     # the first copy comes in: that corner of the hall is kept as it was painted.
     kept = ImageOps.invert(
@@ -127,11 +148,19 @@ def hall_background_deep():
     #    camera, and toned to the shade the left wall is painted in. It starts at the shutter's
     #    frame, so the end the wall was painted with and the kerb under it are under the new wall.
     taken_from, joins_at, top, cap = 22.0, 9.15, WALL_TOP + 0.1, 0.2
-    rear = polygon_mask(
-        size,
-        [[screen(taken_from, 0, 0.6), screen(taken_from + 10, 0, 0.6), screen(taken_from + 10, 0, 3.2), screen(taken_from, 0, 3.2)]],
-    )
-    left = polygon_mask(size, [[screen(0, 4.75, 2.5), screen(0, 5.6, 2.5), screen(0, 5.6, 3.2), screen(0, 4.75, 3.2)]])
+    if FIXED:
+        tone_bottom, tone_top = 1.2, 2.2
+        rear = polygon_mask(
+            size,
+            [[screen(taken_from, 0, tone_bottom), screen(taken_from + 10, 0, tone_bottom), screen(taken_from + 10, 0, tone_top), screen(taken_from, 0, tone_top)]],
+        )
+        left = polygon_mask(size, [[screen(0, 2.5, tone_bottom), screen(0, 3.5, tone_bottom), screen(0, 3.5, tone_top), screen(0, 2.5, tone_top)]])
+    else:
+        rear = polygon_mask(
+            size,
+            [[screen(taken_from, 0, 0.6), screen(taken_from + 10, 0, 0.6), screen(taken_from + 10, 0, 3.2), screen(taken_from, 0, 3.2)]],
+        )
+        left = polygon_mask(size, [[screen(0, 4.75, 2.5), screen(0, 5.6, 2.5), screen(0, 5.6, 3.2), screen(0, 4.75, 3.2)]])
     rear_tone = ImageStat.Stat(base, rear).mean
     left_tone = ImageStat.Stat(base, left).mean
     bands = [
@@ -173,9 +202,9 @@ def hall_background_deep():
     )
     out.paste(shifted(base, 0, DEPTH - DEPTH_BUILT), (0, 0), end)
 
-    out.save(SPRITES / 'hallBackgroundDeep.png', optimize=True)
+    out.save(named('hallBackgroundDeep'), optimize=True)
     return out.size
 
 
 if __name__ == '__main__':
-    print('hallBackgroundDeep.png', hall_background_deep())
+    print(named('hallBackgroundDeep').name, hall_background_deep())

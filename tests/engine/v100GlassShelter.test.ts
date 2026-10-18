@@ -12,7 +12,7 @@
 // £60,000, 12 m along the wall by 3 m deep, ten working days; "later" to its picture]: 3,200 glass
 // units outside behind the rear wall, as the timber shelter keeps its boards, counted with the
 // glass racks, filled by the glass's Restock, standing in for a glass rack on the board, and drawn
-// as kit with no picture until the art side draws it.
+// as kit with no picture until the art side drew it (its picture from v110, P1).
 
 import { describe, expect, it } from 'vitest';
 import { missingEquipment, template } from '../../src/engine/catalog';
@@ -51,8 +51,11 @@ describe('the glass shelter (v100)', () => {
     });
     expect(findSpec('glassShelter')?.variants).toHaveLength(1);
     expect(isServiced('glassShelter')).toBe(false);
-    // No picture yet: the hall draws it as any kit whose picture has not landed.
-    expect(spriteFiles().some((file) => file.startsWith('glassShelter'))).toBe(false);
+    // Its picture from v110, the art side's P1, both ways round (flipped: no picture until then).
+    expect(spriteFiles().filter((file) => file.startsWith('glassShelter'))).toEqual([
+      'glassShelter.standard.png',
+      'glassShelter.standard.r.png',
+    ]);
   });
 
   it('stands outside behind the rear wall and holds 3,200 glass units and nothing else', () => {
@@ -71,7 +74,7 @@ describe('the glass shelter (v100)', () => {
     expect(firstStoreOf(state, 'glass')).toBeNull();
     // The glass's Restock fills it.
     expect(restockCheck(state, 'glass').ok).toBe(true);
-    // Drawn as kit with no picture, its plate over the wall.
+    // Drawn from its picture (v110), its plate over the wall.
     const holder = document.createElement('div');
     holder.innerHTML = renderHall(state);
     expect(holder.innerHTML).toContain('Glass shelter: 0 / 3200');

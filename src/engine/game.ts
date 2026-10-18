@@ -98,8 +98,10 @@ import {
   extendUnit,
   openCanteenRefit,
   openExtension,
+  openHallRefit,
   openOfficeRefit,
   refitCanteen,
+  refitHall,
   refitOffice,
   tidyYard,
 } from './premises';
@@ -477,6 +479,9 @@ export function createGame(options: NewGameOptions): GameState {
       // The canteen as it was built, with no fitters in (v106).
       canteenLevel: 0,
       canteenRefit: null,
+      // And the hall as it was built (v113).
+      hallLevel: 1,
+      hallRefit: null,
     },
     owner: {
       present: true,
@@ -662,6 +667,8 @@ function startDay(state: GameState): void {
   // (v106).
   openOfficeRefit(state);
   openCanteenRefit(state);
+  // And of the hall (v113).
+  openHallRefit(state);
   // The glue has cured and the lacquer dried overnight: the frames that stood are free (CLAUDE.md
   // T28 2.8).
   endTheStands(state);
@@ -2641,6 +2648,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'REFIT_CANTEEN':
       // The next level of the canteen, the same way (v106).
       refitCanteen(next);
+      break;
+    case 'REFIT_HALL':
+      // And of the hall (v113).
+      refitHall(next);
       break;
     case 'CONNECT_EXTRACTION':
       connectExtraction(next, action.equipmentId);

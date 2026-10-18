@@ -1787,6 +1787,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // And its canteen card, the same way (v106).
       dispatch({ type: 'REFIT_CANTEEN' });
       return;
+    case 'refitHall':
+      // And its hall card (v113).
+      dispatch({ type: 'REFIT_HALL' });
+      return;
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
       return;

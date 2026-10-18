@@ -1,0 +1,45 @@
+--- a/scripts/hall-deep.py
++++ b/scripts/hall-deep.py
+@@ -78,10 +78,10 @@
+     out = base.copy()
+     size = out.size
+ 
+     # 1. The floor the copies are taken from, with what is painted on it beside the left wall (the
+-    #    two yellow lines at the shutter, the shade at the door) painted out by the floor two and
+-    #    a half metres further along, so none of it is laid down again every five metres. The hall
++    #    two yellow lines at the shutter, the shade at the door) painted out by the floor three
++    #    metres further along, so none of it is laid down again every five metres. The hall
+     #    itself keeps them.
+     clean = base.copy()
+     along = feathered(
+         size,
+@@ -94,9 +94,9 @@
+         lambda edge: [[screen(0.02, edge), screen(2.3, edge), screen(2.3, PAINTED), screen(0.02, PAINTED)]],
+         2.2,
+         0.3,
+     )
+-    clean.paste(shifted(base, -2.5, 0), (0, 0), ImageChops.darker(along, down))
++    clean.paste(shifted(base, -3.0, 0), (0, 0), ImageChops.darker(along, down))
+     # The yellow line at the near side of the shutter lies on the last of the painted floor, where
+     # the first copy comes in: that corner of the hall is kept as it was painted.
+     kept = ImageOps.invert(
+         feathered(
+@@ -126,13 +126,16 @@
+     #    mirrored, which turns a wall that runs along the hall into one that runs towards the
+     #    camera, and toned to the shade the left wall is painted in. It starts at the shutter's
+     #    frame, so the end the wall was painted with and the kerb under it are under the new wall.
+     taken_from, joins_at, top, cap = 22.0, 9.15, WALL_TOP + 0.1, 0.2
++    # Match the sampled height: above every plinth and below the LED. The left
++    # sample is between the WC and personnel door, over one full metre of wall.
++    tone_bottom, tone_top = 1.2, 2.2
+     rear = polygon_mask(
+         size,
+-        [[screen(taken_from, 0, 0.6), screen(taken_from + 10, 0, 0.6), screen(taken_from + 10, 0, 3.2), screen(taken_from, 0, 3.2)]],
++        [[screen(taken_from, 0, tone_bottom), screen(taken_from + 10, 0, tone_bottom), screen(taken_from + 10, 0, tone_top), screen(taken_from, 0, tone_top)]],
+     )
+-    left = polygon_mask(size, [[screen(0, 4.75, 2.5), screen(0, 5.6, 2.5), screen(0, 5.6, 3.2), screen(0, 4.75, 3.2)]])
++    left = polygon_mask(size, [[screen(0, 2.5, tone_bottom), screen(0, 3.5, tone_bottom), screen(0, 3.5, tone_top), screen(0, 2.5, tone_top)]])
+     rear_tone = ImageStat.Stat(base, rear).mean
+     left_tone = ImageStat.Stat(base, left).mean
+     bands = [
+         band.point(lambda value, ratio=left_tone[index] / rear_tone[index]: int(min(255, value * ratio)))

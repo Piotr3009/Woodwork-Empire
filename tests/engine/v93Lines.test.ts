@@ -449,8 +449,8 @@ describe('a v44 save in this build (v93 section 4)', () => {
     ];
     const opened = migrateState(raw, 44);
     if (opened === null) throw new Error('the save opens');
-    // Flipped in v96: STATE_VERSION 48 (CLAUDE.md T32 section 4); 52 from v111.
-    expect(opened.version).toBe(52);
+    // Flipped in v96: STATE_VERSION 48 (CLAUDE.md T32 section 4); 52 from v111, 53 from v113.
+    expect(opened.version).toBe(53);
     expect(opened.windowLines.map((record) => record.number)).toEqual([1]);
     expect(opened.windowLines[0]?.contract?.status).toBe('active');
     // Flipped in v96: the line's forty boards and twenty glass units are free stock on the counters,

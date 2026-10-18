@@ -11,11 +11,25 @@
 #   python3 scripts/hall-wide.py        (needs Pillow)
 #   npm run sprites:manifest
 
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
 SPRITES = Path(__file__).resolve().parent.parent / 'public' / 'sprites'
+
+# The hall's level (v113): today's hall is level 1 and its files keep their names; the art side's
+# levels 2 to 6 (P2) are cut from their own three layers into files named `<layer>.levelN.png`, so
+#
+#   python3 scripts/hall-wide.py 3
+#
+# cuts level 3. With no level given, level 1, as it always was.
+LEVEL = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+
+
+def named(name):
+    """The file of a layer at the hall's level."""
+    return SPRITES / (f'{name}.png' if LEVEL == 1 else f'{name}.level{LEVEL}.png')
 
 # The projection of docs/art/SPRITES.md 9.2, on the 2x canvas.
 ORIGIN_X, ORIGIN_Y = 600, 288
@@ -31,7 +45,7 @@ def hall_background_wide():
     The slice of the hall from x = 9 to its end is laid down again five metres further along, four
     times, each copy feathered into the one before it over a metre and a half, so the shading of
     the floor and the courses of the blockwork run on without a seam."""
-    source = Image.open(SPRITES / 'hallBackground.png').convert('RGB')
+    source = Image.open(named('hallBackground')).convert('RGB')
     length, depth = 40, 10
     slice_from, seam, feather, steps = 9.0, 14.0, 1.5, 24
     wall_top, kerb = 3.5, 80
@@ -73,7 +87,7 @@ def hall_background_wide():
     while shift <= length - 20 + 0.01:
         out.paste(source, (int(shift * 48), int(shift * 24)), mask)
         shift += step
-    out.save(SPRITES / 'hallBackgroundWide.png', optimize=True)
+    out.save(named('hallBackgroundWide'), optimize=True)
     return out.size
 
 
@@ -83,8 +97,8 @@ def hall_canteen_wide():
     The second door goes, walled up with a patch of the hall's rear wall, and the rim that ran
     between the two roofs is covered with roof. The door of the block as it was built stays where
     it was painted, which is where the game has it (`roomDoorCell`)."""
-    block = Image.open(SPRITES / 'hallCanteen.png').convert('RGBA')
-    hall = Image.open(SPRITES / 'hallBackground.png').convert('RGBA')
+    block = Image.open(named('hallCanteen')).convert('RGBA')
+    hall = Image.open(named('hallBackground')).convert('RGBA')
     out = Image.new('RGBA', block.size, (0, 0, 0, 0))
     out.alpha_composite(block)
     out.alpha_composite(block, (96, 48))
@@ -119,10 +133,10 @@ def hall_canteen_wide():
         fill=255,
     )
     out.paste(roof, (0, 0), mask)
-    out.save(SPRITES / 'hallCanteenWide.png', optimize=True)
+    out.save(named('hallCanteenWide'), optimize=True)
     return out.size
 
 
 if __name__ == '__main__':
-    print('hallBackgroundWide.png', hall_background_wide())
-    print('hallCanteenWide.png', hall_canteen_wide())
+    print(named('hallBackgroundWide').name, hall_background_wide())
+    print(named('hallCanteenWide').name, hall_canteen_wide())

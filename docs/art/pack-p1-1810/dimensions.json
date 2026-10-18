@@ -1,0 +1,155 @@
+{
+  "projection": {
+    "type": "orthographic dimetric 2:1",
+    "units": "metres",
+    "formula": "sx=ox+48*(x-y); sy=oy+24*(x+y)-48*z",
+    "groundEdgeSlopes": [
+      0.5,
+      -0.5
+    ],
+    "verticalPixelsPerMeter": 48
+  },
+  "view90PhysicalTransform": "(x,y,z) -> (y,w-x,z)",
+  "files": [
+    {
+      "file": "sprites-2x/0/glassShelter.standard.png",
+      "canvasPx": [
+        736,
+        520
+      ],
+      "envelopeMeters": [
+        12.0,
+        3.0,
+        3.0
+      ],
+      "anchorPx": [
+        584,
+        512
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          152.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 8,
+      "exactProjectionVerified": true,
+      "sha256": "035825255266de0441f996592570d9e87ac302f0ffb5a05c84e458b661f836af"
+    },
+    {
+      "file": "sprites-2x/90/glassShelter.standard.png",
+      "canvasPx": [
+        736,
+        520
+      ],
+      "envelopeMeters": [
+        12.0,
+        3.0,
+        3.0
+      ],
+      "anchorPx": [
+        152,
+        512
+      ],
+      "matrix": [
+        [
+          48.0,
+          48.0,
+          0.0,
+          8.0
+        ],
+        [
+          -24.0,
+          24.0,
+          -48.0,
+          440.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 8,
+      "exactProjectionVerified": true,
+      "sha256": "ca848eb4e42b7e6ed013021e409622cc660d394b370bc2071d3099a17209e19a"
+    },
+    {
+      "file": "sprites-2x/0/timberShelterLarge.standard.png",
+      "canvasPx": [
+        1024,
+        712
+      ],
+      "envelopeMeters": [
+        18.0,
+        3.0,
+        4.0
+      ],
+      "anchorPx": [
+        872,
+        704
+      ],
+      "matrix": [
+        [
+          48.0,
+          -48.0,
+          0.0,
+          152.0
+        ],
+        [
+          24.0,
+          24.0,
+          -48.0,
+          200.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 8,
+      "exactProjectionVerified": true,
+      "sha256": "ccb80d9fc54553743fc75dfad2c2f960acee30322108c3808551ff52dda82f8c"
+    },
+    {
+      "file": "sprites-2x/90/timberShelterLarge.standard.png",
+      "canvasPx": [
+        1024,
+        712
+      ],
+      "envelopeMeters": [
+        18.0,
+        3.0,
+        4.0
+      ],
+      "anchorPx": [
+        152,
+        704
+      ],
+      "matrix": [
+        [
+          48.0,
+          48.0,
+          0.0,
+          8.0
+        ],
+        [
+          -24.0,
+          24.0,
+          -48.0,
+          632.0
+        ]
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "minimumMarginPx": 8,
+      "exactProjectionVerified": true,
+      "sha256": "fbe66b3979649bbab0949785b085850a0d196afaea24698ff8e51ad170ea84c3"
+    }
+  ]
+}

@@ -64,9 +64,9 @@ describe('a v93 save whose line has no lane (v94)', () => {
     const cash = state.cash;
     const opened = migrateState(asV45(state), 45);
     if (opened === null) throw new Error('the save opens');
-    // 52 from v111: the yard laid out in its order.
-    expect(STATE_VERSION).toBe(52);
-    expect(opened.version).toBe(52);
+    // 52 from v111: the yard laid out in its order; 53 from v113: the hall's level.
+    expect(STATE_VERSION).toBe(53);
+    expect(opened.version).toBe(53);
     expect(rows(opened, 1)).toEqual([14, 14, 14, 14, 14, 14]);
     expect(lineLanes(opened).map((lane) => lane.line)).toEqual([1]);
     expect(opened.cash).toBe(cash);

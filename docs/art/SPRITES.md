@@ -959,3 +959,74 @@ pallet is the art side's new four way pallet (2 × 1 × 0.228 m, its deck's unde
 that the forks of L3 take it unchanged), carried crosswise with its middle 1.0 m ahead of the anchor
 (`loadCenterAheadM` of its JSON), where the window pallet's is 1.225 m. The Sprite check page lists
 the door pallet beside the window pallet and the loaded door sheet beside the other two.
+
+## 20. The glass shelter and the large timber shelter (P1, 18.10.2026; v110)
+
+The two stores behind the rear wall that had no picture (the glass shelter of v100 and the large
+timber shelter of v103, drawn until then as kit with no picture) came from the art side as P1 the
+same evening as P3, marked PODGLĄD: a preview waiting for Piotr's acceptance, with no
+`approval.json`. Piotr: "you have the rest of the art, code it one picture at a time". Their four
+game files went into `public/sprites/` byte for byte (each matches its line in
+`docs/art/pack-p1-1810/checksums.sha256`), the 90 degree views named `.r`; the handoff, the README,
+the camera notes, the measurements and the checksums are kept in `docs/art/pack-p1-1810/`, and the
+masters, models, sources, reports and previews stay in the delivered ZIP. No agent altered a pixel.
+
+| Files in public/sprites/ | What it is | Metres w × d × h | File, px | Anchor, view 0 / `.r` |
+|---|---|---|---|---|
+| `glassShelter.standard.png` (and `.r`) | a steel shelter in the S1 family with six A frames of sealed units under a lean to roof | 12 × 3 × 3 | 736 × 520 | 584, 512 / 152, 512 |
+| `timberShelterLarge.standard.png` (and `.r`) | the same shelter, longer and higher, with grey cantilever arms and sixteen packs of boards on four levels | 18 × 3 × 4 | 1,024 × 712 | 872, 704 / 152, 704 |
+
+Both are the contract's canvases for their metres (section 2), the views 90 the game's own turn
+`(x, y, z) -> (y, w - x, z)`, with no floor, no cast shadow, no plate and no lettering: the game
+draws the wall in front of them and their plate, and behind the wall only what stands above its
+crown shows, as for every store there. The boards and units drawn are a picture of a full
+store and not its count (`inventoryLiteral` false in the pack): the plate says what is in it. A
+shelter made bigger (v105) is drawn through the store's red filter, picture and all.
+
+## 21. The hall's six levels (P2, 18.10.2026; v113)
+
+Piotr approved the art side's board of six hall finishes ("hala ok") and the production files came
+as P2 the same evening, marked PODGLĄD: a preview waiting for his acceptance, with no
+`approval.json`. Piotr: "you have the rest of the art, code it one picture at a time", then "5 koduj"
+to chat's five points (a card on the Premises page, the prices, two points of reputation, the names,
+and the art side's fix of the deep cutter). Level 1 is the hall as it was built: today's three layers
+of section 9, untouched. Levels 2 to 6 are three layers each on the same canvas of **1680 × 1128 px**,
+registered as today's (world (0, 0, 0) at (600, 288), X (48, 24), Y (-48, 24), Z (0, -48)): the
+outside of the hall, the kerbs and the blocks' alpha are today's pixel for pixel, and only the
+surfaces inside the outlines are repainted. Their fifteen files went into `public/sprites/` byte for
+byte (each matches its line in `docs/art/pack-p2-1810/checksums.sha256`); the handoff, the README,
+the measurements, the validation, the checksums, the cutter proposal and its diff are kept in
+`docs/art/pack-p2-1810/`. No agent altered a pixel.
+
+| Level | Name on the Premises page | Floor | Walls | Plinth |
+|---|---|---|---|---|
+| 2 | A proper joinery | clean grey concrete, joints every metre | cream blockwork | graphite, 0.6 m |
+| 3 | A growing firm | light grey resin | off white blockwork | sage green, 0.8 m |
+| 4 | A big works | grey resin | white panels | anthracite, 0.5 m |
+| 5 | A factory | light polished concrete | white panels, brushed aluminium copings, a warm LED strip | dark green, 0.8 m |
+| 6 | The empire | light terrazzo | white panels, the same copings and light | dark green, 0.8 m |
+
+| Files in public/sprites/, N from 2 to 6 | What they are | File, px |
+|---|---|---|
+| `hallBackground.levelN.png` | the floor, the walls, the kerbs, the shutter, the door and the WC, RGB | 1680 × 1128 |
+| `hallOffice.levelN.png`, `hallCanteen.levelN.png` | the two blocks, RGBA, the alpha of today's | 1680 × 1128 |
+| `hallBackgroundWide.levelN.png` and the ten other pieces of sections 9.7 to 9.10 | the bigger halls, cut by the game's own scripts (below) | as today's, piece for piece |
+
+**The bigger halls are cut by the game, not painted.** The four scripts of sections 9.7 to 9.10 take
+the hall's level (`python3 scripts/hall-wide.py N`, then `hall-deep.py N`, `hall-long.py N` and
+`hall-wider.py N`) and read and write `<layer>.levelN.png`; with no level they cut today's files,
+byte for byte as they are in the repo (checked). For levels 2 to 6 the deep cutter takes the art
+side's fix (`docs/art/pack-p2-1810/source/proposed-hall-deep-fix.diff`) [PIOTR: "yes", level 1 left as
+it is]: the floor beside the left wall is painted out by the floor three metres along instead of two
+and a half, so a floor jointed every metre keeps its joints, and the left wall's tone is taken from
+the same height on both walls, 1.2 to 2.2 m, so a plinth or the LED does not tint the wall carried
+on. Every piece of every level came out the size and at the offset of today's, so the canvases of
+sections 9.7 to 9.10 serve every level. The ground round the hall is one colour at every level and is
+not cut again: today's `hallBackgroundGround.png` serves.
+
+**How the game uses them** (v113). The hall's level is the unit's (`hallLevel`, 1 to 6), bought on
+the Premises page. Every layer is picked with the level as its tier (`hallLevelTier`, `level3`), so
+`hallBackground` at level 3 is `hallBackground.level3.png`, and a layer that has no file of its level
+falls back to today's, as every picture without its class falls back to its family's (`pictureFor`).
+Everything drawn on the painting (the kit, the people, the lettering on the wall, the rooms' doors) is
+drawn as it was.

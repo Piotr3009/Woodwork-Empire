@@ -8,9 +8,21 @@
 // no charge, what it is and what it becomes, and the button greyed with the reason beside it
 // until the extension is open and the floor beside the canteen is clear.
 //
+// Refit the canteen, the office and the hall: a card each for its levels, one after the other (v98,
+// v106, v113).
+//
 // Every figure on the page is the engine's (`src/engine/premises.ts`): the page holds none.
 
-import { CANTEEN_LEVELS, OFFICE_LEVELS, canteenLevelSpec, officeLevelSpec, secondExtensionOf } from '../engine/constants';
+import {
+  CANTEEN_LEVELS,
+  HALL_LEVEL_BUILT,
+  HALL_LEVEL_TOP,
+  OFFICE_LEVELS,
+  canteenLevelSpec,
+  hallLevelSpec,
+  officeLevelSpec,
+  secondExtensionOf,
+} from '../engine/constants';
 import { crewLimit } from '../engine/layout';
 import {
   type ExtensionTerms,
@@ -20,10 +32,13 @@ import {
   extendUnitCheck,
   extensionStatus,
   extensionTerms,
+  hallLevelOf,
   nextCanteenLevel,
+  nextHallLevel,
   nextOfficeLevel,
   officeLevelOf,
   refitCanteenCheck,
+  refitHallCheck,
   refitOfficeCheck,
   secondExtensionAreaM2,
 } from '../engine/premises';
@@ -292,6 +307,47 @@ function officeCard(state: GameState): string {
   );
 }
 
+/** The hall's card, under the office's: the next refit offered with its price and its painting's
+ *  words, the one being done, or the top level reached. One card for the art side's levels 2 to 6
+ *  of `HALL_LEVELS`, taken one after the other [PIOTR, 18.10: "5 koduj"] (v113). */
+function hallCard(state: GameState): string {
+  const level = hallLevelOf(state);
+  const refit = state.unit.hallRefit ?? null;
+  if (refit !== null) {
+    const spec = hallLevelSpec(refit.level);
+    return card(
+      'hall',
+      `Refit the hall: ${spec?.name ?? 'the next level'}`,
+      'Being refitted',
+      ' · paid for. The fitters are out in the morning.',
+      spec?.sentence ?? '',
+      '<span class="badge badge-held">Paid</span>',
+    );
+  }
+  const next = nextHallLevel(state);
+  if (next === null) {
+    const top = hallLevelSpec(level);
+    return card(
+      'hall',
+      `The hall: ${top?.name ?? 'the best there is'}`,
+      'Refitted',
+      ` · level ${level} of ${HALL_LEVEL_TOP}`,
+      top?.sentence ?? '',
+      DONE,
+    );
+  }
+  const check = refitHallCheck(state);
+  const now = level === HALL_LEVEL_BUILT ? 'The hall as it was built' : (hallLevelSpec(level)?.name ?? `Level ${level}`);
+  return card(
+    'hall',
+    `Refit the hall: ${next.name}`,
+    money(next.price),
+    ` · level ${next.level} of ${HALL_LEVEL_TOP}, ready the next morning. Today: ${now.toLowerCase()}.`,
+    `${next.sentence} Clients who walk the floor notice a better hall: a few points of reputation the morning it opens.`,
+    check.ok ? button('refitHall', 'Refit') : greyed('Refit', check.reason),
+  );
+}
+
 export function renderPremises(state: GameState): string {
   const unit = state.unit;
   return (
@@ -310,6 +366,9 @@ export function renderPremises(state: GameState): string {
     canteenRefitCard(state) +
     // The office's six refits, one after the other (v98).
     '<h3>Office</h3>' +
-    officeCard(state)
+    officeCard(state) +
+    // And the hall's, levels 2 to 6 (v113).
+    '<h3>Hall</h3>' +
+    hallCard(state)
   );
 }

@@ -54,8 +54,8 @@ describe('GameState', () => {
     // glass and day book, the hall made longer and the quiet weeks (CLAUDE.md T31 section 4). v93
     // is 45: more lines than one. v94 is 46: a line given its lane. v95 is 47: the hall made wider.
     // v96 is 48: one store for every material (CLAUDE.md T32 section 4). v107 is 51: a line's
-    // kind. v111 is 52: the yard laid out in its order.
-    expect(STATE_VERSION).toBe(52);
+    // kind. v111 is 52: the yard laid out in its order. v113 is 53: the hall's level.
+    expect(STATE_VERSION).toBe(53);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

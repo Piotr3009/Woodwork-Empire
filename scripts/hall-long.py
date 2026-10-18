@@ -39,12 +39,26 @@
 #   python3 scripts/hall-long.py        (needs Pillow and numpy)
 #   npm run sprites:manifest
 
+import sys
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
 SPRITES = Path(__file__).resolve().parent.parent / 'public' / 'sprites'
+
+# The hall's level (v113): today's hall is level 1 and its files keep their names; the art side's
+# levels 2 to 6 (P2) are cut from their own three layers into files named `<layer>.levelN.png`, so
+#
+#   python3 scripts/hall-long.py 3
+#
+# cuts level 3. With no level given, level 1, as it always was.
+LEVEL = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+
+
+def named(name):
+    """The file of a layer at the hall's level."""
+    return SPRITES / (f'{name}.png' if LEVEL == 1 else f'{name}.level{LEVEL}.png')
 
 # The projection of docs/art/SPRITES.md 9.8 on the 2x canvas: world (0, 0, 0) at 1080, 288.
 ORIGIN_X, ORIGIN_Y = 1080, 288
@@ -74,7 +88,7 @@ def cropped(image, alpha):
 
 
 def hall_long():
-    deep = Image.open(SPRITES / 'hallBackgroundDeep.png').convert('RGB')
+    deep = Image.open(named('hallBackgroundDeep')).convert('RGB')
     width, height = deep.size
     x = along(width, height)
 
@@ -101,13 +115,13 @@ def hall_long():
     if colours is None or len(colours) != 1 or colours[0][1] != flat_colour:
         raise SystemExit('the ground is not one colour: the picture asks for another cut')
 
-    piece.save(SPRITES / 'hallBackgroundLong.png', optimize=True)
-    end.save(SPRITES / 'hallBackgroundEnd.png', optimize=True)
-    ground.save(SPRITES / 'hallBackgroundGround.png', optimize=True)
+    piece.save(named('hallBackgroundLong'), optimize=True)
+    end.save(named('hallBackgroundEnd'), optimize=True)
+    ground.save(named('hallBackgroundGround'), optimize=True)
     return {
-        'hallBackgroundLong.png': (piece.size, piece_at),
-        'hallBackgroundEnd.png': (end.size, end_at),
-        'hallBackgroundGround.png': (ground.size, colours[0][1]),
+        named('hallBackgroundLong').name: (piece.size, piece_at),
+        named('hallBackgroundEnd').name: (end.size, end_at),
+        named('hallBackgroundGround').name: (ground.size, colours[0][1]),
     }
 
 

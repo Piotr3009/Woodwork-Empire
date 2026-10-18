@@ -254,8 +254,9 @@ describe('what turning does to the picture', () => {
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
     // One hundred and ten from v98: the two glass racks' turns (docs/art/SPRITES.md 17). One hundred
     // and sixteen from v108: the door line's six modules turned, the art side's P3
-    // (docs/art/pack-p3-1810/).
-    expect(turned).toHaveLength(116);
+    // (docs/art/pack-p3-1810/). One hundred and eighteen from v110: the glass shelter's and the
+    // large timber shelter's turns, P1 (docs/art/pack-p1-1810/).
+    expect(turned).toHaveLength(118);
     expect(turned.some((name) => name.includes('.work.sheet') || /\.stack\d\d/.test(name))).toBe(false);
     // Nor a vehicle's sheet or a line's pallet: the window pallet of Turn 31 (CLAUDE.md T31 2.10)
     // and the door pallet of v108, whose turns stay in their packs as nothing turns a pallet.

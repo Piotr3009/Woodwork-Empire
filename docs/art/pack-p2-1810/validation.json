@@ -1,0 +1,189 @@
+{
+  "pack": "P2",
+  "status": "PODGLAD_REQUIRES_REVIEW",
+  "producer": "material compositor",
+  "technicalChecksPassed": false,
+  "nativeAssetChecksPassed": true,
+  "reason": "Strict original-cutter seam-free requirement has documented conflicts. No claim of complete PASS is made. Independent QA report is authoritative.",
+  "levels": [
+    {
+      "level": 2,
+      "exteriorDiffPixels": 0,
+      "kerbDiffPixels": 0,
+      "insideHallPixelsEqualToGround": 0,
+      "yellowSourcePixelDiffCount": 0,
+      "officeAlphaDiffPixels": 0,
+      "canteenAlphaDiffPixels": 0,
+      "formatChecksPassed": true,
+      "differenceMasksVerified": true,
+      "controlPointsMaxDeviationPx": 0,
+      "controlPointEvidence": "Fixed native raster masks retain contour positions. Unchanged exterior, kerbs and room alpha supply direct pixel registration. Door relief is retained from source at identical indices. Hidden ideal world corners are not claimed as visible measurements; see independent QA point measurements.",
+      "registrationVerified": true,
+      "plinthHeightM": 0.6,
+      "wallPanelPeriodM": null,
+      "wallBlockSizeM": [
+        0.5,
+        0.25
+      ],
+      "floorJointPeriodM": 1.0,
+      "floorLighting": "constant, no source luminance inherited",
+      "largeHall": {
+        "canvasPx": [
+          3936,
+          2256
+        ],
+        "originalFourCuttersExecuted": true,
+        "seamFree": false,
+        "status": "REQUIRES_REVIEW",
+        "knownCutterLimitations": [
+          "half-metre floor joint phase in left clean strip"
+        ],
+        "independentQA": "reports/qa-P2.json"
+      }
+    },
+    {
+      "level": 3,
+      "exteriorDiffPixels": 0,
+      "kerbDiffPixels": 0,
+      "insideHallPixelsEqualToGround": 0,
+      "yellowSourcePixelDiffCount": 0,
+      "officeAlphaDiffPixels": 0,
+      "canteenAlphaDiffPixels": 0,
+      "formatChecksPassed": true,
+      "differenceMasksVerified": true,
+      "controlPointsMaxDeviationPx": 0,
+      "controlPointEvidence": "Fixed native raster masks retain contour positions. Unchanged exterior, kerbs and room alpha supply direct pixel registration. Door relief is retained from source at identical indices. Hidden ideal world corners are not claimed as visible measurements; see independent QA point measurements.",
+      "registrationVerified": true,
+      "plinthHeightM": 0.8,
+      "wallPanelPeriodM": null,
+      "wallBlockSizeM": [
+        0.5,
+        0.25
+      ],
+      "floorJointPeriodM": null,
+      "floorLighting": "constant, no source luminance inherited",
+      "largeHall": {
+        "canvasPx": [
+          3936,
+          2256
+        ],
+        "originalFourCuttersExecuted": true,
+        "seamFree": false,
+        "status": "REQUIRES_REVIEW",
+        "knownCutterLimitations": [
+          "mirror tone sample includes .8m plinth but left sample excludes it"
+        ],
+        "independentQA": "reports/qa-P2.json"
+      }
+    },
+    {
+      "level": 4,
+      "exteriorDiffPixels": 0,
+      "kerbDiffPixels": 0,
+      "insideHallPixelsEqualToGround": 0,
+      "yellowSourcePixelDiffCount": 0,
+      "officeAlphaDiffPixels": 0,
+      "canteenAlphaDiffPixels": 0,
+      "formatChecksPassed": true,
+      "differenceMasksVerified": true,
+      "controlPointsMaxDeviationPx": 0,
+      "controlPointEvidence": "Fixed native raster masks retain contour positions. Unchanged exterior, kerbs and room alpha supply direct pixel registration. Door relief is retained from source at identical indices. Hidden ideal world corners are not claimed as visible measurements; see independent QA point measurements.",
+      "registrationVerified": true,
+      "plinthHeightM": 0.5,
+      "wallPanelPeriodM": 1.0,
+      "wallBlockSizeM": null,
+      "floorJointPeriodM": null,
+      "floorLighting": "constant, no source luminance inherited",
+      "largeHall": {
+        "canvasPx": [
+          3936,
+          2256
+        ],
+        "originalFourCuttersExecuted": true,
+        "seamFree": null,
+        "status": "REQUIRES_REVIEW",
+        "knownCutterLimitations": [],
+        "independentQA": "reports/qa-P2.json"
+      }
+    },
+    {
+      "level": 5,
+      "exteriorDiffPixels": 0,
+      "kerbDiffPixels": 0,
+      "insideHallPixelsEqualToGround": 0,
+      "yellowSourcePixelDiffCount": 0,
+      "officeAlphaDiffPixels": 0,
+      "canteenAlphaDiffPixels": 0,
+      "formatChecksPassed": true,
+      "differenceMasksVerified": true,
+      "controlPointsMaxDeviationPx": 0,
+      "controlPointEvidence": "Fixed native raster masks retain contour positions. Unchanged exterior, kerbs and room alpha supply direct pixel registration. Door relief is retained from source at identical indices. Hidden ideal world corners are not claimed as visible measurements; see independent QA point measurements.",
+      "registrationVerified": true,
+      "plinthHeightM": 0.8,
+      "wallPanelPeriodM": 1.0,
+      "wallBlockSizeM": null,
+      "floorJointPeriodM": null,
+      "floorLighting": "constant, no source luminance inherited",
+      "largeHall": {
+        "canvasPx": [
+          3936,
+          2256
+        ],
+        "originalFourCuttersExecuted": true,
+        "seamFree": false,
+        "status": "REQUIRES_REVIEW",
+        "knownCutterLimitations": [
+          "mirror tone sample includes .8m plinth but left sample excludes it"
+        ],
+        "independentQA": "reports/qa-P2.json"
+      }
+    },
+    {
+      "level": 6,
+      "exteriorDiffPixels": 0,
+      "kerbDiffPixels": 0,
+      "insideHallPixelsEqualToGround": 0,
+      "yellowSourcePixelDiffCount": 0,
+      "officeAlphaDiffPixels": 0,
+      "canteenAlphaDiffPixels": 0,
+      "formatChecksPassed": true,
+      "differenceMasksVerified": true,
+      "controlPointsMaxDeviationPx": 0,
+      "controlPointEvidence": "Fixed native raster masks retain contour positions. Unchanged exterior, kerbs and room alpha supply direct pixel registration. Door relief is retained from source at identical indices. Hidden ideal world corners are not claimed as visible measurements; see independent QA point measurements.",
+      "registrationVerified": true,
+      "plinthHeightM": 0.8,
+      "wallPanelPeriodM": 1.0,
+      "wallBlockSizeM": null,
+      "floorJointPeriodM": null,
+      "floorLighting": "constant, no source luminance inherited",
+      "largeHall": {
+        "canvasPx": [
+          3936,
+          2256
+        ],
+        "originalFourCuttersExecuted": true,
+        "seamFree": false,
+        "status": "REQUIRES_REVIEW",
+        "knownCutterLimitations": [
+          "mirror tone sample includes .8m plinth but left sample excludes it"
+        ],
+        "independentQA": "reports/qa-P2.json"
+      }
+    }
+  ],
+  "independentQAReport": "reports/qa-P2.json",
+  "referenceSHA256": {
+    "reference/zalaczniki/Hala-6-poziomow-podglad.png": "b67c97ba76846cdcf7839bb7468e64d035b7a9e0b66d80677b54e06ece757e44",
+    "reference/zalaczniki/hall-deep.py": "b468953439c330afb22c0676ad10d35188cf52584f80a58a82c4867b188e9b52",
+    "reference/zalaczniki/hall-long.py": "2790abcb8dc814d7adbeab05866c42de81cea6ca5b4e6d160620eeee121d1fa1",
+    "reference/zalaczniki/hall-wide.py": "9f577d02eb748563804288dd3a4a8e929c48f642e8721eb6e38bea60c15ddb44",
+    "reference/zalaczniki/hall-wider.py": "cbf17f4acc31bcf620987dc8cff8e4f1f22e335e7a0145c5442449754ca0b313",
+    "reference/zalaczniki/hallBackground.png": "77904a4dc82711baeab3488b5bca9d0cd95406c0c19dd2136e246023b0dcec49",
+    "reference/zalaczniki/hallCanteen.png": "2bda53ede7fdce9e437f2e6b471a29b04651e0de937cf99120504ab54d4fb164",
+    "reference/zalaczniki/hallOffice.png": "1316e83245e1ffebb4a4779a2538935588ed93f60fdd019e0bc324f568988a42",
+    "reference/zamowienie-gpt-AGENCI.md": "f2ced256f6410bb353576b0cab9a1aebb1f8c0650036018023de9ab41f4f0438",
+    "reference/zamowienie-gpt-P2-hala-6-poziomow.md": "71ba82c52f5c74ea510fea1677aadd2dc136d8a54d24e0817d6102bd327099c8"
+  },
+  "independentQAStatus": "FAIL_ORIGINAL_CUTTER_CONFLICTS_ONLY",
+  "independentNativeAssetQAStatus": "PASS"
+}

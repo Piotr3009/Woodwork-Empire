@@ -1,0 +1,229 @@
+{
+  "assets": [
+    {
+      "file": "sprites-2x/hallBackground.level2.png",
+      "level": 2,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGB",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "09605576dde30d63216c4e2ec398c9a37541e4fa9198802bedadb2ce4e27a2b2"
+    },
+    {
+      "file": "sprites-2x/hallOffice.level2.png",
+      "level": 2,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "fb28dd1ba58b94a1460fe9f9f77cd8d1f7180175f0a25dbef9b4ae8b6aa47beb"
+    },
+    {
+      "file": "sprites-2x/hallCanteen.level2.png",
+      "level": 2,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "3229011ddd7706791d246e44da09118d857efabdc1e4f65bd1f920a26a75acf9"
+    },
+    {
+      "file": "sprites-2x/hallBackground.level3.png",
+      "level": 3,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGB",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "91e4b9e959186c02c9b6fec49e5c297dc989a2d144d991b1feb57cc66561ebdc"
+    },
+    {
+      "file": "sprites-2x/hallOffice.level3.png",
+      "level": 3,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "7023829b433c9fa26ccd2d5e11fe8ef7e9dc8aafe987aaa72afc7366aa1f540f"
+    },
+    {
+      "file": "sprites-2x/hallCanteen.level3.png",
+      "level": 3,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "7d18cb6f37fde8e7ae5b33b7eba34c1bac73a24070c59d854a5972f3898ad06e"
+    },
+    {
+      "file": "sprites-2x/hallBackground.level4.png",
+      "level": 4,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGB",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "d48db6b9e8cf122d93f0b06ea8aefffbd9c7576279a88d49fbdf8f674e1f88d7"
+    },
+    {
+      "file": "sprites-2x/hallOffice.level4.png",
+      "level": 4,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "3c36b511fed74f40f3e91ccaba146a93cc0e69745832eed01234f5a04b4eeadd"
+    },
+    {
+      "file": "sprites-2x/hallCanteen.level4.png",
+      "level": 4,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "6144e4e138c8180d1e2d4f7799c03853973cc464fcda315fc39959aecd235e73"
+    },
+    {
+      "file": "sprites-2x/hallBackground.level5.png",
+      "level": 5,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGB",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "47f8f348ddadbbd8ac4159a75207c1984c043b3a9fb1a46bcc1201a1a3d9ba47"
+    },
+    {
+      "file": "sprites-2x/hallOffice.level5.png",
+      "level": 5,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "aedafb3e8cc9245689f1a5e1336be46d9119b9d401b97d499d7096fa067d5eab"
+    },
+    {
+      "file": "sprites-2x/hallCanteen.level5.png",
+      "level": 5,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "7d14c9b2f0265c277cec72717b5fba97525072c936fb4e5b4ecfb98bf98017d0"
+    },
+    {
+      "file": "sprites-2x/hallBackground.level6.png",
+      "level": 6,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGB",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "cd3a15d0d7c19b3dd8b5106cc2438e3f1c554b313e935c8bc4bf1f645f42cb5b"
+    },
+    {
+      "file": "sprites-2x/hallOffice.level6.png",
+      "level": 6,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "07baa7be553339c624d03ae3148d11ca2fba0d3005b9110dd5c8aa057b1eb9e3"
+    },
+    {
+      "file": "sprites-2x/hallCanteen.level6.png",
+      "level": 6,
+      "canvasPx": [
+        1680,
+        1128
+      ],
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "originPx": [
+        600,
+        288
+      ],
+      "sha256": "a70125c8973ab1f1f28e836948d71765a8f3e6e56fc67b406548f9519e9a1c44"
+    }
+  ]
+}

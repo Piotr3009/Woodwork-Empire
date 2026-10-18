@@ -216,8 +216,9 @@ describe('the file on disk and the footprint in the engine', () => {
     // the line's six modules of Turn 30, 3 m high, the sixth new (CLAUDE.md T30 2.2); the loop names
     // a class's picture exactly, so a work sheet or a stack overlay is never one of them. A hundred
     // and thirteen from v98: the two glass racks of G1 (docs/art/SPRITES.md 17). A hundred and
-    // nineteen from v108: the door line's six modules of P3, on the window modules' canvas.
-    expect(checked).toBe(119);
+    // nineteen from v108: the door line's six modules of P3, on the window modules' canvas. A hundred
+    // and twenty one from v110: the glass shelter and the large timber shelter of P1.
+    expect(checked).toBe(121);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }
@@ -262,8 +263,8 @@ describe('the file on disk and the footprint in the engine', () => {
     // from v98: the two glass racks' turns (docs/art/SPRITES.md 17). One hundred and sixteen from
     // v108: the door line's six modules turned (P3; its pallet's turn stays in the pack, as the
     // window pallet's does); and twelve work sheets and twenty stack overlays, the door line's
-    // beside the window line's.
-    expect(turnedFiles).toHaveLength(116);
+    // beside the window line's. One hundred and eighteen from v110: the two shelters' turns (P1).
+    expect(turnedFiles).toHaveLength(118);
     const sheets = spriteFiles().filter((name) => name.endsWith('.work.sheet.png'));
     const overlays = spriteFiles().filter((name) => /\.stack\d\d\.png$/.test(name));
     expect(sheets).toHaveLength(12);

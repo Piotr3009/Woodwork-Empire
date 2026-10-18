@@ -1583,6 +1583,16 @@ function liftToVersion52(state: Raw): void {
   state.version = 52;
 }
 
+/** v113 (PIOTR, 18.10: the hall's six levels): the hall of an older save is the hall as it was
+ *  built, level 1, with no fitters in. */
+function liftToVersion53(state: Raw): void {
+  if (isRecord(state.unit)) {
+    if (typeof state.unit.hallLevel !== 'number') state.unit.hallLevel = 1;
+    if (!isRecord(state.unit.hallRefit)) state.unit.hallRefit = null;
+  }
+  state.version = 53;
+}
+
 /** The whole state step of the lift to 48: a window whose glass was in and whose Glazing had begun,
  *  its current stage the Glazing, has its glass in the window, used and off the counter (CLAUDE.md
  *  T32 section 4); one past production had it set so by the raw lift. Every other window keeps it
@@ -1646,6 +1656,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   49: liftToVersion50,
   50: liftToVersion51,
   51: liftToVersion52,
+  52: liftToVersion53,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

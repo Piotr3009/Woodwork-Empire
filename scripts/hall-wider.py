@@ -41,12 +41,26 @@
 #   python3 scripts/hall-wider.py       (needs Pillow and numpy)
 #   npm run sprites:manifest
 
+import sys
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
 SPRITES = Path(__file__).resolve().parent.parent / 'public' / 'sprites'
+
+# The hall's level (v113): today's hall is level 1 and its files keep their names; the art side's
+# levels 2 to 6 (P2) are cut from their own three layers into files named `<layer>.levelN.png`, so
+#
+#   python3 scripts/hall-wider.py 3
+#
+# cuts level 3. With no level given, level 1, as it always was.
+LEVEL = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+
+
+def named(name):
+    """The file of a layer at the hall's level."""
+    return SPRITES / (f'{name}.png' if LEVEL == 1 else f'{name}.level{LEVEL}.png')
 
 # The projection of docs/art/SPRITES.md 9.8 on the 2x canvas: world (0, 0, 0) at 1080, 288.
 ORIGIN_X, ORIGIN_Y = 1080, 288
@@ -84,7 +98,7 @@ def cropped(image, alpha):
 
 
 def hall_wider():
-    deep = Image.open(SPRITES / 'hallBackgroundDeep.png').convert('RGB')
+    deep = Image.open(named('hallBackgroundDeep')).convert('RGB')
     width, height = deep.size
     along, across = floor_of(width, height)
     flat_colour = deep.getpixel((width - 1, 0))
@@ -104,18 +118,18 @@ def hall_wider():
         return np.where(mask, np.rint(value * 255), 0).astype(np.uint8)
 
     pieces = {
-        'hallBackgroundWider.png': alpha(band & short_of_the_end, band_ramp),
-        'hallBackgroundWiderFront.png': alpha(front & short_of_the_end, front_ramp),
-        'hallBackgroundLongWider.png': alpha(band & short_of_the_end, np.minimum(band_ramp, long_ramp)),
-        'hallBackgroundLongWiderFront.png': alpha(front & short_of_the_end, np.minimum(front_ramp, long_ramp)),
-        'hallBackgroundEndWider.png': alpha(band, np.minimum(band_ramp, end_ramp)),
-        'hallBackgroundEndWiderFront.png': alpha(front, np.minimum(front_ramp, end_ramp)),
+        'hallBackgroundWider': alpha(band & short_of_the_end, band_ramp),
+        'hallBackgroundWiderFront': alpha(front & short_of_the_end, front_ramp),
+        'hallBackgroundLongWider': alpha(band & short_of_the_end, np.minimum(band_ramp, long_ramp)),
+        'hallBackgroundLongWiderFront': alpha(front & short_of_the_end, np.minimum(front_ramp, long_ramp)),
+        'hallBackgroundEndWider': alpha(band, np.minimum(band_ramp, end_ramp)),
+        'hallBackgroundEndWiderFront': alpha(front, np.minimum(front_ramp, end_ramp)),
     }
     made = {}
     for name, mask in pieces.items():
         piece, at = cropped(deep, mask)
-        piece.save(SPRITES / name, optimize=True)
-        made[name] = (piece.size, at)
+        piece.save(named(name), optimize=True)
+        made[named(name).name] = (piece.size, at)
     return made
 
 

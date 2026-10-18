@@ -234,12 +234,16 @@ import type {
  *
  *  Bumped in v111: the yard behind the hall is laid out in its standing order (PIOTR, 18.10:
  *  "arrange those shelters"), and an older save's yard is laid out so when it opens. Every v12 to
- *  v51 save loads. */
-export const STATE_VERSION = 52;
+ *  v51 save loads.
+ *
+ *  Bumped in v113: the unit carries the hall's level and the refit being done (PIOTR, 18.10: the
+ *  art side's six levels of the hall), and every older hall is the hall as it was built, level 1.
+ *  Every v12 to v52 save loads. */
+export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v112';
+export const APP_VERSION = 'v113';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -641,6 +645,78 @@ export function officeLevelSpec(level: number): OfficeLevelSpec | null {
 /** The sprite key of a level's picture: the file in public/sprites. */
 export function officeLevelSprite(level: number): string {
   return `officeLevel${level}`;
+}
+
+/** [PIOTR, 18.10: the art side's six levels of the hall, "hala ok"; then "5 koduj" to chat's five
+ *  points: a card on the Premises page, the levels one after the other and ready the next morning,
+ *  these prices, two points of reputation each, these names] One refit of the hall: a level, its
+ *  name on the Premises page, its price, what its card says and the reputation it earns the
+ *  morning it opens. Level 1 is the hall as it was built, today's three layers, and is never
+ *  bought; levels 2 to 6 are the art side's P2, each painted as the three layers
+ *  `hallBackground.levelN.png`, `hallOffice.levelN.png` and `hallCanteen.levelN.png` on the hall's
+ *  own canvas, and every bigger hall cut from them by the game's own scripts
+ *  (`scripts/hall-*.py N`; docs/art/SPRITES.md 21) [TUNE: chat: the sentences] (v113). */
+export interface HallLevelSpec {
+  level: number;
+  name: string;
+  price: number;
+  sentence: string;
+  /** Reputation asked for the morning it opens, booked at the gain factor as every gain is. */
+  reputation: number;
+}
+
+export const HALL_LEVELS: readonly HallLevelSpec[] = [
+  {
+    level: 2,
+    name: 'A proper joinery',
+    price: 50000,
+    sentence: 'Clean grey concrete jointed every metre, fresh cream blockwork and a graphite plinth round the walls and the blocks.',
+    reputation: 2,
+  },
+  {
+    level: 3,
+    name: 'A growing firm',
+    price: 150000,
+    sentence: 'A light grey resin floor, off white blockwork and a sage green plinth: a brighter shop that clients walk through.',
+    reputation: 2,
+  },
+  {
+    level: 4,
+    name: 'A big works',
+    price: 400000,
+    sentence: 'Grey resin under white wall panels, an anthracite plinth and dark green frames round the shutter and the doors.',
+    reputation: 2,
+  },
+  {
+    level: 5,
+    name: 'A factory',
+    price: 1000000,
+    sentence: 'Light polished concrete, white panels, a dark green plinth, brushed aluminium on the copings and a warm strip of light under them.',
+    reputation: 2,
+  },
+  {
+    level: 6,
+    name: 'The empire',
+    price: 2500000,
+    sentence: 'A light terrazzo floor, white panels, dark green doors and shutter and the warm light along both walls: the works of a joinery empire.',
+    reputation: 2,
+  },
+];
+
+/** The level of the hall as it was built, and the top one. */
+export const HALL_LEVEL_BUILT = 1;
+export const HALL_LEVEL_TOP = 6;
+
+/** The refit of this level, or null for a level there is none of. */
+export function hallLevelSpec(level: number): HallLevelSpec | null {
+  return HALL_LEVELS.find((spec) => spec.level === level) ?? null;
+}
+
+/** The tier a hall level's layers are named with, `level3` for `hallBackground.level3.png`, or
+ *  null for the hall as it was built, whose files keep their names; a layer with no file of its
+ *  level is drawn from today's (the ground round the hall is one and the same at every level). */
+export function hallLevelTier(level: number): string | null {
+  return level > HALL_LEVEL_BUILT ? `level${level}` : null;
 }
 
 /** The systems that take the dust away by duct and pay the waste man instead of filling bags.

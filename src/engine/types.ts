@@ -561,6 +561,11 @@ export interface UnitState {
    *  next morning (PIOTR, 18.10; v106). */
   canteenLevel: number;
   canteenRefit: { level: number } | null;
+  /** The hall's level, 1 for the hall as it was built and 2 to 6 for the art side's levels of
+   *  `HALL_LEVELS`, and the refit paid for and being done, open the next morning (PIOTR, 18.10;
+   *  v113). */
+  hallLevel: number;
+  hallRefit: { level: number } | null;
 }
 
 export interface Worker {
@@ -1051,6 +1056,7 @@ export type GameEventKind =
   | 'unitExtended'
   | 'officeRefitted'
   | 'canteenRefitted'
+  | 'hallRefitted'
   /** The first working day of December: the taxman comes on the 30th (CLAUDE.md T27 2.3). */
   | 'taxComing'
   /** The open of 30 December took a quarter of the account (CLAUDE.md T27 2.2). */
@@ -1766,6 +1772,7 @@ export type GameAction =
   | { type: 'ENLARGE_CANTEEN' }
   | { type: 'REFIT_OFFICE' }
   | { type: 'REFIT_CANTEEN' }
+  | { type: 'REFIT_HALL' }
   /** A store behind the rear wall made twice its room where it stands (v105). */
   | { type: 'EXPAND_STORE'; equipmentId: string }
   /** A machine at the end of its life replaced by a new one of its class, in its place (v105). */

@@ -9,7 +9,8 @@
 
 // v103: the large timber shelter [PIOTR, 17.10: "a mega timber shelter outside for 500k, for 3,000
 // timber, like the one for glass"]: 3,000 boards behind the rear wall, counted with the timber
-// stores, standing in for a timber store on the board, drawn as kit with no picture for now.
+// stores, standing in for a timber store on the board, drawn as kit with no picture until the art
+// side drew it (its picture from v110, P1).
 
 import { describe, expect, it } from 'vitest';
 import { missingEquipment, template } from '../../src/engine/catalog';
