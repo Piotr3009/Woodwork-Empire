@@ -35,6 +35,7 @@
 //       with the line than without; a company in the 400 m² unit is never offered one and its
 //       seeded offer is what it was on v83.
 
+import { lineNoRoom } from '../../src/engine/layout';
 import { describe, expect, it } from 'vitest';
 import {
   CNC5_STAGE_FACTOR,
@@ -377,7 +378,7 @@ describe('(zz) the production line, bought and run (CLAUDE.md T29 2.8 to 2.10; f
   const landed = state;
 
   it('is refused with the rack on its first cells and no seven metres elsewhere, refused half shifted, and ordered whole once the rack is moved', () => {
-    expect(withTheRack).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
+    expect(withTheRack).toEqual({ ok: false, reason: lineNoRoom('window') });
     expect(halfShifted).toEqual({ ok: false, reason: 'The kit is half shifted. Finish the move first' });
     expect(ordered.cash).toBe(10000000);
     expect(orders.map((item) => [item.specId, item.anchorX, item.anchorY])).toEqual(

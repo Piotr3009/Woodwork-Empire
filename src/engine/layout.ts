@@ -44,7 +44,6 @@ import {
 } from './machines';
 import { reservedItems } from './orders';
 import { pinned } from './pinned';
-import { metresBy } from './text';
 import { standsOutsideTheHall } from './walk';
 import type { Equipment, GameState, LineKind, OnOrderItem, Orientation } from './types';
 
@@ -705,6 +704,69 @@ export function lineSite(state: GameState, kind: LineKind): { x: number; y: numb
   return null;
 }
 
+/** Where a line of a kind would best go when the hall has no site for it: the place whose block
+ *  (`lineGround`) has the fewest things in it, counting every item standing or on order in the
+ *  block and every other line whose modules, metres or lane the block would take, the row nearer
+ *  the rear wall first among equals; with what stands in the way, by item id and by line. `fits`
+ *  is true at a clear place, which is then `lineSite`'s own. Null when the block does not go into
+ *  the hall at all (v119) [PIOTR, 19.10: the player is shown, not told to guess]. */
+export function bestLineSite(
+  state: GameState,
+  kind: LineKind,
+): { at: { x: number; y: number }; fits: boolean; items: string[]; lines: number[] } | null {
+  const site = lineSite(state, kind);
+  if (site !== null) return { at: site, fits: true, items: [], lines: [] };
+  const depth = state.unit.depthCells;
+  // Everything standing or held, by the rows it stands on, so a block asks only of the rows it
+  // covers: on a 210 by 69 m hall with 370 things the whole scan is a few hundred milliseconds,
+  // once a click and kept until something moves (`src/render/roomFor.ts`).
+  const things = [...hallItems(state), ...reservedItems(state)].map((item) => ({
+    id: item.id,
+    box: boxOfItem(item, item.anchorX, item.anchorY),
+  }));
+  const byRow: Array<Array<{ id: string; box: Box }>> = Array.from({ length: depth }, () => []);
+  for (const thing of things) {
+    for (let y = Math.max(0, thing.box.y); y < Math.min(depth, thing.box.y + thing.box.depth); y += 1) byRow[y]?.push(thing);
+  }
+  const grounds = claimedGround(state);
+  const rooms = roomsOf(state.unit).map((room) => ({ x: room.x, y: room.y, width: room.width, depth: room.depth }));
+  const gate = gateLane();
+  const size = lineBox({ x: 0, y: 0 }, kind);
+  const gateKind = LINE_KINDS[kind].collection === 'gate';
+  let best: { at: { x: number; y: number }; items: string[]; lines: number[]; score: number } | null = null;
+  for (let y = 0; y + size.depth <= depth; y += 1) {
+    for (let x = 0; x + size.width <= state.unit.widthCells; x += 1) {
+      const ground = lineGround(state, { x, y }, kind);
+      if (ground === null) continue;
+      // A forklift's lane may lie on the way to the gate or over its own line; a house factory's,
+      // along the line in front of it, never does.
+      if (gateKind && laneTrouble(state, { x, y }, kind) !== null) continue;
+      const own = [ground.line, ground.path, ...(ground.behind === null ? [] : [ground.behind])];
+      const strips = stripsOf(ground);
+      const all = [...own, ...strips];
+      // The rooms and the way to the gate never move: a block over them is no place at all.
+      if (all.some((box) => rooms.some((room) => overlaps(box, room)) || overlaps(box, gate))) continue;
+      const top = Math.min(...all.map((box) => box.y));
+      const bottom = Math.max(...all.map((box) => box.y + box.depth));
+      const items: string[] = [];
+      for (let row = top; row < bottom; row += 1) {
+        for (const thing of byRow[row] ?? []) {
+          if (items.includes(thing.id)) continue;
+          if (all.some((box) => overlaps(box, thing.box))) items.push(thing.id);
+        }
+      }
+      const lines: number[] = [];
+      for (const other of grounds) {
+        const taken = own.some((box) => overlaps(box, other.box)) || (!isLaneGround(other.kind) && strips.some((strip) => overlaps(strip, other.box)));
+        if (taken && !lines.includes(other.line)) lines.push(other.line);
+      }
+      const score = items.length + lines.length * 10;
+      if (best === null || score < best.score) best = { at: { x, y }, items, lines, score };
+    }
+  }
+  return best === null ? null : { at: best.at, fits: false, items: best.items, lines: best.lines };
+}
+
 /** The outline of something on order, which setup mode drags about like a machine. */
 export function reservationById(state: GameState, itemId: string): OnOrderItem | null {
   return reservedItems(state).find((entry) => entry.id === itemId) ?? null;
@@ -712,17 +774,45 @@ export function reservationById(state: GameState, itemId: string): OnOrderItem |
 
 /** The line's two refusals in setup mode [TUNE: chat]: it is never turned, its conveyor running one
  *  way and its turned pictures being the other turn, and it goes only where the whole of it has a
- *  clear 36 m by 3 m (CLAUDE.md T30 2.4). */
+ *  clear 36 m by 3 m (CLAUDE.md T30 2.4). From v119 the refusal says the whole block, in metres,
+ *  and where its lane runs [PIOTR, 19.10: "the player cannot be a clairvoyant"]. */
 export const LINE_NEVER_TURNED = 'The line is never turned';
+
+/** The block a line of a kind takes with its ground, in words: `84 m by 22 m` (v119). */
+export function lineBlockWords(kind: LineKind): string {
+  const box = lineBox({ x: 0, y: 0 }, kind);
+  return `${box.width} m by ${lineDepthCells(kind)} m`;
+}
+
+/** What the block is made of, in words, for the refusals: the modules, the metres and the lane,
+ *  and where the lane runs (v119). The wall is named by its gate, never by a side [PIOTR, 19.10:
+ *  "write that it has to be the wall with the exit gate; left for me is the one on my side"]. */
+export function lineBlockExplained(kind: LineKind): string {
+  const spec = LINE_KINDS[kind];
+  const box = lineBox({ x: 0, y: 0 }, kind);
+  const lane =
+    spec.collection === 'lane'
+      ? `its ${spec.laneCells} m lane in front, which the lanes of other lines may cross`
+      : `its ${spec.laneCells} m lane running from the wall with the exit gate to its end`;
+  return `its ${lineModulesOf(kind).length} modules on ${box.width} m by ${box.depth} m, a metre before and behind, and ${lane}`;
+}
+
 export function lineNeedsRoom(kind: LineKind): string {
-  return `The line needs a clear ${metresBy(lineBox({ x: 0, y: 0 }, kind))}, its lane and a metre each side`;
+  return `The line needs a clear ${lineBlockWords(kind)}: ${lineBlockExplained(kind)}`;
 }
 /** The move's refusal where another line's ground is: two lines never stand in one another's way
  *  (v93) [TUNE]. */
 export const LINE_IN_THE_WAY = 'That is in another line\'s way';
 
-/** The order's refusal for want of floor: the line and its ground (CLAUDE.md T31 2.6) [TUNE]. */
+/** The order's refusal for want of floor: the line and its ground (CLAUDE.md T31 2.6) [TUNE]. From
+ *  v119 it says the block and sends the player to Set up hall, where `Room for` draws it. */
 export const LINE_NO_ROOM = 'No room in the hall for the line and its lane';
+export function lineNoRoom(kind: LineKind): string {
+  return (
+    `${LINE_NO_ROOM}: it needs a clear ${lineBlockWords(kind)} (${lineBlockExplained(kind)}). ` +
+    `Open Set up hall and press Room for: ${LINE_KINDS[kind].name} to see where it would go and what stands in the way`
+  );
+}
 
 /** The ids of a whole line as it stands this minute: its modules on the floor, or its outlines on
  *  order. They move together and never stand in one another's way (CLAUDE.md T30 2.4; v93: the

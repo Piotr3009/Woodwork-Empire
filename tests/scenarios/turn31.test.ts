@@ -48,7 +48,7 @@ import { isOvertime, isWorkingDay } from '../../src/engine/clock';
 import { CONTRACT_CUT_SALT, CONTRACT_LOSS_SALT, contractSideCarrier } from '../../src/engine/contracts';
 import { standingPowerPerDay } from '../../src/engine/economy';
 import { monthlyPremiums } from '../../src/engine/insurance';
-import { canPlace, canPlaceSpec, canteenLockers, crewLimit } from '../../src/engine/layout';
+import { canPlace, canPlaceSpec, canteenLockers, crewLimit, lineNeedsRoom } from '../../src/engine/layout';
 import { lineBooks } from '../../src/engine/lineBooks';
 import { lineMaterialPerWindow, lineShortOf, lineWindowsAWeek } from '../../src/engine/lineContract';
 import { restockCheck, restockSplit, stockOnItem } from '../../src/engine/materials';
@@ -423,7 +423,7 @@ describe('(jjj) the line s lane (CLAUDE.md T31 2.6)', () => {
     expect(warnings(opened).find((warning) => warning.key === 'laneBlocked')?.text).toBe("Kit stands in line 1's way: the workbench");
     // From v93 a line's lane is its own, two metres in front of its engineers' metre: the bench at
     // y 18 is on the lane of the line's place at y 14 and of its place at y 13, not of y 11's.
-    expect(canPlace(opened, 'kit-line-1', 2, 13)).toEqual({ ok: false, reason: 'The line needs a clear 36 m by 3 m, its lane and a metre each side' });
+    expect(canPlace(opened, 'kit-line-1', 2, 13)).toEqual({ ok: false, reason: lineNeedsRoom('window') });
     const refused = act(opened, { type: 'MOVE_ITEM', itemId: 'kit-line-1', x: 2, y: 13 });
     expect(refused.equipment.find((item) => item.id === 'kit-line-1')?.anchorY).toBe(14);
     const cleared = act(opened, { type: 'MOVE_ITEM', itemId: 'kit-bench-on-the-lane', x: 24, y: 6 });

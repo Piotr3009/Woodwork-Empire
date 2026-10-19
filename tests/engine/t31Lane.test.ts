@@ -21,7 +21,7 @@ import { describe, expect, it } from 'vitest';
 import { LINE_MODULES, WINDOW_LINE_ORIGIN } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { canBuy, placeEquipmentOrder } from '../../src/engine/game';
-import { canBeMoved, canPlace, canPlaceSpec, firstFreeCell, forkliftLane, lineLanes } from '../../src/engine/layout';
+import { canBeMoved, canPlace, canPlaceSpec, firstFreeCell, forkliftLane, lineLanes, lineNeedsRoom, lineNoRoom } from '../../src/engine/layout';
 import { findSpec } from '../../src/engine/machines';
 import { ownedTile } from '../../src/ui/catalogue';
 import { isFree } from '../../src/engine/walk';
@@ -142,17 +142,17 @@ describe('the line s place asks for it (CLAUDE.md T31 2.6)', () => {
     // A rack in every row the line could stand in: nowhere at all.
     const full = bigUnit();
     for (let y = 5; y < 18; y += 2) placeEquipment(full, 'sheetRack', { variantId: 'standard', x: 20, y, id: `kit-rack-${y}` });
-    expect(canBuy(full, 'windowLine1')).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
+    expect(canBuy(full, 'windowLine1')).toEqual({ ok: false, reason: lineNoRoom('window') });
   });
 
   it('is refused in setup mode onto a place whose lane is blocked or cannot be, and moves where it is clear', () => {
     const state = withLine(bigUnit());
-    expect(canPlace(state, 'kit-line-1', 2, 15)).toEqual({ ok: false, reason: 'The line needs a clear 36 m by 3 m, its lane and a metre each side' });
+    expect(canPlace(state, 'kit-line-1', 2, 15)).toEqual({ ok: false, reason: lineNeedsRoom('window') });
     expect(canPlace(state, 'kit-line-1', 2, 11)).toEqual({ ok: true, reason: '' });
     // A rack stood by a save where the lane of another place would be: the line may not move to a
     // place whose lane it is on.
     placeEquipment(state, 'sheetRack', { variantId: 'standard', x: 20, y: 11, id: 'kit-rack-on-the-lane' });
-    expect(canPlace(state, 'kit-line-1', 2, 8)).toEqual({ ok: false, reason: 'The line needs a clear 36 m by 3 m, its lane and a metre each side' });
+    expect(canPlace(state, 'kit-line-1', 2, 8)).toEqual({ ok: false, reason: lineNeedsRoom('window') });
     const refused = act(state, { type: 'MOVE_ITEM', itemId: 'kit-line-1', x: 2, y: 8 });
     expect(refused.equipment.find((item) => item.id === 'kit-line-1')?.anchorY).toBe(14);
   });

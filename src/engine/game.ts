@@ -29,6 +29,7 @@ import {
   JOINERY_CORE_PRICE_YEARLY,
   LABOURER_CLEAN_WEEKDAY,
   LAPTOP_BOOT_MINUTES,
+  LINE_MODULE_MOVE_MINUTES,
   MOVE_MINUTES_PER_ITEM,
   OVERTIME_DEBT_PER_DAY,
   OWNER_DRAW_TIERS,
@@ -85,7 +86,7 @@ import {
   lockerSlots,
   lockersInWords,
   moveItem,
-  LINE_NO_ROOM,
+  lineNoRoom,
   lineGroup,
   lineModuleCell,
   lineSite,
@@ -1501,7 +1502,7 @@ function endSetup(state: GameState, speed: Speed): void {
     title: 'Moving the hall',
     body:
       `Moving ${plural(heavy.length, 'machine', 'machines')} takes ` +
-      `${hoursText(heavy.length * MOVE_MINUTES_PER_ITEM)}${bill}. Do it?`,
+      `${hoursText(moveMinutesOf(state, heavy))}${bill}. Do it?`,
     choices: [
       { id: 'do', label: 'Do it' },
       { id: 'back', label: 'Put them back' },
@@ -1510,15 +1511,25 @@ function endSetup(state: GameState, speed: Speed): void {
   });
 }
 
-/** Do it: the move is a job of work in the hall, an hour an item, and the clock is run through it
- *  so the player sees the day advance rather than a frozen screen (CLAUDE.md T8 3.4). */
+/** What moving these items takes: an hour a machine or a bench, half an hour a module of a line,
+ *  so a whole line is three hours (PIOTR, 19.10; v119). */
+export function moveMinutesOf(state: GameState, moved: readonly { itemId: string }[]): number {
+  return moved.reduce((total, { itemId }) => {
+    const item = state.equipment.find((entry) => entry.id === itemId);
+    return total + (item !== undefined && isLineModule(item.specId) ? LINE_MODULE_MOVE_MINUTES : MOVE_MINUTES_PER_ITEM);
+  }, 0);
+}
+
+/** Do it: the move is a job of work in the hall, an hour an item and half an hour a line's module,
+ *  and the clock is run through it so the player sees the day advance rather than a frozen screen
+ *  (CLAUDE.md T8 3.4). */
 function startTheMove(state: GameState): void {
   if (state.movedItems.length === 0) return;
   if (movePending(state) !== null) return;
   const task = createTask(state, {
     kind: 'moveMachines',
     label: `Moving machines: ${plural(state.movedItems.length, 'item', 'items')}`,
-    minutes: state.movedItems.length * MOVE_MINUTES_PER_ITEM,
+    minutes: moveMinutesOf(state, state.movedItems),
   });
   // The owner moved the kit, so the owner shifts it, whatever else he was holding. A joiner or
   // the labourer can be sent instead while the owner is not in.
@@ -2871,7 +2882,7 @@ export function canBuy(
 function lineBuyCheck(state: GameState, prepaid: boolean, kind: LineKind): BuyCheck {
   if (!prepaid && !canAfford(state, linePriceOf(kind))) return { ok: false, reason: 'Not enough cash' };
   if (state.movedItems.length > 0) return { ok: false, reason: 'The kit is half shifted. Finish the move first' };
-  if (lineSite(state, kind) === null) return { ok: false, reason: LINE_NO_ROOM };
+  if (lineSite(state, kind) === null) return { ok: false, reason: lineNoRoom(kind) };
   return OK;
 }
 
@@ -2975,7 +2986,7 @@ export function buyEquipment(
   const kind = moduleKind(specId);
   if (kind !== null) {
     const site = lineSite(state, kind);
-    if (site === null) return { ok: false, reason: LINE_NO_ROOM };
+    if (site === null) return { ok: false, reason: lineNoRoom(kind) };
     const line = nextLineNumber(state);
     if (!prepaid) pay(state, 'equipment', `${LINE_KINDS[kind].name}, ${lineName(line).toLowerCase()}`, linePriceOf(kind));
     for (const id of lineModulesOf(kind)) standItem(state, id, STANDARD_VARIANT, lineModuleCell(site, id), true, line);
@@ -3146,7 +3157,7 @@ export function placeEquipmentOrder(
  *  no module's order is called off (CLAUDE.md T30 2.3.4) [TUNE: chat: the words]. */
 function placeLineOrder(state: GameState, kind: LineKind): BuyCheck {
   const site = lineSite(state, kind);
-  if (site === null) return { ok: false, reason: LINE_NO_ROOM };
+  if (site === null) return { ok: false, reason: lineNoRoom(kind) };
   // Under the next number, which its six outlines carry and its record is written for, with its
   // kind (v93; v107).
   const line = nextLineNumber(state);

@@ -35,7 +35,7 @@ import { lockReasonFor, template } from '../../src/engine/catalog';
 import { buyEquipment, cancelOrder, canBuy, canSell, placeEquipmentOrder, sellMachine } from '../../src/engine/game';
 import { insuredValue, propertyPremiumYearly } from '../../src/engine/insurance';
 import { stagedJob } from '../../src/engine/jobs';
-import { canPlace, lineFits } from '../../src/engine/layout';
+import { canPlace, lineFits, lineNoRoom } from '../../src/engine/layout';
 import {
   findSpec,
   hallPace,
@@ -201,7 +201,7 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     // A second line is bought as the first was, for the same price, wherever the hall has seven
     // metres for it (PIOTR, 12.10; v93): this hall has none behind the first, its kit in the way.
     state.cash = 12000000;
-    expect(canBuy(state, 'windowLine1')).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
+    expect(canBuy(state, 'windowLine1')).toEqual({ ok: false, reason: lineNoRoom('window') });
     const poor = bigUnit();
     poor.cash = 1000;
     expect(canBuy(poor, 'windowLine1')).toEqual({ ok: false, reason: 'Not enough cash' });
@@ -214,7 +214,7 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
       placeEquipment(full, 'planer', { variantId: 'standard', x: 18, y, id: `kit-wall-${y}` });
     }
     // From Turn 31 the line's lane is asked with it (CLAUDE.md T31 2.6).
-    expect(canBuy(full, 'windowLine1')).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
+    expect(canBuy(full, 'windowLine1')).toEqual({ ok: false, reason: lineNoRoom('window') });
     // And in that order when more than one fails.
     const poorAndSmall = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     poorAndSmall.cash = 1000;
@@ -592,7 +592,7 @@ describe('the line s card and the sheets that list machines (CLAUDE.md T30 2.3.3
     expect(card(ordered).querySelector('[data-do="buyEquipment"]')).toBeNull();
     const standing = withLine(bigUnit(), 6);
     // The next line is offered as the first was, and this hall has no room for it (v93).
-    expect(card(standing).querySelector('.lock')?.textContent).toBe('No room in the hall for the line and its lane');
+    expect(card(standing).querySelector('.lock')?.textContent).toBe(lineNoRoom('window'));
     expect(card(standing).querySelector('.badge-owned')).not.toBeNull();
   });
 

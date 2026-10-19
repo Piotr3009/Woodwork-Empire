@@ -217,10 +217,11 @@ describe('the sixth chip', () => {
 
 describe('the speed the game takes the clock to', () => {
   it('is the fastest chip there is, and it hands it back afterwards', () => {
-    expect(SKIP_SPEED).toBe(10);
+    // 10 until v119 (PIOTR, 19.10: "let the clock run at 100"): the fastest chip there is.
+    expect(SKIP_SPEED).toBe(100);
     let out = act(measuring(), { type: 'SET_SPEED', speed: 1 });
     out = act(out, { type: 'SKIP_AHEAD' });
-    expect(out.speed).toBe(10);
+    expect(out.speed).toBe(100);
     expect(skippedTask(out)?.kind).toBe('siteMeasure');
     out = clearEvents(runClock(out, SITE_MEASURE_MINUTES));
     expect(skippedTask(out)).toBeNull();

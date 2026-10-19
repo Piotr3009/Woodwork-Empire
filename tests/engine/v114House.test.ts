@@ -33,7 +33,7 @@ import {
 import type { GameState, Worker } from '../../src/engine/index';
 import { addWorkingDays, isWorkingDay } from '../../src/engine/clock';
 import { canBuy, placeEquipmentOrder } from '../../src/engine/game';
-import { canPlaceSpec, forkliftLane, lineBox, lineDepthCells, lineGround, lineSite } from '../../src/engine/layout';
+import { canPlaceSpec, forkliftLane, lineBox, lineDepthCells, lineGround, lineNoRoom, lineSite } from '../../src/engine/layout';
 import {
   answerLineOffer,
   lineOfferBody,
@@ -176,7 +176,7 @@ describe('where it stands (v114)', () => {
     const opened = nextDay(act(nextDay(act(small, { type: 'EXTEND_UNIT' })), { type: 'EXTEND_UNIT', stage: 'second' }));
     opened.cash = 90000000;
     opened.reputation = 40;
-    expect(canBuy(opened, 'houseLine1')).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
+    expect(canBuy(opened, 'houseLine1')).toEqual({ ok: false, reason: lineNoRoom('house') });
   });
 
   it('keeps its lane clear in its own words', () => {

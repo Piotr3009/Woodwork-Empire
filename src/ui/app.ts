@@ -29,6 +29,7 @@ import type {
   Difficulty,
   GameAction,
   GameState,
+  LineKind,
   Orientation,
   Speed,
   StockKind,
@@ -67,6 +68,8 @@ import {
 import {
   APP_VERSION,
   HOUSE_CARD_SECONDS,
+  LINE_KIND_ORDER,
+  LINE_KINDS,
   lineModulesOf,
   type RoomId,
   TOOL_CABINET,
@@ -74,6 +77,7 @@ import {
   roomsOf,
 } from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
+import { roomForWords } from '../render/roomFor';
 import { CANTEEN_PAGE_REGION, canteenPages, canteenScene } from '../render/canteen';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
@@ -266,6 +270,8 @@ interface Ui {
    *  item's own orientation, so the button did nothing at all [PIOTR, 19.09: "it does nothing"]
    *  (CLAUDE.md T22 2.10). */
   armTurn: boolean;
+  /** The kind of line `Room for` draws the block of in Set up hall, or none (v119). */
+  roomFor: LineKind | null;
   speedBeforeSetup: Speed;
   /** What the clock was doing before the P key stopped it, so the same key starts it again where
    *  it was (PIOTR, 17.09; CLAUDE.md T18 2.8). */
@@ -441,6 +447,7 @@ function freshUi(): Ui {
     setup: false,
     rotate: 0,
     armTurn: false,
+    roomFor: null,
     speedBeforeSetup: 0,
     speedBeforePause: 1,
     drag: null,
@@ -707,10 +714,20 @@ function setupControls(current: GameState): string {
     '<div class="view-controls">' +
     '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
     `<button class="btn${ui.armTurn ? ' is-on' : ''}" data-do="rotateGhost">Rotate</button>` +
+    // Where a line of each kind would go, drawn on the floor with what stands in its way (v119).
+    '<span class="reason">Room for:</span>' +
+    LINE_KIND_ORDER.map(
+      (kind) =>
+        `<button class="btn${ui.roomFor === kind ? ' is-on' : ''}" data-do="roomFor" data-kind="${kind}">` +
+        `${escapeHtml(LINE_KINDS[kind].name)}</button>`,
+    ).join('') +
+    // The block's words in plain text, readable at any zoom (v119).
+    (ui.roomFor === null ? '' : `<span class="reason" data-room-words="1">${escapeHtml(roomForWords(current, ui.roomFor))}</span>`) +
     bill +
     '<span class="reason">Drag the machines, the benches and the shelving where you want them. ' +
     'The rooms and the gate stay where they are. Every item moved is an hour of somebody\'s ' +
-    'time. Rotate, or the R key, stands the next one you drop at ninety degrees to the walls.' +
+    'time, half an hour a module of a line. Rotate, or the R key, stands the next one you drop at ' +
+    'ninety degrees to the walls. Room for draws where a line would go and marks what is in its way.' +
     '</span>' +
     '</div>'
   );
@@ -980,7 +997,7 @@ function sceneFor(current: GameState): Scene | null {
     return { key: 'sprites', shell: renderSpriteCheck, live: '' };
   }
   if (ui.view === 'hall') {
-    return hallScene(current, { ghost: ghostFor(current), setup: ui.setup });
+    return hallScene(current, { ghost: ghostFor(current), setup: ui.setup, roomFor: ui.setup ? ui.roomFor : null });
   }
   if (ui.view === 'canteen') {
     return canteenScene(current, roomViewport(), undefined, ui.canteenPage);
@@ -1564,6 +1581,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'rotateGhost':
       turnGhost();
       return;
+    case 'roomFor': {
+      // The same kind again puts the block away (v119).
+      const kind = LINE_KIND_ORDER.find((entry) => entry === element.dataset.kind) ?? null;
+      ui.roomFor = ui.roomFor === kind ? null : kind;
+      break;
+    }
     case 'turnItem':
       turnWhereItStands(id);
       return;
@@ -2565,6 +2588,7 @@ function endSetup(): void {
   if (!ui.setup) return;
   ui.setup = false;
   ui.drag = null;
+  ui.roomFor = null;
   dispatch({ type: 'END_SETUP', speed: ui.speedBeforeSetup });
 }
 

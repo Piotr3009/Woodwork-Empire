@@ -243,7 +243,7 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v118';
+export const APP_VERSION = 'v119';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1365,6 +1365,9 @@ export const UNLOAD_BASE_MINUTES = 45;
 export const BAG_CHANGE_MINUTES = 15;
 /** Moving the kit about is a job of work: an hour a machine or a bench [TUNE]. */
 export const MOVE_MINUTES_PER_ITEM = 60;
+/** [PIOTR, 19.10: "a move of a line is three hours, not six"] A module of a line moves in half the
+ *  time a machine does, so a whole line of six is three hours (v119). */
+export const LINE_MODULE_MOVE_MINUTES = 30;
 // The owner never goes out for what he buys: everything is an order and ordering costs him
 // nothing at all (PIOTR, 13.09; CLAUDE.md T9 3.1). The trip of Turn 7, and the three figures it
 // was measured in, are gone.
@@ -1408,7 +1411,9 @@ export const NO_DUCTING_SPECS = ['compressor', 'sprayRobot'];
  *  thing that takes it there (CLAUDE.md T8 3.4). */
 /** The one speed the game ever takes the clock to for the player: through a trip out or a move of
  *  the hall. It is the fastest chip there is (CLAUDE.md T8 3.3, T9 3.11). */
-export const SKIP_SPEED = 10;
+export const SKIP_SPEED = 100;
+// 10 until v119 [PIOTR, 19.10: "when there is a lot of moving it takes too long: let the clock run at
+// 100, not 30"]: the fastest chip there is, as the rule always said.
 /** Weekly clean (PIOTR): what one sweep of the hall takes with up to
  *  `CLEANING_JOINERS_INCLUDED` joiners making the mess. */
 export const CLEANING_MINUTES = 120;

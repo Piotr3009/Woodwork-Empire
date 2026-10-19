@@ -22,7 +22,7 @@ import { LINE_MODULES, LINE_PRICE, WINDOW_LINE_ORIGIN } from '../../src/engine/c
 import type { GameEvent, GameState, Worker } from '../../src/engine/index';
 import { applyAction, runMinutes } from '../../src/engine/index';
 import { canBuy, placeEquipmentOrder, sellMachine } from '../../src/engine/game';
-import { canPlace, canPlaceSpec, claimedGround, lineLanes, lineSite } from '../../src/engine/layout';
+import { canPlace, canPlaceSpec, claimedGround, lineLanes, lineNoRoom, lineSite } from '../../src/engine/layout';
 import { allLinesBooks, lineBooks, linesWithBooks } from '../../src/engine/lineBooks';
 import {
   answerLineOffer,
@@ -160,7 +160,7 @@ describe('buying the next line (PIOTR, 12.10)', () => {
     expect(lineNumbers(state)).toEqual([1, 2]);
     expect(state.windowLines.map((record) => record.number)).toEqual([1, 2]);
     // A third has nowhere to stand in this hall.
-    expect(canBuy(state, 'windowLine1')).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
+    expect(canBuy(state, 'windowLine1')).toEqual({ ok: false, reason: lineNoRoom('window') });
   });
 
   it('never gives a number twice: a line sold and gone leaves its number, and the next takes the one after', () => {
@@ -383,7 +383,7 @@ describe('the upgrades and the books, a line each', () => {
     // No room for a third in this hall: the button is locked, and still says another.
     const another = folder.querySelector('[data-line="1"] .tile-action button');
     expect(another?.textContent).toBe('Buy another');
-    expect(another?.getAttribute('title')).toBe('No room in the hall for the line and its lane');
+    expect(another?.getAttribute('title')).toBe(lineNoRoom('window'));
   });
 
   it('keeps one day book a line, shows a block a line and all the lines added up on the tab', () => {

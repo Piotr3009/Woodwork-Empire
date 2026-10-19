@@ -31,6 +31,7 @@
 //       from their pictures once the clock is paused and the page written again; module 6 shows the
 //       overlay of the windows on its pallet, and none when it is empty.
 
+import { lineNoRoom } from '../../src/engine/layout';
 import { describe, expect, it } from 'vitest';
 import {
   BREAK_START_MINUTE,
@@ -320,7 +321,7 @@ describe('(ddd) the line bought whole, stood, moved and run on the window jobs (
     expect(smallRefusal).toEqual({ ok: false, reason: 'Needs the 800 m² unit' });
     expect(poorRefusal).toEqual({ ok: false, reason: 'Not enough cash' });
     // From Turn 31 the line's lane is asked with it (CLAUDE.md T31 2.6).
-    expect(fullRefusal).toEqual({ ok: false, reason: 'No room in the hall for the line and its lane' });
+    expect(fullRefusal).toEqual({ ok: false, reason: lineNoRoom('window') });
   });
 
   it('is bought in one click, six on order on one due day for 10,000,000 on one ledger line', () => {
@@ -355,7 +356,8 @@ describe('(ddd) the line bought whole, stood, moved and run on the window jobs (
     const moved = act(setup, { type: 'MOVE_ITEM', itemId: third.id, x: third.anchorX, y: 13 });
     expect(anchors(moved)).toEqual(LINE_MODULES.map((_, index) => [2 + 6 * index, 13]));
     const asked = act(moved, { type: 'END_SETUP', speed: 1 });
-    expect(asked.activeEvent?.body).toBe('Moving 6 machines takes 6 h. Do it?');
+    // 6 h until v119: half an hour a module (PIOTR, 19.10).
+    expect(asked.activeEvent?.body).toBe('Moving 6 machines takes 3 h. Do it?');
     const back = act(asked, { type: 'RESOLVE_EVENT', choiceId: 'back' });
     expect(anchors(back)).toEqual(anchors(landed));
   });

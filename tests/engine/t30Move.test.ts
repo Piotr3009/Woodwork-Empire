@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { LINE_MODULES } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { placeEquipmentOrder } from '../../src/engine/game';
-import { canPlace } from '../../src/engine/layout';
+import { canPlace, lineNeedsRoom } from '../../src/engine/layout';
 import { lineModules } from '../../src/engine/machines';
 import { act, buyStartingKit, newGame, nextDay, placeEquipment, withAir } from '../helpers';
 
@@ -62,7 +62,7 @@ describe('the line moved as one (CLAUDE.md T30 2.4)', () => {
     const state = withLine(bigUnit());
     placeEquipment(state, 'sheetRack', { variantId: 'standard', x: 20, y: 11, id: 'kit-rack-in-the-way' });
     // From Turn 31 the line asks for its lane too, and says so (CLAUDE.md T31 2.6).
-    const refusal = { ok: false, reason: 'The line needs a clear 36 m by 3 m, its lane and a metre each side' };
+    const refusal = { ok: false, reason: lineNeedsRoom('window') };
     expect(canPlace(state, 'kit-line-1', 2, 10)).toEqual(refusal);
     expect(canPlace(state, 'kit-line-6', 33, 11)).toEqual(refusal);
     // Too near the front wall for its men's metre and its lane.
@@ -96,13 +96,14 @@ describe('the line moved as one (CLAUDE.md T30 2.4)', () => {
     expect(moved.movedItems).toEqual([]);
   });
 
-  it('counts six machines and six hours on Done, and Put them back puts the six back', () => {
+  // Six hours until v119: a module moves in half an hour (PIOTR, 19.10: "a line is three hours").
+  it('counts six machines and three hours on Done, and Put them back puts the six back', () => {
     const state = withLine(bigUnit());
     const moved = act(state, { type: 'MOVE_ITEM', itemId: 'kit-line-2', x: 8, y: 11 });
     expect(moved.movedItems).toHaveLength(6);
     const asked = act(moved, { type: 'END_SETUP', speed: 1 });
     expect(asked.activeEvent?.kind).toBe('moveConfirm');
-    expect(asked.activeEvent?.body).toBe('Moving 6 machines takes 6 h. Do it?');
+    expect(asked.activeEvent?.body).toBe('Moving 6 machines takes 3 h. Do it?');
     const back = act(asked, { type: 'RESOLVE_EVENT', choiceId: 'back' });
     expect(anchors(back)).toEqual(anchors(state));
     expect(back.movedItems).toEqual([]);

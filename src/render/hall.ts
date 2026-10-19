@@ -121,6 +121,7 @@ import type {
   Equipment,
   EquipmentSpec,
   GameState,
+  LineKind,
   OnOrderItem,
   Orientation,
 } from '../engine/types';
@@ -166,6 +167,7 @@ import {
 import { lineMakesWindows, lineUnitFrame, palletsAtTheGate, runningLineContract } from '../engine/lineContract';
 import { lineLanes, rearRowOf } from '../engine/layout';
 import { forkliftArt, forkliftPoints } from './forklift';
+import { roomForArt } from './roomFor';
 import { engineersArt } from './engineers';
 import { placeholder } from './placeholder';
 import { jobStage } from '../engine/jobs';
@@ -1983,6 +1985,9 @@ export interface HallOptions {
   /** The character sheets, for the same reason: a figure is his sheet where there is one and the
    *  capsule where there is not (CLAUDE.md T9 3.13). */
   characters?: CharacterOptions['sheets'];
+  /** The kind of line Set up hall's `Room for` is asking about: its block drawn where it fits, or
+   *  where the fewest things stand in its way (v119). */
+  roomFor?: LineKind | null;
 }
 
 export function hallScene(state: GameState, options: HallOptions = {}): Scene {
@@ -2633,6 +2638,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // Every drawable carries the depth it was sorted at, so the renderer can put a figure back in
   // the order of the cell his feet are on without sorting the scene again (CLAUDE.md T20 2.11).
   live.push(drawables.map((drawable) => withDepth(drawable.svg, drawable.depth)).join(''));
+
+  // Where a line of the kind asked for would go, and what stands in its way (v119).
+  if (options.setup === true) live.push(roomForArt(state, options.roomFor));
 
   // The ghost footprint of whatever is being dragged, on top of everything else.
   if (ghost !== null) {
