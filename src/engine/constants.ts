@@ -243,7 +243,7 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v114';
+export const APP_VERSION = 'v115';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -991,6 +991,13 @@ export const HOUSE_LINE_FACTOR = 5;
 /** [TUNE: chat] A house takes a window's minutes times this: a working day of eight hours a house at
  *  the start, eighty minutes off it an upgrade, never under 160 minutes (v114). */
 export const HOUSE_LINE_MINUTES_FACTOR = 8;
+/** [PIOTR, 19.10: "the house factory will be a big outlay and the hall dearer and dearer; make the
+ *  income from the houses twice as big, the clear profit twice as big, let the saving pay off";
+ *  TUNE: chat: the round figure] What the housebuilder pays for a house, in place of the window's
+ *  price times the factors (60,000): the house's timber and glass stay its 80 boards and 40 units,
+ *  24,000, so a house keeps 76,000 where it kept 36,000, and the factory's month after its
+ *  engineers, its power and its cover is a little over twice what it was at every pace (v115). */
+export const HOUSE_PRICE = 100000;
 /** The house factory's six stations in their order along it, each carrying the window module's share
  *  in the same place five times over: 10, 12.5, 6.25, 6.25, 7.5 and 7.5 million, fifty in all
  *  (v114). */
@@ -6417,6 +6424,10 @@ export interface LineKindSpec {
   name: string;
   /** Its modules in their order along it, each with its share of the price, the price their sum. */
   shares: Readonly<Record<string, number>>;
+  /** The client's price of one unit, where it is not the window's times the factors below: the
+   *  house's own (v115). Left out, the price is the window's times the factor and the minutes
+   *  factor. */
+  unitPrice?: number;
   /** Every money figure is the window line's times this [PIOTR]. */
   factor: number;
   /** A unit takes a window's minutes times this. */
@@ -6525,9 +6536,12 @@ export const LINE_KINDS: Readonly<Record<LineKind, LineKindSpec>> = {
     shares: HOUSE_LINE_MODULE_SHARES,
     factor: HOUSE_LINE_FACTOR,
     minutesFactor: HOUSE_LINE_MINUTES_FACTOR,
+    // [PIOTR, 19.10: the clear profit of the houses twice as big] 100,000 a house, its material still
+    // 24,000 (v115).
+    unitPrice: HOUSE_PRICE,
     // Ten engineers, the window line's two five times over, so the factory earns five window lines.
     engineers: LINE_ENGINEERS_MAX * HOUSE_LINE_FACTOR,
-    // A house at £60,000 takes £24,000 of material: the window's two boards and one glass unit times
+    // A house takes £24,000 of material (v115: at £100,000 a house, its material still these): the window's two boards and one glass unit times
     // the factor and the minutes factor, 80 boards and 40 glass units off the same stores.
     boards: LINE_BOARDS_PER_WINDOW * HOUSE_LINE_FACTOR * HOUSE_LINE_MINUTES_FACTOR,
     glass: LINE_GLASS_PER_WINDOW * HOUSE_LINE_FACTOR * HOUSE_LINE_MINUTES_FACTOR,
@@ -6577,15 +6591,23 @@ export function linePriceOf(kind: LineKind): number {
   return Object.values(LINE_KINDS[kind].shares).reduce((total, share) => total + share, 0);
 }
 
-/** What the client pays for a unit of a kind: 1,500 a window, 3,000 a door, 60,000 a house (v114). */
-export function lineUnitPriceOf(kind: LineKind): number {
+/** The window's price times a kind's factor and its minutes factor: 1,500 a window, 3,000 a door,
+ *  60,000 a house, which is what a unit's timber and glass are written from (v114, v115). */
+function lineBasePriceOf(kind: LineKind): number {
   return LINE_WINDOW_PRICE * LINE_KINDS[kind].factor * LINE_KINDS[kind].minutesFactor;
 }
 
-/** What the timber and the glass of a unit cost, the material share of its price: 600 a window,
- *  1,200 a door, 24,000 a house (CLAUDE.md T30 2.6; v114). */
+/** What the client pays for a unit of a kind: 1,500 a window, 3,000 a door, and the house's own
+ *  100,000 (v114; PIOTR, 19.10, v115). */
+export function lineUnitPriceOf(kind: LineKind): number {
+  return LINE_KINDS[kind].unitPrice ?? lineBasePriceOf(kind);
+}
+
+/** What the timber and the glass of a unit cost, the material share of the kind's base price: 600 a
+ *  window, 1,200 a door, 24,000 a house, the house's 80 boards and 40 glass units whatever its own
+ *  price is (CLAUDE.md T30 2.6; v114; v115). */
 export function lineMaterialPerUnitOf(kind: LineKind): number {
-  return lineUnitPriceOf(kind) * LINE_MATERIAL_SHARE;
+  return lineBasePriceOf(kind) * LINE_MATERIAL_SHARE;
 }
 
 /** The modules a kind's engineers on duty keep running: none with none, all of them with the whole

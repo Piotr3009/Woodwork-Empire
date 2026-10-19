@@ -109,7 +109,9 @@ describe('the house factory in the table (v114)', () => {
     expect(house.name).toBe('Timber frame house factory');
     expect(linePriceOf('house')).toBe(50000000);
     expect(Object.values(house.shares)).toEqual([10000000, 12500000, 6250000, 6250000, 7500000, 7500000]);
-    expect(lineUnitPriceOf('house')).toBe(60000);
+    // Flipped in v115: 100,000 a house, its material still 24,000 (PIOTR, 19.10: the clear profit
+    // twice as big).
+    expect(lineUnitPriceOf('house')).toBe(100000);
     expect(lineMaterialPerUnitOf('house')).toBe(24000);
     expect(house.boards * SHEET_VALUE + house.glass * glassUnitPrice()).toBe(24000);
     expect([house.boards, house.glass, house.palletUnits, house.engineers, house.laneCells]).toEqual([80, 40, 1, 10, 10]);
@@ -122,8 +124,11 @@ describe('the house factory in the table (v114)', () => {
       'Second vacuum crane',
     ]);
     expect(linePowerPerDay('house')).toBe(5 * linePowerPerDay('window'));
-    // A minute of a house is worth five minutes of a window: the rule of v107.
-    expect(lineUnitPriceOf('house') / (60 * 8)).toBe((5 * lineUnitPriceOf('window')) / 60);
+    // A minute of a house was worth five minutes of a window, the rule of v107; from v115 it is worth
+    // a third more (PIOTR, 19.10: the houses' clear profit twice as big), and a house keeps 76,000
+    // of its 100,000 where it kept 36,000 of 60,000.
+    expect(lineUnitPriceOf('house') / (60 * 8)).toBeCloseTo((5 * lineUnitPriceOf('window') / 60) * (100000 / 60000), 9);
+    expect(lineUnitPriceOf('house') - lineMaterialPerUnitOf('house')).toBe(76000);
     expect(Array.from({ length: 11 }, (_, onDuty) => lineModulesKept('house', onDuty))).toEqual([0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 6]);
   });
 
@@ -203,7 +208,7 @@ describe('its contract (v114)', () => {
     const offered = toWorkingMorning(state);
     expect(lineState(offered, 1).contract).not.toBeNull();
     expect(lineOfferBody(offered, 1)).toBe(
-      'A housebuilder will take every house line 1 makes, at £60,000 a house. The timber and the glass cost ' +
+      'A housebuilder will take every house line 1 makes, at £100,000 a house. The timber and the glass cost ' +
         '£24,000 a house, taken from your timber stores and glass racks: restock them on the Materials page, ' +
         'or the office does. The line makes one every 8 hours, about 5 a week, and the client collects each ' +
         "house from the line's lane the next working day. It runs until you end it.",
@@ -211,7 +216,7 @@ describe('its contract (v114)', () => {
     expect([lineWindowMinutes(offered, 1), lineWindowsAWeek(offered, 1)]).toEqual([480, 5]);
   });
 
-  it('makes a house off 80 boards and 40 glass units at £60,000, which waits on its lane until the next working day', () => {
+  it('makes a house off 80 boards and 40 glass units at £100,000, which waits on its lane until the next working day', () => {
     let state = toWorkingMorning(houseFactory());
     state.stock.boards = 400;
     state.stock.glass = 200;
@@ -226,7 +231,7 @@ describe('its contract (v114)', () => {
     state = runClock(state, 15);
     expect(runningLineContract(state, 1)?.windowsMade).toBe(1);
     expect([boards - state.stock.boards, glass - state.stock.glass]).toEqual([80, 40]);
-    expect(state.ledger.find((entry) => entry.label === 'Houses off line 1: houses')?.amount).toBe(60000);
+    expect(state.ledger.find((entry) => entry.label === 'Houses off line 1: houses')?.amount).toBe(100000);
     expect([lineState(state, 1).onPallet, lineState(state, 1).palletsAtGate, palletsAtTheGate(state)]).toEqual([0, 1, 0]);
     // The hall draws it at the gate end of the line's lane, and nothing at the gate.
     const hall = page(renderHall(state));
