@@ -243,7 +243,7 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v117';
+export const APP_VERSION = 'v118';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1013,8 +1013,9 @@ export const HOUSE_MODULE_SIZE = { width: 14, depth: 10, height: 10 };
  *  twice the window line's month, built to order (v114). */
 export const HOUSE_LINE_DELIVERY_DAYS = 60;
 /** [TUNE: chat, from the art side's P4-A: "the aisle beside the line, 10 m wide"] The depth of a house
- *  factory's own lane in front of its engineers' metre, from x 0 to the line's end: the houses drive
- *  out sideways on their transporters into it and wait at its gate end for the housebuilder (v114). */
+ *  factory's own lane in front of its engineers' metre, along the line from its first station to its
+ *  last (v118; from x 0 in v114): the houses drive out sideways on their transporters into it and wait
+ *  at its gate side end for the housebuilder (v114). */
 export const HOUSE_LANE_CELLS = 10;
 /** [TUNE: chat, from the art side's P4-A: the transporter's deck 10 m by 7.5 m, the house on it
  *  5.5 m high at the most] Where a finished house waits on its line's lane: one transporter's deck,

@@ -1068,7 +1068,8 @@ the left, never turned, and each is drawn as one picture sorted at its own cell 
 (`kitDepth` in `src/render/hall.ts`), so each file must hold everything of its own box and nothing
 outside it, the runway beams cut at the boundaries (the pack's frames do: their content lies within
 27 to 1,141 by 79 to 1,049). A house factory has no work sheet, no pallet on station 6 and no
-forklift; the drive of the finished house along the lane to the gate is a turn of its own. A finished house waits on the line's own 10 m lane at its gate end, three drawn at the most
-side by side from the left wall (`HOUSE_WAIT_LAYOUT`, `HOUSES_WAITING_DRAWN`), by the kind's
+forklift; the drive of the finished house along the lane to the gate is a turn of its own. A finished house waits on the line's own 10 m lane, which from v118 runs along the line alone
+(from x 0 in v114), at its gate side end, three drawn at the most side by side from that end
+(`HOUSE_WAIT_LAYOUT`, `HOUSES_WAITING_DRAWN`), by the kind's
 `palletSprite`, `houseWaiting`; the lane's outline and the label `Houses for collection: 2` are the
 game's. The Sprite check page lists the waiting house beside the two pallets.

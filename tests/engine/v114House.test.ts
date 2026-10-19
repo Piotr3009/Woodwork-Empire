@@ -156,7 +156,8 @@ describe('the house factory in the table (v114)', () => {
 });
 
 describe('where it stands (v114)', () => {
-  it('takes 84 m by 10 m and a ten metre lane from x 0 with no left strip and no forklift', () => {
+  // The lane ran from x 0 until v118 (PIOTR, 19.10: a factory need not stand by the gate wall).
+  it('takes 84 m by 10 m and a ten metre lane along it with no left strip and no forklift', () => {
     const state = bigHall();
     expect(lineBox({ x: 0, y: 0 }, 'house')).toEqual({ x: 0, y: 0, width: 84, depth: 10 });
     expect(lineDepthCells('house')).toBe(22);
@@ -165,7 +166,7 @@ describe('where it stands (v114)', () => {
       behind: null,
       line: { x: 5, y: 0, width: 84, depth: 10 },
       path: { x: 5, y: 10, width: 84, depth: 1 },
-      front: { x: 0, y: 11, width: 89, depth: 10 },
+      front: { x: 5, y: 11, width: 84, depth: 10 },
       left: null,
     });
     expect(forkliftLane(state, { x: 5, y: 0 }, 'house')).toBeNull();

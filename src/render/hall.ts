@@ -2544,7 +2544,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   }
 
   // Each house factory's finished houses wait for the housebuilder on its own lane, at the lane's
-  // gate end: side by side from the left wall, a transporter's deck each and three at the most, each
+  // gate side end: side by side from that end, a transporter's deck each and three at the most, each
   // drawn from the art side's waiting house or as a box until it comes, and one label on the floor
   // in front of the first, as the pallets' at the gate (PIOTR, 18.10: delivered on the gate's side;
   // v114) [TUNE: chat]. Each is sorted by its back corner and its depth, so it is drawn after the

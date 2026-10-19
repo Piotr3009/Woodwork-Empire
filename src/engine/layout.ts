@@ -338,10 +338,13 @@ export interface GroundBox {
  *  end; the metre in front where its engineers walk; and its lane in front of that from x 0 to the
  *  line's end: the forklift's two metres, with the left strip up the left wall between the lane and
  *  the pallets at the gate, two metres wide [TUNE: chat: no strip round the line's end]; or the house
- *  factory's ten, with no strip, its houses waiting at its gate end (v114). Seven metres in depth a
- *  window line, so two lines stand one behind the other in the 800 m2 hall, or side by side along a
- *  longer one; twenty two a house factory. Null where the lane cannot be: off the floor, or on the
- *  way to the gate (CLAUDE.md T31 2.6; v93). */
+ *  factory's ten, with no strip, along the line alone, from its first station to its last, its houses
+ *  waiting at the lane's gate side end [PIOTR, 19.10: "change only the condition that it has to be
+ *  near the gate"; v118: until then from x 0 as a forklift's lane is, which kept a factory off every
+ *  hall whose free floor did not touch the gate wall]. Seven metres in depth a window line, so two
+ *  lines stand one behind the other in the 800 m2 hall, or side by side along a longer one; twenty
+ *  two a house factory. Null where the lane cannot be: off the floor, or on the way to the gate
+ *  (CLAUDE.md T31 2.6; v93). */
 export function lineGround(
   state: GameState,
   at: { x: number; y: number },
@@ -353,7 +356,10 @@ export function lineGround(
   const behind: Box | null =
     line.y >= LINE_BEHIND_CELLS ? { x: line.x, y: line.y - LINE_BEHIND_CELLS, width: line.width, depth: LINE_BEHIND_CELLS } : null;
   const path: Box = { x: line.x, y: line.y + line.depth, width: line.width, depth: LINE_FRONT_CELLS };
-  const front: Box = { x: 0, y: path.y + path.depth, width: line.x + line.width, depth: spec.laneCells };
+  const front: Box =
+    spec.collection === 'lane'
+      ? { x: line.x, y: path.y + path.depth, width: line.width, depth: spec.laneCells }
+      : { x: 0, y: path.y + path.depth, width: line.x + line.width, depth: spec.laneCells };
   let left: Box | null = null;
   if (spec.collection === 'gate') {
     const pallets = LINE_PALLET_LAYOUT;
