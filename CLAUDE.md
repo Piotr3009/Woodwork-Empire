@@ -16,7 +16,7 @@ parallel one, flip a test and never keep it beside a new one, the Skylon Develop
 every new code file). The rule relaxed in Turn 26 stays relaxed [PIOTR, 01.10]: a scenario figure
 that moves is restated with ONE line of reason; a test that pins an exact pound of a played month
 may be loosened to a range when the exact figure says nothing about the rule under test, and the
-comment says so.
+comment says so
 
 Before a line is written: clone, read what is there, and build with it. Every screen, card, row,
 button and strip line this turn needs already has its kind in the repo: the Materials page's head
