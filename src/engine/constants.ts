@@ -243,7 +243,7 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v113';
+export const APP_VERSION = 'v114';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -982,15 +982,48 @@ export const DOOR_LINE_FACTOR = 2;
 export const DOOR_LINE_MODULE_SHARES: Readonly<Record<string, number>> = Object.fromEntries(
   Object.values(LINE_MODULE_SHARES).map((share, index) => [`doorLine${index + 1}`, share * DOOR_LINE_FACTOR]),
 );
+/** [PIOTR, 18.10: "5 tak zakoduj" to chat's house factory; TUNE: chat: five and eight] What every
+ *  money figure of the timber frame house factory is of the window line's: its price and each
+ *  station's share, each upgrade, its engineers and its power; and a house's price and material are
+ *  a window's times this and times the house's minutes factor below, so the factory pays back what a
+ *  window line pays back at every pace, the rule of v107 (v114). */
+export const HOUSE_LINE_FACTOR = 5;
+/** [TUNE: chat] A house takes a window's minutes times this: a working day of eight hours a house at
+ *  the start, eighty minutes off it an upgrade, never under 160 minutes (v114). */
+export const HOUSE_LINE_MINUTES_FACTOR = 8;
+/** The house factory's six stations in their order along it, each carrying the window module's share
+ *  in the same place five times over: 10, 12.5, 6.25, 6.25, 7.5 and 7.5 million, fifty in all
+ *  (v114). */
+export const HOUSE_LINE_MODULE_SHARES: Readonly<Record<string, number>> = Object.fromEntries(
+  Object.values(LINE_MODULE_SHARES).map((share, index) => [`houseLine${index + 1}`, share * HOUSE_LINE_FACTOR]),
+);
+/** [TUNE: chat, from the art side's P4-A: "a station 14 x 10 m, the structure 10 m high"] One
+ *  station of the house factory, its six end to end along x making the 84 m by 10 m line (v114). */
+export const HOUSE_MODULE_SIZE = { width: 14, depth: 10, height: 10 };
+/** [TUNE: chat] The working days from the order of a house factory to the day its stations land:
+ *  twice the window line's month, built to order (v114). */
+export const HOUSE_LINE_DELIVERY_DAYS = 60;
+/** [TUNE: chat, from the art side's P4-A: "the aisle beside the line, 10 m wide"] The depth of a house
+ *  factory's own lane in front of its engineers' metre, from x 0 to the line's end: the houses drive
+ *  out sideways on their transporters into it and wait at its gate end for the housebuilder (v114). */
+export const HOUSE_LANE_CELLS = 10;
+/** [TUNE: chat, from the art side's P4-A: the transporter's deck 10 m by 7.5 m, the house on it
+ *  5.5 m high at the most] Where a finished house waits on its line's lane: one transporter's deck,
+ *  the first a metre in from the lane's gate end and each next one a metre past the one before,
+ *  in the middle of the lane's depth; three drawn at the most, a day's houses at the line's best
+ *  pace (v114). */
+export const HOUSE_WAIT_LAYOUT = { fromEnd: 1, gap: 1, width: 10, depth: 7.5, height: 5.5 };
+export const HOUSES_WAITING_DRAWN = 3;
 /** Kit built to order, whose order cannot be called off once it is placed: the money is the
  *  maker's from the click, so an order placed before 30 December and called off in January saves
  *  no tax (CLAUDE.md T29 2.6, 2.10) [TUNE: chat]. Every other machine is still called off in full
  *  until the lorry comes (section 8). The door line's modules are built to order as the window
- *  line's are (v107). */
+ *  line's are (v107), and the house factory's stations (v114). */
 export const BUILT_TO_ORDER: readonly string[] = [
   'cnc5',
   ...Object.keys(LINE_MODULE_SHARES),
   ...Object.keys(DOOR_LINE_MODULE_SHARES),
+  ...Object.keys(HOUSE_LINE_MODULE_SHARES),
 ];
 /** What an order built to order says in place of its refund (CLAUDE.md T29 2.10). */
 export const BUILT_TO_ORDER_LINE = 'Built to order: it cannot be called off';
@@ -2589,23 +2622,25 @@ export const SPRAY_ROBOT_VARIANTS: EquipmentVariant[] = [
 /** One class of a module of the line, its price its share of the 10 million (CLAUDE.md T30
  *  2.3.1), 60 a day of power [TUNE], the art side's metres: 6 by 3 by 3 from Turn 30 (CLAUDE.md
  *  T29 2.9.1, 2.10; T30 2.2). A door line's module draws twice the power, as every money figure of
- *  it is twice the window line's (v107). */
+ *  it is twice the window line's (v107); a house factory's station five times, on its own 14 m by
+ *  10 m by 10 m (v114). */
 function lineModuleVariants(
   name: string,
   price: number,
   description: string,
   powerPerDay: number = LINE_MODULE_POWER_PER_DAY,
+  size: { width: number; depth: number; height: number } = { width: 6, depth: 3, height: 3 },
 ): EquipmentVariant[] {
   return [
     {
       id: STANDARD_VARIANT,
       name,
       price,
-      width: 6,
-      depth: 3,
-      height: 3,
-      zoneWidth: 6,
-      zoneDepth: 3,
+      width: size.width,
+      depth: size.depth,
+      height: size.height,
+      zoneWidth: size.width,
+      zoneDepth: size.depth,
       enduranceFactor: 1,
       powerPerDay,
       description,
@@ -4045,6 +4080,55 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
       'with its hinges and lock, wrapped and stacked on a pallet.',
     LINE_MODULE_POWER_PER_DAY * DOOR_LINE_FACTOR,
   ),
+  // The house factory's six stations, each under its gantry crane, at five times the window
+  // module's share and power on their own 14 m by 10 m by 10 m (PIOTR, 18.10: "5 tak zakoduj"; v114)
+  // [TUNE: chat: the sentences, from the art side's P4-A].
+  houseLine1: lineModuleVariants(
+    'House line, module 1',
+    HOUSE_LINE_MODULE_SHARES.houseLine1 ?? 0,
+    'The floor station: the joists laid out on the house\'s transporter under the gantry crane, glued, ' +
+      'insulated and decked.',
+    LINE_MODULE_POWER_PER_DAY * HOUSE_LINE_FACTOR,
+    HOUSE_MODULE_SIZE,
+  ),
+  houseLine2: lineModuleVariants(
+    'House line, module 2',
+    HOUSE_LINE_MODULE_SHARES.houseLine2 ?? 0,
+    'The frame station: the wall frames lifted on to the floor by the gantry crane, stood up, braced ' +
+      'and nailed.',
+    LINE_MODULE_POWER_PER_DAY * HOUSE_LINE_FACTOR,
+    HOUSE_MODULE_SIZE,
+  ),
+  houseLine3: lineModuleVariants(
+    'House line, module 3',
+    HOUSE_LINE_MODULE_SHARES.houseLine3 ?? 0,
+    'The services and insulation station: the wiring, the pipes and the insulation fitted into the ' +
+      'open walls.',
+    LINE_MODULE_POWER_PER_DAY * HOUSE_LINE_FACTOR,
+    HOUSE_MODULE_SIZE,
+  ),
+  houseLine4: lineModuleVariants(
+    'House line, module 4',
+    HOUSE_LINE_MODULE_SHARES.houseLine4 ?? 0,
+    'The roof station: the roof lifted on whole by the gantry crane and fixed down over the walls.',
+    LINE_MODULE_POWER_PER_DAY * HOUSE_LINE_FACTOR,
+    HOUSE_MODULE_SIZE,
+  ),
+  houseLine5: lineModuleVariants(
+    'House line, module 5',
+    HOUSE_LINE_MODULE_SHARES.houseLine5 ?? 0,
+    'The finishing station: the cladding, the windows and the doors fitted, inside and out.',
+    LINE_MODULE_POWER_PER_DAY * HOUSE_LINE_FACTOR,
+    HOUSE_MODULE_SIZE,
+  ),
+  houseLine6: lineModuleVariants(
+    'House line, module 6',
+    HOUSE_LINE_MODULE_SHARES.houseLine6 ?? 0,
+    'The inspection and handover station: every house checked and signed off, then driven out ' +
+      'sideways on its transporter to the lane.',
+    LINE_MODULE_POWER_PER_DAY * HOUSE_LINE_FACTOR,
+    HOUSE_MODULE_SIZE,
+  ),
   spindleMoulder: SPINDLE_MOULDER_VARIANTS,
   // The cabinet is a family of five from Turn 22, and what a class is for is how many men's hand
   // tools it holds (PIOTR, 19.09; CLAUDE.md T22 2.12).
@@ -4158,6 +4242,33 @@ function doorModuleSpec(place: number, effect: string): SpecDraft {
     height: 3,
     zoneWidth: 6,
     zoneDepth: 3,
+    spriteKey: id,
+    usedOn: 'solidWood',
+    minUnitM2: BIG_KIT_UNIT_M2,
+    effect,
+  };
+}
+
+/** One station of the timber frame house factory in the catalogue (v114): built to order in its own
+ *  sixty working days, in the `line` tab under its own folder, at its share of the factory's fifty
+ *  million, 14 m by 10 m by 10 m; station 1 stands for the whole factory there, as the window line's
+ *  module 1 stands for its line (CLAUDE.md T30 2.3.3) [TUNE: chat]. */
+function houseModuleSpec(place: number, effect: string): SpecDraft {
+  const id = `houseLine${place}`;
+  return {
+    ...BASE_SPEC,
+    id,
+    deliveryDays: HOUSE_LINE_DELIVERY_DAYS,
+    folder: 'Timber frame house factory',
+    tab: 'line',
+    name: `House line, module ${place}`,
+    price: HOUSE_LINE_MODULE_SHARES[id] ?? 0,
+    category: 'machine',
+    width: HOUSE_MODULE_SIZE.width,
+    depth: HOUSE_MODULE_SIZE.depth,
+    height: HOUSE_MODULE_SIZE.height,
+    zoneWidth: HOUSE_MODULE_SIZE.width,
+    zoneDepth: HOUSE_MODULE_SIZE.depth,
     spriteKey: id,
     usedOn: 'solidWood',
     minUnitM2: BIG_KIT_UNIT_M2,
@@ -5021,6 +5132,14 @@ const SPEC_DRAFTS: SpecDraft[] = [
   doorModuleSpec(4, 'Module 4 of the door line: pressing.'),
   doorModuleSpec(5, 'Module 5 of the door line: the Finishing, sprayed and hung on the overhead rail.'),
   doorModuleSpec(6, 'Module 6 of the door line: the Glazing and the hanging, then wrapped and stacked on a pallet.'),
+  // The house factory's six [PIOTR, 18.10: "5 tak zakoduj" to chat's layout A of the art side's P4-A]
+  // (v114): station 1 standing for the factory in the catalogue as the window line's module 1 does.
+  houseModuleSpec(1, 'Makes timber frame houses from the floor to the handover: six stations in one line, 84 m long.'),
+  houseModuleSpec(2, 'Module 2 of the house line: the frame.'),
+  houseModuleSpec(3, 'Module 3 of the house line: the services and the insulation.'),
+  houseModuleSpec(4, 'Module 4 of the house line: the roof.'),
+  houseModuleSpec(5, 'Module 5 of the house line: the finishing.'),
+  houseModuleSpec(6, 'Module 6 of the house line: the inspection and the handover, then out to the lane.'),
 
 
   {
@@ -6251,6 +6370,42 @@ export const DOOR_LINE_UPGRADES: readonly LineUpgradeSpec[] = [
   },
 ];
 
+/** [PIOTR, 18.10: "5 tak zakoduj"; TUNE: chat: the names and the sentences] The house factory's four
+ *  upgrades: in the window line's order at five times its prices, each taking eighty minutes off a
+ *  house, the window's ten times the house's minutes factor (v114). */
+export const HOUSE_LINE_UPGRADES: readonly LineUpgradeSpec[] = [
+  {
+    id: 'houseTooling',
+    name: 'Diamond tooling',
+    price: (LINE_UPGRADES[0]?.price ?? 0) * HOUSE_LINE_FACTOR,
+    sentence:
+      'Diamond tipped saw blades and cutters for the floor and the frame stations: the timber is cut ' +
+      'faster and the tools are changed less often.',
+  },
+  {
+    id: 'houseSoftware',
+    name: 'Factory software',
+    price: (LINE_UPGRADES[1]?.price ?? 0) * HOUSE_LINE_FACTOR,
+    sentence:
+      'One program for the whole factory: each house\'s cutting lists and wall panels go to every station ' +
+      'in turn, with no stop between plans.',
+  },
+  {
+    id: 'houseNailingBridge',
+    name: 'Second nailing bridge',
+    price: (LINE_UPGRADES[2]?.price ?? 0) * HOUSE_LINE_FACTOR,
+    sentence: 'A second nailing bridge in module 2: one wall is nailed while the next is laid out.',
+  },
+  {
+    id: 'houseVacuumCrane',
+    name: 'Second vacuum crane',
+    price: (LINE_UPGRADES[3]?.price ?? 0) * HOUSE_LINE_FACTOR,
+    sentence:
+      'A second vacuum lifter on the gantries of modules 3 and 4: the insulation and the roof panels are ' +
+      'no longer the slowest step.',
+  },
+];
+
 /** What one kind of production line is (v107). The window line's figures are its own constants
  *  of Turns 29 to 32, and every other kind is written from them: its money is the window line's
  *  times its factor and its minutes the window's times its minutes factor, so a line of any kind
@@ -6266,21 +6421,34 @@ export interface LineKindSpec {
   factor: number;
   /** A unit takes a window's minutes times this. */
   minutesFactor: number;
-  /** The engineers that keep the whole line: two a window line, four a door line [PIOTR, 18.10]. */
+  /** The engineers that keep the whole line: two a window line, four a door line [PIOTR, 18.10], ten
+   *  a house factory (v114). */
   engineers: number;
   /** What one unit takes off the timber stores and the glass racks. */
   boards: number;
   glass: number;
   /** The units a pallet takes before it goes to the gate, and the picture of a full one standing
-   *  alone at the gate. */
+   *  alone at the gate; a house line's one house, and the picture of a house waiting on its lane
+   *  (v114). */
   palletUnits: number;
   palletSprite: string;
+  /** Where what it makes waits for the client: on pallets at the gate, carried there by the line's
+   *  forklift along its lane's two strips (`gate`), or each unit on the line's own lane at its gate
+   *  end, driven there on its own transporter with no forklift (`lane`, the house factory) (v114). */
+  collection: 'gate' | 'lane';
+  /** The depth of its lane in front of its engineers' metre: the forklift's two metres, or the house
+   *  factory's ten (v114). */
+  laneCells: number;
   upgrades: readonly LineUpgradeSpec[];
   /** The line's card's sentence, in the place of a class's description. */
   description: string;
   /** What each module's row on the line's card says after its stage, where the stage's own word is
    *  not the whole of it. */
   rowTails: Partial<Record<StageId, string>>;
+  /** What each module's row says in place of the stages of a timber job, for a kind whose modules do
+   *  none of them: the house factory's stations, in their order; null for the window and the door
+   *  lines (v114). */
+  moduleRows: readonly string[] | null;
   /** The words of what it makes: `window`, `windows`; the contract's name before the line's number;
    *  and who takes them. */
   unit: string;
@@ -6304,9 +6472,12 @@ export const LINE_KINDS: Readonly<Record<LineKind, LineKindSpec>> = {
     glass: LINE_GLASS_PER_WINDOW,
     palletUnits: LINE_PALLET_WINDOWS,
     palletSprite: 'windowPallet',
+    collection: 'gate',
+    laneCells: FORKLIFT_LANE_CELLS,
     upgrades: LINE_UPGRADES,
     description: LINE_DESCRIPTION,
     rowTails: LINE_ROW_TAIL,
+    moduleRows: null,
     unit: 'window',
     units: 'windows',
     contractName: LINE_CONTRACT_NAME,
@@ -6328,6 +6499,8 @@ export const LINE_KINDS: Readonly<Record<LineKind, LineKindSpec>> = {
     glass: LINE_GLASS_PER_WINDOW * DOOR_LINE_FACTOR,
     palletUnits: LINE_PALLET_WINDOWS,
     palletSprite: 'doorPallet',
+    collection: 'gate',
+    laneCells: FORKLIFT_LANE_CELLS,
     upgrades: DOOR_LINE_UPGRADES,
     description:
       'Six modules of 6 m by 3 m, end to end: a cross cut saw and a planer, a five axis CNC, a through ' +
@@ -6337,16 +6510,61 @@ export const LINE_KINDS: Readonly<Record<LineKind, LineKindSpec>> = {
       finishing: 'sprayed and hung on the overhead rail',
       assembly: 'hung in its frame, then wrapped and stacked on a pallet',
     },
+    moduleRows: null,
     unit: 'door',
     units: 'doors',
     contractName: 'Doors off line',
     client: 'A door company',
     servesJobs: false,
   },
+  house: {
+    kind: 'house',
+    // [PIOTR, 18.10: "5 tak zakoduj" to chat's layout A of the art side's P4-A; TUNE: chat: the
+    // names, the figures and the words] (v114).
+    name: 'Timber frame house factory',
+    shares: HOUSE_LINE_MODULE_SHARES,
+    factor: HOUSE_LINE_FACTOR,
+    minutesFactor: HOUSE_LINE_MINUTES_FACTOR,
+    // Ten engineers, the window line's two five times over, so the factory earns five window lines.
+    engineers: LINE_ENGINEERS_MAX * HOUSE_LINE_FACTOR,
+    // A house at £60,000 takes £24,000 of material: the window's two boards and one glass unit times
+    // the factor and the minutes factor, 80 boards and 40 glass units off the same stores.
+    boards: LINE_BOARDS_PER_WINDOW * HOUSE_LINE_FACTOR * HOUSE_LINE_MINUTES_FACTOR,
+    glass: LINE_GLASS_PER_WINDOW * HOUSE_LINE_FACTOR * HOUSE_LINE_MINUTES_FACTOR,
+    // One house a load: it goes out whole on its transporter and waits on the lane (PIOTR, 18.10:
+    // "the side the finished house is delivered on" is the gate's).
+    palletUnits: 1,
+    palletSprite: 'houseWaiting',
+    collection: 'lane',
+    laneCells: HOUSE_LANE_CELLS,
+    upgrades: HOUSE_LINE_UPGRADES,
+    description:
+      'Six stations of 14 m by 10 m, end to end under their gantry cranes: the floor, the frame, the ' +
+      'services and the insulation, the roof, the finishing, and the inspection, where each house is ' +
+      'signed off and driven out sideways on its transporter to the lane in front.',
+    rowTails: {},
+    moduleRows: [
+      'the floor: the joists, the insulation and the decking on the house\'s transporter',
+      'the frame: the walls stood up and nailed',
+      'the services and the insulation',
+      'the roof, lifted on by the gantry crane',
+      'the finishing: the cladding, the windows and the doors',
+      'the inspection and the handover, then out to the lane',
+    ],
+    unit: 'house',
+    units: 'houses',
+    contractName: 'Houses off line',
+    client: 'A housebuilder',
+    servesJobs: false,
+  },
 };
 
 /** The kinds in the order the catalogue and the books list them. */
-export const LINE_KIND_ORDER: readonly LineKind[] = ['window', 'door'];
+export const LINE_KIND_ORDER: readonly LineKind[] = ['window', 'door', 'house'];
+
+/** The kinds whose full pallets wait at the gate for the client, in that order: what the gate draws
+ *  and the forklifts carry; the house factory's houses wait on its own lane (v114). */
+export const GATE_LINE_KINDS: readonly LineKind[] = LINE_KIND_ORDER.filter((kind) => LINE_KINDS[kind].collection === 'gate');
 
 /** A kind's modules in their order along it. */
 export function lineModulesOf(kind: LineKind): readonly string[] {
@@ -6354,25 +6572,26 @@ export function lineModulesOf(kind: LineKind): readonly string[] {
 }
 
 /** What a whole line of a kind costs, the sum of its shares and never a figure of its own: ten
- *  million a window line, twenty a door line. */
+ *  million a window line, twenty a door line, fifty a house factory (v114). */
 export function linePriceOf(kind: LineKind): number {
   return Object.values(LINE_KINDS[kind].shares).reduce((total, share) => total + share, 0);
 }
 
-/** What the client pays for a unit of a kind: 1,500 a window, 3,000 a door. */
+/** What the client pays for a unit of a kind: 1,500 a window, 3,000 a door, 60,000 a house (v114). */
 export function lineUnitPriceOf(kind: LineKind): number {
   return LINE_WINDOW_PRICE * LINE_KINDS[kind].factor * LINE_KINDS[kind].minutesFactor;
 }
 
 /** What the timber and the glass of a unit cost, the material share of its price: 600 a window,
- *  1,200 a door (CLAUDE.md T30 2.6). */
+ *  1,200 a door, 24,000 a house (CLAUDE.md T30 2.6; v114). */
 export function lineMaterialPerUnitOf(kind: LineKind): number {
   return lineUnitPriceOf(kind) * LINE_MATERIAL_SHARE;
 }
 
 /** The modules a kind's engineers on duty keep running: none with none, all of them with the whole
  *  crew, and in between the share of the modules the share of the crew keeps, rounded down: a
- *  window line 0, 3 and 6 as Turn 29 had it, a door line 0, 1, 3, 4 and 6 (v107) [TUNE: chat]. */
+ *  window line 0, 3 and 6 as Turn 29 had it, a door line 0, 1, 3, 4 and 6 (v107), a house factory
+ *  0, 1, 1, 2, 3, 3, 4, 4, 5 and 6 with one to ten of its ten on duty (v114) [TUNE: chat]. */
 export function lineModulesKept(kind: LineKind, onDuty: number): number {
   const spec = LINE_KINDS[kind];
   const modules = lineModulesOf(kind).length;
@@ -6434,12 +6653,16 @@ const LINE_WORK_SHEET: WorkSheetFigures = {
 /** The machines that have a working motion, by family: the line's six, module N starting its loop
  *  at minute `(N - 1) * LINE_SHEET_STAGGER_MINUTES` of the hour (CLAUDE.md T30 2.11; v91). */
 export const MACHINE_WORK_SHEETS: Readonly<Record<string, WorkSheetFigures>> = Object.fromEntries(
-  // Every kind's modules, the door line's sheets the art side's own of P3 in the window line's cells
-  // and figures (docs/art/pack-p3-1810/sheets/; v107, v108).
-  ALL_LINE_MODULES.map((id) => [
-    id,
-    { ...LINE_WORK_SHEET, atMinute: ((LINE_MODULE_INDEX.get(id)?.place ?? 1) - 1) * LINE_SHEET_STAGGER_MINUTES },
-  ]),
+  // The window and the door lines' modules, the door line's sheets the art side's own of P3 in the
+  // window line's cells and figures (docs/art/pack-p3-1810/sheets/; v107, v108). The house
+  // factory's stations, of their own size, have no working motion until the art side draws one
+  // (v114).
+  (['window', 'door'] as const)
+    .flatMap((kind) => lineModulesOf(kind))
+    .map((id) => [
+      id,
+      { ...LINE_WORK_SHEET, atMinute: ((LINE_MODULE_INDEX.get(id)?.place ?? 1) - 1) * LINE_SHEET_STAGGER_MINUTES },
+    ]),
 );
 /** The figures of a vehicle's driving sheet: four rows, one a direction, of cells the same size,
  *  each with the vehicle's anchor in it, played at the sheet's own frames a second (docs/art/
@@ -6512,9 +6735,10 @@ export const FORKLIFT_LOAD_AHEAD = 1.225;
  *  ahead of its anchor the middle of that pallet is. The door pallet is the art side's new four way
  *  pallet, carried crosswise with its middle a metre ahead (`loadCenterAheadM` of the P3 forklift
  *  sheet's JSON, docs/art/pack-p3-1810/) (v108). */
-export const FORKLIFT_LOADED_BY_KIND: Readonly<Record<LineKind, { sheet: VehicleSheetFigures; ahead: number }>> = {
+export const FORKLIFT_LOADED_BY_KIND: Readonly<Partial<Record<LineKind, { sheet: VehicleSheetFigures; ahead: number }>>> = {
   window: { sheet: FORKLIFT_SHEETS.loaded, ahead: FORKLIFT_LOAD_AHEAD },
   door: { sheet: FORKLIFT_SHEETS.loadedDoor, ahead: 1 },
+  // None for the house factory: a house drives out on its own transporter (v114).
 };
 
 export const HIRING_SPECS: HiringSpec[] = [
@@ -6579,10 +6803,10 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Line engineer',
     monthlyWage: LINE_ENGINEER_MONTHLY_WAGE,
     minReputation: REPUTATION_MIN,
-    // A line of each kind takes its own crew (v107) [TUNE: the words].
+    // A line of each kind takes its own crew (v107; v114: the house factory's ten) [TUNE: the words].
     duties:
       'Keeps a production line running. A window line takes two: one keeps up to three modules, two ' +
-      'keep all six. A door line takes four.',
+      'keep all six. A door line takes four, a house factory ten.',
   },
   // The manager is a tiered role from Turn 23, four grades and four cards like the joiner, on his
   // own wage table (PIOTR, 20.09; CLAUDE.md T23 2.4).
@@ -6704,6 +6928,13 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   doorLine4: 0,
   doorLine5: 0,
   doorLine6: 0,
+  // And the house factory's stations, each with its own extraction (v114).
+  houseLine1: 0,
+  houseLine2: 0,
+  houseLine3: 0,
+  houseLine4: 0,
+  houseLine5: 0,
+  houseLine6: 0,
   sprayBooth: 0, // its own extraction, off this table
   sprayRobot: 0, // an arm at the booth: no chips, and the booth's extraction is its own (CLAUDE.md T29 2.7)
   spindleMoulder: 0.12, // a bag a day, the figure the Turn 12 comment kept for it (PIOTR)

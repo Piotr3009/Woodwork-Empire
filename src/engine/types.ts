@@ -894,9 +894,11 @@ export interface LineSince {
  *  `GameState.windowLines` (PIOTR, 12.10). From v96 it keeps no timber or glass of its own: its
  *  contract holds them on the company's stores (CLAUDE.md T32 2.5). */
 /** What a production line makes [PIOTR, 18.10: "a line of doors, two times the windows"] (v107):
- *  the window line of Turn 29 and the door line. The names of the record and its counts stay the
- *  window line's (`windowLines`, `windows`) and count a line's units of whatever kind. */
-export type LineKind = 'window' | 'door';
+ *  the window line of Turn 29, the door line, and from v114 the timber frame house factory [PIOTR,
+ *  18.10: "5 tak zakoduj"]. The names of the record and its counts stay the window line's
+ *  (`windowLines`, `windows`, `palletsAtGate`) and count a line's units of whatever kind: a house
+ *  line's `palletsAtGate` are its houses waiting on its lane. */
+export type LineKind = 'window' | 'door' | 'house';
 
 export interface WindowLineState {
   /** The line's number, 1 for the first bought and one more for each after it: what its modules

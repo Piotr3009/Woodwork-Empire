@@ -60,7 +60,7 @@ function rows(state: GameState, line: number, onOrder = false): number[] {
 describe('a v93 save whose line has no lane (v94)', () => {
   it('opens with the line moved one metre back to where it has its lane, free, and a card that says so', () => {
     const state = company({ x: 2, y: 15 });
-    expect(laneTrouble(state, { x: 2, y: 15 })).toBe('frontWall');
+    expect(laneTrouble(state, { x: 2, y: 15 }, 'window')).toBe('frontWall');
     const cash = state.cash;
     const opened = migrateState(asV45(state), 45);
     if (opened === null) throw new Error('the save opens');

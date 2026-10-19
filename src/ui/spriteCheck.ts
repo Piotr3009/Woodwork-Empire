@@ -7,6 +7,8 @@ import {
   CUTTER_SETS,
   EQUIPMENT_SPECS,
   FORKLIFT_SHEETS,
+  GATE_LINE_KINDS,
+  HOUSE_WAIT_LAYOUT,
   LINE_KINDS,
   LINE_KIND_ORDER,
   LINE_PALLET_LAYOUT,
@@ -159,7 +161,7 @@ export function spriteTargets(): SpriteTarget[] {
   });
   // The pallet of a line's ten windows or ten doors standing alone, which is no family's class
   // either: its size is where it stands at the gate (CLAUDE.md T31 2.10; v108: the door line's).
-  for (const kind of LINE_KIND_ORDER) {
+  for (const kind of GATE_LINE_KINDS) {
     const key = LINE_KINDS[kind].palletSprite;
     add({
       name: `${key}.standard`,
@@ -172,6 +174,23 @@ export function spriteTargets(): SpriteTarget[] {
       zoneWidth: LINE_PALLET_LAYOUT.width,
       zoneDepth: LINE_PALLET_LAYOUT.depth,
       where: `at the gate, the ${LINE_KINDS[kind].unit} line's`,
+    });
+  }
+  // And a finished house on its transporter waiting on the house factory's lane: its size is the
+  // transporter's deck it stands on (v114).
+  for (const kind of LINE_KIND_ORDER.filter((each) => LINE_KINDS[each].collection === 'lane')) {
+    const key = LINE_KINDS[kind].palletSprite;
+    add({
+      name: `${key}.standard`,
+      specId: key,
+      spriteKey: key,
+      tier: 'standard',
+      width: HOUSE_WAIT_LAYOUT.width,
+      depth: HOUSE_WAIT_LAYOUT.depth,
+      height: HOUSE_WAIT_LAYOUT.height,
+      zoneWidth: HOUSE_WAIT_LAYOUT.width,
+      zoneDepth: HOUSE_WAIT_LAYOUT.depth,
+      where: `on the lane, the ${LINE_KINDS[kind].unit} line's`,
     });
   }
   return targets;

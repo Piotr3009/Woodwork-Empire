@@ -69,8 +69,8 @@ describe('the version in the corner', () => {
     // renewals at most (PIOTR, 18.10). v110 is the glass shelter's and the large timber shelter's
     // pictures (PIOTR, 18.10). v111 is the yard behind the hall laid out in its order (PIOTR, 18.10).
     // v112 is the security firms at half the price (PIOTR, 18.10). v113 is the hall's six levels
-    // (PIOTR, 18.10).
-    expect(APP_VERSION).toBe('v113');
+    // (PIOTR, 18.10). v114 is the timber frame house factory (PIOTR, 18.10).
+    expect(APP_VERSION).toBe('v114');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -86,7 +86,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v113'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v114'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

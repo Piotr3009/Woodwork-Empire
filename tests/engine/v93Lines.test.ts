@@ -150,7 +150,7 @@ describe('buying the next line (PIOTR, 12.10)', () => {
   it('is bought as the first was, for the same ten million, under the next number, seven metres behind the first', () => {
     const state = withLine(bigUnit(), 1, WINDOW_LINE_ORIGIN);
     expect(canBuy(state, 'windowLine1')).toEqual({ ok: true, reason: '' });
-    expect(lineSite(state)).toEqual({ x: 2, y: 7 });
+    expect(lineSite(state, 'window')).toEqual({ x: 2, y: 7 });
     const cash = state.cash;
     expect(placeEquipmentOrder(state, 'windowLine1').ok).toBe(true);
     expect(state.cash).toBe(cash - LINE_PRICE);

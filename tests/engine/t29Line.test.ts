@@ -243,7 +243,7 @@ describe('the six modules of the line (CLAUDE.md T30 2.3.1, 2.3.7)', () => {
     let expected: { x: number; y: number } | null = null;
     for (let y = 0; y + 3 <= state.unit.depthCells && expected === null; y += 1) {
       for (let x = 0; x + 36 <= state.unit.widthCells; x += 1) {
-        if (lineFits(state, { x, y }, new Set())) {
+        if (lineFits(state, { x, y }, 'window', new Set())) {
           expected = { x, y };
           break;
         }
@@ -539,8 +539,9 @@ describe('the line s card and the sheets that list machines (CLAUDE.md T30 2.3.3
   it('is one folder on the tab, from the whole line s price', () => {
     const tab = folder(bigUnit());
     const folders = Array.from(tab.querySelectorAll('.folder')).map((node) => node.getAttribute('data-folder'));
-    // The window line's folder, and the door line's beside it from v107 (flipped).
-    expect(folders).toEqual(['windowLine1', 'doorLine1']);
+    // The window line's folder, the door line's beside it from v107 and the house factory's from
+    // v114 (flipped).
+    expect(folders).toEqual(['windowLine1', 'doorLine1', 'houseLine1']);
     expect(tab.textContent).toContain('Window production line');
     expect(tab.textContent).toContain('from £10,000,000');
     expect(tab.textContent).toContain('Makes windows from the board to the pallet: six modules in one line, 36 m long.');

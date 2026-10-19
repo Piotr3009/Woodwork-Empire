@@ -8,8 +8,10 @@ import {
   CNC_TOOL_CHANGER_SPRITE,
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
+  GATE_LINE_KINDS,
+  HOUSE_WAIT_LAYOUT,
+  HOUSES_WAITING_DRAWN,
   LINE_KINDS,
-  LINE_KIND_ORDER,
   LINE_PALLET_LAYOUT,
   LINE_PALLETS_DRAWN,
   FORKLIFT_SHEETS,
@@ -1074,6 +1076,17 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
   return NO_FX;
 }
 
+/** The depth a piece of kit is sorted at among the hall's drawables: its own cell's, as every
+ *  machine's; and a house factory's station, ten metres deep and ten high, its cell's and its depth,
+ *  so what stands beside it on its left, the rooms and their doors among them, is drawn before it and
+ *  the houses waiting on its lane after it (v114) [TUNE: chat]. The window and the door lines'
+ *  modules, three metres deep, are sorted at their cells as before. */
+function kitDepth(item: Equipment, stands: { depth: number }): number {
+  const kind = moduleKind(item.specId);
+  const deep = kind !== null && LINE_KINDS[kind].collection === 'lane' ? stands.depth : 0;
+  return depthKey(item.anchorX, item.anchorY) + deep;
+}
+
 /** True while a module of the line plays its working motion: only while the clock runs (the test
  *  the hall's sound makes: a speed, no card open, the game not over), and then, while the line's
  *  contract runs, all six in the minutes the line makes windows, and without it a module the hall
@@ -1833,10 +1846,23 @@ export function expandedStoreFilter(id: string = STORE_EXPANDED_FILTER): string 
 /** The forklift's lane of every line that stands or is on order and has one: the outline of each
  *  L, from the pallets at the gate along the left wall and along the front strip to the line's end,
  *  in the one token for it, marked with its line's number. Nothing for a line with no lane
- *  (CLAUDE.md T31 2.6; v93) [TUNE: the outline]. */
+ *  (CLAUDE.md T31 2.6; v93) [TUNE: the outline]. A house factory's lane is its front strip alone,
+ *  outlined the same way (v114). */
 function laneArt(state: GameState): string {
   return lineLanes(state)
     .map(({ line, front, left }) => {
+      if (left === null) {
+        const box = [
+          { x: front.x, y: front.y },
+          { x: front.x + front.width, y: front.y },
+          { x: front.x + front.width, y: front.y + front.depth },
+          { x: front.x, y: front.y + front.depth },
+        ].map((corner) => tileToScreen(corner.x, corner.y));
+        return (
+          `<polygon data-lane="${line}" points="${points(box)}" fill="none" stroke="var(--lane-yellow)" ` +
+          `stroke-width="${LANE_STROKE}" stroke-linejoin="miter" pointer-events="none" />`
+        );
+      }
       const top = Math.min(left.y, front.y);
       const bottom = Math.max(left.y + left.depth, front.y + front.depth);
       // The left strip spans the front strip's rows and the pallets' row: the outline goes round
@@ -2157,7 +2183,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const fx = machineFx(state, item, spec);
     const foot: FloorBox = { x: stands.x, y: stands.y, width: stands.width, depth: stands.depth };
     drawables.push({
-      depth: depthKey(item.anchorX, item.anchorY),
+      depth: kitDepth(item, stands),
       foot,
       svg:
         `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
@@ -2455,7 +2481,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const pallets = palletsAtTheGate(state);
   if (pallets > 0) {
     const gate = LINE_PALLET_LAYOUT;
-    const waiting = LINE_KIND_ORDER.map((kind) => ({ kind, count: palletsAtTheGate(state, kind) })).filter(
+    // The kinds whose pallets wait at the gate: a house factory's houses wait on its lane (v114).
+    const waiting = GATE_LINE_KINDS.map((kind) => ({ kind, count: palletsAtTheGate(state, kind) })).filter(
       (entry) => entry.count > 0,
     );
     const shown = waiting
@@ -2495,6 +2522,52 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
               .map((entry, index) => `${index === 0 ? plural(entry.count, 'pallet', 'pallets') : entry.count} of ${LINE_KINDS[entry.kind].units}`)
               .join(' and ')}`,
       ),
+    });
+  }
+
+  // Each house factory's finished houses wait for the housebuilder on its own lane, at the lane's
+  // gate end: side by side from the left wall, a transporter's deck each and three at the most, each
+  // drawn from the art side's waiting house or as a box until it comes, and one label on the floor
+  // in front of the first, as the pallets' at the gate (PIOTR, 18.10: delivered on the gate's side;
+  // v114) [TUNE: chat]. Each is sorted by its back corner and its depth, so it is drawn after the
+  // stations behind it, as a station is (`kitDepth`).
+  for (const { line, front } of lineLanes(state)) {
+    const record = lineRecord(state, line);
+    if (record === null || record.palletsAtGate === 0) continue;
+    const kind = LINE_KINDS[record.kind];
+    if (kind.collection !== 'lane') continue;
+    const wait = HOUSE_WAIT_LAYOUT;
+    const y = front.y + (front.depth - wait.depth) / 2;
+    const title = `${capitalFirst(kind.units)} for collection`;
+    const shown = Math.min(record.palletsAtGate, HOUSES_WAITING_DRAWN);
+    for (let index = 0; index < shown; index += 1) {
+      const x = front.x + wait.fromEnd + index * (wait.width + wait.gap);
+      drawables.push({
+        depth: depthKey(x, y) + wait.depth,
+        foot: { x, y, width: wait.width, depth: wait.depth },
+        svg:
+          `<g data-house-waiting="${index}" data-house-line="${line}"><title>${title}</title>` +
+          objectArt({
+            files,
+            spriteKey: kind.palletSprite,
+            tier: 'standard',
+            x,
+            y,
+            width: wait.width,
+            depth: wait.depth,
+            height: wait.height,
+            fill: 'var(--kit-stock)',
+            shade: 'var(--kit-stock-dark)',
+            label: title,
+          }) +
+          '</g>',
+      });
+    }
+    const first = front.x + wait.fromEnd;
+    const ahead = y + wait.depth;
+    drawables.push({
+      depth: depthKey(first, ahead) + wait.depth + 0.3,
+      svg: label(centreOf(first, ahead, wait.width, front.y + front.depth - ahead), `${title}: ${record.palletsAtGate}`),
     });
   }
 

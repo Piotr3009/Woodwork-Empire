@@ -2871,7 +2871,7 @@ export function canBuy(
 function lineBuyCheck(state: GameState, prepaid: boolean, kind: LineKind): BuyCheck {
   if (!prepaid && !canAfford(state, linePriceOf(kind))) return { ok: false, reason: 'Not enough cash' };
   if (state.movedItems.length > 0) return { ok: false, reason: 'The kit is half shifted. Finish the move first' };
-  if (lineSite(state) === null) return { ok: false, reason: LINE_NO_ROOM };
+  if (lineSite(state, kind) === null) return { ok: false, reason: LINE_NO_ROOM };
   return OK;
 }
 
@@ -2974,7 +2974,7 @@ export function buyEquipment(
   // once, under the next number (CLAUDE.md T30 2.3.4; v93).
   const kind = moduleKind(specId);
   if (kind !== null) {
-    const site = lineSite(state);
+    const site = lineSite(state, kind);
     if (site === null) return { ok: false, reason: LINE_NO_ROOM };
     const line = nextLineNumber(state);
     if (!prepaid) pay(state, 'equipment', `${LINE_KINDS[kind].name}, ${lineName(line).toLowerCase()}`, linePriceOf(kind));
@@ -3145,7 +3145,7 @@ export function placeEquipmentOrder(
  *  with its share as the price paid, for the insurance, the books and the sale. Built to order, so
  *  no module's order is called off (CLAUDE.md T30 2.3.4) [TUNE: chat: the words]. */
 function placeLineOrder(state: GameState, kind: LineKind): BuyCheck {
-  const site = lineSite(state);
+  const site = lineSite(state, kind);
   if (site === null) return { ok: false, reason: LINE_NO_ROOM };
   // Under the next number, which its six outlines carry and its record is written for, with its
   // kind (v93; v107).

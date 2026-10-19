@@ -21,7 +21,7 @@
 import { FIGURE_DEPTH_OFFSET, LINE_FRONT_CELLS } from '../engine/constants';
 import { isWorkingDay } from '../engine/clock';
 import { lineBox, linePlace } from '../engine/layout';
-import { lineEngineersOnDuty, standingLines } from '../engine/machines';
+import { lineEngineersOnDuty, lineKindOf, standingLines } from '../engine/machines';
 import { crewHasGoneHome } from '../engine/staff';
 import type { GameState } from '../engine/types';
 import { type CharacterOptions, type Facing, characterArt, faceCharacter, walkPace } from './characters';
@@ -76,7 +76,7 @@ export function engineerPath(state: GameState, line: number): { from: Point; len
   if (!standingLines(state).includes(line)) return null;
   const at = linePlace(state, line);
   if (at === null) return null;
-  const box = lineBox(at);
+  const box = lineBox(at, lineKindOf(state, line));
   return {
     from: { x: box.x + IN_FROM_THE_END, y: box.y + box.depth + LINE_FRONT_CELLS / 2 },
     length: Math.max(0, box.width - 2 * IN_FROM_THE_END),

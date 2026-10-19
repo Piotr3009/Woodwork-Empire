@@ -312,8 +312,13 @@ function lineContractBlock(state: GameState, line: number): string {
     `In all: ${contract.windowsMade}</strong> · ${money(lineUnitPriceOf(record.kind))} a ${kind.unit}; the timber and the glass ` +
     `${money(lineMaterialPerUnitOf(record.kind))} a ${kind.unit}, from the stores</p>` +
     `<p class="hint">One ${kind.unit} every ${escapeHtml(lineWindowEvery(minutesEach))}: about ${lineWindowsAWeek(state, line)} a week</p>` +
-    countRow('On the pallet', `${record.onPallet} of ${kind.palletUnits}`) +
-    (record.palletsAtGate > 0 ? countRow('At the gate for collection', plural(record.palletsAtGate, 'pallet', 'pallets')) : '') +
+    // A house factory has no pallet: each house waits on its own lane (v114).
+    (kind.collection === 'gate'
+      ? countRow('On the pallet', `${record.onPallet} of ${kind.palletUnits}`) +
+        (record.palletsAtGate > 0 ? countRow('At the gate for collection', plural(record.palletsAtGate, 'pallet', 'pallets')) : '')
+      : record.palletsAtGate > 0
+        ? countRow('On the lane for collection', plural(record.palletsAtGate, kind.unit, kind.units))
+        : '') +
     still +
     lineMaterialRows(contract, record.kind) +
     '</div>'

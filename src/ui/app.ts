@@ -622,7 +622,7 @@ function ghostFor(current: GameState): Ghost | null {
   if (kind !== null) {
     const offset = lineModuleCell({ x: 0, y: 0 }, kit.specId);
     const first = { x: drag.x - offset.x, y: drag.y - offset.y };
-    const whole = lineBox(first);
+    const whole = lineBox(first, kind);
     return {
       ...whole,
       ok: check.ok,

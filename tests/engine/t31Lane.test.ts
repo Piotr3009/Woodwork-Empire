@@ -59,19 +59,19 @@ describe('where the lane is (CLAUDE.md T31 2.6)', () => {
   it('is the front strip from x 0 to the line s end and the left strip up the left wall from y 10, for the line at (2, 14)', () => {
     const state = withLine(bigUnit());
     expect(state.unit.depthCells).toBe(20);
-    expect(forkliftLane(state, { x: 2, y: 14 })).toEqual([
+    expect(forkliftLane(state, { x: 2, y: 14 }, 'window')).toEqual([
       { x: 0, y: 18, width: 38, depth: 2 },
       { x: 0, y: 10, width: 2, depth: 10 },
     ]);
     expect(lineLanes(state)).toEqual([{ line: 1, front: { x: 0, y: 18, width: 38, depth: 2 }, left: { x: 0, y: 10, width: 2, depth: 10 } }]);
     // The lane follows the line: two metres in front of its engineers' metre, wherever it stands
     // (v93), the left strip reaching the pallets' row.
-    expect(forkliftLane(state, { x: 4, y: 12 })).toEqual([
+    expect(forkliftLane(state, { x: 4, y: 12 }, 'window')).toEqual([
       { x: 0, y: 16, width: 40, depth: 2 },
       { x: 0, y: 10, width: 2, depth: 8 },
     ]);
     // A line behind the pallets' row: its left strip runs down from its front strip to them.
-    expect(forkliftLane(state, { x: 2, y: 7 })).toEqual([
+    expect(forkliftLane(state, { x: 2, y: 7 }, 'window')).toEqual([
       { x: 0, y: 11, width: 38, depth: 2 },
       { x: 0, y: 10, width: 2, depth: 3 },
     ]);
@@ -79,10 +79,10 @@ describe('where the lane is (CLAUDE.md T31 2.6)', () => {
 
   it('cannot be for a line nearer the front wall than y 14, over the left strip, or so near the rear wall that its lane crosses the way to the gate', () => {
     const state = bigUnit();
-    expect(forkliftLane(state, { x: 2, y: 15 })).toBeNull();
-    expect(forkliftLane(state, { x: 0, y: 12 })).toBeNull();
-    expect(forkliftLane(state, { x: 2, y: 5 })).toBeNull();
-    expect(forkliftLane(state, { x: 2, y: 6 })).not.toBeNull();
+    expect(forkliftLane(state, { x: 2, y: 15 }, 'window')).toBeNull();
+    expect(forkliftLane(state, { x: 0, y: 12 }, 'window')).toBeNull();
+    expect(forkliftLane(state, { x: 2, y: 5 }, 'window')).toBeNull();
+    expect(forkliftLane(state, { x: 2, y: 6 }, 'window')).not.toBeNull();
   });
 
   it('is there while the line is on order, and none without a line', () => {
@@ -102,7 +102,7 @@ describe('nothing else stands on it (CLAUDE.md T31 2.6)', () => {
     if (rack === undefined) throw new Error('the rack is wanted');
     expect(canPlace(state, rack.id, 20, 18)).toEqual({ ok: false, reason: "That is the forklift's lane" });
     // Every free place a purchase finds is off the lane.
-    const strips = lineLanes(state).flatMap((lane) => [lane.front, lane.left]);
+    const strips = lineLanes(state).flatMap((lane) => (lane.left === null ? [lane.front] : [lane.front, lane.left]));
     let bought = state;
     for (let n = 0; n < 6; n += 1) bought = buyNow(bought, 'workbench');
     for (const item of bought.equipment.filter((entry) => entry.specId === 'workbench')) {

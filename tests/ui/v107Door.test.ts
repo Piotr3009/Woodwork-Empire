@@ -75,9 +75,11 @@ function page(html: string): HTMLElement {
 describe('the catalogue (v107)', () => {
   it('holds a folder a kind of line, the door line s from its own price', () => {
     const tab = page(renderCatalogue(bigUnit(), '', catalogueTabFrom('line')));
+    // And the house factory's after them from v114 (flipped).
     expect(Array.from(tab.querySelectorAll('.folder')).map((node) => node.getAttribute('data-folder'))).toEqual([
       'windowLine1',
       'doorLine1',
+      'houseLine1',
     ]);
     const door = tab.querySelector('[data-folder="doorLine1"]')?.textContent ?? '';
     expect(door).toContain('Door production line');
@@ -212,8 +214,8 @@ describe('the door line s forklift (v108)', () => {
     if (points === null) throw new Error('the door line s forklift is wanted');
     // The pallets' row is at y 10 to 11; the door line's lane comes to it from below, so it stops a
     // metre short of the middle on that side.
-    expect(Math.abs(points.drop.y - 10.5)).toBeCloseTo(FORKLIFT_LOADED_BY_KIND.door.ahead, 6);
-    expect(FORKLIFT_LOADED_BY_KIND.door.ahead).toBe(1);
+    expect(Math.abs(points.drop.y - 10.5)).toBeCloseTo(FORKLIFT_LOADED_BY_KIND.door?.ahead ?? 0, 6);
+    expect(FORKLIFT_LOADED_BY_KIND.door?.ahead).toBe(1);
     // A window pallet already waits at the gate when the forklifts are first seen; then the door line
     // sends one and its forklift takes it.
     lineState(state, 1).palletsAtGate = 1;

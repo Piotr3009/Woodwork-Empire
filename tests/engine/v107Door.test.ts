@@ -168,7 +168,8 @@ describe('the door line in the table (PIOTR, 18.10)', () => {
       expect(BUILT_TO_ORDER, id).toContain(id);
       expect(LINE_MODULE_INDEX.get(id), id).toEqual({ kind: 'door', place: index + 1 });
     });
-    expect(ALL_LINE_MODULES).toHaveLength(12);
+    // Eighteen from v114: the house factory's six after them.
+    expect(ALL_LINE_MODULES).toHaveLength(18);
   });
 });
 

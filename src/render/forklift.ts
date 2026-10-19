@@ -25,9 +25,10 @@
 import {
   FIGURE_DEPTH_OFFSET,
   FORKLIFT_CELLS_PER_SECOND,
+  FORKLIFT_LOAD_AHEAD,
   FORKLIFT_LOADED_BY_KIND,
   FORKLIFT_SHEETS,
-  LINE_KIND_ORDER,
+  GATE_LINE_KINDS,
   LINE_PALLET_LAYOUT,
   LINE_PALLETS_DRAWN,
 } from '../engine/constants';
@@ -95,12 +96,14 @@ const MAX_STEP_SECONDS = 1;
  *  corner, and where it stops with the pallet on its forks over its place at the gate, which is up
  *  the left strip for a line in front of the pallets and down it for a line behind them. Null while
  *  the six do not stand whole or the line has no lane: then there is no forklift (CLAUDE.md T31
- *  2.10; v93). */
+ *  2.10; v93); and never one for a house factory, whose houses drive out on their own transporters
+ *  (v114). */
 export function forkliftPoints(state: GameState, line: number): { wait: Point; corner: Point; drop: Point; key: string } | null {
   if (!lineStandsWhole(state, line)) return null;
   const at = linePlace(state, line);
   if (at === null) return null;
-  const lane = forkliftLane(state, at);
+  const kind = lineKindOf(state, line);
+  const lane = forkliftLane(state, at, kind);
   const front = lane?.[0];
   const left = lane?.[1];
   if (front === undefined || left === undefined) return null;
@@ -109,7 +112,7 @@ export function forkliftPoints(state: GameState, line: number): { wait: Point; c
   const palletMiddle = LINE_PALLET_LAYOUT.y + LINE_PALLET_LAYOUT.depth / 2;
   // The pallet is ahead of the forklift along the way it drives: the stop is short of the pallets'
   // row on the side it comes from, by how far ahead its kind's pallet rides (v108).
-  const ahead = FORKLIFT_LOADED_BY_KIND[lineKindOf(state, line)].ahead;
+  const ahead = FORKLIFT_LOADED_BY_KIND[kind]?.ahead ?? FORKLIFT_LOAD_AHEAD;
   const drop = frontMiddle >= palletMiddle ? palletMiddle + ahead : palletMiddle - ahead;
   return {
     wait: { x: front.x + front.width - WAIT_SHORT_OF_THE_END, y: frontMiddle },
@@ -122,15 +125,15 @@ export function forkliftPoints(state: GameState, line: number): { wait: Point; c
 /** The sheet of the forklift on this leg: loaded with its line's kind of pallet on the way out,
  *  empty otherwise (v108). */
 function sheetOf(forklift: Forklift): VehicleSheetFigures {
-  return forklift.leg === 'out' ? FORKLIFT_LOADED_BY_KIND[forklift.kind].sheet : FORKLIFT_SHEETS.empty;
+  return forklift.leg === 'out' ? (FORKLIFT_LOADED_BY_KIND[forklift.kind]?.sheet ?? FORKLIFT_SHEETS.loaded) : FORKLIFT_SHEETS.empty;
 }
 
 /** Where the newest pallet of a kind stands among the pallets the hall draws at the gate, the
  *  windows' first and then the doors' and never more than the drawn ones, so its forklift carries
  *  the very pallet the gate leaves out; null when none of that kind is drawn (CLAUDE.md T31 2.10;
- *  v108). */
+ *  v108). The kinds whose pallets wait at the gate only (v114). */
 function newestDrawnPallet(state: GameState, kind: LineKind): number | null {
-  const before = LINE_KIND_ORDER.slice(0, LINE_KIND_ORDER.indexOf(kind)).reduce(
+  const before = GATE_LINE_KINDS.slice(0, GATE_LINE_KINDS.indexOf(kind)).reduce(
     (total, earlier) => total + palletsAtTheGate(state, earlier),
     0,
   );

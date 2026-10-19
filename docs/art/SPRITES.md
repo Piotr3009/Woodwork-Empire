@@ -1030,3 +1030,26 @@ the Premises page. Every layer is picked with the level as its tier (`hallLevelT
 falls back to today's, as every picture without its class falls back to its family's (`pictureFor`).
 Everything drawn on the painting (the kit, the people, the lettering on the wall, the rooms' doors) is
 drawn as it was.
+
+## 22. The timber frame house factory (P4, 18.10.2026; v114; files owed)
+
+Piotr took the art side's concept P4-A ("masz grafikę") as layout A, with one change: the finished
+house is delivered towards the gate. The game has the factory from v114 (docs/notes-v114.md), each
+station drawn as kit with no picture is drawn, a box of its metres with its name, until the files of
+the order docs/art/REQUESTS-P4.md land; then they are drawn by their keys with no code. The concept's
+ZIP stays with Piotr: it was a board for a decision, and nothing of it is a game file.
+
+| Keys the game asks for | What they are | Metres w x d x h | File, px | Anchor, view 0 / `.r` |
+|---|---|---|---|---|
+| `houseLine1.standard` to `houseLine6.standard` (and `.r`) | the six stations under their gantry cranes, each with its stage's house on its transporter | 14 x 10 x 10 | 1,168 x 1,072 | 680, 1,064 / 488, 1,064 |
+| `houseWaiting.standard` | a finished house standing alone on its transporter, facing the gate (minus x) | 10 x 7.5 x 5.5 | 856 x 700 | 488, 692 |
+
+**How the game uses them.** The six stations stand end to end along x at a 14 m pitch, station 1 at
+the left, never turned, and each is drawn as one picture sorted at its own cell and its 10 m of depth
+(`kitDepth` in `src/render/hall.ts`), so each file must hold everything of its own box and nothing
+outside it, the runway beams cut at the boundaries. A house factory has no working motion
+(`MACHINE_WORK_SHEETS` holds the window and door lines' modules only), no pallet on station 6 and no
+forklift. A finished house waits on the line's own 10 m lane at its gate end, three drawn at the most
+side by side from the left wall (`HOUSE_WAIT_LAYOUT`, `HOUSES_WAITING_DRAWN`), by the kind's
+`palletSprite`, `houseWaiting`; the lane's outline and the label `Houses for collection: 2` are the
+game's. The Sprite check page lists the waiting house beside the two pallets.

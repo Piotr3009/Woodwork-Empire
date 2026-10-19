@@ -387,13 +387,16 @@ function figureLines(lines: Line[]): string {
 }
 
 /** The line's own lines on its card, from the constants and never in written figures: a row a
- *  module with the stages it does (`LINE_COVERS`), what the window line gives the window jobs with
- *  its two engineers and what a new line makes a window in, or what a door line makes with its four,
- *  and how it is sold (CLAUDE.md T30 2.3.3; v107). */
+ *  module with the stages it does (`LINE_COVERS`), or a house factory's station in its own words,
+ *  what the window line gives the window jobs with its two engineers and what a new line makes a
+ *  window in, or what a door line makes with its four and a house factory with its ten, and how it is
+ *  sold (CLAUDE.md T30 2.3.3; v107; v114). */
 function lineLines(kindId: LineKind): Line[] {
   const kind = LINE_KINDS[kindId];
   const rows = lineModulesOf(kindId).map((_, index) => {
     const place = index + 1;
+    const own = kind.moduleRows?.[index];
+    if (own !== undefined) return line(`Module ${place}: ${own}`);
     const stages = TIMBER_STAGES.filter((stage) => LINE_COVERS[stage.id] === place);
     const words = stages.map((stage) => {
       const tail = kind.rowTails[stage.id];
@@ -424,7 +427,7 @@ function lineLines(kindId: LineKind): Line[] {
  *  2.3.3; v107). */
 function lineCostLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant, kind: LineKind): Line[] {
   const power = lineModulesOf(kind).reduce((total, id) => total + (findVariant(id, variant.id)?.powerPerDay ?? 0), 0);
-  const floor = lineBox({ x: 0, y: 0 });
+  const floor = lineBox({ x: 0, y: 0 }, kind);
   return [
     line(deliveryLine(spec, variant)),
     line(`Power ${money(power)} a day`),

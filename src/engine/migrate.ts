@@ -45,7 +45,7 @@ import {
   standsBehindTheWall,
   standsOutside,
 } from './layout';
-import { findSpec, isLineModule, isSold, lineNumbers, standingLines } from './machines';
+import { findSpec, isLineModule, isSold, lineKindOf, lineNumbers, standingLines } from './machines';
 import { queueEvent } from './events';
 import { glassForJob } from './materials';
 import { planPlaces } from './production';
@@ -1370,10 +1370,12 @@ function placeForOrder(state: GameState, line: number, at: { x: number; y: numbe
   const near = nearestLanePlace(state, line, at);
   if (near !== null) return near;
   const ignore = new Set(lineGroup(state, true, line));
-  const size = lineBox({ x: 0, y: 0 });
+  // Of its own kind: a save this lift runs on has window lines only, and the kind says so (v114).
+  const kind = lineKindOf(state, line);
+  const size = lineBox({ x: 0, y: 0 }, kind);
   for (let y = 0; y + size.depth <= state.unit.depthCells; y += 1) {
     for (let x = 0; x + size.width <= state.unit.widthCells; x += 1) {
-      if (lineFits(state, { x, y }, ignore, line)) return { x, y };
+      if (lineFits(state, { x, y }, kind, ignore, line)) return { x, y };
     }
   }
   return null;
@@ -1389,7 +1391,7 @@ function giveTheLinesTheirLanes(state: GameState): void {
   const told: string[] = [];
   for (const line of standingLines(state)) {
     const at = linePlace(state, line);
-    if (at === null || laneTrouble(state, at) === null) continue;
+    if (at === null || laneTrouble(state, at, lineKindOf(state, line)) === null) continue;
     let to = nearestLanePlace(state, line, at, new Set(), LANE_LIFT_MAX_ROWS);
     let inTheWay: number[] = [];
     if (to === null) {
@@ -1411,7 +1413,7 @@ function giveTheLinesTheirLanes(state: GameState): void {
       const there = linePlace(state, other);
       if (there === null) continue;
       const ignore = new Set(lineGroup(state, true, other));
-      if (lineFits(state, there, ignore, other)) continue;
+      if (lineFits(state, there, lineKindOf(state, other), ignore, other)) continue;
       const place = placeForOrder(state, other, there);
       if (place === null) {
         undone = true;

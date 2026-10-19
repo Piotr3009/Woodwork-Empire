@@ -242,7 +242,8 @@ describe('the tabs', () => {
     expect(all.filter((id) => id === 'spindleMoulder')).toHaveLength(2);
     const once = all.filter((id) => id !== 'spindleMoulder');
     expect(new Set(once).size).toBe(once.length);
-    expect(folders('line')).toEqual(['windowLine1', 'doorLine1']);
+    // A folder a kind of line: the house factory's from v114 (flipped).
+    expect(folders('line')).toEqual(['windowLine1', 'doorLine1', 'houseLine1']);
     expect(new Set(all)).toEqual(
       new Set(EQUIPMENT_SPECS.map((spec) => spec.id).filter((id) => !isLineModule(id) || lineModuleIndex(id) === 1)),
     );

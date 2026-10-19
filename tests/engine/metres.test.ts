@@ -147,6 +147,13 @@ describe('footprints in metres', () => {
       doorLine4: [6, 3, 3],
       doorLine5: [6, 3, 3],
       doorLine6: [6, 3, 3],
+      // The house factory's six stations, chat's metres from the art side's P4-A (v114).
+      houseLine1: [14, 10, 10],
+      houseLine2: [14, 10, 10],
+      houseLine3: [14, 10, 10],
+      houseLine4: [14, 10, 10],
+      houseLine5: [14, 10, 10],
+      houseLine6: [14, 10, 10],
       // The two timber stores, the art side's metres; the shelter declared as the art side drew it,
       // 6 m along the rear wall by 3 m deep, since it stands behind the wall from Turn 31 (CLAUDE.md
       // T29 2.4, 2.11.1; T31 2.8).

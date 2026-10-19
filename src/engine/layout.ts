@@ -10,7 +10,7 @@ import {
   GATE_LANE,
   LINE_BEHIND_CELLS,
   LINE_FRONT_CELLS,
-  LINE_MODULES,
+  LINE_KINDS,
   LINE_PALLET_LAYOUT,
   LOCKER_SLOT_LAYOUT,
   LOCKER_SLOT_LAYOUT_WIDE,
@@ -24,6 +24,7 @@ import {
   UNIT_SECOND_EXTENSION_M2,
   WINDOW_LINE_ORIGIN,
   YARD_WIDTH_CELLS,
+  lineModulesOf,
   roomsOf,
   secondExtensionOf,
 } from './constants';
@@ -33,9 +34,11 @@ import {
   isLineModule,
   isSold,
   itemStandsInTheHall,
+  lineKindOf,
   lineModuleIndex,
   lineNumbers,
   lineOf,
+  moduleKind,
   standsInTheHall,
   zoneOf,
 } from './machines';
@@ -43,7 +46,7 @@ import { reservedItems } from './orders';
 import { pinned } from './pinned';
 import { metresBy } from './text';
 import { standsOutsideTheHall } from './walk';
-import type { Equipment, GameState, OnOrderItem, Orientation } from './types';
+import type { Equipment, GameState, LineKind, OnOrderItem, Orientation } from './types';
 
 export interface PlaceCheck {
   ok: boolean;
@@ -303,16 +306,24 @@ export function canPlaceSpec(
  *  2.6) [TUNE]. */
 export const FORKLIFT_LANE_REFUSAL = 'That is the forklift\'s lane';
 
-/** The three kinds of ground a line claims beside its own 36 m by 3 m (v93): the forklift's lane,
- *  the metre in front where its engineers walk, and the metre behind it (PIOTR, 12.10). */
-export type GroundKind = 'lane' | 'path' | 'behind';
+/** The kinds of ground a line claims beside its own 36 m by 3 m (v93): the forklift's lane, the
+ *  metre in front where its engineers walk, and the metre behind it (PIOTR, 12.10); and the house
+ *  factory's lane in place of a forklift's, where its houses drive out and wait (v114). */
+export type GroundKind = 'lane' | 'drive' | 'path' | 'behind';
 
 /** What setup mode and every purchase's search say of a cell of each kind [TUNE: the words]. */
 export const GROUND_REFUSALS: Readonly<Record<GroundKind, string>> = {
   lane: FORKLIFT_LANE_REFUSAL,
+  drive: 'That is the house factory\'s lane',
   path: 'That is the engineers\' path',
   behind: 'That is the metre behind the line',
 };
+
+/** True for a lane's ground, a forklift's or a house factory's: what two lines may share (v93;
+ *  v114). */
+function isLaneGround(kind: GroundKind): boolean {
+  return kind === 'lane' || kind === 'drive';
+}
 
 /** One box of a line's ground, by its line and its kind. */
 export interface GroundBox {
@@ -321,50 +332,67 @@ export interface GroundBox {
   box: Box;
 }
 
-/** The ground a line claims with module 1 at this cell (PIOTR, 12.10: "1 metre for the engineers,
- *  2 for the forklift, and add one more metre of free space"): the metre behind it, towards the
- *  rear wall, where nothing stands (none for a line at the rear wall); its 36 m by 3 m; the metre in
- *  front where its engineers walk; and the forklift's lane, two metres in front of that from x 0 to
- *  the line's end, with the left strip up the left wall between the lane and the pallets at the
- *  gate, two metres wide [TUNE: chat: no strip round the line's end]. Seven metres in depth, so two
- *  lines stand one behind the other in the 800 m2 hall, or side by side along a longer one. Null
- *  where the lane cannot be: off the floor, or on the way to the gate (CLAUDE.md T31 2.6; v93). */
+/** The ground a line of a kind claims with module 1 at this cell (PIOTR, 12.10: "1 metre for the
+ *  engineers, 2 for the forklift, and add one more metre of free space"): the metre behind it,
+ *  towards the rear wall, where nothing stands (none for a line at the rear wall); its modules end to
+ *  end; the metre in front where its engineers walk; and its lane in front of that from x 0 to the
+ *  line's end: the forklift's two metres, with the left strip up the left wall between the lane and
+ *  the pallets at the gate, two metres wide [TUNE: chat: no strip round the line's end]; or the house
+ *  factory's ten, with no strip, its houses waiting at its gate end (v114). Seven metres in depth a
+ *  window line, so two lines stand one behind the other in the 800 m2 hall, or side by side along a
+ *  longer one; twenty two a house factory. Null where the lane cannot be: off the floor, or on the
+ *  way to the gate (CLAUDE.md T31 2.6; v93). */
 export function lineGround(
   state: GameState,
   at: { x: number; y: number },
-): { behind: Box | null; line: Box; path: Box; front: Box; left: Box } | null {
+  kind: LineKind,
+): { behind: Box | null; line: Box; path: Box; front: Box; left: Box | null } | null {
   const depth = state.unit.depthCells;
-  const line = lineBox(at);
+  const spec = LINE_KINDS[kind];
+  const line = lineBox(at, kind);
   const behind: Box | null =
     line.y >= LINE_BEHIND_CELLS ? { x: line.x, y: line.y - LINE_BEHIND_CELLS, width: line.width, depth: LINE_BEHIND_CELLS } : null;
   const path: Box = { x: line.x, y: line.y + line.depth, width: line.width, depth: LINE_FRONT_CELLS };
-  const front: Box = { x: 0, y: path.y + path.depth, width: line.x + line.width, depth: FORKLIFT_LANE_CELLS };
-  const pallets = LINE_PALLET_LAYOUT;
-  const top = Math.min(pallets.y, front.y);
-  const bottom = Math.max(pallets.y + pallets.depth, front.y + front.depth);
-  const left: Box = { x: 0, y: top, width: FORKLIFT_LANE_CELLS, depth: bottom - top };
+  const front: Box = { x: 0, y: path.y + path.depth, width: line.x + line.width, depth: spec.laneCells };
+  let left: Box | null = null;
+  if (spec.collection === 'gate') {
+    const pallets = LINE_PALLET_LAYOUT;
+    const top = Math.min(pallets.y, front.y);
+    const bottom = Math.max(pallets.y + pallets.depth, front.y + front.depth);
+    left = { x: 0, y: top, width: FORKLIFT_LANE_CELLS, depth: bottom - top };
+  }
   if (front.y + front.depth > depth || front.x + front.width > state.unit.widthCells || line.x < 0 || line.y < 0) return null;
   return { behind, line, path, front, left };
+}
+
+/** A line's lane as boxes: its front strip, and its left strip where it has one (v114). */
+function stripsOf(ground: { front: Box; left: Box | null }): Box[] {
+  return ground.left === null ? [ground.front] : [ground.front, ground.left];
 }
 
 /** Why a line standing at this cell has no lane: too near the front wall for its engineers' metre
  *  and the front strip; too near the rear wall, its lane on the way to the gate; or over the left
  *  strip, the lane crossing the line itself. Null when it has one (CLAUDE.md T31 2.6; v93). */
-export function laneTrouble(state: GameState, at: { x: number; y: number }): 'frontWall' | 'rearWall' | 'leftWall' | null {
-  const ground = lineGround(state, at);
+export function laneTrouble(
+  state: GameState,
+  at: { x: number; y: number },
+  kind: LineKind,
+): 'frontWall' | 'rearWall' | 'leftWall' | null {
+  const ground = lineGround(state, at, kind);
   if (ground === null) return 'frontWall';
-  const strips = [ground.front, ground.left];
+  const strips = stripsOf(ground);
   // The lane never crosses the way to the gate [TUNE].
   if (strips.some((strip) => overlaps(strip, gateLane()))) return 'rearWall';
   if (strips.some((strip) => overlaps(strip, ground.line) || overlaps(strip, ground.path))) return 'leftWall';
   return null;
 }
 
-/** The forklift's lane of a line whose module 1 is at this cell: its front strip and its left strip,
- *  or null where the line can have none (CLAUDE.md T31 2.6; v93). */
-export function forkliftLane(state: GameState, at: { x: number; y: number }): Box[] | null {
-  const ground = lineGround(state, at);
-  if (ground === null || laneTrouble(state, at) !== null) return null;
+/** The forklift's lane of a line of a kind whose module 1 is at this cell: its front strip and its
+ *  left strip, or null where the line can have none, or has no forklift: the house factory, whose
+ *  houses drive out on their own transporters (CLAUDE.md T31 2.6; v93; v114). */
+export function forkliftLane(state: GameState, at: { x: number; y: number }, kind: LineKind): Box[] | null {
+  const ground = lineGround(state, at, kind);
+  if (ground === null || ground.left === null || laneTrouble(state, at, kind) !== null) return null;
   return [ground.front, ground.left];
 }
 
@@ -376,10 +404,11 @@ export function canBeMoved(state: GameState, itemId: string): boolean {
   const item = state.equipment.find((entry) => entry.id === itemId);
   if (item === undefined) return false;
   const check = canPlace(state, itemId, item.anchorX, item.anchorY);
+  const kind = moduleKind(item.specId);
   return (
     check.ok ||
     Object.values(GROUND_REFUSALS).includes(check.reason) ||
-    check.reason === lineNeedsRoom() ||
+    (kind !== null && check.reason === lineNeedsRoom(kind)) ||
     check.reason === LINE_IN_THE_WAY
   );
 }
@@ -412,12 +441,14 @@ function linePlaces(state: GameState): Map<number, { x: number; y: number }> {
 }
 
 /** The lanes of every line that stands or is on order and has one, by line: for the hall's yellow
- *  lines and the forklifts (v93). */
-export function lineLanes(state: GameState): { line: number; front: Box; left: Box }[] {
-  const lanes: { line: number; front: Box; left: Box }[] = [];
+ *  lines and the forklifts (v93), and where a house factory's houses wait (v114); a house factory's
+ *  lane has no left strip. */
+export function lineLanes(state: GameState): { line: number; front: Box; left: Box | null }[] {
+  const lanes: { line: number; front: Box; left: Box | null }[] = [];
   for (const line of lineNumbers(state)) {
     const at = linePlace(state, line);
-    const ground = at === null || laneTrouble(state, at) !== null ? null : lineGround(state, at);
+    const kind = lineKindOf(state, line);
+    const ground = at === null || laneTrouble(state, at, kind) !== null ? null : lineGround(state, at, kind);
     if (ground !== null) lanes.push({ line, front: ground.front, left: ground.left });
   }
   return lanes;
@@ -437,38 +468,45 @@ function groundOf(state: GameState, except: ReadonlySet<number>): GroundBox[] {
   for (const line of lineNumbers(state)) {
     if (except.has(line)) continue;
     const at = linePlace(state, line);
-    const ground = at === null || laneTrouble(state, at) !== null ? null : lineGround(state, at);
+    const kind = lineKindOf(state, line);
+    const ground = at === null || laneTrouble(state, at, kind) !== null ? null : lineGround(state, at, kind);
     if (ground === null) continue;
-    boxes.push({ line, kind: 'lane', box: ground.front }, { line, kind: 'lane', box: ground.left }, { line, kind: 'path', box: ground.path });
+    // A house factory's lane is its own kind of ground, said in its own words (v114).
+    const lane: GroundKind = LINE_KINDS[kind].collection === 'lane' ? 'drive' : 'lane';
+    boxes.push({ line, kind: lane, box: ground.front });
+    if (ground.left !== null) boxes.push({ line, kind: lane, box: ground.left });
+    boxes.push({ line, kind: 'path', box: ground.path });
     if (ground.behind !== null) boxes.push({ line, kind: 'behind', box: ground.behind });
   }
   return boxes;
 }
 
-/** Can a line stand with module 1 at this cell: its 36 m by 3 m, its engineers' metre, the metre
- *  behind it and its lane all clear as `canPlaceBox` asks, of everything standing or held for a
- *  delivery but what `ignore` names; and out of every other line's way: its own modules, its
+/** Can a line of a kind stand with module 1 at this cell: its modules, its engineers' metre, the
+ *  metre behind it and its lane all clear as `canPlaceBox` asks, of everything standing or held for
+ *  a delivery but what `ignore` names; and out of every other line's way: its own modules, its
  *  engineers' metre and the metre behind it off every other line's ground, and its lane off every
- *  other line's modules, metres and ground but the lanes, which two lines may share (v93). The one
- *  question the order and the move ask (CLAUDE.md T31 2.6). `line` is the line asking, left out of
- *  the others. */
+ *  other line's modules, metres and ground but the lanes, which two lines may share, a house
+ *  factory's among them (v93; v114). The one question the order and the move ask (CLAUDE.md T31
+ *  2.6). `line` is the line asking, left out of the others. */
 export function lineFits(
   state: GameState,
   at: { x: number; y: number },
+  kind: LineKind,
   ignore: ReadonlySet<string>,
   line: number | null = null,
   alsoLeftOut: ReadonlySet<number> = new Set(),
 ): boolean {
-  const ground = lineGround(state, at);
-  if (ground === null || laneTrouble(state, at) !== null) return false;
+  const ground = lineGround(state, at, kind);
+  if (ground === null || laneTrouble(state, at, kind) !== null) return false;
   const own = [ground.line, ground.path, ...(ground.behind === null ? [] : [ground.behind])];
-  for (const box of [...own, ground.front, ground.left]) {
+  const strips = stripsOf(ground);
+  for (const box of [...own, ...strips]) {
     if (!canPlaceBox(state, box, ignore).ok) return false;
   }
   const others = claimedGround(state, new Set([...(line === null ? [] : [line]), ...alsoLeftOut]));
   for (const other of others) {
     if (own.some((box) => overlaps(box, other.box))) return false;
-    if (other.kind !== 'lane' && (overlaps(ground.front, other.box) || overlaps(ground.left, other.box))) return false;
+    if (!isLaneGround(other.kind) && strips.some((strip) => overlaps(strip, other.box))) return false;
   }
   return true;
 }
@@ -488,10 +526,11 @@ export function nearestLanePlace(
   for (const number of [line, ...leftOut]) {
     for (const id of [...lineGroup(state, false, number), ...lineGroup(state, true, number)]) ignore.add(id);
   }
+  const kind = lineKindOf(state, line);
   for (let step = 1; step <= maxRows; step += 1) {
     for (const y of [at.y - step, at.y + step]) {
       if (y < 0) continue;
-      if (lineFits(state, { x: at.x, y }, ignore, line, leftOut)) return { x: at.x, y };
+      if (lineFits(state, { x: at.x, y }, kind, ignore, line, leftOut)) return { x: at.x, y };
     }
   }
   return null;
@@ -501,10 +540,11 @@ export function nearestLanePlace(
  *  everything standing or on order on its 36 m by 3 m and its ground, each once; what the strip
  *  names for a line that has no lane (v94). */
 export function inTheWayAt(state: GameState, line: number, at: { x: number; y: number }): string[] {
-  const ground = lineGround(state, at);
+  const ground = lineGround(state, at, lineKindOf(state, line));
   if (ground === null) return [];
   const found: string[] = [];
-  for (const box of [ground.line, ground.path, ground.front, ground.left, ...(ground.behind === null ? [] : [ground.behind])]) {
+  const parts = [ground.line, ground.path, ...stripsOf(ground)];
+  for (const box of [...parts, ...(ground.behind === null ? [] : [ground.behind])]) {
     for (const specId of standingOn(state, box)) {
       if (!isLineModule(specId) && !found.includes(specId)) found.push(specId);
     }
@@ -514,8 +554,8 @@ export function inTheWayAt(state: GameState, line: number, at: { x: number; y: n
     if (other === line) continue;
     const there = linePlace(state, other);
     if (there === null) continue;
-    const box = lineBox(there);
-    if ([ground.line, ground.path, ground.front, ground.left].some((part) => overlaps(part, box))) found.push(`line:${other}`);
+    const box = lineBox(there, lineKindOf(state, other));
+    if (parts.some((part) => overlaps(part, box))) found.push(`line:${other}`);
   }
   return found;
 }
@@ -523,14 +563,14 @@ export function inTheWayAt(state: GameState, line: number, at: { x: number; y: n
 /** Where a line that has no lane would have it, the kit apart: along x past the left strip for a
  *  line over it, and otherwise the nearest row along its own x where its lane fits the hall (v94).
  *  Null when no row does. */
-export function laneTarget(state: GameState, at: { x: number; y: number }): { x: number; y: number } | null {
-  const trouble = laneTrouble(state, at);
+export function laneTarget(state: GameState, at: { x: number; y: number }, kind: LineKind): { x: number; y: number } | null {
+  const trouble = laneTrouble(state, at, kind);
   if (trouble === null) return at;
   const x = trouble === 'leftWall' ? Math.max(at.x, FORKLIFT_LANE_CELLS) : at.x;
-  if (laneTrouble(state, { x, y: at.y }) === null) return { x, y: at.y };
+  if (laneTrouble(state, { x, y: at.y }, kind) === null) return { x, y: at.y };
   for (let step = 1; step < state.unit.depthCells; step += 1) {
     for (const y of [at.y - step, at.y + step]) {
-      if (y >= 0 && laneTrouble(state, { x, y }) === null) return { x, y };
+      if (y >= 0 && laneTrouble(state, { x, y }, kind) === null) return { x, y };
     }
   }
   return null;
@@ -604,49 +644,56 @@ export function canPlaceBox(
   return OK;
 }
 
-/** The 36 m by 3 m the whole line takes with module 1 at this cell: its six modules end to end
- *  along x, at orientation 0, the line never being turned (CLAUDE.md T30 2.4). */
-export function lineBox(at: { x: number; y: number }): Box {
-  const module = findSpec(LINE_MODULES[0] ?? '');
-  const width = module?.width ?? 0;
-  return { x: at.x, y: at.y, width: width * LINE_MODULES.length, depth: module?.depth ?? 0 };
+/** Module 1 of a kind of line, whose size every module of the kind has (v114). */
+function firstModuleOf(kind: LineKind): ReturnType<typeof findSpec> {
+  return findSpec(lineModulesOf(kind)[0] ?? '');
 }
 
-/** Where module N of a line stands whose module 1 is at this cell: six cells along x from the one
- *  before, a door line's modules as a window line's (CLAUDE.md T30 2.4; v107). */
+/** What the whole line of a kind takes with module 1 at this cell: its six modules end to end along
+ *  x, at orientation 0, the line never being turned: 36 m by 3 m a window or a door line, 84 m by
+ *  10 m a house factory (CLAUDE.md T30 2.4; v114). */
+export function lineBox(at: { x: number; y: number }, kind: LineKind): Box {
+  const module = firstModuleOf(kind);
+  const width = module?.width ?? 0;
+  return { x: at.x, y: at.y, width: width * lineModulesOf(kind).length, depth: module?.depth ?? 0 };
+}
+
+/** Where module N of a line stands whose module 1 is at this cell: a module's width along x from the
+ *  one before, six metres a window or a door line's, fourteen a house factory's (CLAUDE.md T30 2.4;
+ *  v107; v114). */
 export function lineModuleCell(at: { x: number; y: number }, specId: string): { x: number; y: number } {
-  const width = findSpec(LINE_MODULES[0] ?? '')?.width ?? 0;
+  const width = firstModuleOf(moduleKind(specId) ?? 'window')?.width ?? 0;
   return { x: at.x + width * Math.max(0, lineModuleIndex(specId) - 1), y: at.y };
 }
 
-/** The depth a line takes with its ground: the metre behind it, its three, its engineers' metre and
- *  the lane's two, seven (v93). */
-export function lineDepthCells(): number {
-  const module = findSpec(LINE_MODULES[0] ?? '');
-  return LINE_BEHIND_CELLS + (module?.depth ?? 0) + LINE_FRONT_CELLS + FORKLIFT_LANE_CELLS;
+/** The depth a line of a kind takes with its ground: the metre behind it, its modules' depth, its
+ *  engineers' metre and its lane: seven a window line, twenty two a house factory (v93; v114). */
+export function lineDepthCells(kind: LineKind): number {
+  const module = firstModuleOf(kind);
+  return LINE_BEHIND_CELLS + (module?.depth ?? 0) + LINE_FRONT_CELLS + LINE_KINDS[kind].laneCells;
 }
 
-/** Where a new line is put at its order: `WINDOW_LINE_ORIGIN` when the line and its ground are
- *  clear there; then the row seven metres behind each line that stands or is on order, and the row
- *  seven metres in front of it, at its x, so the next line stands behind the first (PIOTR, 12.10);
- *  then cell by cell in the order `firstFreeCell` searches a machine's place, which finds a place
- *  beside a line along a longer hall. Null when the hall has none (CLAUDE.md T30 2.4, T31 2.6; v93)
- *  [TUNE: chat]. */
-export function lineSite(state: GameState): { x: number; y: number } | null {
+/** Where a new line of a kind is put at its order: `WINDOW_LINE_ORIGIN` when the line and its
+ *  ground are clear there; then the row its own depth behind each line that stands or is on order,
+ *  and the row its depth in front of it, at its x, so the next line stands behind the first (PIOTR,
+ *  12.10); then cell by cell in the order `firstFreeCell` searches a machine's place, which finds a
+ *  place beside a line along a longer hall. Null when the hall has none (CLAUDE.md T30 2.4, T31 2.6;
+ *  v93; v114) [TUNE: chat]. */
+export function lineSite(state: GameState, kind: LineKind): { x: number; y: number } | null {
   const none = new Set<string>();
-  if (lineFits(state, WINDOW_LINE_ORIGIN, none)) return { ...WINDOW_LINE_ORIGIN };
-  const step = lineDepthCells();
+  if (lineFits(state, WINDOW_LINE_ORIGIN, kind, none)) return { ...WINDOW_LINE_ORIGIN };
+  const step = lineDepthCells(kind);
   for (const line of lineNumbers(state)) {
     const at = linePlace(state, line);
     if (at === null) continue;
     for (const y of [at.y - step, at.y + step]) {
-      if (lineFits(state, { x: at.x, y }, none)) return { x: at.x, y };
+      if (lineFits(state, { x: at.x, y }, kind, none)) return { x: at.x, y };
     }
   }
-  const size = lineBox({ x: 0, y: 0 });
+  const size = lineBox({ x: 0, y: 0 }, kind);
   for (let y = 0; y + size.depth <= state.unit.depthCells; y += 1) {
     for (let x = 0; x + size.width <= state.unit.widthCells; x += 1) {
-      if (lineFits(state, { x, y }, none)) return { x, y };
+      if (lineFits(state, { x, y }, kind, none)) return { x, y };
     }
   }
   return null;
@@ -661,8 +708,8 @@ export function reservationById(state: GameState, itemId: string): OnOrderItem |
  *  way and its turned pictures being the other turn, and it goes only where the whole of it has a
  *  clear 36 m by 3 m (CLAUDE.md T30 2.4). */
 export const LINE_NEVER_TURNED = 'The line is never turned';
-export function lineNeedsRoom(): string {
-  return `The line needs a clear ${metresBy(lineBox({ x: 0, y: 0 }))}, its lane and a metre each side`;
+export function lineNeedsRoom(kind: LineKind): string {
+  return `The line needs a clear ${metresBy(lineBox({ x: 0, y: 0 }, kind))}, its lane and a metre each side`;
 }
 /** The move's refusal where another line's ground is: two lines never stand in one another's way
  *  (v93) [TUNE]. */
@@ -692,18 +739,19 @@ function canPlaceLine(
 ): PlaceCheck {
   if (orientation !== undefined && orientation !== 0) return { ok: false, reason: LINE_NEVER_TURNED };
   const line = lineOf(module);
+  const kind = moduleKind(module.specId) ?? 'window';
   const offset = lineModuleCell({ x: 0, y: 0 }, module.specId);
-  const box = lineBox({ x: x - offset.x, y: y - offset.y });
+  const box = lineBox({ x: x - offset.x, y: y - offset.y }, kind);
   const ignore = new Set(lineGroup(state, onOrder, line));
-  if (lineFits(state, box, ignore, line)) return OK;
+  if (lineFits(state, box, kind, ignore, line)) return OK;
   // Its own ground clear and only another line's in the way: said so [TUNE].
-  const ground = lineGround(state, box);
+  const ground = lineGround(state, box, kind);
   const ownClear =
     ground !== null &&
-    [ground.line, ground.path, ground.front, ground.left, ...(ground.behind === null ? [] : [ground.behind])].every(
+    [ground.line, ground.path, ...stripsOf(ground), ...(ground.behind === null ? [] : [ground.behind])].every(
       (part) => canPlaceBox(state, part, ignore).ok,
     );
-  return { ok: false, reason: ownClear ? LINE_IN_THE_WAY : lineNeedsRoom() };
+  return { ok: false, reason: ownClear ? LINE_IN_THE_WAY : lineNeedsRoom(kind) };
 }
 
 /** Can this item stand here? An outline held for a delivery answers exactly as the machine it is

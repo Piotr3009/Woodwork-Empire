@@ -363,7 +363,10 @@ export function lineOfferBody(state: GameState, line: number): string {
     `${spec.unit}. The timber and the glass cost ${formatMoney(lineMaterialPerUnitOf(kind))} a ${spec.unit}, taken from your ` +
     'timber stores and glass racks: restock them on the Materials page, or the office does. The line makes one every ' +
     `${lineWindowEvery(lineWindowMinutes(state, line))}, about ${lineWindowsAWeek(state, line)} a week, and the client ` +
-    `collects each pallet of ${inWords(spec.palletUnits)} the next working day. It runs until you end it.`
+    // A house factory's houses are collected one by one off its own lane (v114).
+    (spec.collection === 'gate'
+      ? `collects each pallet of ${inWords(spec.palletUnits)} the next working day. It runs until you end it.`
+      : `collects each ${spec.unit} from the line's lane the next working day. It runs until you end it.`)
   );
 }
 
@@ -502,7 +505,9 @@ export function runLineMinute(state: GameState): void {
  *  holds first and then the free stock (CLAUDE.md T32 2.5). The material was paid when it was bought,
  *  so nothing of it is booked here (CLAUDE.md T31 2.1); its books count the material a unit used,
  *  £600 a window and £1,200 a door. It stands on the pallet, and the tenth sends the pallet to the
- *  gate (CLAUDE.md T30 2.7, 2.8). Then the office looks at what is left (CLAUDE.md T31 2.3). */
+ *  gate (CLAUDE.md T30 2.7, 2.8); a house, its kind's pallet of one, goes out to its line's lane at
+ *  once, where it waits for the housebuilder the same way (v114). Then the office looks at what is
+ *  left (CLAUDE.md T31 2.3). */
 function makeUnit(state: GameState, line: number): void {
   const contract = runningLineContract(state, line);
   if (contract === null) return;
@@ -535,9 +540,10 @@ function makeUnit(state: GameState, line: number): void {
 }
 
 /** The pallets waiting at the gate for the client, every line's together, or every line's of one
- *  kind: what the hall draws there (CLAUDE.md T30 2.8; v93; v107). */
+ *  kind: what the hall draws there (CLAUDE.md T30 2.8; v93; v107). A house factory's houses wait on
+ *  its own lane and are none of them (v114). */
 export function palletsAtTheGate(state: GameState, kind: LineKind | null = null): number {
   return state.windowLines
-    .filter((record) => kind === null || record.kind === kind)
+    .filter((record) => (kind === null ? LINE_KINDS[record.kind].collection === 'gate' : record.kind === kind))
     .reduce((total, record) => total + record.palletsAtGate, 0);
 }

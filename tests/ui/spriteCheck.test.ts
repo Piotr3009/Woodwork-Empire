@@ -29,8 +29,9 @@ describe('the sprite check page', () => {
     // asked for once, by the family key. The office desk items went with the desk (T4 3.1) and
     // the rooms are the hall layers now (docs/art/SPRITES.md 9.3).
     // And from Turn 31 the line's pallet of ten windows standing alone, which is no family's class
-    // (CLAUDE.md T31 2.10), and from v108 the door line's pallet of ten doors beside it (P3).
-    const wanted = new Set<string>([PALLET_SPRITE, 'windowPallet.standard', 'doorPallet.standard']);
+    // (CLAUDE.md T31 2.10), and from v108 the door line's pallet of ten doors beside it (P3); and
+    // from v114 the house factory's finished house waiting on its lane.
+    const wanted = new Set<string>([PALLET_SPRITE, 'windowPallet.standard', 'doorPallet.standard', 'houseWaiting.standard']);
     for (const spec of EQUIPMENT_SPECS) {
       if (spec.variants.length > 1) {
         for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);

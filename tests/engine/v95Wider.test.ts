@@ -216,10 +216,10 @@ describe('a production line in the seven metres (v95)', () => {
 
   it('has room for a third line in front of the first, with its lane along the new front', () => {
     const eight = twoLines(deep());
-    expect(lineSite(eight)).toBeNull();
+    expect(lineSite(eight, 'window')).toBeNull();
     const open = twoLines(wider(deep()));
-    expect(lineSite(open)).toEqual({ x: 2, y: 21 });
-    expect(laneTrouble(open, { x: 2, y: 21 })).toBeNull();
+    expect(lineSite(open, 'window')).toEqual({ x: 2, y: 21 });
+    expect(laneTrouble(open, { x: 2, y: 21 }, 'window')).toBeNull();
     expect(placeEquipmentOrder(open, 'windowLine1').ok).toBe(true);
     expect(linePlace(open, 3)).toEqual({ x: 2, y: 21 });
     const lane = lineLanes(open).find((entry) => entry.line === 3);

@@ -241,10 +241,11 @@ function laneBlockedWarning(state: GameState): Warning | null {
   for (const line of lineNumbers(state)) {
     const at = linePlace(state, line);
     if (at === null) continue;
-    const trouble = laneTrouble(state, at);
+    const kind = lineKindOf(state, line);
+    const trouble = laneTrouble(state, at, kind);
     if (trouble !== null) {
       // What stands where it would have its lane, so the player knows what to move first (v94).
-      const target = laneTarget(state, at);
+      const target = laneTarget(state, at, kind);
       const way = target === null ? [] : inTheWayAt(state, line, target);
       const names = way.map((id) =>
         id.startsWith('line:') ? lineName(Number(id.slice(5))).toLowerCase() : `the ${inASentence(findSpec(id)?.name ?? id)}`,
