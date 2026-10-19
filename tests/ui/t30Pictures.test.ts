@@ -65,7 +65,7 @@ describe('the pictures of the line (CLAUDE.md T30 2.2, section 7)', () => {
 
   it('holds six work sheets of twelve cells and ten overlays a line, none of them a class picture or a turn', () => {
     // The window line's and, from v108, the door line's of P3 beside them (flipped); the house
-    // factory's stations have no working motion yet (v114).
+    // factory's stations have frames of their own and no sheet (v114; v117, P4).
     const sheets = spriteFiles().filter((name) => name.endsWith('.work.sheet.png'));
     expect(sheets).toEqual(
       ALL_LINE_MODULES.filter((id) => LINE_MODULE_INDEX.get(id)?.kind !== 'house')

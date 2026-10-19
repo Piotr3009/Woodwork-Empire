@@ -281,6 +281,16 @@ export function lineWindowMinutes(state: GameState, line: number): number {
   return factor * Math.max(LINE_WINDOW_MINUTES_MIN, LINE_WINDOW_MINUTES - LINE_UPGRADE_MINUTES * fitted);
 }
 
+/** Which of `frames` pictures a station of a line shows for the unit in hand: the frames spread
+ *  over the unit's minutes (`lineWindowMinutes`), the first at nought and the last held from the
+ *  last share of the cycle, and past the cycle too while the line waits for its material with a
+ *  unit's minutes done. Null while no contract runs: the station has no unit in its hands (v117). */
+export function lineUnitFrame(state: GameState, line: number, frames: number): number | null {
+  if (runningLineContract(state, line) === null) return null;
+  const minutes = lineRecord(state, line)?.minutes ?? 0;
+  return Math.max(0, Math.min(frames - 1, Math.floor((minutes / lineWindowMinutes(state, line)) * frames)));
+}
+
 /** True from the open of the day an upgrade is fitted on. */
 function upgradeIsFitted(state: GameState, fittedOnDay: number): boolean {
   return state.clock.day >= fittedOnDay;

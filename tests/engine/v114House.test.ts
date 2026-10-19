@@ -9,7 +9,7 @@
 
 // @vitest-environment jsdom
 // v114: the timber frame house factory [PIOTR, 18.10: "5 tak zakoduj" to chat's layout A of the art
-// side's P4-A, its stations drawn as boxes until the art side's files come, and the finished house
+// side's P4-A, its stations drawn as boxes until the art side's files came (v117), and the finished house
 // delivered on the gate's side]. A third kind of line: six stations of 14 m by 10 m by 10 m, a ten
 // metre lane in front with no forklift, every money figure the window line's five times over and a
 // house the window's minutes eight times over, so it pays back what a window line pays back.

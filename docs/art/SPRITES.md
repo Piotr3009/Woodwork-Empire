@@ -1031,25 +1031,44 @@ falls back to today's, as every picture without its class falls back to its fami
 Everything drawn on the painting (the kit, the people, the lettering on the wall, the rooms' doors) is
 drawn as it was.
 
-## 22. The timber frame house factory (P4, 18.10.2026; v114; files owed)
+## 22. The timber frame house factory (P4, 18.10.2026; v114; the files from v117)
 
 Piotr took the art side's concept P4-A ("masz grafikę") as layout A, with one change: the finished
 house is delivered towards the gate. The game has the factory from v114 (docs/notes-v114.md), each
-station drawn as kit with no picture is drawn, a box of its metres with its name, until the files of
-the order docs/art/REQUESTS-P4.md land; then they are drawn by their keys with no code. The concept's
-ZIP stays with Piotr: it was a board for a decision, and nothing of it is a game file.
+station drawn as kit with no picture is drawn until its files landed. The concept's ZIP stays with
+Piotr: it was a board for a decision, and nothing of it is a game file.
 
-| Keys the game asks for | What they are | Metres w x d x h | File, px | Anchor, view 0 / `.r` |
+**The files landed on 19.10 (v117)** from the art side's P4 pack of robotic production
+(`Woodwork-Empire-P4-A-robotyczna-produkcja-2026-10-19.zip`, its notes in docs/art/pack-p4-1910/):
+the six stations in sixteen frames each and empty, all byte for byte on the game's canvas, and the
+waiting house, the pack's loaded transporter moved onto the game's canvas by a shift alone
+(pack-p4-1910/EDITED.md). The line is never turned, so no `.r` file is owed.
+
+| Keys the game draws | What they are | Metres w x d x h | File, px | Anchor |
 |---|---|---|---|---|
-| `houseLine1.standard` to `houseLine6.standard` (and `.r`) | the six stations under their gantry cranes, each with its stage's house on its transporter | 14 x 10 x 10 | 1,168 x 1,072 | 680, 1,064 / 488, 1,064 |
+| `houseLine1.standard` to `houseLine6.standard` | the six stations under their gantry cranes, each with its stage's house finished on its transporter (frame 15 again): the class picture | 14 x 10 x 10 | 1,168 x 1,072 | 680, 1,064 |
+| `houseLineN.standard.work00` to `.work15` | the station at work: the robots and the crane building the stage from its start (00) to its end (15) | 14 x 10 x 10 | 1,168 x 1,072 | 680, 1,064 |
+| `houseLineN.standard.empty` | the station's crane and runway with the robots parked, no house and no transporter | 14 x 10 x 10 | 1,168 x 1,072 | 680, 1,064 |
 | `houseWaiting.standard` | a finished house standing alone on its transporter, facing the gate (minus x) | 10 x 7.5 x 5.5 | 856 x 700 | 488, 692 |
+
+**The frames (v117)** [PIOTR, 19.10: "I want the animation right away"]. A station is drawn by the
+house in its hands: while the line's contract runs, the frame `floor(minutes of the house in hand /
+the house's minutes x 16)`, capped at 15 (`lineUnitFrame`, `HOUSE_WORK_FRAMES`), so the six build
+their stages over the cycle together, hold the finished stage from the last sixteenth of it, and
+start again at 00 when the house is made; a line that stands (dinner, after five, no material, a
+pause) holds its frame, since the house's minutes stand; a house's minutes done while the line waits
+for material holds 15. With no contract the station is empty. The frame is a tier of the station's
+class picture (`stationTier` in `src/render/hall.ts`), picked as any picture is, and the class
+picture stands in where a frame's file is missing. Nothing plays in real time: the picture changes
+with the game's minute, thirty minutes a frame at the factory's base pace, so a slow processor
+reads one picture a station. No sheet: `MACHINE_WORK_SHEETS` holds the window and door lines only.
 
 **How the game uses them.** The six stations stand end to end along x at a 14 m pitch, station 1 at
 the left, never turned, and each is drawn as one picture sorted at its own cell and its 10 m of depth
 (`kitDepth` in `src/render/hall.ts`), so each file must hold everything of its own box and nothing
-outside it, the runway beams cut at the boundaries. A house factory has no working motion
-(`MACHINE_WORK_SHEETS` holds the window and door lines' modules only), no pallet on station 6 and no
-forklift. A finished house waits on the line's own 10 m lane at its gate end, three drawn at the most
+outside it, the runway beams cut at the boundaries (the pack's frames do: their content lies within
+27 to 1,141 by 79 to 1,049). A house factory has no work sheet, no pallet on station 6 and no
+forklift; the drive of the finished house along the lane to the gate is a turn of its own. A finished house waits on the line's own 10 m lane at its gate end, three drawn at the most
 side by side from the left wall (`HOUSE_WAIT_LAYOUT`, `HOUSES_WAITING_DRAWN`), by the kind's
 `palletSprite`, `houseWaiting`; the lane's outline and the label `Houses for collection: 2` are the
 game's. The Sprite check page lists the waiting house beside the two pallets.

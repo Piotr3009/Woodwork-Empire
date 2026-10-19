@@ -1,0 +1,99 @@
+{
+  "schema": "woodwork-house-factory-layout-v3",
+  "status": "CODED_FOR_INTEGRATION",
+  "units": "metres",
+  "stationCount": 6,
+  "stationPitch": 14,
+  "height": 10,
+  "reservedFloorSize": [
+    96,
+    30
+  ],
+  "aisleBounds": [
+    0,
+    10,
+    96,
+    20
+  ],
+  "line1": {
+    "origin": [
+      12,
+      0
+    ],
+    "deliveryPad": [
+      0,
+      0,
+      12,
+      10
+    ],
+    "routeCarrierCenters": [
+      [
+        89,
+        5
+      ],
+      [
+        89,
+        15
+      ],
+      [
+        6,
+        15
+      ],
+      [
+        6,
+        5
+      ]
+    ]
+  },
+  "line2": {
+    "origin": [
+      12,
+      20
+    ],
+    "deliveryPad": [
+      0,
+      20,
+      12,
+      30
+    ],
+    "routeCarrierCenters": [
+      [
+        89,
+        25
+      ],
+      [
+        89,
+        15
+      ],
+      [
+        6,
+        15
+      ],
+      [
+        6,
+        25
+      ]
+    ]
+  },
+  "houseSize": [
+    8,
+    6
+  ],
+  "carrierActualWidth": 7.511,
+  "sharedAisleCapacity": 1,
+  "deliveryReadyAt": "start",
+  "deliveryCountIncrement": "explicit completeDelivery() at start dock",
+  "stationManifest": "assets/production/manifest.json",
+  "transportManifest": "assets/transport/sprite-manifest.json",
+  "motionModule": "source/delivery-route.mjs",
+  "visualAdapter": "source/delivery-visuals.mjs",
+  "transportAnimationImplemented": true,
+  "stationWorkAnimationImplemented": true,
+  "repoIntegrationPerformed": false,
+  "consumerHandoff": "HANDOFF-CLAUDE.md",
+  "roboticProduction": true,
+  "productionController": "source/production-controller.mjs",
+  "productionStages": 6,
+  "productionFramesPerStage": 16,
+  "productionPlayback": "once_hold_last"
+}

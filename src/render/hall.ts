@@ -10,6 +10,7 @@ import {
   FINISHED_GOODS_LAYOUT,
   GATE_LINE_KINDS,
   HOUSE_WAIT_LAYOUT,
+  HOUSE_WORK_FRAMES,
   HOUSES_WAITING_DRAWN,
   LINE_KINDS,
   LINE_PALLET_LAYOUT,
@@ -162,7 +163,7 @@ import {
   spriteImage,
   spriteUrl,
 } from './sprites';
-import { lineMakesWindows, palletsAtTheGate, runningLineContract } from '../engine/lineContract';
+import { lineMakesWindows, lineUnitFrame, palletsAtTheGate, runningLineContract } from '../engine/lineContract';
 import { lineLanes, rearRowOf } from '../engine/layout';
 import { forkliftArt, forkliftPoints } from './forklift';
 import { engineersArt } from './engineers';
@@ -171,7 +172,7 @@ import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
 import type { StageId } from '../engine/types';
 import { figureIsThroughADoor, takeDoorGoings } from './doors';
-import { pictureFor, portFor } from '../engine/ports';
+import { pictureFor, portFor, spriteFileName } from '../engine/ports';
 import { bubblesFor } from '../engine/bubbles';
 
 /** What the hall can be heard doing (CLAUDE.md T19 2.10, T20 2.13). The render layer owns the
@@ -1099,6 +1100,19 @@ export function moduleWorks(state: GameState, item: Equipment): boolean {
   const line = lineOf(item);
   if (runningLineContract(state, line) !== null) return lineMakesWindows(state, line);
   return machineInUse(state, item);
+}
+
+/** A house factory's station drawn by the house in its hands (v117): the frame of its stage's
+ *  sixteen by how far the line's house in hand has come, the last held to the end of the cycle, and
+ *  the station empty with its robots parked while no contract runs. The frame is a tier of the
+ *  station's class picture (`houseLine3.standard.work07`, `houseLine3.standard.empty`), picked as any
+ *  picture is; where the frame's file has not landed, the class picture. Any other kit is drawn by
+ *  its class as before. */
+function stationTier(state: GameState, item: Equipment, files: readonly string[]): string {
+  if (moduleKind(item.specId) !== 'house') return item.variantId;
+  const frame = lineUnitFrame(state, lineOf(item), HOUSE_WORK_FRAMES);
+  const tier = frame === null ? `${item.variantId}.empty` : `${item.variantId}.work${String(frame).padStart(2, '0')}`;
+  return files.includes(spriteFileName(item.spriteKey, tier, item.orientation)) ? tier : item.variantId;
 }
 
 /** The work sheet of this machine's class when the art side has delivered it, or null. */
@@ -2182,6 +2196,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const top = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
     const fx = machineFx(state, item, spec);
     const foot: FloorBox = { x: stands.x, y: stands.y, width: stands.width, depth: stands.depth };
+    // A house factory's station is drawn by the frame of the house in its hands (v117).
+    const tier = stationTier(state, item, files);
     drawables.push({
       depth: kitDepth(item, stands),
       foot,
@@ -2191,6 +2207,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `${painted && item.anchorY < 0 ? `data-behind-wall="1" clip-path="url(#${REAR_WALL_CLIP})" ` : ''}` +
         `data-foot="${round(foot.x)},${round(foot.y)},${round(foot.width)},${round(foot.depth)}" ` +
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
+        // A house factory's station says which frame it stands on (v117).
+        `${moduleKind(item.specId) === 'house' ? `data-station-frame="${tier.slice(item.variantId.length + 1)}" ` : ''}` +
         `class="clickable${fx.className}">` +
         `<title>${escapeText(tooltip)}</title>` +
         (item.expanded === true ? `<g filter="url(#${STORE_EXPANDED_FILTER})">` : '') +
@@ -2199,7 +2217,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           : objectArt({
               files,
               spriteKey: artKeyOf(item, headed, files),
-              tier: item.variantId,
+              tier,
               orientation: item.orientation,
               x: stands.x,
               y: stands.y,

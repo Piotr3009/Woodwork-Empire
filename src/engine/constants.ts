@@ -243,7 +243,7 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v116';
+export const APP_VERSION = 'v117';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1023,6 +1023,13 @@ export const HOUSE_LANE_CELLS = 10;
  *  pace (v114). */
 export const HOUSE_WAIT_LAYOUT = { fromEnd: 1, gap: 1, width: 10, depth: 7.5, height: 5.5 };
 export const HOUSES_WAITING_DRAWN = 3;
+/** [PIOTR, 19.10: "I want the animation right away"; the art side's P4 pack of 19.10: sixteen frames a
+ *  station, played once and held on the last] The frames of a house factory's station at work: its
+ *  stage's house built from the first to the last over the line's cycle, the frame picked by how far
+ *  the house in hand has come (`lineUnitFrame`), and the station empty with its robots parked while
+ *  no contract runs (v117). The files are `houseLineN.standard.workFF.png` and
+ *  `houseLineN.standard.empty.png` (docs/art/SPRITES.md 22). */
+export const HOUSE_WORK_FRAMES = 16;
 /** Kit built to order, whose order cannot be called off once it is placed: the money is the
  *  maker's from the click, so an order placed before 30 December and called off in January saves
  *  no tax (CLAUDE.md T29 2.6, 2.10) [TUNE: chat]. Every other machine is still called off in full

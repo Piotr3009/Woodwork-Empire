@@ -217,8 +217,10 @@ describe('the file on disk and the footprint in the engine', () => {
     // a class's picture exactly, so a work sheet or a stack overlay is never one of them. A hundred
     // and thirteen from v98: the two glass racks of G1 (docs/art/SPRITES.md 17). A hundred and
     // nineteen from v108: the door line's six modules of P3, on the window modules' canvas. A hundred
-    // and twenty one from v110: the glass shelter and the large timber shelter of P1.
-    expect(checked).toBe(121);
+    // and twenty one from v110: the glass shelter and the large timber shelter of P1. A hundred and
+    // twenty seven from v117: the house factory's six stations of P4, each the last frame of its
+    // stage; their frames and empty pictures are tiers of the class and not counted here.
+    expect(checked).toBe(127);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }
@@ -280,6 +282,11 @@ describe('the file on disk and the footprint in the engine', () => {
       'vehicle.forklift.driveLoadedDoor.sheet.png',
     ]);
     for (const name of [...vehicles, 'windowPallet.standard.png', 'doorPallet.standard.png']) expect(turnedFiles, name).not.toContain(name);
+    // The house factory's frames and empty stations of v117 (P4): a tier of a station's class each,
+    // a hundred and two on disk, no turn among them, and the waiting house beside the two pallets.
+    const frames = spriteFiles().filter((name) => /^houseLine\d\.standard\.(work\d\d|empty)\.png$/.test(name));
+    expect(frames).toHaveLength(102);
+    for (const name of [...frames, 'houseWaiting.standard.png']) expect(turnedFiles, name).not.toContain(name);
   });
 
   it('draws the CNC with its tool changer on the CNC s own canvas, both ways round (v56)', () => {

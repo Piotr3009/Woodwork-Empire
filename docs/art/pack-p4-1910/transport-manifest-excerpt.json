@@ -1,0 +1,3487 @@
+{
+ "schema": "woodwork-empire/house-transporter-sprites/v1",
+ "status": "PRODUCTION_ASSET_EXPORT",
+ "units": "metres",
+ "canvasPx": [
+  896,
+  640
+ ],
+ "anchorPx": [
+  448,
+  408
+ ],
+ "anchorSourceM": [
+  0,
+  0,
+  0
+ ],
+ "anchorMeaning": "Chassis floor centre; constant for empty and loaded sprites",
+ "deckMeters": [
+  10,
+  7.5
+ ],
+ "deckTopMeters": 0.72,
+ "literalLocalBoundsMeters": [
+  [
+   -5.000000000000001,
+   -3.756,
+   0.0
+  ],
+  [
+   5.0,
+   3.755,
+   5.476
+  ]
+ ],
+ "houseNominalMeters": [
+  8,
+  6
+ ],
+ "houseOriginMeters": [
+  -4,
+  -3,
+  0.72
+ ],
+ "projection": {
+  "x": "anchorX + 48*(worldX-worldY)",
+  "y": "anchorY + 24*(worldX+worldY)-48*worldZ",
+  "groundSlopeMagnitude": 0.5,
+  "isometricRatio": "2:1",
+  "physicalRotationsDegrees": [
+   0,
+   90,
+   180,
+   270
+  ]
+ },
+ "lighting": {
+  "fixedLightsWorld": [
+   [
+    -2.5,
+    4.5,
+    7.0
+   ],
+   [
+    5.0,
+    -3.0,
+    4.0
+   ],
+   [
+    -3.0,
+    -4.0,
+    6.0
+   ]
+  ],
+  "renderer": "unchanged L3 adapter and L2 fragment shader",
+  "ao": {
+   "name": "frozen-original-L1-phase-zero-AO",
+   "baselineCalculation": "original L1 eight-ray box AO, identical rounded inputs",
+   "staticLookup": "exact tuple(round(position+normal,7))",
+   "dynamicFallback": "matching baseline triangle/vertex index and material; otherwise fixed baseline material mean; new material zero",
+   "baselineUniqueVertices": 45674,
+   "baselineTriangles": 26226,
+   "usesBitmapCachingOrMasking": false,
+   "movingGeometryRecalculatesStaticAO": false
+  },
+  "baselineAOExactLocalPruningMaxError": {
+   "loaded/x": 0.0,
+   "loaded/y": 0.0,
+   "empty/x": 0.0,
+   "empty/y": 0.0
+  }
+ },
+ "alpha": {
+  "mode": "RGBA",
+  "transparentRGB": [
+   0,
+   0,
+   0
+  ],
+  "floor": false,
+  "castShadow": false,
+  "text": false
+ },
+ "animation": {
+  "frameCountPerStateAndDirection": 4,
+  "phases": [
+   0.0,
+   0.25,
+   0.5,
+   0.75
+  ],
+  "wheelRadiusMeters": 0.3,
+  "wheelCircumferenceMeters": 1.8849555921538759,
+  "distanceMetersPerFrame": 0.47123889803846897,
+  "phaseFormula": "phase = positiveModulo(signedDistanceMeters / wheelCircumferenceMeters, 1)",
+  "frameFormula": "floor(phase * 4) modulo 4",
+  "positivePhaseTravel": "local +X for steer x; local +Y for steer y",
+  "reverseTravel": "decrease signed distance; do not mirror PNGs",
+  "steering": "14 bogies physically rotate around vertical kingpins; house and chassis retain their orientation",
+  "steerXAxleLocal": [
+   0,
+   1,
+   0
+  ],
+  "steerYAxleLocal": [
+   -1,
+   0,
+   0
+  ],
+  "steerAtRestOnly": true,
+  "chassisRotatesDuringSideTransfer": false,
+  "wheelPivotFloorCoordinates": [
+   [
+    -4.55,
+    -3.42,
+    0.0
+   ],
+   [
+    -4.55,
+    3.42,
+    0.0
+   ],
+   [
+    -3.033333333333333,
+    -3.42,
+    0.0
+   ],
+   [
+    -3.033333333333333,
+    3.42,
+    0.0
+   ],
+   [
+    -1.5166666666666666,
+    -3.42,
+    0.0
+   ],
+   [
+    -1.5166666666666666,
+    3.42,
+    0.0
+   ],
+   [
+    0.0,
+    -3.42,
+    0.0
+   ],
+   [
+    0.0,
+    3.42,
+    0.0
+   ],
+   [
+    1.5166666666666666,
+    -3.42,
+    0.0
+   ],
+   [
+    1.5166666666666666,
+    3.42,
+    0.0
+   ],
+   [
+    3.033333333333333,
+    -3.42,
+    0.0
+   ],
+   [
+    3.033333333333333,
+    3.42,
+    0.0
+   ],
+   [
+    4.55,
+    -3.42,
+    0.0
+   ],
+   [
+    4.55,
+    3.42,
+    0.0
+   ]
+  ],
+  "frozenAOAcrossRollingFrames": true,
+  "fixedDepthRangeAcrossRollingFrames": true
+ },
+ "spriteCount": 64,
+ "sprites": [
+  {
+   "id": "house-transporter-loaded-steer-x-r000-f0",
+   "file": "assets/transport/house-transporter-loaded-steer-x-r000-f0.png",
+   "state": "loaded",
+   "steerAxisLocal": "x",
+   "rotationDegrees": 0,
+   "frame": 0,
+   "wheelRevolutionPhase": 0.0,
+   "anchorPx": [
+    448,
+    408
+   ],
+   "canvasPx": [
+    896,
+    640
+   ],
+   "alphaBoundsPx": [
+    28,
+    32,
+    868,
+    606
+   ],
+   "objectTransform": [
+    [
+     1.0,
+     -0.0,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     1.0,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     1.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "sourceToPixel": [
+    [
+     48.0,
+     -48.0,
+     0.0,
+     448.0
+    ],
+    [
+     24.0,
+     24.0,
+     -48.0,
+     408.0
+    ]
+   ],
+   "uniforms": {
+    "canvas": [
+     896,
+     640
+    ],
+    "origin": [
+     448.0,
+     408.0
+    ],
+    "model_transform": [
+     [
+      1.0,
+      -0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      1.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    "depth_range": [
+     -9.28426456451416,
+     12.563604354858398
+    ]
+   },
+   "pngSHA256": "2ee56c75d81710a722fd5edf0b1a287eafa16387042758f5dfaaedde07fb8fe7",
+   "meshId": "loaded-steer-x-f0"
+  }
+ ],
+ "models": [
+  {
+   "id": "loaded-steer-x-f0",
+   "file": "assets/transport/models/loaded-steer-x-f0.npz",
+   "archiveSHA256": "2ebe0c6f979638d8375e56247341833035fd10d83c34f9afcfe4796fb16b2229",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     5.476
+    ]
+   ],
+   "triangleCount": 26226,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ],
+    "house": [
+     14076,
+     26226
+    ]
+   },
+   "sourceMeshSHA256": "894ceac9cb6a16d267ed7f03fc0ecfb9e9b0118d937db6477310827fbee1fa12"
+  },
+  {
+   "id": "loaded-steer-y-f0",
+   "file": "assets/transport/models/loaded-steer-y-f0.npz",
+   "archiveSHA256": "4f0df9881557e398a3fa854bc1422ae126dc30fd57443de6b9803db4da9e9ff9",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     5.476
+    ]
+   ],
+   "triangleCount": 26226,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ],
+    "house": [
+     14076,
+     26226
+    ]
+   },
+   "sourceMeshSHA256": "ac396adf99ae3524c845c448e352b443f732dccc299969d01ac6e6038ed6aabd"
+  },
+  {
+   "id": "empty-steer-x-f0",
+   "file": "assets/transport/models/empty-steer-x-f0.npz",
+   "archiveSHA256": "d985b52b44da3196f0ee92547598589df0441f3416d1e766a70e4fbf1e3c4a65",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     1.0
+    ]
+   ],
+   "triangleCount": 14076,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ]
+   },
+   "sourceMeshSHA256": "40c21ee289fe654c44f8d231bd70c162aefab48c05f238a6ec3bdd08b6c56247"
+  },
+  {
+   "id": "empty-steer-y-f0",
+   "file": "assets/transport/models/empty-steer-y-f0.npz",
+   "archiveSHA256": "8ce8658840db4511a5fc7b5423a9e029cf7c9e58ecc4a686e104e197274484f5",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     1.0
+    ]
+   ],
+   "triangleCount": 14076,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ]
+   },
+   "sourceMeshSHA256": "26416d89dc528ab5ca3994e2e41d16c883f674cc5431be16a3a385b688ac04a9"
+  },
+  {
+   "id": "loaded-steer-x-f1",
+   "file": "assets/transport/models/loaded-steer-x-f1.npz",
+   "archiveSHA256": "9b639314f6d6bcd030abcbff8353e870b308a7125cb09e62f57e6de832859811",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     5.476
+    ]
+   ],
+   "triangleCount": 26226,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ],
+    "house": [
+     14076,
+     26226
+    ]
+   },
+   "sourceMeshSHA256": "424bd67b0fb5a670bba5d2e5880921b8b7ba86d831f224235bd080820d5a5eb0"
+  },
+  {
+   "id": "loaded-steer-x-f2",
+   "file": "assets/transport/models/loaded-steer-x-f2.npz",
+   "archiveSHA256": "1956122bb1b4badcc152ccfbb9a72e248b9ea07726bd57c1c50367c6292d2109",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     5.476
+    ]
+   ],
+   "triangleCount": 26226,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ],
+    "house": [
+     14076,
+     26226
+    ]
+   },
+   "sourceMeshSHA256": "38a073e985b4a7bc9989c6ab8712b1c08b33ecb828642ebb2ca28aa0522c5d35"
+  },
+  {
+   "id": "loaded-steer-x-f3",
+   "file": "assets/transport/models/loaded-steer-x-f3.npz",
+   "archiveSHA256": "7c7b4ac51603f610e67462ee4bd343769559d50b13ef80e06778ea25c11656e6",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     5.476
+    ]
+   ],
+   "triangleCount": 26226,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ],
+    "house": [
+     14076,
+     26226
+    ]
+   },
+   "sourceMeshSHA256": "4814a3c7f3f087ffc732951b96889beb8de6a66be54fcef7fc48e4a0b66bb51a"
+  },
+  {
+   "id": "loaded-steer-y-f1",
+   "file": "assets/transport/models/loaded-steer-y-f1.npz",
+   "archiveSHA256": "08781cfb2a187b1ede5db4a9b3c32e890af768d6fed11cacd0c13175f0964532",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     5.476
+    ]
+   ],
+   "triangleCount": 26226,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ],
+    "house": [
+     14076,
+     26226
+    ]
+   },
+   "sourceMeshSHA256": "d1f564b57aeccf37eca9a0ddc7f4a0d24b543b8a760b237084aeda00a9b74071"
+  },
+  {
+   "id": "loaded-steer-y-f2",
+   "file": "assets/transport/models/loaded-steer-y-f2.npz",
+   "archiveSHA256": "d59528a29f99a93429aa0521a4c22b5759bf38db702204871bec5a7574547b1e",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     5.476
+    ]
+   ],
+   "triangleCount": 26226,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ],
+    "house": [
+     14076,
+     26226
+    ]
+   },
+   "sourceMeshSHA256": "8e34a110fa87063eeb0b701c2782f114884c1a933252b48a2b8dbffdc6f1ac90"
+  },
+  {
+   "id": "loaded-steer-y-f3",
+   "file": "assets/transport/models/loaded-steer-y-f3.npz",
+   "archiveSHA256": "c3777a3f72bf58174fe8e1ee5b0635fd5dd1b928af27de8fb2607259bf3876ac",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     5.476
+    ]
+   ],
+   "triangleCount": 26226,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ],
+    "house": [
+     14076,
+     26226
+    ]
+   },
+   "sourceMeshSHA256": "2b942984330ea9ef7e8b045cafe05ab210fdc1dc2a49c62c41e3251c3fe83a9f"
+  },
+  {
+   "id": "empty-steer-x-f1",
+   "file": "assets/transport/models/empty-steer-x-f1.npz",
+   "archiveSHA256": "296bf995675b1f0f861884e9323c1c530d9fbb969aa40d918b0505861535379d",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     1.0
+    ]
+   ],
+   "triangleCount": 14076,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ]
+   },
+   "sourceMeshSHA256": "e57353425f84aee38e2d4a9fa762629d0831da5cb865a068ecb76bbc1040a78a"
+  },
+  {
+   "id": "empty-steer-x-f2",
+   "file": "assets/transport/models/empty-steer-x-f2.npz",
+   "archiveSHA256": "ec7df19143efaa118078c495a2be25b83877570975b355b3ca9f51b044c16c4a",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     1.0
+    ]
+   ],
+   "triangleCount": 14076,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ]
+   },
+   "sourceMeshSHA256": "28352c97c9b17eafcd29a64f750bc72dbfb1e87c5179b0eb695f7946566b6e7c"
+  },
+  {
+   "id": "empty-steer-x-f3",
+   "file": "assets/transport/models/empty-steer-x-f3.npz",
+   "archiveSHA256": "b7db11bb17914896a27eebd75dc465c5b163b62270699f78129d372f8853c727",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     1.0
+    ]
+   ],
+   "triangleCount": 14076,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ]
+   },
+   "sourceMeshSHA256": "220971a3a2cab123a5f6924df77d8221069483078c2f8d1d411d30ec88c275e0"
+  },
+  {
+   "id": "empty-steer-y-f1",
+   "file": "assets/transport/models/empty-steer-y-f1.npz",
+   "archiveSHA256": "28836a1d5fb7f3274b90357cc666af4ffb214be98a992ac2a2b8f6ff497bc375",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     1.0
+    ]
+   ],
+   "triangleCount": 14076,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ]
+   },
+   "sourceMeshSHA256": "fc362142c2a315d24081cb722ecbc399300a7e8bd4ea204c69db29a2058cdd91"
+  },
+  {
+   "id": "empty-steer-y-f2",
+   "file": "assets/transport/models/empty-steer-y-f2.npz",
+   "archiveSHA256": "5619b2662f7301b72f79c0a8ae7e9e99b45ef37ccfb25793375ad9310e708e39",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     1.0
+    ]
+   ],
+   "triangleCount": 14076,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ]
+   },
+   "sourceMeshSHA256": "9ba8fe75e6072fe4c93c9fd979e19942238d7cc16ce4ee1a8c43a3e497718038"
+  },
+  {
+   "id": "empty-steer-y-f3",
+   "file": "assets/transport/models/empty-steer-y-f3.npz",
+   "archiveSHA256": "4a8a7e4f07166fa3de7d6945900a0dd7a74a3c6cdd4f50a1cf778f249293d0dd",
+   "boundsMeters": [
+    [
+     -5.000000000000001,
+     -3.756,
+     0.0
+    ],
+    [
+     5.0,
+     3.755,
+     1.0
+    ]
+   ],
+   "triangleCount": 14076,
+   "componentTriangleRanges": {
+    "chassis": [
+     0,
+     1980
+    ],
+    "bogies": [
+     [
+      1980,
+      2232
+     ],
+     [
+      2844,
+      3096
+     ],
+     [
+      3708,
+      3960
+     ],
+     [
+      4572,
+      4824
+     ],
+     [
+      5436,
+      5688
+     ],
+     [
+      6300,
+      6552
+     ],
+     [
+      7164,
+      7416
+     ],
+     [
+      8028,
+      8280
+     ],
+     [
+      8892,
+      9144
+     ],
+     [
+      9756,
+      10008
+     ],
+     [
+      10620,
+      10872
+     ],
+     [
+      11484,
+      11736
+     ],
+     [
+      12348,
+      12600
+     ],
+     [
+      13212,
+      13464
+     ]
+    ],
+    "wheels": [
+     [
+      2232,
+      2844
+     ],
+     [
+      3096,
+      3708
+     ],
+     [
+      3960,
+      4572
+     ],
+     [
+      4824,
+      5436
+     ],
+     [
+      5688,
+      6300
+     ],
+     [
+      6552,
+      7164
+     ],
+     [
+      7416,
+      8028
+     ],
+     [
+      8280,
+      8892
+     ],
+     [
+      9144,
+      9756
+     ],
+     [
+      10008,
+      10620
+     ],
+     [
+      10872,
+      11484
+     ],
+     [
+      11736,
+      12348
+     ],
+     [
+      12600,
+      13212
+     ],
+     [
+      13464,
+      14076
+     ]
+    ]
+   },
+   "sourceMeshSHA256": "9ba9dcba11bc6a467ea52e965f8bb4d4c116d3be949c5ecb5bcab4bee8e6927f"
+  }
+ ],
+ "atlases": [
+  {
+   "file": "assets/transport/house-transporter-loaded-steer-x-atlas.png",
+   "canvasPx": [
+    3584,
+    2560
+   ],
+   "pngSHA256": "7722fc4b86f44a3fe4ee81c2c4df484473f758463b4a9c82ad70fa0f3329b0b4",
+   "rows": "0,90,180,270 physical degrees",
+   "columns": "wheel phases 0,.25,.5,.75",
+   "cells": [
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r000-f0",
+     "rectPx": [
+      0,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r000-f1",
+     "rectPx": [
+      896,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r000-f2",
+     "rectPx": [
+      1792,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r000-f3",
+     "rectPx": [
+      2688,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r090-f0",
+     "rectPx": [
+      0,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r090-f1",
+     "rectPx": [
+      896,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r090-f2",
+     "rectPx": [
+      1792,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r090-f3",
+     "rectPx": [
+      2688,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r180-f0",
+     "rectPx": [
+      0,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r180-f1",
+     "rectPx": [
+      896,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r180-f2",
+     "rectPx": [
+      1792,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r180-f3",
+     "rectPx": [
+      2688,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r270-f0",
+     "rectPx": [
+      0,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r270-f1",
+     "rectPx": [
+      896,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r270-f2",
+     "rectPx": [
+      1792,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-x-r270-f3",
+     "rectPx": [
+      2688,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      2328
+     ]
+    }
+   ]
+  },
+  {
+   "file": "assets/transport/house-transporter-loaded-steer-y-atlas.png",
+   "canvasPx": [
+    3584,
+    2560
+   ],
+   "pngSHA256": "9b87593562ec26b96cfa9e065c94256ba486c6fcca1e1130013a6db48b0567f0",
+   "rows": "0,90,180,270 physical degrees",
+   "columns": "wheel phases 0,.25,.5,.75",
+   "cells": [
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r000-f0",
+     "rectPx": [
+      0,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r000-f1",
+     "rectPx": [
+      896,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r000-f2",
+     "rectPx": [
+      1792,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r000-f3",
+     "rectPx": [
+      2688,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r090-f0",
+     "rectPx": [
+      0,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r090-f1",
+     "rectPx": [
+      896,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r090-f2",
+     "rectPx": [
+      1792,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r090-f3",
+     "rectPx": [
+      2688,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r180-f0",
+     "rectPx": [
+      0,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r180-f1",
+     "rectPx": [
+      896,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r180-f2",
+     "rectPx": [
+      1792,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r180-f3",
+     "rectPx": [
+      2688,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r270-f0",
+     "rectPx": [
+      0,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r270-f1",
+     "rectPx": [
+      896,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r270-f2",
+     "rectPx": [
+      1792,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-loaded-steer-y-r270-f3",
+     "rectPx": [
+      2688,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      2328
+     ]
+    }
+   ]
+  },
+  {
+   "file": "assets/transport/house-transporter-empty-steer-x-atlas.png",
+   "canvasPx": [
+    3584,
+    2560
+   ],
+   "pngSHA256": "6a43a882c569e73d72340afb9fac1901ff6006bee1d8ed5419acc3eaab7f6716",
+   "rows": "0,90,180,270 physical degrees",
+   "columns": "wheel phases 0,.25,.5,.75",
+   "cells": [
+    {
+     "spriteId": "house-transporter-empty-steer-x-r000-f0",
+     "rectPx": [
+      0,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r000-f1",
+     "rectPx": [
+      896,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r000-f2",
+     "rectPx": [
+      1792,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r000-f3",
+     "rectPx": [
+      2688,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r090-f0",
+     "rectPx": [
+      0,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r090-f1",
+     "rectPx": [
+      896,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r090-f2",
+     "rectPx": [
+      1792,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r090-f3",
+     "rectPx": [
+      2688,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r180-f0",
+     "rectPx": [
+      0,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r180-f1",
+     "rectPx": [
+      896,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r180-f2",
+     "rectPx": [
+      1792,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r180-f3",
+     "rectPx": [
+      2688,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r270-f0",
+     "rectPx": [
+      0,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r270-f1",
+     "rectPx": [
+      896,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r270-f2",
+     "rectPx": [
+      1792,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-x-r270-f3",
+     "rectPx": [
+      2688,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      2328
+     ]
+    }
+   ]
+  },
+  {
+   "file": "assets/transport/house-transporter-empty-steer-y-atlas.png",
+   "canvasPx": [
+    3584,
+    2560
+   ],
+   "pngSHA256": "ef33c4b1f9fb014f05cf3170275f37aa89f2a482054d1c256608d6ab8f2e3091",
+   "rows": "0,90,180,270 physical degrees",
+   "columns": "wheel phases 0,.25,.5,.75",
+   "cells": [
+    {
+     "spriteId": "house-transporter-empty-steer-y-r000-f0",
+     "rectPx": [
+      0,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r000-f1",
+     "rectPx": [
+      896,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r000-f2",
+     "rectPx": [
+      1792,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r000-f3",
+     "rectPx": [
+      2688,
+      0,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      408
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r090-f0",
+     "rectPx": [
+      0,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r090-f1",
+     "rectPx": [
+      896,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r090-f2",
+     "rectPx": [
+      1792,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r090-f3",
+     "rectPx": [
+      2688,
+      640,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      1048
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r180-f0",
+     "rectPx": [
+      0,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r180-f1",
+     "rectPx": [
+      896,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r180-f2",
+     "rectPx": [
+      1792,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r180-f3",
+     "rectPx": [
+      2688,
+      1280,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      1688
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r270-f0",
+     "rectPx": [
+      0,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      448,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r270-f1",
+     "rectPx": [
+      896,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      1344,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r270-f2",
+     "rectPx": [
+      1792,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      2240,
+      2328
+     ]
+    },
+    {
+     "spriteId": "house-transporter-empty-steer-y-r270-f3",
+     "rectPx": [
+      2688,
+      1920,
+      896,
+      640
+     ],
+     "anchorInAtlasPx": [
+      3136,
+      2328
+     ]
+    }
+   ]
+  }
+ ]
+}
