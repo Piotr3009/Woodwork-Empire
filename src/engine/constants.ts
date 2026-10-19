@@ -243,7 +243,7 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v115';
+export const APP_VERSION = 'v116';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -538,7 +538,9 @@ export const UNIT_LONG_EXTENSION_CELLS = 10;
  *  extensions are reckoned past (CLAUDE.md T31 2.7). */
 export const UNIT_SECOND_EXTENSION_M2 = 800;
 export const UNIT_LONG_EXTENSION_PRICE = 600000;
-export const UNIT_LONG_EXTENSION_GROWTH = 1.2;
+/** [PIOTR, 19.10: "1.15 I like"; v116] The growth was 1.2 from 11.10; after twenty four
+ *  extensions a seventh metre of a 210 m hall stood at 350 million, eight times what 1.15 asks. */
+export const UNIT_LONG_EXTENSION_GROWTH = 1.15;
 /** [PIOTR, 12.10: "the extension of the hall I have only along the length, and where is the
  *  width?"; "3 ok" to seven metres a time] The hall made wider: once the second extension is open
  *  the front of the hall can be taken out this many metres at a time, again and again, one at a

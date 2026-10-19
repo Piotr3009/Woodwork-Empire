@@ -158,9 +158,9 @@ function unitWith(unit: UnitState, stage: ExtensionStage): UnitState {
 
 /** The builder's price of a stage: a long or a wide one is its square metres at
  *  `UNIT_EXTENSION_PRICE_PER_M2`, up by the growth with every long and wide one already open,
- *  rounded to the pound: 600,000, 720,000, 864,000 and on for the long ones of a hall twenty
- *  metres deep (CLAUDE.md T31 2.7), and 840,000 for the first seven metres of a hall forty long
- *  (PIOTR, 12.10: "3 ok"; v95). */
+ *  rounded to the pound: 600,000, 690,000, 793,500 and on for the long ones of a hall twenty
+ *  metres deep (CLAUDE.md T31 2.7; the growth 1.15 from v116), and 840,000 for the first seven
+ *  metres of a hall forty long (PIOTR, 12.10: "3 ok"; v95). */
 function extensionPrice(unit: UnitState, stage: ExtensionStage): number {
   if (stage === 'first') return UNIT_EXTENSION_PRICE;
   if (stage === 'second') return UNIT_SECOND_EXTENSION_PRICE;

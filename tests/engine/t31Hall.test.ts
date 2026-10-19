@@ -62,7 +62,8 @@ describe('the offer of the hall that grows (CLAUDE.md T31 2.7)', () => {
     expect(extendUnitCheck(short, 'long')).toEqual({ ok: false, reason: 'Not enough in the account' });
   });
 
-  it('costs 600,000, 720,000, 864,000 and 1,036,800, each with the deposit on the bigger rent', () => {
+  // The growth 1.2 to 1.15 (PIOTR, 19.10; v116): 720,000, 864,000 and 1,036,800 are now these.
+  it('costs 600,000, 690,000, 793,500 and 912,525, each with the deposit on the bigger rent', () => {
     let state = deep();
     const prices: number[] = [];
     for (let n = 0; n < 4; n += 1) {
@@ -75,7 +76,7 @@ describe('the offer of the hall that grows (CLAUDE.md T31 2.7)', () => {
       expect(paid.cash).toBe(cash - terms.total);
       state = nextDay(paid);
     }
-    expect(prices).toEqual([600000, 720000, 864000, 1036800]);
+    expect(prices).toEqual([600000, 690000, 793500, 912525]);
   });
 
   it('is one at a time: the builders are in until the morning, and then the next is offered', () => {
@@ -95,7 +96,7 @@ describe('the offer of the hall that grows (CLAUDE.md T31 2.7)', () => {
     for (let n = 0; n < 8; n += 1) state = longer(state);
     expect(state.unit.widthCells).toBe(40 + 8 * UNIT_LONG_EXTENSION_CELLS);
     expect(extendUnitCheck(state, 'long')).toEqual({ ok: true, reason: '' });
-    expect(extensionTerms(state, 'long').price).toBe(Math.round(600000 * 1.2 ** 8));
+    expect(extensionTerms(state, 'long').price).toBe(Math.round(600000 * 1.15 ** 8));
   });
 });
 
