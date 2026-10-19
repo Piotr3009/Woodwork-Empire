@@ -120,14 +120,28 @@ function identitiesOf(nodes: readonly Node[]): Array<string | null> {
   });
 }
 
+/** The things that walk and drive: the engineers, the forklifts and the men. When a figure has
+ *  passed a machine since the last page and the order of the two has to change, it is the figure
+ *  that is moved and never the machine (v121) [PIOTR, 19.10: "the houses disappear and blink like
+ *  mad"]: moving an SVG `<image>` out of the document and back fetches and decodes its picture
+ *  again, which on a station of the house factory, five million pixels, is a blink the eye sees;
+ *  a figure is a cell of a small sheet and comes back at once. Measured on v120: at 1x a station
+ *  was moved about once a game minute, as its ten engineers walked past it. */
+const MOVABLE = ['data-engineer', 'data-forklift-line', 'data-figure'];
+
+function isMovable(identity: string | null): boolean {
+  return identity !== null && MOVABLE.some((name) => identity.startsWith(`${name}=`));
+}
+
 /** The places in `from` of the longest run of old places that rise, the old places being the
  *  order the nodes stand in now and -1 for a node that is new: the nodes already in the right
- *  order among themselves, which are left where they are. */
-function longestRising(from: readonly number[]): Set<number> {
+ *  order among themselves, which are left where they are. A place marked `movable` is never in the
+ *  run: its node is put where it belongs around the ones that stay (v121). */
+function longestRising(from: readonly number[], movable: readonly boolean[] = []): Set<number> {
   const tails: number[] = [];
   const previous = new Array<number>(from.length).fill(-1);
   from.forEach((value, index) => {
-    if (value < 0) return;
+    if (value < 0 || movable[index] === true) return;
     let low = 0;
     let high = tails.length;
     while (low < high) {
@@ -180,7 +194,10 @@ function patchByIdentity(target: Element, olds: readonly Node[], news: readonly 
   olds.forEach((old, index) => {
     if (!kept.has(index)) target.removeChild(old);
   });
-  const stay = longestRising(from);
+  const stay = longestRising(
+    from,
+    identities.map((identity) => isMovable(identity)),
+  );
   let after: Node | null = null;
   for (let index = final.length - 1; index >= 0; index -= 1) {
     const node = final[index] as Node;
