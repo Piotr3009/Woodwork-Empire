@@ -1062,6 +1062,9 @@ class picture (`stationTier` in `src/render/hall.ts`), picked as any picture is,
 picture stands in where a frame's file is missing. Nothing plays in real time: the picture changes
 with the game's minute, thirty minutes a frame at the factory's base pace, so a slow processor
 reads one picture a station. No sheet: `MACHINE_WORK_SHEETS` holds the window and door lines only.
+From v120 the frames are fetched ahead of their minute, the two wanted next first, and held in
+memory as blobs the station is drawn from (`src/render/prefetch.ts`), so a swap never waits for
+the network and the house on the station never blinks out [PIOTR, 19.10: "the houses disappear"].
 
 **How the game uses them.** The six stations stand end to end along x at a 14 m pitch, station 1 at
 the left, never turned, and each is drawn as one picture sorted at its own cell and its 10 m of depth

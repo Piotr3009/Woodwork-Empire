@@ -168,6 +168,7 @@ import { lineMakesWindows, lineUnitFrame, palletsAtTheGate, runningLineContract 
 import { lineLanes, rearRowOf } from '../engine/layout';
 import { forkliftArt, forkliftPoints } from './forklift';
 import { roomForArt } from './roomFor';
+import { cachedUrl, prefetch } from './prefetch';
 import { engineersArt } from './engineers';
 import { placeholder } from './placeholder';
 import { jobStage } from '../engine/jobs';
@@ -306,7 +307,8 @@ export function objectArt(art: {
     const mirror = mirrorNeeded(files, art.spriteKey, art.tier, orientation)
       ? ` transform="translate(${round(anchor.x * 2)},0) scale(-1, 1)"`
       : '';
-    return shadow + spriteImage(url, at, mirror.trim());
+    // From the blob held for it where one is (the house factory's frames, v120), else the file.
+    return shadow + spriteImage(cachedUrl(url), at, mirror.trim());
   }
   // A Turn 13 picture the art side has not painted yet is drawn by the one placeholder function,
   // in the hall's 2:1 dimetric, where its file will go (CLAUDE.md T13 1, 3.13, 3.21).
@@ -1115,6 +1117,22 @@ function stationTier(state: GameState, item: Equipment, files: readonly string[]
   const frame = lineUnitFrame(state, lineOf(item), HOUSE_WORK_FRAMES);
   const tier = frame === null ? `${item.variantId}.empty` : `${item.variantId}.work${String(frame).padStart(2, '0')}`;
   return files.includes(spriteFileName(item.spriteKey, tier, item.orientation)) ? tier : item.variantId;
+}
+
+/** Asks the browser for a house factory's station pictures before their minute: the two frames
+ *  after the one drawn first, then the rest of its sixteen and the empty picture, each once, so
+ *  the swap at the next sixteenth of the cycle finds the file down and decoded and the house on
+ *  the station never blinks out (v120) [PIOTR, 19.10]. Only the files that have landed. */
+function prefetchStationFrames(item: Equipment, tier: string, files: readonly string[]): void {
+  if (moduleKind(item.specId) !== 'house') return;
+  const frame = /\.work(\d\d)$/.exec(tier);
+  const shown = frame === null ? -1 : Number(frame[1]);
+  const name = (suffix: string): string => spriteFileName(item.spriteKey, `${item.variantId}.${suffix}`, item.orientation);
+  const all = [...Array.from({ length: HOUSE_WORK_FRAMES }, (_, index) => name(`work${String(index).padStart(2, '0')}`)), name('empty')];
+  const next = [1, 2].map((ahead) => name(`work${String((shown + ahead) % HOUSE_WORK_FRAMES).padStart(2, '0')}`));
+  const url = (file: string): string => `${SPRITE_DIR}/${file}`;
+  prefetch(next.filter((file) => files.includes(file)).map(url), true);
+  prefetch(all.filter((file) => files.includes(file)).map(url));
 }
 
 /** The work sheet of this machine's class when the art side has delivered it, or null. */
@@ -2203,6 +2221,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const foot: FloorBox = { x: stands.x, y: stands.y, width: stands.width, depth: stands.depth };
     // A house factory's station is drawn by the frame of the house in its hands (v117).
     const tier = stationTier(state, item, files);
+    prefetchStationFrames(item, tier, files);
     drawables.push({
       depth: kitDepth(item, stands),
       foot,
