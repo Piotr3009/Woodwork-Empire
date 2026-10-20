@@ -22,6 +22,16 @@ function isSame(old: Node, fresh: Node): boolean {
   if (old.nodeType !== ELEMENT_NODE) return true;
   const before = old as Element;
   const after = fresh as Element;
+  // The scene the page carries from page to page (`mountScene`) and the empty slot the fresh
+  // markup leaves for it are the same thing, whatever their tags: an `<svg>` of the hall standing
+  // where the markup says `<div data-scene-slot>`. Told apart by their tags, as they were until
+  // v122, the hall was taken out of the page at every page written, once a game minute, and put
+  // back by `mountScene`: every picture in it painted again from nothing, and the big ones, the
+  // house factory's stations first, blinked [PIOTR, 20.10: "the graphic disappears and comes back,
+  // the same problem the other lines had"]. One marked and the other not are never the same.
+  const slotBefore = before.hasAttribute('data-scene-slot');
+  const slotAfter = after.hasAttribute('data-scene-slot');
+  if (slotBefore || slotAfter) return slotBefore && slotAfter;
   if (before.tagName !== after.tagName) return false;
   // The one rule the whole fix hangs on (CLAUDE.md T9 3.8).
   if (before.getAttribute('data-do') !== after.getAttribute('data-do')) return false;

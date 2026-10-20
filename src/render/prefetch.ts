@@ -19,14 +19,26 @@
 // The hall now asks for the frames ahead of their minute, one at a time in the order they are
 // wanted (the next two of every station first, then the rest of its sixteen and the empty
 // picture), keeps each as a blob of its own in memory (`URL.createObjectURL`, about half a megabyte
-// a frame, fifty for a whole factory), decodes it once, and from then on draws the station from
-// that blob (`cachedUrl`): no network at the swap, whatever the server's headers. The renderer's
-// and nothing of the state; a page without `fetch` or object URLs (the tests' jsdom) asks nothing
-// and draws the files as before.
+// a frame, fifty for a whole factory), and from then on draws the station from that blob
+// (`cachedUrl`): no network at the swap, whatever the server's headers. The renderer's and nothing
+// of the state; a page without `fetch` or object URLs (the tests' jsdom) asks nothing and draws the
+// files as before.
+//
+// Decoded, a frame is five megabytes, a factory's hundred and two over five hundred: more than the
+// browser keeps of decoded pictures, so v120's decode of every frame as it landed pushed out of the
+// browser's keeping the pictures on the screen, and those were painted blank again until decoded
+// again. From v122 a blob is only held, and the one frame each station shows next is decoded ahead
+// (`warm`), a few seconds at the most before it is wanted.
 
 /** Every URL ever queued, so a file is asked for once a page; and the blob each one became. */
 const queued = new Set<string>();
 const cached = new Map<string, string>();
+/** When each URL was last decoded ahead, real milliseconds, so a page a frame asks it once. */
+const warmed = new Map<string, number>();
+/** A frame decoded ahead is decoded again no sooner than this [TUNE]: long enough that sixty pages
+ *  a second ask nothing, short enough that a frame decoded and pushed out is decoded again before
+ *  its turn at 1x, thirty seconds a frame. */
+export const WARM_AGAIN_MS = 5000;
 const queue: string[] = [];
 let busy = false;
 
@@ -42,6 +54,7 @@ export function resetPrefetch(): void {
   }
   cached.clear();
   queued.clear();
+  warmed.clear();
   queue.length = 0;
   busy = false;
 }
@@ -66,6 +79,22 @@ export function cachedUrl(url: string): string {
   return cached.get(url) ?? url;
 }
 
+/** Decodes the picture a station shows next, from its blob, so the swap at its minute finds it
+ *  decoded: once in `WARM_AGAIN_MS`, and not before its blob is held (the page after it lands asks
+ *  again). True when a decode was asked for (v122). */
+export function warm(url: string, nowMs: number = typeof performance === 'undefined' ? Date.now() : performance.now()): boolean {
+  if (!canPrefetch() || typeof Image === 'undefined') return false;
+  const held = cached.get(url);
+  if (held === undefined) return false;
+  const last = warmed.get(url);
+  if (last !== undefined && nowMs - last < WARM_AGAIN_MS) return false;
+  warmed.set(url, nowMs);
+  const image = new Image();
+  image.src = held;
+  if (typeof image.decode === 'function') image.decode().catch(() => undefined);
+  return true;
+}
+
 function pump(): void {
   if (busy) return;
   const url = queue.shift();
@@ -78,13 +107,8 @@ function pump(): void {
   fetch(url)
     .then((response) => (response.ok ? response.blob() : Promise.reject(new Error(String(response.status)))))
     .then((blob) => {
-      const held = URL.createObjectURL(blob);
-      cached.set(url, held);
-      // Decoded once now, so the hall's first swap to it paints at once.
-      if (typeof Image === 'undefined') return undefined;
-      const image = new Image();
-      image.src = held;
-      return typeof image.decode === 'function' ? image.decode().catch(() => undefined) : undefined;
+      // Held, not decoded: the frame wanted next is decoded by `warm` (v122).
+      cached.set(url, URL.createObjectURL(blob));
     })
     .then(done, done);
 }

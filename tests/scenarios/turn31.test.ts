@@ -24,7 +24,7 @@
 //       was away.
 // (jjj) The line's lane refuses a rack put on it; a save with a bench on the lane shows `laneBlocked`
 //       and the line moved onto a place whose lane is blocked is refused, until the bench is moved.
-// (kkk) The hall extended three times (600,000, 690,000, 793,500 from v116) is 70 by 20 m, its rent, rates,
+// (kkk) The hall extended three times (600,000, 660,000, 726,000 from v122) is 70 by 20 m, its rent, rates,
 //       power, insurance and security up with it, 56 lockers in its enlarged canteen, and the van
 //       and the apron moved out each time.
 // (lll) Over a played year of three sheet contracts, with the seed chosen to show it, one is lost
@@ -459,9 +459,9 @@ describe('(kkk) the hall extended three times (CLAUDE.md T31 2.7)', () => {
     widths.push(grown.unit.widthCells);
   }
 
-  it('cost 600,000, 690,000 and 793,500, each the next working morning ten metres longer, the van moved out each time', () => {
+  it('cost 600,000, 660,000 and 726,000, each the next working morning ten metres longer, the van moved out each time', () => {
     // The first extension was 200 m² too: the last three lines are the long ones.
-    expect(line(grown, 'Extension of the unit, 200 m²').slice(-3)).toEqual([-600000, -690000, -793500]); // the growth 1.15 (PIOTR, 19.10; v116)
+    expect(line(grown, 'Extension of the unit, 200 m²').slice(-3)).toEqual([-600000, -660000, -726000]); // the growth 1.1 (PIOTR, 20.10; v122)
     expect(line(grown, 'Extension of the unit, 200 m²')).toHaveLength(4);
     expect(widths).toEqual([50, 60, 70]);
     expect(vans).toEqual([50, 60, 70]);

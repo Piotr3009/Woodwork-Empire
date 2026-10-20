@@ -93,8 +93,8 @@ describe('the Premises page s card (CLAUDE.md T31 2.7)', () => {
     const open = nextDay(paid);
     const page = dom(renderPremises(open));
     expect(linesOf(page.querySelector('[data-premises="extendLong"]'))[0]).toBe(
-      // 720,000 until v116: the growth is 1.15 (PIOTR, 19.10).
-      '£690,000 · and £2,400 more deposit. Needs £692,400 in the account.',
+      // 720,000 until v116, 690,000 until v122: the growth is 1.1 (PIOTR, 20.10).
+      '£660,000 · and £2,400 more deposit. Needs £662,400 in the account.',
     );
     // The second is still named by the 800 m² it made, and says the unit as it stands now.
     const second = page.querySelector('[data-premises="extendSecond"]');

@@ -90,22 +90,22 @@ describe('the offer of the hall made wider (v95)', () => {
     expect(paid.cash).toBe(cash - first.total);
     expect(paid.ledger.at(-2)).toMatchObject({ category: 'unitExtension', label: 'Extension of the unit, 280 m²', amount: -840000 });
     state = nextDay(paid);
-    // 1,008,000 until v116: the growth is 1.15 (PIOTR, 19.10).
-    expect(extensionTerms(state, 'wide')).toMatchObject({ price: 966000, addsM2: 280, depthCells: 34 });
+    // 1,008,000 until v116, 966,000 until v122: the growth is 1.1 (PIOTR, 20.10).
+    expect(extensionTerms(state, 'wide')).toMatchObject({ price: 924000, addsM2: 280, depthCells: 34 });
   });
 
   it('counts the long ones and the wide ones together, each priced by the square metres it adds', () => {
     // Wider first: the long one after it is ten metres of a hall twenty seven deep, the second of
     // the two.
     const widerFirst = wider(deep());
-    expect(extensionTerms(widerFirst, 'long')).toMatchObject({ price: 931500, addsM2: 270, widthCells: 50, depthCells: 27 });
+    expect(extensionTerms(widerFirst, 'long')).toMatchObject({ price: 891000, addsM2: 270, widthCells: 50, depthCells: 27 });
     // Longer first: the wide one after it is seven metres of a hall fifty long.
     const longerFirst = longer(deep());
-    expect(extensionTerms(longerFirst, 'wide')).toMatchObject({ price: 1207500, addsM2: 350, widthCells: 50, depthCells: 27 });
-    expect(Math.round(UNIT_EXTENSION_PRICE_PER_M2 * 350 * UNIT_LONG_EXTENSION_GROWTH)).toBe(1207500);
+    expect(extensionTerms(longerFirst, 'wide')).toMatchObject({ price: 1155000, addsM2: 350, widthCells: 50, depthCells: 27 });
+    expect(Math.round(UNIT_EXTENSION_PRICE_PER_M2 * 350 * UNIT_LONG_EXTENSION_GROWTH)).toBe(1155000);
     // And the long ones of a hall twenty deep cost what they cost before.
     expect(extensionTerms(deep(), 'long').price).toBe(600000);
-    expect(extensionTerms(longerFirst, 'long').price).toBe(690000);
+    expect(extensionTerms(longerFirst, 'long').price).toBe(660000);
   });
 
   it('is one at a time, and the long one waits while the builders are in for it, and the other way', () => {
@@ -129,7 +129,7 @@ describe('the offer of the hall made wider (v95)', () => {
     for (let n = 0; n < 5; n += 1) state = wider(state);
     expect(state.unit.depthCells).toBe(20 + 5 * UNIT_WIDE_EXTENSION_CELLS);
     expect(extendUnitCheck(state, 'wide')).toEqual({ ok: true, reason: '' });
-    expect(extensionTerms(state, 'wide').price).toBe(Math.round(3000 * 280 * 1.15 ** 5));
+    expect(extensionTerms(state, 'wide').price).toBe(Math.round(3000 * 280 * 1.1 ** 5));
   });
 });
 

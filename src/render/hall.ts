@@ -168,7 +168,7 @@ import { lineMakesWindows, lineUnitFrame, palletsAtTheGate, runningLineContract 
 import { lineLanes, rearRowOf } from '../engine/layout';
 import { forkliftArt, forkliftPoints } from './forklift';
 import { roomForArt } from './roomFor';
-import { cachedUrl, prefetch } from './prefetch';
+import { cachedUrl, prefetch, warm } from './prefetch';
 import { engineersArt } from './engineers';
 import { placeholder } from './placeholder';
 import { jobStage } from '../engine/jobs';
@@ -1121,8 +1121,9 @@ function stationTier(state: GameState, item: Equipment, files: readonly string[]
 
 /** Asks the browser for a house factory's station pictures before their minute: the two frames
  *  after the one drawn first, then the rest of its sixteen and the empty picture, each once, so
- *  the swap at the next sixteenth of the cycle finds the file down and decoded and the house on
- *  the station never blinks out (v120) [PIOTR, 19.10]. Only the files that have landed. */
+ *  the swap at the next sixteenth of the cycle finds the file down and the house on the station
+ *  never blinks out (v120) [PIOTR, 19.10], and the next one decoded (v122). Only the files that have
+ *  landed. */
 function prefetchStationFrames(item: Equipment, tier: string, files: readonly string[]): void {
   if (moduleKind(item.specId) !== 'house') return;
   const frame = /\.work(\d\d)$/.exec(tier);
@@ -1133,6 +1134,9 @@ function prefetchStationFrames(item: Equipment, tier: string, files: readonly st
   const url = (file: string): string => `${SPRITE_DIR}/${file}`;
   prefetch(next.filter((file) => files.includes(file)).map(url), true);
   prefetch(all.filter((file) => files.includes(file)).map(url));
+  // The one frame it shows next decoded ahead, from its blob once held (v122).
+  const coming = next[0];
+  if (coming !== undefined && files.includes(coming)) warm(url(coming));
 }
 
 /** The work sheet of this machine's class when the art side has delivered it, or null. */

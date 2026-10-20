@@ -160,10 +160,15 @@ function round(value: number): number {
 
 /** The image element for an object, sized and placed by the contract. */
 export function spriteImage(url: string, box: SpriteBox, extra = ''): string {
+  // `decoding="sync"` (v122): a picture whose decode is not in the browser's cache is painted
+  // when it is decoded, the old tile standing until then, and never as an empty tile first. A big
+  // picture without it (a megabyte decoded and more: a station of the house factory is five) is
+  // first painted without the picture and then again with it, which is a blink [PIOTR, 20.10].
+  // A small picture is decoded at once either way.
   return (
     `<image href="${url}" x="${round(box.x)}" y="${round(box.y)}" ` +
     `width="${round(box.width)}" height="${round(box.height)}" ` +
-    `preserveAspectRatio="xMidYMax meet"${extra ? ` ${extra}` : ''} />`
+    `preserveAspectRatio="xMidYMax meet" decoding="sync"${extra ? ` ${extra}` : ''} />`
   );
 }
 

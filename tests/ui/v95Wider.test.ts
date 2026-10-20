@@ -103,8 +103,8 @@ describe('the Premises page s card for the hall made wider (v95)', () => {
     expect(long?.querySelector('.reason')?.textContent).toBe('The builders are in');
     const open = dom(renderPremises(nextDay(paid)));
     expect(linesOf(open.querySelector('[data-premises="extendWide"]'))[0]).toBe(
-      // 1,008,000 until v116: the growth is 1.15 (PIOTR, 19.10).
-      '£966,000 · and £3,360 more deposit. Needs £969,360 in the account.',
+      // 1,008,000 until v116, 966,000 until v122: the growth is 1.1 (PIOTR, 20.10).
+      '£924,000 · and £3,360 more deposit. Needs £927,360 in the account.',
     );
     // The long one is ten metres of a hall twenty seven deep now.
     expect(open.querySelector('[data-premises="extendLong"] h3')?.textContent).toBe('Extend the hall: 270 m² more');
