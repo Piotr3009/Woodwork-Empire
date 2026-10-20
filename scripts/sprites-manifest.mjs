@@ -14,17 +14,18 @@ export const MANIFEST_NAME = 'manifest.json';
  *  cannot be fetched at render time (CLAUDE.md T9 3.13). */
 export const CHARACTERS_NAME = 'characters.json';
 
-/** The PNG names out of a list, sorted, so the manifest does not change with the file system. */
-export function pickPngs(names) {
+/** The pictures out of a list, PNG and WebP (v123: the yacht line's frames came as WebP), sorted,
+ *  so the manifest does not change with the file system. */
+export function pickPictures(names) {
   return names
-    .filter((name) => name.toLowerCase().endsWith('.png'))
+    .filter((name) => name.toLowerCase().endsWith('.png') || name.toLowerCase().endsWith('.webp'))
     .sort((left, right) => left.localeCompare(right));
 }
 
-/** Every PNG in the folder. A folder that is not there yet is an empty folder. */
+/** Every picture in the folder. A folder that is not there yet is an empty folder. */
 export function spriteFilesIn(directory) {
   if (!existsSync(directory)) return [];
-  return pickPngs(readdirSync(directory));
+  return pickPictures(readdirSync(directory));
 }
 
 /** Every character JSON in the folder, read into one object keyed by its own name without the

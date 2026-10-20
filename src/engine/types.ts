@@ -898,7 +898,7 @@ export interface LineSince {
  *  18.10: "5 tak zakoduj"]. The names of the record and its counts stay the window line's
  *  (`windowLines`, `windows`, `palletsAtGate`) and count a line's units of whatever kind: a house
  *  line's `palletsAtGate` are its houses waiting on its lane. */
-export type LineKind = 'window' | 'door' | 'house';
+export type LineKind = 'window' | 'door' | 'house' | 'yacht';
 
 export interface WindowLineState {
   /** The line's number, 1 for the first bought and one more for each after it: what its modules

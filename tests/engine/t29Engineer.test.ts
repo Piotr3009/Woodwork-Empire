@@ -72,9 +72,9 @@ describe('the line engineer (CLAUDE.md T29 2.8)', () => {
       monthlyWage: 15000,
       minReputation: REPUTATION_MIN,
       duties:
-        // The house factory's ten from v114 (flipped).
+        // The house factory's ten from v114, and the yacht line's ten from v123 (flipped).
         'Keeps a production line running. A window line takes two: one keeps up to three modules, two ' +
-        'keep all six. A door line takes four, a house factory ten.',
+        'keep all six. A door line takes four, a house factory ten, a yacht line ten.',
     });
     expect(LINE_ENGINEER_MONTHLY_WAGE).toBe(15000);
     // The sentence is the rule in words: of a window line one keeps three and two keep all six

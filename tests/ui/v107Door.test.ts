@@ -75,11 +75,12 @@ function page(html: string): HTMLElement {
 describe('the catalogue (v107)', () => {
   it('holds a folder a kind of line, the door line s from its own price', () => {
     const tab = page(renderCatalogue(bigUnit(), '', catalogueTabFrom('line')));
-    // And the house factory's after them from v114 (flipped).
+    // And the house factory's after them from v114, and the yacht line's from v123 (flipped).
     expect(Array.from(tab.querySelectorAll('.folder')).map((node) => node.getAttribute('data-folder'))).toEqual([
       'windowLine1',
       'doorLine1',
       'houseLine1',
+      'yachtLine1',
     ]);
     const door = tab.querySelector('[data-folder="doorLine1"]')?.textContent ?? '';
     expect(door).toContain('Door production line');

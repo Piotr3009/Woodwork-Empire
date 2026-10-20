@@ -151,7 +151,8 @@ describe('the house factory in the table (v114)', () => {
       // No working motion until the art side draws one.
       expect(MACHINE_WORK_SHEETS[id], id).toBeUndefined();
     });
-    expect(ALL_LINE_MODULES).toHaveLength(18);
+    // Thirty from v123: the yacht line's twelve after them (flipped).
+    expect(ALL_LINE_MODULES).toHaveLength(30);
   });
 });
 
@@ -254,10 +255,12 @@ describe('the catalogue (v114)', () => {
   it('holds the house factory s folder from its own price, and its card in its own words', () => {
     const state = houseFactory();
     const tab = page(renderCatalogue(state, '', catalogueTabFrom('line')));
+    // And the yacht line's after it from v123 (flipped).
     expect(Array.from(tab.querySelectorAll('.folder')).map((node) => node.getAttribute('data-folder'))).toEqual([
       'windowLine1',
       'doorLine1',
       'houseLine1',
+      'yachtLine1',
     ]);
     expect(tab.querySelector('[data-folder="houseLine1"]')?.textContent).toContain('from £50,000,000');
     const card = page(renderMachine(state, 'houseLine1')).querySelector('.tile[data-line]');

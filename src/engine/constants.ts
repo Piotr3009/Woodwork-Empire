@@ -243,7 +243,7 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v122';
+export const APP_VERSION = 'v123';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1033,6 +1033,108 @@ export const HOUSES_WAITING_DRAWN = 3;
  *  no contract runs (v117). The files are `houseLineN.standard.workFF.png` and
  *  `houseLineN.standard.empty.png` (docs/art/SPRITES.md 22). */
 export const HOUSE_WORK_FRAMES = 16;
+/** [PIOTR, 20.10: "now code the production, graphics only, of the yacht building", on the art side's
+ *  pack of the yacht line (`Woodwork-Empire-Linia-Jachtow-Kod-do-gry.zip`, its pictures alone, none
+ *  of its code); TUNE: chat: ten] What every money figure of the yacht line is of the window line's:
+ *  the house factory's five twice over, as its twelve stations are the house factory's six twice
+ *  over: its price and each station's share, each upgrade, the power of each station; and a yacht's
+ *  base price and material are a window's times this and times the minutes factor below (v123). */
+export const YACHT_LINE_FACTOR = 10;
+/** [TUNE: chat] A yacht takes a window's minutes times this: two working days a yacht at the start,
+ *  160 minutes off it an upgrade, never under 320 minutes (v123). */
+export const YACHT_LINE_MINUTES_FACTOR = 16;
+/** [TUNE: chat: the house's rule of v115, 100,000 for its 60,000 (PIOTR, 19.10: "let the saving pay
+ *  off"), five thirds of the window's price times the factors] What the yacht dealer pays for a
+ *  yacht, in place of 240,000: its timber and glass stay its 320 boards and 160 units, 96,000, so a
+ *  yacht keeps 304,000 (v123). */
+export const YACHT_PRICE = 400000;
+/** The yacht line's twelve stations in their order along it, two for each window module, each pair
+ *  carrying that module's share in the same place ten times over between them: 10, 10, 12.5, 12.5,
+ *  6.25 four times and 7.5 four times million, a hundred in all (v123). */
+export const YACHT_LINE_MODULE_SHARES: Readonly<Record<string, number>> = Object.fromEntries(
+  Object.values(LINE_MODULE_SHARES).flatMap((share, index) => [
+    [`yachtLine${2 * index + 1}`, (share * YACHT_LINE_FACTOR) / 2],
+    [`yachtLine${2 * index + 2}`, (share * YACHT_LINE_FACTOR) / 2],
+  ]),
+);
+/** [TUNE: chat, from the art side's pack: "twelve stations of 14 x 10 x 12 m, 168 m of production"]
+ *  One station of the yacht line, its twelve end to end along x making the 168 m by 10 m line
+ *  (v123). */
+export const YACHT_MODULE_SIZE = { width: 14, depth: 10, height: 12 };
+/** [TUNE: chat] The working days from the order of a yacht line to the day its stations land: half
+ *  as long again as the house factory's sixty, built to order (v123). */
+export const YACHT_LINE_DELIVERY_DAYS = 90;
+/** [TUNE: chat, from the art side's pack: "the aisle beside the line, 10 m wide"] The depth of a yacht
+ *  line's own lane in front of its engineers' metre, along the line from its first station to its
+ *  last, as the house factory's (v118): the yachts drive out sideways on their transporters into it
+ *  and wait at its gate side end for the dealer (v123). */
+export const YACHT_LANE_CELLS = 10;
+/** [TUNE: chat, from the art side's transporter: its deck 12.8 m by 5.4 m] Where a finished yacht
+ *  waits on its line's lane: a box of 13 m by 6 m round the transporter, 4 m high, the first a metre
+ *  in from the lane's gate side end and each next one a metre past the one before, in the middle of
+ *  the lane's depth; three drawn at the most (v123). */
+export const YACHT_WAIT_LAYOUT = { fromEnd: 1, gap: 1, width: 13, depth: 6, height: 4 };
+export const YACHTS_WAITING_DRAWN = 3;
+/** [The art side's pack: sixteen frames a station, played once and held on the last] The frames of a
+ *  yacht line's station at work, picked as a house factory's are (`lineUnitFrame`, v117): the files
+ *  are `yachtLineN.standard.workFF.webp` and `yachtLineN.standard.empty.webp` (docs/art/SPRITES.md
+ *  23). */
+export const YACHT_WORK_FRAMES = 16;
+/** The yacht line's twelve stations, the art side's twelve stages in their order: the words of each
+ *  station's row on the line's card, and the sentence of its class in the catalogue [TUNE: chat: the
+ *  words, from the pack's stage names] (v123). */
+export const YACHT_STATIONS: ReadonlyArray<{ row: string; sentence: string }> = [
+  {
+    row: 'the mould: cleaned, waxed and gel coated under the gantry crane',
+    sentence: 'The mould station: the hull mould cleaned, waxed and gel coated under the gantry crane.',
+  },
+  {
+    row: 'the lamination: the glass mat laid into the mould by the robots',
+    sentence: 'The laminating station: the robots lay the glass mat into the mould, layer on layer.',
+  },
+  {
+    row: 'the vacuum infusion: the resin drawn through the laminate under the bag',
+    sentence: 'The vacuum infusion station: the laminate bagged and the resin drawn through it.',
+  },
+  {
+    row: 'the demoulding: the hull lifted out and set on its transporter',
+    sentence: 'The demoulding station: the hull lifted out of its mould by the gantry crane and set on its transporter.',
+  },
+  {
+    row: 'the bulkheads and the structure, bonded into the hull',
+    sentence: 'The structure station: the bulkheads and the stringers bonded into the hull.',
+  },
+  {
+    row: 'the engines, the shafts and the tanks',
+    sentence: 'The engine station: the engines, the shafts and the tanks lowered in by the gantry crane.',
+  },
+  {
+    row: 'the services: the wiring, the plumbing and the electronics',
+    sentence: 'The services station: the wiring, the plumbing and the electronics run through the hull.',
+  },
+  {
+    row: 'the mahogany interior',
+    sentence: 'The interior station: the mahogany joinery fitted below deck.',
+  },
+  {
+    row: 'the deck and the superstructure, lifted on by the gantry crane',
+    sentence: 'The deck station: the deck and the cabin lifted on whole and bonded down.',
+  },
+  {
+    row: 'the glazing: the windows set into the cabin and the hull',
+    sentence: 'The glazing station: the windows set into the cabin and the hull.',
+  },
+  {
+    row: 'the premium finishing: the teak, the brightwork and the fittings',
+    sentence: 'The finishing station: the teak, the brightwork and the fittings, inside and out.',
+  },
+  {
+    row: 'the inspection and the handover, then out to the lane',
+    sentence:
+      'The inspection station: each yacht checked from the keel to the cabin roof, signed off and driven out ' +
+      'sideways on its transporter to the lane in front.',
+  },
+];
 /** Kit built to order, whose order cannot be called off once it is placed: the money is the
  *  maker's from the click, so an order placed before 30 December and called off in January saves
  *  no tax (CLAUDE.md T29 2.6, 2.10) [TUNE: chat]. Every other machine is still called off in full
@@ -1043,6 +1145,7 @@ export const BUILT_TO_ORDER: readonly string[] = [
   ...Object.keys(LINE_MODULE_SHARES),
   ...Object.keys(DOOR_LINE_MODULE_SHARES),
   ...Object.keys(HOUSE_LINE_MODULE_SHARES),
+  ...Object.keys(YACHT_LINE_MODULE_SHARES),
 ];
 /** What an order built to order says in place of its refund (CLAUDE.md T29 2.10). */
 export const BUILT_TO_ORDER_LINE = 'Built to order: it cannot be called off';
@@ -4153,6 +4256,21 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
     LINE_MODULE_POWER_PER_DAY * HOUSE_LINE_FACTOR,
     HOUSE_MODULE_SIZE,
   ),
+  // The yacht line's twelve stations, each under its gantry crane, at its share and at ten times the
+  // window module's power on their own 14 m by 10 m by 12 m (PIOTR, 20.10; v123) [TUNE: chat: the
+  // sentences, from the art side's twelve stages].
+  ...Object.fromEntries(
+    Object.keys(YACHT_LINE_MODULE_SHARES).map((id, index) => [
+      id,
+      lineModuleVariants(
+        `Yacht line, module ${index + 1}`,
+        YACHT_LINE_MODULE_SHARES[id] ?? 0,
+        YACHT_STATIONS[index]?.sentence ?? '',
+        LINE_MODULE_POWER_PER_DAY * YACHT_LINE_FACTOR,
+        YACHT_MODULE_SIZE,
+      ),
+    ]),
+  ),
   spindleMoulder: SPINDLE_MOULDER_VARIANTS,
   // The cabinet is a family of five from Turn 22, and what a class is for is how many men's hand
   // tools it holds (PIOTR, 19.09; CLAUDE.md T22 2.12).
@@ -4266,6 +4384,33 @@ function doorModuleSpec(place: number, effect: string): SpecDraft {
     height: 3,
     zoneWidth: 6,
     zoneDepth: 3,
+    spriteKey: id,
+    usedOn: 'solidWood',
+    minUnitM2: BIG_KIT_UNIT_M2,
+    effect,
+  };
+}
+
+/** One station of the yacht line in the catalogue (v123): built to order in its own ninety working
+ *  days, in the `line` tab under its own folder, at its share of the line's hundred million, 14 m by
+ *  10 m by 12 m; station 1 stands for the whole line there, as the window line's module 1 stands for
+ *  its line (CLAUDE.md T30 2.3.3) [TUNE: chat]. */
+function yachtModuleSpec(place: number, effect: string): SpecDraft {
+  const id = `yachtLine${place}`;
+  return {
+    ...BASE_SPEC,
+    id,
+    deliveryDays: YACHT_LINE_DELIVERY_DAYS,
+    folder: 'Yacht production line',
+    tab: 'line',
+    name: `Yacht line, module ${place}`,
+    price: YACHT_LINE_MODULE_SHARES[id] ?? 0,
+    category: 'machine',
+    width: YACHT_MODULE_SIZE.width,
+    depth: YACHT_MODULE_SIZE.depth,
+    height: YACHT_MODULE_SIZE.height,
+    zoneWidth: YACHT_MODULE_SIZE.width,
+    zoneDepth: YACHT_MODULE_SIZE.depth,
     spriteKey: id,
     usedOn: 'solidWood',
     minUnitM2: BIG_KIT_UNIT_M2,
@@ -5164,6 +5309,11 @@ const SPEC_DRAFTS: SpecDraft[] = [
   houseModuleSpec(4, 'Module 4 of the house line: the roof.'),
   houseModuleSpec(5, 'Module 5 of the house line: the finishing.'),
   houseModuleSpec(6, 'Module 6 of the house line: the inspection and the handover, then out to the lane.'),
+  // The yacht line's twelve [PIOTR, 20.10] (v123): station 1 standing for the line in the catalogue.
+  yachtModuleSpec(1, 'Makes yachts from the hull mould to the handover: twelve stations in one line, 168 m long.'),
+  ...YACHT_STATIONS.slice(1).map((station, index) =>
+    yachtModuleSpec(index + 2, `Module ${index + 2} of the yacht line: ${station.row}.`),
+  ),
 
 
   {
@@ -6430,6 +6580,41 @@ export const HOUSE_LINE_UPGRADES: readonly LineUpgradeSpec[] = [
   },
 ];
 
+/** The yacht line's four upgrades, each the window line's ten times over in price and taking its
+ *  ten minutes times the yacht's minutes factor off each yacht (v123) [TUNE: chat: the names and the
+ *  sentences]. */
+export const YACHT_LINE_UPGRADES: readonly LineUpgradeSpec[] = [
+  {
+    id: 'yachtMoulds',
+    name: 'Heated moulds',
+    price: (LINE_UPGRADES[0]?.price ?? 0) * YACHT_LINE_FACTOR,
+    sentence:
+      'Heated moulds for the first three stations: the laminate cures faster and the hull comes out of the ' +
+      'mould sooner.',
+  },
+  {
+    id: 'yachtSoftware',
+    name: 'Yard software',
+    price: (LINE_UPGRADES[1]?.price ?? 0) * YACHT_LINE_FACTOR,
+    sentence:
+      'One program for the whole line: each yacht\'s plans and cutting lists go to every station in turn, ' +
+      'with no stop between hulls.',
+  },
+  {
+    id: 'yachtLaminating',
+    name: 'Second laminating robot',
+    price: (LINE_UPGRADES[2]?.price ?? 0) * YACHT_LINE_FACTOR,
+    sentence: 'A second robot in module 2: one layer is laid while the next is cut.',
+  },
+  {
+    id: 'yachtFinishing',
+    name: 'Second finishing robot',
+    price: (LINE_UPGRADES[3]?.price ?? 0) * YACHT_LINE_FACTOR,
+    sentence:
+      'A second robot in module 11: the brightwork and the varnish are no longer the slowest step.',
+  },
+];
+
 /** What one kind of production line is (v107). The window line's figures are its own constants
  *  of Turns 29 to 32, and every other kind is written from them: its money is the window line's
  *  times its factor and its minutes the window's times its minutes factor, so a line of any kind
@@ -6467,6 +6652,13 @@ export interface LineKindSpec {
   /** The depth of its lane in front of its engineers' metre: the forklift's two metres, or the house
    *  factory's ten (v114). */
   laneCells: number;
+  /** Where a finished unit of a `lane` kind waits on its lane, and how many are drawn there at the
+   *  most: the house's transporter, the yacht's (v123); null for a kind whose pallets go to the gate. */
+  wait: { fromEnd: number; gap: number; width: number; depth: number; height: number; drawn: number } | null;
+  /** The frames of a station at work, picked by how far the unit in hand has come (v117), for a kind
+   *  the art side drew so: sixteen the house factory's and the yacht line's; null for a kind whose
+   *  modules play a work sheet or nothing (v123). */
+  stationFrames: number | null;
   upgrades: readonly LineUpgradeSpec[];
   /** The line's card's sentence, in the place of a class's description. */
   description: string;
@@ -6502,6 +6694,8 @@ export const LINE_KINDS: Readonly<Record<LineKind, LineKindSpec>> = {
     palletSprite: 'windowPallet',
     collection: 'gate',
     laneCells: FORKLIFT_LANE_CELLS,
+    wait: null,
+    stationFrames: null,
     upgrades: LINE_UPGRADES,
     description: LINE_DESCRIPTION,
     rowTails: LINE_ROW_TAIL,
@@ -6529,6 +6723,8 @@ export const LINE_KINDS: Readonly<Record<LineKind, LineKindSpec>> = {
     palletSprite: 'doorPallet',
     collection: 'gate',
     laneCells: FORKLIFT_LANE_CELLS,
+    wait: null,
+    stationFrames: null,
     upgrades: DOOR_LINE_UPGRADES,
     description:
       'Six modules of 6 m by 3 m, end to end: a cross cut saw and a planer, a five axis CNC, a through ' +
@@ -6568,6 +6764,8 @@ export const LINE_KINDS: Readonly<Record<LineKind, LineKindSpec>> = {
     palletSprite: 'houseWaiting',
     collection: 'lane',
     laneCells: HOUSE_LANE_CELLS,
+    wait: { ...HOUSE_WAIT_LAYOUT, drawn: HOUSES_WAITING_DRAWN },
+    stationFrames: HOUSE_WORK_FRAMES,
     upgrades: HOUSE_LINE_UPGRADES,
     description:
       'Six stations of 14 m by 10 m, end to end under their gantry cranes: the floor, the frame, the ' +
@@ -6588,10 +6786,48 @@ export const LINE_KINDS: Readonly<Record<LineKind, LineKindSpec>> = {
     client: 'A housebuilder',
     servesJobs: false,
   },
+  yacht: {
+    kind: 'yacht',
+    // [PIOTR, 20.10: "now code the production, graphics only, of the yacht building"; TUNE: chat: the
+    // names, the figures and the words, the house factory's made twice as big] (v123).
+    name: 'Yacht production line',
+    shares: YACHT_LINE_MODULE_SHARES,
+    factor: YACHT_LINE_FACTOR,
+    minutesFactor: YACHT_LINE_MINUTES_FACTOR,
+    unitPrice: YACHT_PRICE,
+    // [TUNE: chat] Ten engineers, as the house factory has: the robots do the work (the art side's
+    // stations have no men in them), and ten walking the metre are as many as the hall can draw at
+    // its pace. The rule of v107 would have twenty.
+    engineers: LINE_ENGINEERS_MAX * HOUSE_LINE_FACTOR,
+    // A yacht takes £96,000 of material: the window's two boards and one glass unit times the factor
+    // and the minutes factor, 320 boards and 160 glass units off the same stores.
+    boards: LINE_BOARDS_PER_WINDOW * YACHT_LINE_FACTOR * YACHT_LINE_MINUTES_FACTOR,
+    glass: LINE_GLASS_PER_WINDOW * YACHT_LINE_FACTOR * YACHT_LINE_MINUTES_FACTOR,
+    // One yacht a load, driven out whole on its transporter to wait on the lane, as a house.
+    palletUnits: 1,
+    palletSprite: 'yachtWaiting',
+    collection: 'lane',
+    laneCells: YACHT_LANE_CELLS,
+    wait: { ...YACHT_WAIT_LAYOUT, drawn: YACHTS_WAITING_DRAWN },
+    stationFrames: YACHT_WORK_FRAMES,
+    upgrades: YACHT_LINE_UPGRADES,
+    description:
+      'Twelve stations of 14 m by 10 m, end to end under their gantry cranes: the mould, the lamination, ' +
+      'the vacuum infusion, the demoulding, the structure, the engines, the services, the mahogany ' +
+      'interior, the deck and the superstructure, the glazing, the finishing, and the inspection, where ' +
+      'each yacht is signed off and driven out sideways on its transporter to the lane in front.',
+    rowTails: {},
+    moduleRows: YACHT_STATIONS.map((station) => station.row),
+    unit: 'yacht',
+    units: 'yachts',
+    contractName: 'Yachts off line',
+    client: 'A yacht dealer',
+    servesJobs: false,
+  },
 };
 
 /** The kinds in the order the catalogue and the books list them. */
-export const LINE_KIND_ORDER: readonly LineKind[] = ['window', 'door', 'house'];
+export const LINE_KIND_ORDER: readonly LineKind[] = ['window', 'door', 'house', 'yacht'];
 
 /** The kinds whose full pallets wait at the gate for the client, in that order: what the gate draws
  *  and the forklifts carry; the house factory's houses wait on its own lane (v114). */
@@ -6845,7 +7081,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     // A line of each kind takes its own crew (v107; v114: the house factory's ten) [TUNE: the words].
     duties:
       'Keeps a production line running. A window line takes two: one keeps up to three modules, two ' +
-      'keep all six. A door line takes four, a house factory ten.',
+      'keep all six. A door line takes four, a house factory ten, a yacht line ten.',
   },
   // The manager is a tiered role from Turn 23, four grades and four cards like the joiner, on his
   // own wage table (PIOTR, 20.09; CLAUDE.md T23 2.4).
@@ -6974,6 +7210,8 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   houseLine4: 0,
   houseLine5: 0,
   houseLine6: 0,
+  // And the yacht line's stations (v123).
+  ...Object.fromEntries(Object.keys(YACHT_LINE_MODULE_SHARES).map((id) => [id, 0])),
   sprayBooth: 0, // its own extraction, off this table
   sprayRobot: 0, // an arm at the booth: no chips, and the booth's extraction is its own (CLAUDE.md T29 2.7)
   spindleMoulder: 0.12, // a bag a day, the figure the Turn 12 comment kept for it (PIOTR)

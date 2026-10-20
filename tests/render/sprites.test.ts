@@ -15,7 +15,7 @@ import {
   spriteUrl,
 } from '../../src/render/sprites';
 import { TILE_WIDTH, tileToScreen } from '../../src/render/iso';
-import { pickPngs, spriteFilesIn } from '../../scripts/sprites-manifest.mjs';
+import { pickPictures, spriteFilesIn } from '../../scripts/sprites-manifest.mjs';
 import manifest from '../../public/sprites/manifest.json';
 
 describe('which file an object is drawn with', () => {
@@ -37,7 +37,8 @@ describe('which file an object is drawn with', () => {
     // build writes, and by no other route.
     expect(spriteFiles()).toEqual(spriteFilesIn('public/sprites'));
     for (const name of spriteFilesIn('public/sprites')) {
-      const key = name.replace(/\.png$/i, '');
+      // A WebP answers for its name as a PNG does, the yacht line's frames among them (v123, flipped).
+      const key = name.replace(/\.(png|webp)$/i, '');
       expect(spriteUrl(key), key).toBe(`/sprites/${name}`);
     }
     // The classes arrived with Turn 7 and the family file did not: a class file answers for its
@@ -140,13 +141,16 @@ describe('where the image goes', () => {
 });
 
 describe('the manifest the build writes', () => {
-  it('keeps the PNG files, sorted, and nothing else', () => {
-    expect(pickPngs(['b.png', 'a.PNG', 'notes.txt', 'c.jpg', 'd.png'])).toEqual([
+  // The PNG files until v123, and the WebP files beside them from then: the yacht line's frames.
+  it('keeps the PNG and the WebP files, sorted, and nothing else', () => {
+    expect(pickPictures(['b.png', 'a.PNG', 'notes.txt', 'c.jpg', 'd.png', 'e.webp', 'f.WEBP'])).toEqual([
       'a.PNG',
       'b.png',
       'd.png',
+      'e.webp',
+      'f.WEBP',
     ]);
-    expect(pickPngs([])).toEqual([]);
+    expect(pickPictures([])).toEqual([]);
   });
 
   it('writes what is on disk, and reads a missing folder as an empty one', () => {

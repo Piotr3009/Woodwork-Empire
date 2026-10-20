@@ -8,7 +8,6 @@ import {
   EQUIPMENT_SPECS,
   FORKLIFT_SHEETS,
   GATE_LINE_KINDS,
-  HOUSE_WAIT_LAYOUT,
   LINE_KINDS,
   LINE_KIND_ORDER,
   LINE_PALLET_LAYOUT,
@@ -176,20 +175,22 @@ export function spriteTargets(): SpriteTarget[] {
       where: `at the gate, the ${LINE_KINDS[kind].unit} line's`,
     });
   }
-  // And a finished house on its transporter waiting on the house factory's lane: its size is the
-  // transporter's deck it stands on (v114).
-  for (const kind of LINE_KIND_ORDER.filter((each) => LINE_KINDS[each].collection === 'lane')) {
+  // And a finished house or yacht on its transporter waiting on its line's lane: its size is its
+  // kind's wait, the transporter it stands on (v114; v123).
+  for (const kind of LINE_KIND_ORDER) {
+    const wait = LINE_KINDS[kind].wait;
+    if (LINE_KINDS[kind].collection !== 'lane' || wait === null) continue;
     const key = LINE_KINDS[kind].palletSprite;
     add({
       name: `${key}.standard`,
       specId: key,
       spriteKey: key,
       tier: 'standard',
-      width: HOUSE_WAIT_LAYOUT.width,
-      depth: HOUSE_WAIT_LAYOUT.depth,
-      height: HOUSE_WAIT_LAYOUT.height,
-      zoneWidth: HOUSE_WAIT_LAYOUT.width,
-      zoneDepth: HOUSE_WAIT_LAYOUT.depth,
+      width: wait.width,
+      depth: wait.depth,
+      height: wait.height,
+      zoneWidth: wait.width,
+      zoneDepth: wait.depth,
       where: `on the lane, the ${LINE_KINDS[kind].unit} line's`,
     });
   }

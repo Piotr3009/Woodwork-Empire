@@ -7,6 +7,9 @@ declare module 'node:fs' {
   export interface FileBytes {
     subarray(from: number, to: number): FileBytes;
     readUInt32BE(at: number): number;
+    /** And the header of a WebP, whose sizes are little endian (v123). */
+    readUIntLE(at: number, length: number): number;
+    toString(encoding: 'latin1', start?: number, end?: number): string;
     length: number;
   }
   export function readFileSync(path: string, encoding: 'utf8'): string;

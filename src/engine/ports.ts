@@ -230,6 +230,15 @@ export function spriteFileName(
   return `${spriteKey}${tier}${SUFFIX[orientation]}.png`;
 }
 
+/** The file delivered under this picture's name, if it is: the PNG, or the same picture as a WebP
+ *  where the art side delivered that (v123: the yacht line's frames, a sixth of their PNGs' size),
+ *  the PNG first, so a PNG landing later is drawn with no code. Null when neither is there. */
+export function deliveredFile(files: readonly string[], name: string): string | null {
+  if (files.includes(name)) return name;
+  const webp = name.replace(/\.png$/, '.webp');
+  return webp !== name && files.includes(webp) ? webp : null;
+}
+
 /** Which file the hall really draws this picture with, and whether it has to mirror the base one to
  *  do it. The rule is the loader's own (`pickSprite` and `mirrorNeeded` in
  *  `src/render/sprites.ts`), written here as well so the engine can ask it of a plain list of file
@@ -247,13 +256,15 @@ export function pictureFor(
     spriteFileName(spriteKey, null, orientation),
   ];
   for (const name of wanted) {
-    if (files.includes(name)) return { file: name, mirrored: false };
+    const file = deliveredFile(files, name);
+    if (file !== null) return { file, mirrored: false };
   }
   // No file for this orientation. The base picture, mirrored where a quarter turn is what was
   // asked for; a half turn has no mirror that would be right, so it takes the base as it is.
   const base = [spriteFileName(spriteKey, variantId, 0), spriteFileName(spriteKey, null, 0)];
   for (const name of base) {
-    if (files.includes(name)) return { file: name, mirrored: swapsFaces(orientation) };
+    const file = deliveredFile(files, name);
+    if (file !== null) return { file, mirrored: swapsFaces(orientation) };
   }
   return { file: null, mirrored: false };
 }
@@ -277,8 +288,8 @@ function hasOwnPicture(
   orientation: Orientation,
 ): boolean {
   return (
-    files.includes(spriteFileName(spriteKey, variantId, orientation)) ||
-    files.includes(spriteFileName(spriteKey, null, orientation))
+    deliveredFile(files, spriteFileName(spriteKey, variantId, orientation)) !== null ||
+    deliveredFile(files, spriteFileName(spriteKey, null, orientation)) !== null
   );
 }
 

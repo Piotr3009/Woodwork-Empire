@@ -154,6 +154,19 @@ describe('footprints in metres', () => {
       houseLine4: [14, 10, 10],
       houseLine5: [14, 10, 10],
       houseLine6: [14, 10, 10],
+      // The yacht line's twelve stations, the art side's metres in its yacht pack (v123).
+      yachtLine1: [14, 10, 12],
+      yachtLine2: [14, 10, 12],
+      yachtLine3: [14, 10, 12],
+      yachtLine4: [14, 10, 12],
+      yachtLine5: [14, 10, 12],
+      yachtLine6: [14, 10, 12],
+      yachtLine7: [14, 10, 12],
+      yachtLine8: [14, 10, 12],
+      yachtLine9: [14, 10, 12],
+      yachtLine10: [14, 10, 12],
+      yachtLine11: [14, 10, 12],
+      yachtLine12: [14, 10, 12],
       // The two timber stores, the art side's metres; the shelter declared as the art side drew it,
       // 6 m along the rear wall by 3 m deep, since it stands behind the wall from Turn 31 (CLAUDE.md
       // T29 2.4, 2.11.1; T31 2.8).

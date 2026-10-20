@@ -1,0 +1,163 @@
+{
+  "schema": "woodwork-yacht-factory-layout-v1",
+  "status": "CODED_FOR_INTEGRATION",
+  "units": "metres",
+  "stationCount": 12,
+  "stationPitch": 14,
+  "stationSize": [
+    14,
+    10,
+    12
+  ],
+  "productionSize": [
+    168,
+    10,
+    12
+  ],
+  "height": 12,
+  "reservedFloorSize": [
+    182,
+    30
+  ],
+  "aisleBounds": [
+    0,
+    10,
+    182,
+    20
+  ],
+  "line1": {
+    "origin": [
+      14,
+      0
+    ],
+    "deliveryPad": [
+      0,
+      0,
+      14,
+      10
+    ],
+    "routeCarrierCenters": [
+      [
+        175,
+        5
+      ],
+      [
+        175,
+        15
+      ],
+      [
+        7,
+        15
+      ],
+      [
+        7,
+        5
+      ]
+    ]
+  },
+  "line2": {
+    "origin": [
+      14,
+      20
+    ],
+    "deliveryPad": [
+      0,
+      20,
+      14,
+      30
+    ],
+    "routeCarrierCenters": [
+      [
+        175,
+        25
+      ],
+      [
+        175,
+        15
+      ],
+      [
+        7,
+        15
+      ],
+      [
+        7,
+        25
+      ]
+    ]
+  },
+  "yachtSize": [
+    12,
+    4.4
+  ],
+  "yachtNativeCenter": [
+    7,
+    5,
+    0
+  ],
+  "yachtTransportTranslation": [
+    -7,
+    -5,
+    0
+  ],
+  "yachtKeelHeight": 1.05,
+  "carrierSize": [
+    12.8,
+    5.4
+  ],
+  "carrierActualWidth": 5.4,
+  "aisleSideClearance": 2.3,
+  "sharedAisleCapacity": 1,
+  "deliveryReadyAt": "start",
+  "deliveryCountIncrement": "explicit completeDelivery() at start dock",
+  "carrierMotion": "omnidirectional translation; yacht does not rotate at route corners",
+  "stationManifest": "assets/production/manifest.json",
+  "transportManifest": "assets/transport/sprite-manifest.json",
+  "motionModule": "source/delivery-route.mjs",
+  "visualAdapter": "source/delivery-visuals.mjs",
+  "transportAnimationImplemented": true,
+  "stationWorkAnimationImplemented": true,
+  "repoIntegrationPerformed": false,
+  "consumerHandoff": "HANDOFF-CLAUDE.md",
+  "roboticProduction": true,
+  "productionController": "source/production-controller.mjs",
+  "productionStages": 12,
+  "productionFramesPerStage": 16,
+  "productionPlayback": "once_hold_last",
+  "productPalette": {
+    "hull": "pearl white",
+    "wood": "rich mahogany",
+    "metalAccents": "warm gold",
+    "glazing": "dark navy"
+  },
+  "camera": {
+    "projection": "2:1 dimetric",
+    "pixelsPerMetre": [
+      48,
+      24,
+      48
+    ],
+    "productionCanvasPx": [
+      1168,
+      1168
+    ],
+    "stationViewSign": "negative physical rotation",
+    "anchorsByViewPx": {
+      "000": [
+        488,
+        584
+      ],
+      "090": [
+        8,
+        920
+      ],
+      "180": [
+        680,
+        1160
+      ],
+      "270": [
+        1160,
+        824
+      ]
+    }
+  }
+}

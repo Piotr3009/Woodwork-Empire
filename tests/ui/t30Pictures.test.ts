@@ -16,7 +16,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ALL_LINE_MODULES, LINE_MODULE_INDEX, LINE_MODULES } from '../../src/engine/constants';
+import { ALL_LINE_MODULES, LINE_KINDS, LINE_MODULE_INDEX, LINE_MODULES } from '../../src/engine/constants';
 import { footprintOf } from '../../src/engine/machines';
 import { spriteFileSize, spriteFiles } from '../../src/render/sprites';
 
@@ -65,10 +65,15 @@ describe('the pictures of the line (CLAUDE.md T30 2.2, section 7)', () => {
 
   it('holds six work sheets of twelve cells and ten overlays a line, none of them a class picture or a turn', () => {
     // The window line's and, from v108, the door line's of P3 beside them (flipped); the house
-    // factory's stations have frames of their own and no sheet (v114; v117, P4).
+    // factory's stations have frames of their own and no sheet (v114; v117, P4), and from v123 so
+    // has every kind whose stations have frames, the yacht line's (flipped).
     const sheets = spriteFiles().filter((name) => name.endsWith('.work.sheet.png'));
+    const framed = (id: string): boolean => {
+      const kind = LINE_MODULE_INDEX.get(id)?.kind;
+      return kind !== undefined && LINE_KINDS[kind].stationFrames !== null;
+    };
     expect(sheets).toEqual(
-      ALL_LINE_MODULES.filter((id) => LINE_MODULE_INDEX.get(id)?.kind !== 'house')
+      ALL_LINE_MODULES.filter((id) => !framed(id))
         .map((id) => `${id}.standard.work.sheet.png`)
         .sort(),
     );

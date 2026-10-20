@@ -9,9 +9,6 @@ import {
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
   GATE_LINE_KINDS,
-  HOUSE_WAIT_LAYOUT,
-  HOUSE_WORK_FRAMES,
-  HOUSES_WAITING_DRAWN,
   LINE_KINDS,
   LINE_PALLET_LAYOUT,
   LINE_PALLETS_DRAWN,
@@ -175,7 +172,7 @@ import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
 import type { StageId } from '../engine/types';
 import { figureIsThroughADoor, takeDoorGoings } from './doors';
-import { pictureFor, portFor, spriteFileName } from '../engine/ports';
+import { deliveredFile, pictureFor, portFor, spriteFileName } from '../engine/ports';
 import { bubblesFor } from '../engine/bubbles';
 
 /** What the hall can be heard doing (CLAUDE.md T19 2.10, T20 2.13). The render layer owns the
@@ -1082,10 +1079,11 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
 }
 
 /** The depth a piece of kit is sorted at among the hall's drawables: its own cell's, as every
- *  machine's; and a house factory's station, ten metres deep and ten high, its cell's and its depth,
- *  so what stands beside it on its left, the rooms and their doors among them, is drawn before it and
- *  the houses waiting on its lane after it (v114) [TUNE: chat]. The window and the door lines'
- *  modules, three metres deep, are sorted at their cells as before. */
+ *  machine's; and a station of a line with a lane of its own, ten metres deep (the house factory's,
+ *  v114; the yacht line's, v123), its cell's and its depth, so what stands beside it on its left, the
+ *  rooms and their doors among them, is drawn before it and the units waiting on its lane after it
+ *  [TUNE: chat]. The window and the door lines' modules, three metres deep, are sorted at their cells
+ *  as before. */
 function kitDepth(item: Equipment, stands: { depth: number }): number {
   const kind = moduleKind(item.specId);
   const deep = kind !== null && LINE_KINDS[kind].collection === 'lane' ? stands.depth : 0;
@@ -1106,37 +1104,49 @@ export function moduleWorks(state: GameState, item: Equipment): boolean {
   return machineInUse(state, item);
 }
 
-/** A house factory's station drawn by the house in its hands (v117): the frame of its stage's
- *  sixteen by how far the line's house in hand has come, the last held to the end of the cycle, and
- *  the station empty with its robots parked while no contract runs. The frame is a tier of the
- *  station's class picture (`houseLine3.standard.work07`, `houseLine3.standard.empty`), picked as any
- *  picture is; where the frame's file has not landed, the class picture. Any other kit is drawn by
- *  its class as before. */
-function stationTier(state: GameState, item: Equipment, files: readonly string[]): string {
-  if (moduleKind(item.specId) !== 'house') return item.variantId;
-  const frame = lineUnitFrame(state, lineOf(item), HOUSE_WORK_FRAMES);
-  const tier = frame === null ? `${item.variantId}.empty` : `${item.variantId}.work${String(frame).padStart(2, '0')}`;
-  return files.includes(spriteFileName(item.spriteKey, tier, item.orientation)) ? tier : item.variantId;
+/** The frames of this item's station, for a station of a kind the art side drew in frames (the house
+ *  factory's, v117; the yacht line's, v123), or null. */
+function stationFramesOf(item: Equipment): number | null {
+  const kind = moduleKind(item.specId);
+  return kind === null ? null : LINE_KINDS[kind].stationFrames;
 }
 
-/** Asks the browser for a house factory's station pictures before their minute: the two frames
- *  after the one drawn first, then the rest of its sixteen and the empty picture, each once, so
- *  the swap at the next sixteenth of the cycle finds the file down and the house on the station
- *  never blinks out (v120) [PIOTR, 19.10], and the next one decoded (v122). Only the files that have
- *  landed. */
+/** A station drawn by the unit in its hands (v117): the frame of its stage's sixteen by how far the
+ *  line's house or yacht in hand has come, the last held to the end of the cycle, and the station
+ *  empty with its robots parked while no contract runs. The frame is a tier of the station's class
+ *  picture (`houseLine3.standard.work07`, `yachtLine9.standard.empty`), picked as any picture is,
+ *  PNG or WebP (v123); where the frame's file has not landed, the class picture. Any other kit is
+ *  drawn by its class as before. */
+function stationTier(state: GameState, item: Equipment, files: readonly string[]): string {
+  const frames = stationFramesOf(item);
+  if (frames === null) return item.variantId;
+  const frame = lineUnitFrame(state, lineOf(item), frames);
+  const tier = frame === null ? `${item.variantId}.empty` : `${item.variantId}.work${String(frame).padStart(2, '0')}`;
+  return deliveredFile(files, spriteFileName(item.spriteKey, tier, item.orientation)) !== null ? tier : item.variantId;
+}
+
+/** Asks the browser for the pictures of a station drawn in frames (the house factory's, v117; the
+ *  yacht line's, v123) before their minute: the two frames after the one drawn first, then the rest
+ *  of its sixteen and the empty picture, each once, so the swap at the next sixteenth of the cycle
+ *  finds the file down and the house or the yacht on the station never blinks out (v120) [PIOTR,
+ *  19.10], and the next one decoded (v122). Only the files that have landed. */
 function prefetchStationFrames(item: Equipment, tier: string, files: readonly string[]): void {
-  if (moduleKind(item.specId) !== 'house') return;
+  const frames = stationFramesOf(item);
+  if (frames === null) return;
   const frame = /\.work(\d\d)$/.exec(tier);
   const shown = frame === null ? -1 : Number(frame[1]);
-  const name = (suffix: string): string => spriteFileName(item.spriteKey, `${item.variantId}.${suffix}`, item.orientation);
-  const all = [...Array.from({ length: HOUSE_WORK_FRAMES }, (_, index) => name(`work${String(index).padStart(2, '0')}`)), name('empty')];
-  const next = [1, 2].map((ahead) => name(`work${String((shown + ahead) % HOUSE_WORK_FRAMES).padStart(2, '0')}`));
+  // The file each frame landed as, PNG or WebP (v123), or null.
+  const name = (suffix: string): string | null =>
+    deliveredFile(files, spriteFileName(item.spriteKey, `${item.variantId}.${suffix}`, item.orientation));
+  const landed = (names: Array<string | null>): string[] => names.filter((file): file is string => file !== null);
+  const all = landed([...Array.from({ length: frames }, (_, index) => name(`work${String(index).padStart(2, '0')}`)), name('empty')]);
+  const next = landed([1, 2].map((ahead) => name(`work${String((shown + ahead) % frames).padStart(2, '0')}`)));
   const url = (file: string): string => `${SPRITE_DIR}/${file}`;
-  prefetch(next.filter((file) => files.includes(file)).map(url), true);
-  prefetch(all.filter((file) => files.includes(file)).map(url));
+  prefetch(next.map(url), true);
+  prefetch(all.map(url));
   // The one frame it shows next decoded ahead, from its blob once held (v122).
   const coming = next[0];
-  if (coming !== undefined && files.includes(coming)) warm(url(coming));
+  if (coming !== undefined) warm(url(coming));
 }
 
 /** The work sheet of this machine's class when the art side has delivered it, or null. */
@@ -1884,8 +1894,8 @@ export function expandedStoreFilter(id: string = STORE_EXPANDED_FILTER): string 
 /** The forklift's lane of every line that stands or is on order and has one: the outline of each
  *  L, from the pallets at the gate along the left wall and along the front strip to the line's end,
  *  in the one token for it, marked with its line's number. Nothing for a line with no lane
- *  (CLAUDE.md T31 2.6; v93) [TUNE: the outline]. A house factory's lane is its front strip alone,
- *  outlined the same way (v114). */
+ *  (CLAUDE.md T31 2.6; v93) [TUNE: the outline]. The lane of a house factory or a yacht line is its
+ *  front strip alone, outlined the same way (v114; v123). */
 function laneArt(state: GameState): string {
   return lineLanes(state)
     .map(({ line, front, left }) => {
@@ -2223,7 +2233,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const top = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
     const fx = machineFx(state, item, spec);
     const foot: FloorBox = { x: stands.x, y: stands.y, width: stands.width, depth: stands.depth };
-    // A house factory's station is drawn by the frame of the house in its hands (v117).
+    // A station drawn in frames is drawn by the frame of the house or the yacht in its hands (v117;
+    // v123).
     const tier = stationTier(state, item, files);
     prefetchStationFrames(item, tier, files);
     drawables.push({
@@ -2235,8 +2246,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `${painted && item.anchorY < 0 ? `data-behind-wall="1" clip-path="url(#${REAR_WALL_CLIP})" ` : ''}` +
         `data-foot="${round(foot.x)},${round(foot.y)},${round(foot.width)},${round(foot.depth)}" ` +
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
-        // A house factory's station says which frame it stands on (v117).
-        `${moduleKind(item.specId) === 'house' ? `data-station-frame="${tier.slice(item.variantId.length + 1)}" ` : ''}` +
+        // A station drawn in frames says which frame it stands on (v117; v123).
+        `${stationFramesOf(item) !== null ? `data-station-frame="${tier.slice(item.variantId.length + 1)}" ` : ''}` +
         `class="clickable${fx.className}">` +
         `<title>${escapeText(tooltip)}</title>` +
         (item.expanded === true ? `<g filter="url(#${STORE_EXPANDED_FILTER})">` : '') +
@@ -2571,21 +2582,23 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
-  // Each house factory's finished houses wait for the housebuilder on its own lane, at the lane's
-  // gate side end: side by side from that end, a transporter's deck each and three at the most, each
-  // drawn from the art side's waiting house or as a box until it comes, and one label on the floor
-  // in front of the first, as the pallets' at the gate (PIOTR, 18.10: delivered on the gate's side;
-  // v114) [TUNE: chat]. Each is sorted by its back corner and its depth, so it is drawn after the
+  // Each house factory's finished houses wait for the housebuilder on its own lane, and from v123
+  // each yacht line's yachts for the yacht dealer on its, at the lane's gate side end: side by side
+  // from that end, a transporter's deck each and three at the most (the kind's `wait`), each drawn
+  // from the art side's waiting house or yacht or as a box until it comes, and one label on the
+  // floor in front of the first, as the pallets' at the gate (PIOTR, 18.10: delivered on the gate's
+  // side; v114) [TUNE: chat]. Each is sorted by its back corner and its depth, so it is drawn after the
   // stations behind it, as a station is (`kitDepth`).
   for (const { line, front } of lineLanes(state)) {
     const record = lineRecord(state, line);
     if (record === null || record.palletsAtGate === 0) continue;
     const kind = LINE_KINDS[record.kind];
-    if (kind.collection !== 'lane') continue;
-    const wait = HOUSE_WAIT_LAYOUT;
+    // Where its kind's units wait: the house's transporter, the yacht's (v123).
+    const wait = kind.wait;
+    if (kind.collection !== 'lane' || wait === null) continue;
     const y = front.y + (front.depth - wait.depth) / 2;
     const title = `${capitalFirst(kind.units)} for collection`;
-    const shown = Math.min(record.palletsAtGate, HOUSES_WAITING_DRAWN);
+    const shown = Math.min(record.palletsAtGate, wait.drawn);
     for (let index = 0; index < shown; index += 1) {
       const x = front.x + wait.fromEnd + index * (wait.width + wait.gap);
       drawables.push({

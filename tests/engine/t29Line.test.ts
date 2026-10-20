@@ -539,9 +539,9 @@ describe('the line s card and the sheets that list machines (CLAUDE.md T30 2.3.3
   it('is one folder on the tab, from the whole line s price', () => {
     const tab = folder(bigUnit());
     const folders = Array.from(tab.querySelectorAll('.folder')).map((node) => node.getAttribute('data-folder'));
-    // The window line's folder, the door line's beside it from v107 and the house factory's from
-    // v114 (flipped).
-    expect(folders).toEqual(['windowLine1', 'doorLine1', 'houseLine1']);
+    // The window line's folder, the door line's beside it from v107, the house factory's from
+    // v114 and the yacht line's from v123 (flipped).
+    expect(folders).toEqual(['windowLine1', 'doorLine1', 'houseLine1', 'yachtLine1']);
     expect(tab.textContent).toContain('Window production line');
     expect(tab.textContent).toContain('from £10,000,000');
     expect(tab.textContent).toContain('Makes windows from the board to the pallet: six modules in one line, 36 m long.');

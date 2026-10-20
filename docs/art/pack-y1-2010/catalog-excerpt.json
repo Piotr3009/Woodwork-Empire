@@ -1,0 +1,381 @@
+{
+ "schema": "woodwork-yacht-browser-assets-v1",
+ "description": "Approved renders, uniformly half-sized; canonical anchors and matrices are retained, with explicit bitmap equivalents.",
+ "pixelsHalfScale": 0.5,
+ "projection": {
+  "canonicalPixelsPerMetre": 48,
+  "bitmapPixelsPerMetre": 24,
+  "floorEdgeSlopeMagnitude": 0.5
+ },
+ "codec": {
+  "format": "WebP",
+  "quality": 90,
+  "alphaQuality": 100,
+  "method": 4,
+  "resample": "Lanczos",
+  "cropped": false
+ },
+ "production": {
+  "canvasPx": [
+   1168,
+   1168
+  ],
+  "bitmapPx": [
+   584,
+   584
+  ],
+  "pixelsHalfScale": 0.5,
+  "stationCount": 12,
+  "frameCountPerStation": 16,
+  "views": [
+   0,
+   90,
+   180,
+   270
+  ],
+  "viewConvention": "physicalRotationDegrees=-view",
+  "stationEnvelopeM": [
+   14.0,
+   10.0,
+   12.0
+  ],
+  "lineStationPitchM": 14,
+  "viewMetadata": {
+   "0": {
+    "anchorPx": [
+     488.0,
+     584.0
+    ],
+    "bitmapAnchorPx": [
+     244.0,
+     292.0
+    ],
+    "sourceToPixel": [
+     [
+      48.0,
+      -48.0,
+      0.0,
+      488.0
+     ],
+     [
+      24.0,
+      24.0,
+      -48.0,
+      584.0
+     ]
+    ],
+    "sourceToBitmap": [
+     [
+      24.0,
+      -24.0,
+      0.0,
+      244.0
+     ],
+     [
+      12.0,
+      12.0,
+      -24.0,
+      292.0
+     ]
+    ]
+   },
+   "90": {
+    "anchorPx": [
+     8.0,
+     920.0
+    ],
+    "bitmapAnchorPx": [
+     4.0,
+     460.0
+    ],
+    "sourceToPixel": [
+     [
+      48.0,
+      48.0,
+      0.0,
+      8.0
+     ],
+     [
+      -24.0,
+      24.0,
+      -48.0,
+      920.0
+     ]
+    ],
+    "sourceToBitmap": [
+     [
+      24.0,
+      24.0,
+      0.0,
+      4.0
+     ],
+     [
+      -12.0,
+      12.0,
+      -24.0,
+      460.0
+     ]
+    ]
+   },
+   "180": {
+    "anchorPx": [
+     680.0,
+     1160.0
+    ],
+    "bitmapAnchorPx": [
+     340.0,
+     580.0
+    ],
+    "sourceToPixel": [
+     [
+      -48.0,
+      48.0,
+      0.0,
+      680.0
+     ],
+     [
+      -24.0,
+      -24.0,
+      -48.0,
+      1160.0
+     ]
+    ],
+    "sourceToBitmap": [
+     [
+      -24.0,
+      24.0,
+      0.0,
+      340.0
+     ],
+     [
+      -12.0,
+      -12.0,
+      -24.0,
+      580.0
+     ]
+    ]
+   },
+   "270": {
+    "anchorPx": [
+     1160.0,
+     824.0
+    ],
+    "bitmapAnchorPx": [
+     580.0,
+     412.0
+    ],
+    "sourceToPixel": [
+     [
+      -48.0,
+      -48.0,
+      0.0,
+      1160.0
+     ],
+     [
+      24.0,
+      -24.0,
+      -48.0,
+      824.0
+     ]
+    ],
+    "sourceToBitmap": [
+     [
+      -24.0,
+      -24.0,
+      0.0,
+      580.0
+     ],
+     [
+      12.0,
+      -12.0,
+      -24.0,
+      412.0
+     ]
+    ]
+   }
+  }
+ },
+ "stations": [
+  {
+   "stationIndex": 1,
+   "name": "Przygotowanie formy",
+   "jobType": "mould-preparation",
+   "inputState": 0,
+   "outputState": 1,
+   "lineOffsetM": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 2,
+   "name": "Laminowanie",
+   "jobType": "lamination",
+   "inputState": 1,
+   "outputState": 2,
+   "lineOffsetM": [
+    14,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 3,
+   "name": "Infuzja próżniowa",
+   "jobType": "vacuum-infusion",
+   "inputState": 2,
+   "outputState": 3,
+   "lineOffsetM": [
+    28,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 4,
+   "name": "Wyjęcie kadłuba",
+   "jobType": "demoulding",
+   "inputState": 3,
+   "outputState": 4,
+   "lineOffsetM": [
+    42,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 5,
+   "name": "Grodzie i konstrukcja",
+   "jobType": "bulkhead-assembly",
+   "inputState": 4,
+   "outputState": 5,
+   "lineOffsetM": [
+    56,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 6,
+   "name": "Montaż napędu",
+   "jobType": "powertrain-installation",
+   "inputState": 5,
+   "outputState": 6,
+   "lineOffsetM": [
+    70,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 7,
+   "name": "Instalacje techniczne",
+   "jobType": "services-installation",
+   "inputState": 6,
+   "outputState": 7,
+   "lineOffsetM": [
+    84,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 8,
+   "name": "Wnętrze mahoniowe",
+   "jobType": "interior-installation",
+   "inputState": 7,
+   "outputState": 8,
+   "lineOffsetM": [
+    98,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 9,
+   "name": "Pokład i nadbudowa",
+   "jobType": "superstructure-installation",
+   "inputState": 8,
+   "outputState": 9,
+   "lineOffsetM": [
+    112,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 10,
+   "name": "Montaż przeszkleń",
+   "jobType": "paint-and-glazing",
+   "inputState": 9,
+   "outputState": 10,
+   "lineOffsetM": [
+    126,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 11,
+   "name": "Wykończenie premium",
+   "jobType": "final-fitting",
+   "inputState": 10,
+   "outputState": 11,
+   "lineOffsetM": [
+    140,
+    0,
+    0
+   ]
+  },
+  {
+   "stationIndex": 12,
+   "name": "Kontrola jakości",
+   "jobType": "quality-control",
+   "inputState": 11,
+   "outputState": 12,
+   "lineOffsetM": [
+    154,
+    0,
+    0
+   ]
+  }
+ ],
+ "transport": {
+  "canvasPx": [
+   920,
+   900
+  ],
+  "bitmapPx": [
+   460,
+   450
+  ],
+  "pixelsHalfScale": 0.5,
+  "anchorPx": [
+   460,
+   560
+  ],
+  "bitmapAnchorPx": [
+   230.0,
+   280.0
+  ],
+  "frameCount": 4,
+  "spriteCount": 64,
+  "rotations": [
+   0,
+   90,
+   180,
+   270
+  ],
+  "steeringAxes": [
+   "x",
+   "y"
+  ],
+  "rotationConvention": "positive physical rotation about centered Z; never mirrored bitmap",
+  "carrierFootprintM": [
+   12.8,
+   5.4
+  ],
+  "wheelRadiusM": 0.25
+ }
+}

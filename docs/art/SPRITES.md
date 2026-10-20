@@ -1076,3 +1076,32 @@ forklift; the drive of the finished house along the lane to the gate is a turn o
 (`HOUSE_WAIT_LAYOUT`, `HOUSES_WAITING_DRAWN`), by the kind's
 `palletSprite`, `houseWaiting`; the lane's outline and the label `Houses for collection: 2` are the
 game's. The Sprite check page lists the waiting house beside the two pallets.
+
+## 23. The yacht line (the art side's pack of 19.10.2026; v123)
+
+Piotr, 20.10: "now code the production, graphics only, of the yacht building": the game took the
+pack's pictures and none of its code (docs/art/pack-y1-2010/EDITED.md). The yacht line is a fourth
+kind of line built as the house factory is (docs/notes-v123.md): twelve stations of 14 m by 10 m by
+12 m end to end along x, 168 m, never turned, its finished yachts waiting on its own 10 m lane at the
+gate side end.
+
+| Keys the game draws | What they are | Metres w x d x h | File, px | Anchor |
+|---|---|---|---|---|
+| `yachtLine1.standard` to `yachtLine12.standard` | the twelve stations under their gantry cranes, each with its stage's yacht finished on its transporter (frame 15 again): the class picture | 14 x 10 x 12 | 584 x 584 WebP (half of 1,168 x 1,168) | 340, 580 (half of 680, 1,160) |
+| `yachtLineN.standard.work00` to `.work15` | the station at work, the stage built from its start (00) to its end (15) | 14 x 10 x 12 | 584 x 584 WebP | 340, 580 |
+| `yachtLineN.standard.empty` | the station's crane and runway with the robots parked, no yacht and no transporter | 14 x 10 x 12 | 584 x 584 WebP | 340, 580 |
+| `yachtWaiting.standard` | a finished yacht on its transporter, waiting on the lane | 13 x 6 x 4 | 464 x 332 PNG (half of 928 x 664) | 316, 328 (half of 632, 656) |
+
+**Half the contract's scale, WebP.** The pack's pictures are the approved renders halved and saved
+as WebP. A picture is drawn into the box its metres owe whatever its pixels (`spriteBox`,
+`preserveAspectRatio`), so a file of exactly half the owed canvas stands exactly where a full one
+would: sharp at the hall's size, softer zoomed in past it. The picture rule takes a WebP where no PNG
+of the same name has landed and the PNG first where both have (`deliveredFile` in
+`src/engine/ports.ts`), and the build's manifest lists both (`pickPictures`): the full sized renders
+as PNGs under these names are drawn with no code. Asked of the art side the day Piotr wants the
+yachts as sharp as the houses up close.
+
+**The frames.** As the house factory's (section 22): the frame by how far the yacht in hand has come,
+held on the last, the station empty with no contract, fetched ahead and held as blobs, the next one
+decoded ahead (`src/render/prefetch.ts`). A yacht is sixteen hours of the line at its base pace, so a
+frame is an hour of the game's clock.
