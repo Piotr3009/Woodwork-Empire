@@ -124,14 +124,31 @@ export function openLineDay(state: GameState): void {
   // Every line's day before is closed into its book, a line sold among them, so its last days are
   // never lost from its books (v93).
   for (const record of state.windowLines) lineToday(state, record.number);
-  for (const line of standingLines(state)) {
-    if (!lineStandsWhole(state, line)) continue;
-    const today = lineToday(state, line);
-    if (today.power > 0) continue;
+  // What every line's day takes, read first for all of them with the state pinned, and written
+  // after: which lines stand, which engineers are whose and what each line is worth were worked out
+  // again for every line, the whole hall each time, so the open of a day took four times as long
+  // for twice the lines (v127). Nothing a line's day book takes changes what another line's reads.
+  const opened = whilePinned(state, () => {
+    const days: Array<{ line: number; today: LineDay; engineers: number; power: number; cover: number }> = [];
+    for (const line of standingLines(state)) {
+      if (!lineStandsWhole(state, line)) continue;
+      const today = lineToday(state, line);
+      if (today.power > 0) continue;
+      days.push({
+        line,
+        today,
+        engineers: lineEngineersPerDay(state, line, today.day),
+        power: linePowerPerDay(lineKindOf(state, line)),
+        cover: lineCoverPerDay(state, line),
+      });
+    }
+    return days;
+  });
+  for (const { line, today, engineers, power, cover } of opened) {
     const since = lineState(state, line).since;
-    today.engineers = lineEngineersPerDay(state, line, today.day);
-    today.power = linePowerPerDay(lineKindOf(state, line));
-    today.cover = lineCoverPerDay(state, line);
+    today.engineers = engineers;
+    today.power = power;
+    today.cover = cover;
     if (since.firstDay === null) since.firstDay = today.day;
     since.engineers += today.engineers;
     since.power += today.power;

@@ -20,6 +20,7 @@ import { canAfford, charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { isLineModule, lineOf, variantFor } from './machines';
 import { glassUnitPrice } from './materials';
+import { keptWhilePinned } from './pinned';
 import { int } from './rng';
 import type { GameState } from './types';
 
@@ -91,12 +92,28 @@ export function lineValue(state: GameState): number {
 /** What one line's modules standing in the hall cost, by the line's number: its own books' share
  *  of the property cover (CLAUDE.md T31 2.5; v93). */
 export function lineValueOf(state: GameState, line: number): number {
+  // Every line's worth from one reading of the kit while the state is pinned: the open of a day asks
+  // it of every line, and every line read the whole kit (v127).
+  const values = keptWhilePinned(state, 'lineValues', () => lineValuesOf(state));
+  if (values !== null) return Math.round(values.get(line) ?? 0);
   let value = 0;
   for (const item of state.equipment) {
     if (item.soldOnDay !== null || !isLineModule(item.specId) || lineOf(item) !== line) continue;
     value += item.purchasePrice;
   }
   return Math.round(value);
+}
+
+/** What the modules of every line cost, by line, summed in the order the kit was bought as
+ *  `lineValueOf` sums them (v127). */
+function lineValuesOf(state: GameState): Map<number, number> {
+  const values = new Map<number, number>();
+  for (const item of state.equipment) {
+    if (item.soldOnDay !== null || !isLineModule(item.specId)) continue;
+    const line = lineOf(item);
+    values.set(line, (values.get(line) ?? 0) + item.purchasePrice);
+  }
+  return values;
 }
 
 /** The rate on what is insured and the vans' own figures, and twice the two of them on the

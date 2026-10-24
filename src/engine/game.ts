@@ -401,13 +401,73 @@ export interface NewGameOptions {
   showWhy: boolean;
 }
 
-/** A copy of the state that shares nothing with it: what `JSON.parse(JSON.stringify(state))` gives,
- *  value for value, since the state is plain JSON (types.ts), made by walking it once instead of
- *  writing it out as text and reading the text back, which took three times as long. Every game
- *  minute and every action copies the whole state, on Piotr's save of 18.10 four megabytes of it
- *  [PIOTR, 18.10: "the whole program stutters every second"] (v104). */
+/** A copy of the state: what `JSON.parse(JSON.stringify(state))` gives, value for value, since the
+ *  state is plain JSON (types.ts), made by walking it once instead of writing it out as text and
+ *  reading the text back, which took three times as long. Every game minute and every action copies
+ *  the whole state, on Piotr's save of 18.10 four megabytes of it [PIOTR, 18.10: "the whole program
+ *  stutters every second"] (v104).
+ *
+ *  From v127 it shares the state's two histories with it, the two parts of it that are only ever
+ *  added to: the closed days of every line's book (`windowLines[].days`, written by `lineToday`
+ *  alone and never again once a day is closed) and the months' reports (`monthlyReports`, each
+ *  pushed at its month's end and only read). Each entry of them is copied once, the first time,
+ *  so it is in JSON's shape as everything copied is, and that copy is handed on from copy to copy
+ *  from then on. On Piotr's save of day 8,464 the two are 85% of the state, and every game minute
+ *  copied all of it, 7.8 million characters of it as a save, two thirds of the minute's time
+ *  [PIOTR, 24.10: "it still stutters"]. */
 export function clone(state: GameState): GameState {
-  return copyOfJson(state) as GameState;
+  const source = state as unknown as Record<string, unknown>;
+  const copy: Record<string, unknown> = {};
+  for (const key of Object.keys(source)) {
+    const entry = source[key];
+    if (leftOutByJson(entry)) continue;
+    if (key === 'monthlyReports' && Array.isArray(entry)) copy[key] = copyHistory(entry);
+    else if (key === 'windowLines' && Array.isArray(entry)) copy[key] = copyLineRecords(entry);
+    else copy[key] = copyOfJson(entry);
+  }
+  return copy as unknown as GameState;
+}
+
+/** The entries of the two histories already copied once, shared from copy to copy (v127). */
+const settledHistory = new WeakSet<object>();
+
+/** A history's entries: each copied the first time and shared from then on, the list itself new. */
+function copyHistory(entries: readonly unknown[]): unknown[] {
+  const copy: unknown[] = [];
+  for (const entry of entries) {
+    if (typeof entry === 'object' && entry !== null && settledHistory.has(entry)) {
+      copy.push(entry);
+      continue;
+    }
+    const made = leftOutByJson(entry) ? null : copyOfJson(entry);
+    if (typeof made === 'object' && made !== null) settledHistory.add(made);
+    copy.push(made);
+  }
+  return copy;
+}
+
+/** The lines' records, each copied as everything is but for its closed days. */
+function copyLineRecords(records: readonly unknown[]): unknown[] {
+  const copy: unknown[] = [];
+  for (const record of records) {
+    if (leftOutByJson(record)) {
+      copy.push(null);
+      continue;
+    }
+    if (typeof record !== 'object' || record === null || Array.isArray(record)) {
+      copy.push(copyOfJson(record));
+      continue;
+    }
+    const source = record as Record<string, unknown>;
+    const line: Record<string, unknown> = {};
+    for (const key of Object.keys(source)) {
+      const entry = source[key];
+      if (leftOutByJson(entry)) continue;
+      line[key] = key === 'days' && Array.isArray(entry) ? copyHistory(entry) : copyOfJson(entry);
+    }
+    copy.push(line);
+  }
+  return copy;
 }
 
 /** JSON's copy of a value: a number JSON cannot write is null and minus nought is nought, a key
@@ -1927,27 +1987,32 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     tallyEfficiency(state, 0, lost);
     return;
   }
-  // The hall as it is with those machines running: the dust band, the missing labourer, the crowded
-  // gate, the broken extractor and the extraction sum, all through the one breakdown.
-  const hall = hallProductivityFactor(state);
-  const dusty = underExtracted(state);
-  // What the men at the benches draw for their nailers and their sanders, through the one
-  // selector the hall and the board read as well (CLAUDE.md T10 3.2).
-  const air = hallAirCheck(state);
-  // And what the men at the benches do when there is nothing in the hose: they stand. A bench
-  // wants its 30 l/min at 6 bar and without a compressor, or on one that is short, there is no
-  // bench work at all from tonight [PIOTR, 20.09] (CLAUDE.md T23 2.7). The night shift's own
-  // minute does exactly this in `workMinute`, which is the twin phase C is to fold this onto.
-  const running: AtWork[] = [];
-  for (const entry of atWork) {
-    if (standsForAir(state, entry.stage)) {
-      // He keeps his place at the bench and stands at it. The minute is one the hall stopped and
-      // the mark over his head says why (src/engine/bubbles.ts).
-      lose('hallStopped');
-      continue;
+  // The readings of the hall below are asked together with the state pinned, nothing being written
+  // between them: each of them asked who stands at which machine afresh (v127).
+  const { hall, dusty, air, running } = whilePinned(state, () => {
+    // The hall as it is with those machines running: the dust band, the missing labourer, the
+    // crowded gate, the broken extractor and the extraction sum, all through the one breakdown.
+    const hallNow = hallProductivityFactor(state);
+    const dustyNow = underExtracted(state);
+    // What the men at the benches draw for their nailers and their sanders, through the one
+    // selector the hall and the board read as well (CLAUDE.md T10 3.2).
+    const airNow = hallAirCheck(state);
+    // And what the men at the benches do when there is nothing in the hose: they stand. A bench
+    // wants its 30 l/min at 6 bar and without a compressor, or on one that is short, there is no
+    // bench work at all from tonight [PIOTR, 20.09] (CLAUDE.md T23 2.7). The night shift's own
+    // minute does exactly this in `workMinute`, which is the twin phase C is to fold this onto.
+    const runningNow: AtWork[] = [];
+    for (const entry of atWork) {
+      if (standsForAir(state, entry.stage)) {
+        // He keeps his place at the bench and stands at it. The minute is one the hall stopped and
+        // the mark over his head says why (src/engine/bubbles.ts).
+        lose('hallStopped');
+        continue;
+      }
+      runningNow.push(entry);
     }
-    running.push(entry);
-  }
+    return { hall: hallNow, dusty: dustyNow, air: airNow, running: runningNow };
+  });
   if (running.length === 0 && contract.worked === 0) {
     tallyEfficiency(state, 0, lost);
     return;

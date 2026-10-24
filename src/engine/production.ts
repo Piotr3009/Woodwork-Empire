@@ -783,29 +783,34 @@ export function workMinute(
     atWork.push({ hand, ...place.work });
   }
   if (atWork.length === 0) return report;
-  // The hall as it is with those machines running: the dust band, the missing labourer, the crowded
-  // gate, the broken extractor, the extraction sum and the saws too few for the crew, all through
-  // the one breakdown.
-  const hall = hallProductivityFactor(state, shift);
-  const dusty = underExtracted(state);
-  // What the men at the benches draw for their nailers and their sanders, through the one
-  // selector the hall and the board read as well (CLAUDE.md T10 3.2).
-  const air = hallAirCheck(state);
-  // And what the men at the benches do when there is nothing in the hose: they stand. A bench
-  // wants its 30 l/min at 6 bar and without a compressor, or on one that is short, there is no
-  // bench work at all from tonight [PIOTR, 20.09] (CLAUDE.md T23 2.7). It is asked here and not
-  // in `placeHand`, because the air sum is the sum of the machines running this very minute, which
-  // is not known until every hand has been placed.
-  const running: AtWork[] = [];
-  for (const entry of atWork) {
-    if (standsForAir(state, entry.stage)) {
-      // He keeps his place at the bench and stands at it. The minute is one the hall stopped and
-      // the mark over his head says why (src/engine/bubbles.ts).
-      lose('hallStopped');
-      continue;
+  // The readings of the hall below are asked together with the state pinned, nothing being written
+  // between them: each of them asked who stands at which machine afresh (v127).
+  const { hall, dusty, air, running } = whilePinned(state, () => {
+    // The hall as it is with those machines running: the dust band, the missing labourer, the
+    // crowded gate, the broken extractor, the extraction sum and the saws too few for the crew, all
+    // through the one breakdown.
+    const hallNow = hallProductivityFactor(state, shift);
+    const dustyNow = underExtracted(state);
+    // What the men at the benches draw for their nailers and their sanders, through the one
+    // selector the hall and the board read as well (CLAUDE.md T10 3.2).
+    const airNow = hallAirCheck(state);
+    // And what the men at the benches do when there is nothing in the hose: they stand. A bench
+    // wants its 30 l/min at 6 bar and without a compressor, or on one that is short, there is no
+    // bench work at all from tonight [PIOTR, 20.09] (CLAUDE.md T23 2.7). It is asked here and not
+    // in `placeHand`, because the air sum is the sum of the machines running this very minute,
+    // which is not known until every hand has been placed.
+    const runningNow: AtWork[] = [];
+    for (const entry of atWork) {
+      if (standsForAir(state, entry.stage)) {
+        // He keeps his place at the bench and stands at it. The minute is one the hall stopped and
+        // the mark over his head says why (src/engine/bubbles.ts).
+        lose('hallStopped');
+        continue;
+      }
+      runningNow.push(entry);
     }
-    running.push(entry);
-  }
+    return { hall: hallNow, dusty: dustyNow, air: airNow, running: runningNow };
+  });
   if (running.length === 0) return report;
   // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
   // it out and what fills the hall's bags (CLAUDE.md T7 2, T12 2.3).
