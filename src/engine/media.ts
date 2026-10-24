@@ -32,6 +32,7 @@ import {
   machineIsOut,
   machinesAtWork,
 } from './machines';
+import { pinned } from './pinned';
 import { currentStage } from './stages';
 import type { Equipment, GameState } from './types';
 
@@ -211,7 +212,11 @@ export function compressorAirOf(item: { variantId: string }): { bar: number; lit
 /** The compressors in the hall, in the order they were bought, which is the order the modal and
  *  the Owned tab number them in: "Air: compressor 2" is the second of these. */
 export function compressors(state: GameState): Equipment[] {
-  return state.equipment.filter((item) => item.specId === COMPRESSOR && !isSold(item));
+  // Kept for as long as the state is pinned: every machine of the Owned tab and every family's air
+  // ask for the hall's compressors, and each was the whole kit (v125).
+  return pinned(state, 'compressors', () =>
+    state.equipment.filter((item) => item.specId === COMPRESSOR && !isSold(item)),
+  );
 }
 
 /** What the player calls this one: "compressor 2". */

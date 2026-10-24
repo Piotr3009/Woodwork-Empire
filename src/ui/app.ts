@@ -133,6 +133,7 @@ import {
   type StoredSave,
   peekSave,
   readStore,
+  saveHead,
   saveStore,
 } from '../cloud/store';
 import { cloudAvailable } from '../cloud/supabase';
@@ -1491,24 +1492,17 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.saved = peekSave();
       ui.startOverAsked = false;
       break;
-    case 'continueSaved': {
-      const stored = readStore();
-      if (stored.state === null) {
-        ui.saved = peekSave();
-        setNote(stored.note);
-        break;
+    case 'continueSaved':
+      // The whole save may still be on its way out of the browser's database, the head having told
+      // the start screen what it is (v125): the click goes through the moment it is in.
+      if (saveStore.loaded()) continueSaved();
+      else {
+        void saveStore.whenLoaded().then(() => {
+          continueSaved();
+          render();
+        });
       }
-      state = stored.state;
-      ui.screen = 'game';
-      accumulator = 0;
-      resetWalkers();
-      resetDoors();
-      resetForklift();
-      resetEngineers();
-      startedStore();
-      noteOrders();
       break;
-    }
     case 'startGame':
       // A new company is the end of the old one: the store is cleared before the first minute.
       saveStore.clear();
@@ -2244,7 +2238,27 @@ let storePending: ReturnType<typeof setTimeout> | null = null;
 function writeStore(): void {
   if (state === null) return;
   storedAt = nowMs();
-  saveStore.write(encodeSaveFile(state));
+  // With its head, which the start screen reads (v125).
+  saveStore.write(encodeSaveFile(state), saveHead(state));
+}
+
+/** The game in the browser's store taken up where it was left: Continue on the start screen. */
+function continueSaved(): void {
+  const stored = readStore();
+  if (stored.state === null) {
+    ui.saved = peekSave();
+    setNote(stored.note);
+    return;
+  }
+  state = stored.state;
+  ui.screen = 'game';
+  accumulator = 0;
+  resetWalkers();
+  resetDoors();
+  resetForklift();
+  resetEngineers();
+  startedStore();
+  noteOrders();
 }
 
 function autosaveLocal(): void {
@@ -3109,6 +3123,15 @@ export function mount(element: HTMLElement): void {
   accumulator = 0;
   ui.saved = peekSave();
   void refreshCloud().then(render);
+  // The browser's database answers after the page is up: the start screen is said again then, in
+  // case the head it read was of a save the browser has since thrown away (v125).
+  if (!saveStore.loaded()) {
+    void saveStore.whenLoaded().then(() => {
+      if (ui.screen !== 'start') return;
+      ui.saved = peekSave();
+      render();
+    });
+  }
   element.addEventListener('click', onClick);
   element.addEventListener('input', onInput);
   element.addEventListener('mousedown', onPointerDown);

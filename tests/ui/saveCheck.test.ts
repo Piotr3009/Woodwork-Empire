@@ -146,7 +146,7 @@ describe('a fresh game in this build', () => {
     // is state 51 too: the two shelters' pictures. v111 is state 52: the yard laid out in its order.
     // v112 is state 52 too: the security firms at half the price. v113 is state 53: the hall's
     // level. v114 is state 53 too: the timber frame house factory, a third kind of line.
-    expect(APP_VERSION).toBe('v124');
+    expect(APP_VERSION).toBe('v125');
     expect(STATE_VERSION).toBe(53);
   });
 
@@ -222,7 +222,15 @@ describe('a v20 save', () => {
     expect(opened.note).toBe('Loaded from file.');
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    const store: SaveStore = { write: () => undefined, read: () => text, clear: () => undefined };
+    // A store holding this text, its head the whole of it (v125: the start screen reads `peek`).
+    const store: SaveStore = {
+      write: () => undefined,
+      read: () => text,
+      clear: () => undefined,
+      peek: () => text,
+      loaded: () => true,
+      whenLoaded: () => Promise.resolve(),
+    };
     expect(peekSave(store)).toEqual({ kind: 'ready', companyName: 'Woodwork Empire', day: 2 });
     expect(readStore(store).state).toEqual(state);
     expect(openSavedRow({ state: text, state_version: 14 }).state).toEqual(state);

@@ -515,9 +515,13 @@ export function lineModules(state: GameState, line: number): number {
  *  not absent. It holds for the second shift too, since the line runs at night under the engineers
  *  of the day (CLAUDE.md T29 2.8). */
 function engineersOnDuty(state: GameState): Worker[] {
-  return state.workers.filter(
-    (worker) =>
-      worker.role === 'lineEngineer' && worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0,
+  // Kept for as long as the state is pinned: every line asks it for its own share, and the line's
+  // minute asks for every line at once (v125).
+  return pinned(state, 'engineersOnDuty', () =>
+    state.workers.filter(
+      (worker) =>
+        worker.role === 'lineEngineer' && worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0,
+    ),
   );
 }
 
@@ -728,9 +732,13 @@ export function anyLineStandsWhole(state: GameState): boolean {
 /** The modules of a line the company holds, standing or sold and waiting for the van, in their
  *  order along it (CLAUDE.md T30 2.3.5). */
 export function lineItems(state: GameState, line: number): Equipment[] {
-  return lineModulesOf(lineKindOf(state, line)).flatMap((id) =>
-    state.equipment.filter((item) => item.specId === id && lineOf(item) === line),
-  );
+  // Kept for as long as the state is pinned: the Owned tab asks it of every module of every line
+  // (v125). A copy, so a caller's list is its own.
+  return pinned(state, `lineItems:${line}`, () =>
+    lineModulesOf(lineKindOf(state, line)).flatMap((id) =>
+      state.equipment.filter((item) => item.specId === id && lineOf(item) === line),
+    ),
+  ).slice();
 }
 
 /** What the buyer pays for a whole line: half of what its six cost, each module's half summed
@@ -940,6 +948,13 @@ function placeAmong(
  *  answer to "who is at this machine" for the hall's sums, the figures and the cards alike
  *  (CLAUDE.md T25 2.5, 2.6). */
 export function menAtPlaces(state: GameState): Array<{ who: string; item: Equipment; place: number }> {
+  // Kept for as long as the state is pinned: the Owned tab asked it once or twice for every piece of
+  // kit, the whole crew each time, a third of a second a page on Piotr's save of day 8,464 and five
+  // seconds at four times his factory (v125).
+  return pinned(state, 'menAtPlaces', () => menAtPlacesOf(state));
+}
+
+function menAtPlacesOf(state: GameState): Array<{ who: string; item: Equipment; place: number }> {
   const found: Array<{ who: string; item: Equipment; place: number }> = [];
   const given = new Map<string, number>();
   // Each family's machines in their order, read once for the whole crew and not once a man: the
@@ -2271,6 +2286,12 @@ export interface BagStore {
 /** How full is this hall's store: the one place that is read. The floor, the Owned tab, the
  *  chore and the full rule all come through here (CLAUDE.md T12 2.3). */
 export function bagStore(state: GameState): BagStore {
+  // Kept for as long as the state is pinned: every tile of the Owned tab and every family asks it
+  // (v125).
+  return pinned(state, 'bagStore', () => bagStoreOf(state));
+}
+
+function bagStoreOf(state: GameState): BagStore {
   const exists = bagsExist(state);
   let bags = 0;
   for (const item of state.equipment) {

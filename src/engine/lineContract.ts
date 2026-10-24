@@ -59,7 +59,7 @@ import { buyStock, freeFor, pendingStockSheets, reserveWindowsShortfalls, restoc
 import { crewHasGoneHome, lineEngineers } from './staff';
 import { firstOnDutyOf, movingMachines } from './tasks';
 import { inWords, plural } from './text';
-import { pinned } from './pinned';
+import { pinned, whilePinned } from './pinned';
 import { emptyLineDay } from './machines';
 import type { GameState, LineContract, LineDay, LineKind, LineLostMinutes, Worker } from './types';
 
@@ -140,9 +140,10 @@ export function openLineDay(state: GameState): void {
 }
 
 /** Why a line cannot use a working minute of its contract, or null when it can: no two engineers
- *  on duty, the line being moved, or the timber, the glass or both short (CLAUDE.md T31 2.5). */
-function lineLostTo(state: GameState, line: number): keyof LineLostMinutes | null {
-  if (lineLevel(state, line) < lineModulesOf(lineKindOf(state, line)).length) return 'engineer';
+ *  on duty, the line being moved, or the timber, the glass or both short (CLAUDE.md T31 2.5). The
+ *  line's level is the minute's, worked out once for every line (`runLineMinute`; v125). */
+function lineLostTo(state: GameState, line: number, level: number): keyof LineLostMinutes | null {
+  if (level < lineModulesOf(lineKindOf(state, line)).length) return 'engineer';
   if (movingMachines(state) !== null) return 'move';
   const short = lineShortOf(state, line);
   if (short === 'timber') return 'timber';
@@ -154,13 +155,13 @@ function lineLostTo(state: GameState, line: number): keyof LineLostMinutes | nul
 /** A working minute of a line's contract in its day book: possible while the contract runs on a
  *  working day, outside the dinner hour and before five, worth the window's share of it at today's
  *  pace, and lost by why when the line cannot use it (CLAUDE.md T31 2.5). */
-function bookLineMinute(state: GameState, line: number): void {
+function bookLineMinute(state: GameState, line: number, level: number): void {
   if (runningLineContract(state, line) === null) return;
   if (!isWorkingDay(state.clock.day) || isBreak(state.clock.minute) || crewHasGoneHome(state)) return;
   const today = lineToday(state, line);
   today.possibleMinutes += 1;
   today.possibleWindows += 1 / lineWindowMinutes(state, line);
-  const lost = lineLostTo(state, line);
+  const lost = lineLostTo(state, line, level);
   if (lost !== null) today.lost[lost] += 1;
 }
 
@@ -476,16 +477,16 @@ export function endLineContract(state: GameState, line: number): void {
  *  not after five whatever the owner does, the line running whole (two engineers on duty), and not
  *  while it is being moved. Not on the second shift: the line's minute runs only from the day's
  *  clock, and the engineers work by day (CLAUDE.md T30 2.7) [TUNE: chat]. */
-export function lineMakesWindows(state: GameState, line: number): boolean {
+export function lineMakesWindows(state: GameState, line: number, level?: number): boolean {
   // Kept for as long as the state is pinned: the hall asks it of each of a line's six modules
-  // (v104).
+  // (v104). The line's minute hands it the level it has worked out for the minute (v125).
   return pinned(state, `lineMakesWindows:${line}`, () => {
     if (runningLineContract(state, line) === null) return false;
     if (!isWorkingDay(state.clock.day)) return false;
     if (isBreak(state.clock.minute)) return false;
     if (crewHasGoneHome(state)) return false;
     if (movingMachines(state) !== null) return false;
-    if (lineLevel(state, line) < lineModulesOf(lineKindOf(state, line)).length) return false;
+    if ((level ?? lineLevel(state, line)) < lineModulesOf(lineKindOf(state, line)).length) return false;
     // And a window's boards and glass: a minute with too little is a minute the line stands
     // (CLAUDE.md T31 2.1).
     return lineShortOf(state, line) === null;
@@ -497,10 +498,20 @@ export function lineMakesWindows(state: GameState, line: number): boolean {
  *  and its labourer do not touch it, and no minute of any man or machine is booked for it
  *  (CLAUDE.md T30 2.7) [TUNE]. */
 export function runLineMinute(state: GameState): void {
+  // Every line's level, worked out once for the minute (v125). Asked line by line, two and three
+  // times a line, each was the whole kit and every man again: on Piotr's save of day 8,464 the line
+  // minute grew four times over for twice the lines, 0.7 s a game minute at eight times his
+  // factory. Nothing a line does in its minute stands or sells a module, or puts an engineer on or
+  // off duty, so the levels hold to the minute's end and are what each line was asked before.
+  const levels = whilePinned(
+    state,
+    () => new Map(state.windowLines.map((record) => [record.number, lineLevel(state, record.number)])),
+  );
   for (const record of state.windowLines) {
     const line = record.number;
-    bookLineMinute(state, line);
-    if (!lineMakesWindows(state, line)) continue;
+    const level = levels.get(line) ?? 0;
+    bookLineMinute(state, line, level);
+    if (!lineMakesWindows(state, line, level)) continue;
     record.minutes += 1;
     const each = lineWindowMinutes(state, line);
     while (record.minutes >= each && lineShortOf(state, line) === null) {

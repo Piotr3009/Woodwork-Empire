@@ -73,6 +73,7 @@ import {
 } from './machines';
 import { ownerDrawPerDay, staffOutputFactor } from './owner';
 import { changeReputation, effectiveReputation, reputationTier } from './reputation';
+import { pinned } from './pinned';
 import { chance, float, int, pick } from './rng';
 import type { RngCarrier } from './rng';
 import { crewHasGoneHome, isWorkingToday, joiners, managerPaceFor } from './staff';
@@ -568,7 +569,12 @@ export function contractResultFor(
   contract: Contract,
   worker: Worker | null,
 ): ContractResult {
-  return resultAtSpeed(state, contract, worker, contractPieceSpeed(state, contractPiece(contract)));
+  // The piece's speed is the hall's and not the man's: kept for as long as the state is pinned, so
+  // the Contracts tab works it out once a contract and not twice for every joiner (v125).
+  const speed = pinned(state, `contractPieceSpeed:${contract.id}`, () =>
+    contractPieceSpeed(state, contractPiece(contract)),
+  );
+  return resultAtSpeed(state, contract, worker, speed);
 }
 
 /** How many men like this one the contract wants at the least: the client's day against what one

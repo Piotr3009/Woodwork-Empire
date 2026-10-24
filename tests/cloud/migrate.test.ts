@@ -99,7 +99,15 @@ describe('opening it in this build', () => {
   });
 
   it('is ready on the start screen and in the cloud row, not stale', () => {
-    const store: SaveStore = { write: () => undefined, read: () => text, clear: () => undefined };
+    // A store holding this text, its head the whole of it (v125: the start screen reads `peek`).
+    const store: SaveStore = {
+      write: () => undefined,
+      read: () => text,
+      clear: () => undefined,
+      peek: () => text,
+      loaded: () => true,
+      whenLoaded: () => Promise.resolve(),
+    };
     expect(peekSave(store)).toEqual({ kind: 'ready', companyName: 'Woodwork Empire', day: 2 });
     expect(openSavedRow({ state: text, state_version: 12 }).state).not.toBeNull();
     expect(openSavedRow({ state: text, state_version: 12 }).note).toBe('Loaded.');

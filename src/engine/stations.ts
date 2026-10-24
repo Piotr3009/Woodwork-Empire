@@ -608,15 +608,19 @@ const ENDS_OF: Record<Side, readonly Side[]> = {
  *  fixed order: the side it is worked from first, then its two ends, then the far side, then the
  *  next ring (CLAUDE.md T26 2.2). The worked side and the far side carry the ring's corners. The
  *  rings run out as far as the unit is wide, which is further than any hall can need, or for
- *  `rings` of them when the caller wants so many and no more. */
-export function ringCells(
+ *  `rings` of them when the caller wants so many and no more.
+ *
+ *  Handed out one cell at a time, so a caller that has what it wants after the first ring never
+ *  makes the rest (v125): the whole list out to the unit's width was made for every figure whose
+ *  own places were taken, about 260,000 cells a figure on Piotr's hall of 360 m, a third of the
+ *  hall's page and most of its garbage. */
+export function* ringCells(
   state: GameState,
   box: { x: number; y: number; width: number; depth: number },
   worked: Side,
   first = 0,
   rings = Number.POSITIVE_INFINITY,
-): Cell[] {
-  const cells: Cell[] = [];
+): Generator<Cell> {
   const reach = Math.min(Math.max(state.unit.widthCells, state.unit.depthCells), first + rings - 1);
   const extentOf = (side: Side): number => (side === 'front' || side === 'back' ? box.width : box.depth);
   for (let out = first; out <= reach; out += 1) {
@@ -625,11 +629,10 @@ export function ringCells(
       // length and no corner is listed twice.
       const corners = side === worked || side === ACROSS[worked] ? out + 1 : 0;
       for (let along = -corners; along < extentOf(side) + corners; along += 1) {
-        cells.push(cellAt(box, { side, along, out }));
+        yield cellAt(box, { side, along, out });
       }
     }
   }
-  return cells;
 }
 
 /** The first `count` cells of `anchors`, in their order, that a man can stand on (no footprint, no
@@ -641,7 +644,7 @@ export function ringCells(
  *  canteen door's queue, the men at the gate and the home cells all come through here. */
 export function standingCellsFor(
   state: GameState,
-  anchors: readonly Cell[],
+  anchors: Iterable<Cell>,
   count: number,
   taken: Set<string>,
   /** False for a caller that goes on to its own next cells when these run out (`placeCellsAt`). */
@@ -655,8 +658,14 @@ export function standingCellsFor(
     taken.add(key);
     found.push({ x: cell.x, y: cell.y });
   };
-  for (const cell of anchors) take(cell);
-  const centre = anchors[0];
+  // The anchors may be the rings themselves, handed out one at a time: asked no further than the
+  // count wants (v125).
+  let centre: Cell | undefined;
+  for (const cell of anchors) {
+    if (centre === undefined) centre = cell;
+    if (found.length >= count) break;
+    take(cell);
+  }
   if (spread && centre !== undefined && found.length < count) {
     for (const cell of ringCells(state, { x: centre.x, y: centre.y, width: 1, depth: 1 }, 'front')) {
       if (found.length >= count) break;

@@ -138,19 +138,41 @@ function footOf(node: Element): FloorBox | null {
   return box;
 }
 
+/** One drawable as a batch of placements found it: the node, the depth it carries and the floor it
+ *  stands on, read once (v125). */
+interface DrawableEntry {
+  node: Element;
+  depth: number | null;
+  foot: FloorBox | null;
+}
+
+/** The drawables under each parent a batch of placements has looked at, in document order, each
+ *  read off the page once and kept in step with every move the batch makes (v125). A frame used to
+ *  read every drawable of the hall again for every man it put back in order: 264 engineers among
+ *  4,000 drawables on Piotr's save of day 8,464, a quarter of the processor with the clock stopped
+ *  and seven tenths at twice his factory. A caller that puts many in order in one go hands the same
+ *  batch to each; nothing else may move a drawable while the batch is in hand. */
+export type DrawableBatch = Map<ParentNode, DrawableEntry[]>;
+
+/** The parent's drawables for this batch: read now when the batch has not read them yet, or when
+ *  the page has taken one away or put one in since. */
+function entriesOf(batch: DrawableBatch, parent: ParentNode): DrawableEntry[] {
+  const known = batch.get(parent);
+  if (known !== undefined && known.length === parent.childElementCount) return known;
+  const entries = Array.from(parent.children, (node) => ({ node, depth: depthOf(node), foot: footOf(node) }));
+  batch.set(parent, entries);
+  return entries;
+}
+
 /** The drawables round a figure that carry a depth, in document order and without him, and how
  *  many of them are before him now: the run the scene sorted, between the siblings with no depth
  *  on either side of it, which are not crossed. */
-function runAround(node: Element): { run: Element[]; index: number } {
-  const before: Element[] = [];
-  for (let at = node.previousElementSibling; at !== null && depthOf(at) !== null; at = at.previousElementSibling) {
-    before.unshift(at);
-  }
-  const after: Element[] = [];
-  for (let at = node.nextElementSibling; at !== null && depthOf(at) !== null; at = at.nextElementSibling) {
-    after.push(at);
-  }
-  return { run: [...before, ...after], index: before.length };
+function runAround(entries: readonly DrawableEntry[], at: number): { run: DrawableEntry[]; index: number } {
+  let from = at;
+  while (from > 0 && (entries[from - 1] as DrawableEntry).depth !== null) from -= 1;
+  let to = at;
+  while (to < entries.length - 1 && (entries[to + 1] as DrawableEntry).depth !== null) to += 1;
+  return { run: [...entries.slice(from, at), ...entries.slice(at + 1, to + 1)], index: at - from };
 }
 
 /** Puts every figure in the painter's order for where his feet are this frame: a full insertion
@@ -163,11 +185,15 @@ function runAround(node: Element): { run: Element[]; index: number } {
  *  Returns how many figures were moved, which is what the stability test counts. */
 export function resortFigures(root: ParentNode): number {
   let moved = 0;
+  // One batch for every figure: the drawables read once (v125).
+  const batch: DrawableBatch = new Map();
   for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
     const key = node.getAttribute('data-figure');
     const walker = key === null ? undefined : walkers.get(key);
     if (walker === undefined) continue;
-    if (placeAmongDrawables(node, figureDepth(walker), { x: walker.at.x + 0.5, y: walker.at.y + 0.5 })) moved += 1;
+    if (placeAmongDrawables(node, figureDepth(walker), { x: walker.at.x + 0.5, y: walker.at.y + 0.5 }, batch)) {
+      moved += 1;
+    }
   }
   return moved;
 }
@@ -194,7 +220,12 @@ const lastPlaced = new WeakMap<Element, string>();
  *  the scene writes the depth itself when the page is written again, in its own order, so a node
  *  that still carries what was last written here is where it was put, or where the scene has
  *  just put it for the same feet. */
-export function placeAmongDrawables(node: Element, depth: number, feet: { x: number; y: number }): boolean {
+export function placeAmongDrawables(
+  node: Element,
+  depth: number,
+  feet: { x: number; y: number },
+  batch: DrawableBatch = new Map(),
+): boolean {
   const written = String(Math.round(depth * 1000) / 1000);
   const key = `${written}|${feet.x}|${feet.y}`;
   if (lastPlaced.get(node) === key && node.getAttribute('data-depth') === written) return false;
@@ -202,17 +233,38 @@ export function placeAmongDrawables(node: Element, depth: number, feet: { x: num
   lastPlaced.set(node, key);
   const parent = node.parentNode;
   if (parent === null) return false;
-  const { run, index } = runAround(node);
+  let entries = entriesOf(batch, parent);
+  let at = entries.findIndex((entry) => entry.node === node);
+  if (at < 0) {
+    // Not in the batch's list: the page changed under it, so it is read again.
+    batch.delete(parent);
+    entries = entriesOf(batch, parent);
+    at = entries.findIndex((entry) => entry.node === node);
+    if (at < 0) return false;
+  }
+  const own = entries[at] as DrawableEntry;
+  own.depth = depthOf(node);
+  const { run, index } = runAround(entries, at);
   if (run.length === 0) return false;
   const slot = figureSlot(
-    run.map((sibling) => ({ depth: depthOf(sibling) ?? 0, foot: footOf(sibling) })),
+    run.map((sibling) => ({ depth: sibling.depth ?? 0, foot: sibling.foot })),
     { depth, feet },
   );
   // Already there: nothing to do this frame.
   if (slot === index) return false;
   const after = run[slot];
-  if (after !== undefined) parent.insertBefore(node, after);
-  else parent.insertBefore(node, (run[run.length - 1] as Element).nextSibling);
+  const last = run[run.length - 1] as DrawableEntry;
+  if ((after ?? last).node.parentNode !== parent) {
+    // The batch's list holds a node the page has since taken away: read again, and placed afresh.
+    batch.delete(parent);
+    lastPlaced.delete(node);
+    return placeAmongDrawables(node, depth, feet, batch);
+  }
+  if (after !== undefined) parent.insertBefore(node, after.node);
+  else parent.insertBefore(node, last.node.nextSibling);
+  // And the batch's list moved with it.
+  entries.splice(at, 1);
+  entries.splice(after !== undefined ? entries.indexOf(after) : entries.indexOf(last) + 1, 0, own);
   return true;
 }
 

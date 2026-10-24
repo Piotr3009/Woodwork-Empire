@@ -41,7 +41,7 @@ import type { GameState, LineKind } from '../engine/types';
 import { type Facing, cellBox, frameAt, walksAreSkipped } from './characters';
 import { depthKey, tileToScreen } from './iso';
 import { SPRITE_DIR, SPRITE_SCALE } from './sprites';
-import { placeAmongDrawables, writeAttribute } from './walkers';
+import { type DrawableBatch, placeAmongDrawables, writeAttribute } from './walkers';
 
 interface Point {
   x: number;
@@ -289,6 +289,8 @@ function draw(root: ParentNode, nowMs: number): void {
   }
   // Every attribute written only when it changes: a forklift that waits writes nothing in a frame
   // (v97).
+  // One batch for every forklift: the drawables read once (v125).
+  const batch: DrawableBatch = new Map();
   for (const node of Array.from(root.querySelectorAll('[data-forklift]'))) {
     const forklift = forklifts.get(Number(node.getAttribute('data-forklift-line'))) ?? null;
     if (forklift === null) continue;
@@ -306,7 +308,7 @@ function draw(root: ParentNode, nowMs: number): void {
       const picture = art.querySelector('image');
       if (picture !== null) writeAttribute(picture, 'href', `${SPRITE_DIR}/${sheet.file}`);
     }
-    placeAmongDrawables(node, depthAt(forklift.at), forklift.at);
+    placeAmongDrawables(node, depthAt(forklift.at), forklift.at, batch);
   }
 }
 

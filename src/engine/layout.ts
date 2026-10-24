@@ -992,8 +992,20 @@ export function lineNoRoom(kind: LineKind): string {
  *  order. They move together and never stand in one another's way (CLAUDE.md T30 2.4; v93: the
  *  line by its number). */
 export function lineGroup(state: GameState, onOrder: boolean, line: number): string[] {
-  const items = onOrder ? reservedItems(state) : hallItems(state);
-  return items.filter((item) => isLineModule(item.specId) && lineOf(item) === line).map((item) => item.id);
+  // Every line's modules in one pass over the kit, kept for as long as the state is pinned: the
+  // Owned tab asks it of every module of every line, once each, and each was the whole kit (v125).
+  // In the kit's own order, as the filter gave them; a copy, so a caller's list is its own.
+  const groups = pinned(state, onOrder ? 'lineGroupsOnOrder' : 'lineGroups', () => {
+    const byLine = new Map<number, string[]>();
+    for (const item of onOrder ? reservedItems(state) : hallItems(state)) {
+      if (!isLineModule(item.specId)) continue;
+      const ids = byLine.get(lineOf(item));
+      if (ids === undefined) byLine.set(lineOf(item), [item.id]);
+      else ids.push(item.id);
+    }
+    return byLine;
+  });
+  return (groups.get(line) ?? []).slice();
 }
 
 /** Can the whole line stand with this module at this cell: never turned, and a clear 36 m by 3 m

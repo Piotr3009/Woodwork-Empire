@@ -26,7 +26,7 @@ import { crewHasGoneHome } from '../engine/staff';
 import type { GameState } from '../engine/types';
 import { type CharacterOptions, type Facing, characterArt, faceCharacter, walkPace } from './characters';
 import { depthKey, tileToScreen } from './iso';
-import { placeAmongDrawables, writeAttribute } from './walkers';
+import { type DrawableBatch, placeAmongDrawables, writeAttribute } from './walkers';
 
 interface Point {
   x: number;
@@ -219,6 +219,8 @@ function walkOn(walk: EngineerWalk, metres: number, length: number): void {
  *  his depth among the drawables. Nothing it set before survives a page written, so all of it is
  *  written each time; the frame of his walk is `playCharacters`'s. */
 function draw(root: ParentNode, paths: Paths): void {
+  // One batch for every engineer: the drawables read once a frame and not once a man (v125).
+  const batch: DrawableBatch = new Map();
   for (const node of Array.from(root.querySelectorAll('[data-engineer]'))) {
     const [lineText, indexText] = (node.getAttribute('data-engineer') ?? '').split(':');
     const line = Number(lineText);
@@ -231,7 +233,7 @@ function draw(root: ParentNode, paths: Paths): void {
     writeAttribute(node, 'transform', screenAt(at));
     const art = node.querySelector('[data-character]');
     if (art !== null) faceCharacter(art, facingOf(walk.direction));
-    placeAmongDrawables(node, depthAt(at), feetAt(at));
+    placeAmongDrawables(node, depthAt(at), feetAt(at), batch);
   }
 }
 
