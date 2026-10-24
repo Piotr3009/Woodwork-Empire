@@ -124,6 +124,7 @@ import type {
 } from '../engine/types';
 import {
   type BoxFaces,
+  type DepthSibling,
   type FloorBox,
   type Point,
   type Polygon,
@@ -342,13 +343,16 @@ interface Drawable {
  *  T26 2.4). The walker does the same every frame for a man on his way (`resortFigures`). */
 function placeFigures(drawables: Drawable[]): void {
   const figures = drawables.filter((entry) => entry.feet !== undefined);
+  // What `figureSlot` reads of each drawable, kept in step with them move for move: it was made
+  // afresh for every figure, eight hundred entries a figure on Piotr's save (v126).
+  const siblings: DepthSibling[] = drawables.map((entry) => ({ depth: entry.depth, foot: entry.foot ?? null }));
   for (const figure of figures) {
-    drawables.splice(drawables.indexOf(figure), 1);
-    const at = figureSlot(
-      drawables.map((entry) => ({ depth: entry.depth, foot: entry.foot ?? null })),
-      { depth: figure.depth, feet: figure.feet ?? { x: 0, y: 0 } },
-    );
+    const from = drawables.indexOf(figure);
+    drawables.splice(from, 1);
+    siblings.splice(from, 1);
+    const at = figureSlot(siblings, { depth: figure.depth, feet: figure.feet ?? { x: 0, y: 0 } });
     drawables.splice(at, 0, figure);
+    siblings.splice(at, 0, { depth: figure.depth, foot: figure.foot ?? null });
   }
 }
 
@@ -1996,6 +2000,10 @@ export interface Scene {
   shell: () => string;
   /** Written into that element on every render. */
   live: string;
+  /** The live part as the pieces it is made of, in their order: each drawable of the hall one
+   *  piece. Where a scene gives them, the page brings its live part into line piece by piece and
+   *  parses only what has changed (v126). */
+  liveParts?: readonly string[];
 }
 
 /** The empty element a shell leaves for its live part. */
@@ -2673,7 +2681,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
 
   // Every drawable carries the depth it was sorted at, so the renderer can put a figure back in
   // the order of the cell his feet are on without sorting the scene again (CLAUDE.md T20 2.11).
-  live.push(drawables.map((drawable) => withDepth(drawable.svg, drawable.depth)).join(''));
+  // Each one a piece of its own, so the page parses only the drawables that have changed (v126).
+  for (const drawable of drawables) live.push(withDepth(drawable.svg, drawable.depth));
 
   // Where a line of the kind asked for would go, and what stands in its way (v119).
   if (options.setup === true) live.push(roomForArt(state, options.roomFor));
@@ -2743,7 +2752,12 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       // writes the camera it is holding onto the group (CLAUDE.md T6 3.3).
       `<g class="hall-scene" data-camera="1" transform="${cameraTransform(HALL_CAMERA_FIT)}">` +
       `${parts.join('')}${LIVE_SLOT}</g></svg>`,
-    live: live.join(''),
+    // The live part whole only for a caller that asks for it, the tests' `renderHall` among them:
+    // the page takes it piece by piece (v126).
+    get live(): string {
+      return live.join('');
+    },
+    liveParts: live,
   };
 }
 

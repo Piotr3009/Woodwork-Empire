@@ -87,31 +87,61 @@ export function isFree(state: GameState, cell: Cell): boolean {
 /** The floor, cell by cell: the cells a footprint stands on, and the machines whose pictures cover
  *  each cell, worked out once while the state is pinned and null while it is not (v104). The page
  *  asks a cell of every machine on the floor thousands of times while it puts the men where they
- *  stand: on Piotr's hall of 251 things a third of the hall's drawing. */
-function floorMap(state: GameState): { footprints: Set<string>; pictures: Map<string, string[]> } | null {
+ *  stand: on Piotr's hall of 251 things a third of the hall's drawing. From v126 the floor of the
+ *  last page is kept while the hall is laid out as it was: a game minute moves men and stock and
+ *  seldom a machine, and the floor was worked out afresh for every page, a sixth of its drawing. */
+function floorMap(state: GameState): FloorMap | null {
   return keptWhilePinned(state, 'floorMap', () => {
-    const footprints = new Set<string>();
-    const pictures = new Map<string, string[]>();
-    for (const item of state.equipment) {
-      if (!onTheFloor(state, item)) continue;
-      const box = footprintCells(item);
-      for (let x = box.x; x < box.x + box.width; x += 1) {
-        for (let y = box.y; y < box.y + box.depth; y += 1) footprints.add(keyOf({ x, y }));
-      }
-      if (!isAMachine(item)) continue;
-      const drawn = footprintOrigin(item);
-      for (let x = Math.floor(drawn.x); x < drawn.x + drawn.width; x += 1) {
-        for (let y = Math.floor(drawn.y); y < drawn.y + drawn.depth; y += 1) {
-          if (!pictureCovers(item, { x, y })) continue;
-          const key = keyOf({ x, y });
-          const over = pictures.get(key);
-          if (over === undefined) pictures.set(key, [item.id]);
-          else over.push(item.id);
-        }
+    const layout = layoutKey(state);
+    if (lastFloor !== null && lastFloor.layout === layout) return lastFloor.map;
+    const map = floorMapOf(state);
+    lastFloor = { layout, map };
+    return map;
+  });
+}
+
+/** The cells a footprint stands on, and the machines whose pictures cover each cell. */
+type FloorMap = { footprints: Set<string>; pictures: Map<string, string[]> };
+
+/** The floor last worked out, and the layout it was worked out for (v126). */
+let lastFloor: { layout: string; map: FloorMap } | null = null;
+
+/** Everything of the hall its floor is worked out from, in one line: the unit's width, and every
+ *  thing's name, class, turn, place and whether it is sold, in the order the state keeps them (v126).
+ *  Two states with the same line have the same floor, cell for cell. */
+function layoutKey(state: GameState): string {
+  const parts: string[] = [String(state.unit.widthCells)];
+  for (const item of state.equipment) {
+    parts.push(
+      [item.id, item.specId, item.variantId, item.orientation ?? 0, item.anchorX, item.anchorY, isSold(item) ? 1 : 0].join('\u0001'),
+    );
+  }
+  return parts.join('\u0002');
+}
+
+/** The floor, cell by cell, worked out from the state itself (`floorMap`). */
+function floorMapOf(state: GameState): FloorMap {
+  const footprints = new Set<string>();
+  const pictures = new Map<string, string[]>();
+  for (const item of state.equipment) {
+    if (!onTheFloor(state, item)) continue;
+    const box = footprintCells(item);
+    for (let x = box.x; x < box.x + box.width; x += 1) {
+      for (let y = box.y; y < box.y + box.depth; y += 1) footprints.add(keyOf({ x, y }));
+    }
+    if (!isAMachine(item)) continue;
+    const drawn = footprintOrigin(item);
+    for (let x = Math.floor(drawn.x); x < drawn.x + drawn.width; x += 1) {
+      for (let y = Math.floor(drawn.y); y < drawn.y + drawn.depth; y += 1) {
+        if (!pictureCovers(item, { x, y })) continue;
+        const key = keyOf({ x, y });
+        const over = pictures.get(key);
+        if (over === undefined) pictures.set(key, [item.id]);
+        else over.push(item.id);
       }
     }
-    return { footprints, pictures };
-  });
+  }
+  return { footprints, pictures };
 }
 
 /** Whether a machine's picture covers this cell on the floor: its drawn footprint over at least

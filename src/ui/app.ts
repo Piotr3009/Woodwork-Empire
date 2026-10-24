@@ -119,7 +119,7 @@ import { unconnectedMachines } from '../engine/pipes';
 import { OWNER, hasCentralExtraction, moduleKind } from '../engine/machines';
 import { whilePinned } from '../engine/pinned';
 import { nextSpriteOrientation, playSheets } from '../render/sprites';
-import { patchInto } from './patch';
+import { patchInto, patchPieces } from './patch';
 import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
 import { renderShopping } from './shopping';
@@ -1209,8 +1209,12 @@ function mountScene(page: Element, wanted: Scene | null): void {
   }
   const live = scene.node.querySelector('[data-live]');
   // The live part is patched like everything else: the board by the door is a control in it, and
-  // a control that is replaced every minute cannot be clicked (CLAUDE.md T9 3.8).
-  if (live !== null) patchInto(live, wanted.live);
+  // a control that is replaced every minute cannot be clicked (CLAUDE.md T9 3.8). The hall's comes
+  // in its pieces, so only what has changed is parsed and written (v126).
+  if (live !== null) {
+    if (wanted.liveParts !== undefined) patchPieces(live, wanted.liveParts);
+    else patchInto(live, wanted.live);
+  }
   if (slot !== scene.node) slot.replaceWith(scene.node);
 }
 

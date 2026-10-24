@@ -234,9 +234,33 @@ export function spriteFileName(
  *  where the art side delivered that (v123: the yacht line's frames, a sixth of their PNGs' size),
  *  the PNG first, so a PNG landing later is drawn with no code. Null when neither is there. */
 export function deliveredFile(files: readonly string[], name: string): string | null {
-  if (files.includes(name)) return name;
+  if (listHas(files, name)) return name;
   const webp = name.replace(/\.png$/, '.webp');
-  return webp !== name && files.includes(webp) ? webp : null;
+  return webp !== name && listHas(files, webp) ? webp : null;
+}
+
+/** A list of files asked this many times is looked up by a set of its names from then on (v126). */
+const SET_AFTER_ASKS = 8;
+
+/** The lists of files asked so far, how often, and the set of names of each asked often (v126). */
+const fileSets = new WeakMap<readonly string[], { asked: number; length: number; names: Set<string> | null }>();
+
+/** Whether a list of files holds this name: the list read through from the start, as `includes`
+ *  reads it, until it has been asked often, and then a set of its names, made again whenever the
+ *  list's length changes (v126). The hall asks the one list of 761 files of every station's frames
+ *  and every picture, every page: read through, a tenth of the hall's drawing on Piotr's save. */
+function listHas(files: readonly string[], name: string): boolean {
+  let seen = fileSets.get(files);
+  if (seen === undefined || seen.length !== files.length) {
+    seen = { asked: 0, length: files.length, names: null };
+    fileSets.set(files, seen);
+  }
+  if (seen.names === null) {
+    seen.asked += 1;
+    if (seen.asked < SET_AFTER_ASKS) return files.includes(name);
+    seen.names = new Set(files);
+  }
+  return seen.names.has(name);
 }
 
 /** Which file the hall really draws this picture with, and whether it has to mirror the base one to

@@ -15,6 +15,11 @@
 const TEXT_NODE = 3;
 const ELEMENT_NODE = 1;
 
+/** The nodes a piece of markup made on its own, one node a piece (`patchPieces`), each with the
+ *  markup it was made of after its first tag: only such a node can stand in for its piece the next
+ *  time without the piece being parsed (v126). */
+const pieceBodies = new WeakMap<Node, string>();
+
 /** True when these two are the same thing a minute apart, and not two different things. */
 function isSame(old: Node, fresh: Node): boolean {
   if (old.nodeType !== fresh.nodeType) return false;
@@ -175,7 +180,13 @@ function longestRising(from: readonly number[], movable: readonly boolean[] = []
  *  before it and its picture was fetched again, and the line blinked out of the hall [PIOTR,
  *  18.10: "every now and then our production lines disappear"]. A node that says nothing is matched
  *  to the next old node that says nothing, as before. */
-function patchByIdentity(target: Element, olds: readonly Node[], news: readonly Node[], identities: Array<string | null>): void {
+function patchByIdentity(
+  target: Element,
+  olds: readonly Node[],
+  news: readonly Node[],
+  identities: Array<string | null>,
+  kept: ReadonlyMap<Node, string | null> = new Map(),
+): void {
   const oldIdentities = identitiesOf(olds);
   const byIdentity = new Map<string, number>();
   const loose: number[] = [];
@@ -186,14 +197,24 @@ function patchByIdentity(target: Element, olds: readonly Node[], news: readonly 
   let looseAt = 0;
   const final: Node[] = [];
   const from: number[] = [];
-  const kept = new Set<number>();
+  const matched = new Set<number>();
   news.forEach((next, index) => {
     const identity = identities[index] ?? null;
     const at = identity === null ? loose[looseAt++] : byIdentity.get(identity);
     const old = at === undefined ? undefined : olds[at];
-    if (old !== undefined && at !== undefined && !kept.has(at) && isSame(old, next)) {
-      patchNode(old, next);
-      kept.add(at);
+    if (old !== undefined && at !== undefined && !matched.has(at) && (old === next || isSame(old, next))) {
+      // A node handed in as itself (`patchPieces`) is the same markup as it stands: only the depth
+      // it is sorted at, which its mark does not cover, is brought into line (v126).
+      if (old === next) {
+        keepDepth(old as Element, kept.get(old) ?? null);
+      } else {
+        patchNode(old, next);
+        // The old node stands for whatever the fresh one was made from from now on (v126).
+        const body = pieceBodies.get(next);
+        if (body === undefined) pieceBodies.delete(old);
+        else pieceBodies.set(old, body);
+      }
+      matched.add(at);
       final.push(old);
       from.push(at);
     } else {
@@ -202,7 +223,7 @@ function patchByIdentity(target: Element, olds: readonly Node[], news: readonly 
     }
   });
   olds.forEach((old, index) => {
-    if (!kept.has(index)) target.removeChild(old);
+    if (!matched.has(index)) target.removeChild(old);
   });
   const stay = longestRising(
     from,
@@ -211,7 +232,10 @@ function patchByIdentity(target: Element, olds: readonly Node[], news: readonly 
   let after: Node | null = null;
   for (let index = final.length - 1; index >= 0; index -= 1) {
     const node = final[index] as Node;
-    if (!stay.has(index)) target.insertBefore(node, after);
+    // A figure already standing where it belongs is not taken out of the page and put back: every
+    // engineer and man was, every page, wherever he stood (v126).
+    const inPlace = node.parentNode === target && node.nextSibling === after;
+    if (!stay.has(index) && !inPlace) target.insertBefore(node, after);
     after = node;
   }
 }
@@ -252,4 +276,173 @@ export function patchInto(target: Element, html: string): void {
   if (!(holder instanceof Element)) return;
   holder.innerHTML = html;
   patchChildren(target, holder);
+}
+
+// ---------------------------------------------------------------------------
+// The live layer piece by piece (v126) [PIOTR, 24.10: "redrawing every second makes no sense: only
+// let the animations run, and work it out again when something changes"]. The hall's live layer
+// was written whole every game minute: four thousand elements of markup, about 440,000 characters
+// on Piotr's save of day 8,464, parsed by the browser and compared node for node with what stood,
+// when in most minutes a handful of them had changed. A drawable whose markup carries the mark it
+// carried last time is now left standing untouched, its markup never parsed; only what has changed,
+// come or gone is parsed and put in. The page left is the page the whole writing left.
+// ---------------------------------------------------------------------------
+
+/** Writes the depth the scene sorted a drawable at, which its mark does not cover. */
+function keepDepth(node: Element, depth: string | null): void {
+  if (depth === null) {
+    if (node.hasAttribute('data-depth')) node.removeAttribute('data-depth');
+  } else if (node.getAttribute('data-depth') !== depth) {
+    node.setAttribute('data-depth', depth);
+  }
+}
+
+/** The text of an attribute as markup writes it, as the page reads it. */
+function attributeText(raw: string): string {
+  return raw
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+/** The attributes a first tag's own reading here gives exactly as the browser's parser gives them:
+ *  names it keeps as they are written, and values with no character it would read otherwise. */
+const PLAIN_NAME = /^(?:data-[a-z0-9-]+|aria-[a-z-]+|transform|class|style|pointer-events|opacity|fill|stroke|visibility|display|cursor|id|role|tabindex)$/;
+const PLAIN_VALUE = /^(?:[^&\r\0]|&(?:quot|#39|lt|gt|amp);)*$/;
+
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+
+/** What a piece says of itself in its first tag. */
+interface Head {
+  /** The tag's name as written. */
+  tag: string;
+  /** Its attributes in their order as the page reads them, the first of a name winning, or null
+   *  when one of them is not plain enough to be sure the page reads it the same. */
+  attributes: Array<[string, string]> | null;
+  /** The thing it is drawn for, its mark and its depth. */
+  identity: string | null;
+  sig: string | null;
+  depth: string | null;
+  /** Where the first tag ends in the piece. */
+  end: number;
+}
+
+/** What a piece says of itself in its first tag; null for a piece that does not open with a tag. */
+function headOf(piece: string): Head | null {
+  const tag = /^<([a-zA-Z][^\s>/]*)((?:\s+[^\s=>/]+(?:="[^"]*")?)*)\s*\/?>/.exec(piece);
+  if (tag === null) return null;
+  const read = new Map<string, string>();
+  let plain = true;
+  for (const found of (tag[2] ?? '').matchAll(/([^\s=>/]+)(?:="([^"]*)")?/g)) {
+    const name = found[1];
+    if (name === undefined || read.has(name)) continue;
+    const raw = found[2] ?? '';
+    if (!PLAIN_NAME.test(name) || !PLAIN_VALUE.test(raw)) plain = false;
+    read.set(name, attributeText(raw));
+  }
+  let identity: string | null = null;
+  for (const name of IDENTITY) {
+    const value = read.get(name);
+    if (value !== undefined) {
+      identity = `${name}=${value}`;
+      break;
+    }
+  }
+  return {
+    tag: tag[1] ?? '',
+    attributes: plain ? Array.from(read.entries()) : null,
+    identity,
+    sig: read.get('data-sig') ?? null,
+    depth: read.get('data-depth') ?? null,
+    end: tag[0].length,
+  };
+}
+
+/** True when this standing node is the element the piece's first tag would make, all but its
+ *  attributes: the same tag, an SVG element as the hall's are, the same control, and no slot. */
+function takesHead(old: Element, head: Head, attributes: ReadonlyArray<[string, string]>): boolean {
+  if (old.namespaceURI !== SVG_NAMESPACE || old.tagName !== head.tag) return false;
+  const valueOf = (name: string): string | null => attributes.find(([written]) => written === name)?.[1] ?? null;
+  if (old.hasAttribute('data-scene-slot') || valueOf('data-scene-slot') !== null) return false;
+  return old.getAttribute('data-do') === valueOf('data-do') && old.getAttribute('data-id') === valueOf('data-id');
+}
+
+/** Brings a node's own attributes into line with a first tag's, as `patchAttributes` brings them
+ *  into line with a fresh node's. */
+function writeHead(old: Element, attributes: ReadonlyArray<[string, string]>): void {
+  for (const [name, value] of attributes) {
+    if (old.getAttribute(name) !== value) old.setAttribute(name, value);
+  }
+  const written = new Set(attributes.map(([name]) => name));
+  for (const attribute of Array.from(old.attributes)) {
+    if (isPlayersToKeep(old, attribute.name)) continue;
+    if (!written.has(attribute.name)) old.removeAttribute(attribute.name);
+  }
+}
+
+/** Writes this markup, given as the pieces it is made of in their order, each the markup of one
+ *  drawable or of a few nodes, into the element: what `patchInto` writes of the pieces joined, the
+ *  page node for node the same (v126). A piece whose node stands with the mark the piece carries is
+ *  not parsed: the node is kept as it is, and only its depth is written. Nor is a piece whose node
+ *  stands made of the same markup after its first tag, an engineer walked on or a man come into
+ *  another cell: only the node's own attributes are written, as a fresh node's would be. */
+export function patchPieces(target: Element, pieces: readonly string[]): void {
+  const olds = Array.from(target.childNodes);
+  const standing = new Map<string, Node>();
+  identitiesOf(olds).forEach((identity, index) => {
+    const old = olds[index];
+    if (identity !== null && old !== undefined) standing.set(identity, old);
+  });
+  const news: Node[] = [];
+  const identities: Array<string | null> = [];
+  const kept = new Map<Node, string | null>();
+  // Counted in the order of the fresh markup, as `identitiesOf` counts it: a second node drawn for
+  // the same thing is told apart from the first by its count.
+  const counts = new Map<string, number>();
+  const nextOf = (identity: string): string => {
+    const count = counts.get(identity) ?? 0;
+    return count === 0 ? identity : `${identity}#${count}`;
+  };
+  const count = (identity: string | null): string | null => {
+    if (identity === null) return null;
+    const counted = nextOf(identity);
+    counts.set(identity, (counts.get(identity) ?? 0) + 1);
+    return counted;
+  };
+  let holder: Element | null = null;
+  for (const piece of pieces) {
+    const head = headOf(piece);
+    if (head !== null && head.identity !== null) {
+      const old = standing.get(nextOf(head.identity));
+      const body = old === undefined ? undefined : pieceBodies.get(old);
+      if (old instanceof Element && body !== undefined) {
+        const same = head.sig !== null && old.getAttribute('data-sig') === head.sig;
+        const attributes = head.attributes;
+        const inside = !same && attributes !== null && body === piece.slice(head.end) && takesHead(old, head, attributes);
+        if (same || inside) {
+          if (inside && attributes !== null) writeHead(old, attributes);
+          news.push(old);
+          identities.push(count(head.identity));
+          kept.set(old, head.depth);
+          continue;
+        }
+      }
+    }
+    if (holder === null) {
+      const copy = target.cloneNode(false);
+      if (!(copy instanceof Element)) return;
+      holder = copy;
+    }
+    holder.innerHTML = piece;
+    const made = Array.from(holder.childNodes);
+    for (const node of made) {
+      news.push(node);
+      identities.push(count(identityOf(node)));
+    }
+    const only = made.length === 1 ? made[0] : undefined;
+    if (only !== undefined && head !== null) pieceBodies.set(only, piece.slice(head.end));
+  }
+  patchByIdentity(target, olds, news, identities, kept);
 }

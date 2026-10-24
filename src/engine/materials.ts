@@ -38,6 +38,7 @@ import {
   stockKindOf,
   stockWords,
 } from './machines';
+import { keptWhilePinned } from './pinned';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
 import { andList, plural } from './text';
@@ -79,6 +80,10 @@ export function rackCapacity(state: GameState): number {
  *  boards and the glass (CLAUDE.md T29 2.11.2, T31 2.1, T32 2.1); nought on anything that keeps
  *  none. */
 export function stockOnItem(state: GameState, item: { id: string }): number {
+  // Every rack's share worked out once while the state is pinned: the hall asks it of every rack and
+  // every rack asked it of the whole kit, a tenth of the hall's drawing on Piotr's save (v126).
+  const spread = keptWhilePinned(state, 'stockSpread', () => stockSpread(state));
+  if (spread !== null) return spread.get(item.id) ?? 0;
   const found = state.equipment.find((entry) => entry.id === item.id);
   const kind = found === undefined ? null : stockKindOf(found);
   if (kind === null) return 0;
@@ -92,6 +97,32 @@ export function stockOnItem(state: GameState, item: { id: string }): number {
     left -= here;
   }
   return 0;
+}
+
+/** What stands on every rack, timber store and glass rack, by its name: `stockOnItem`'s answer for
+ *  each thing in the hall at once, the same spread of each kind over its kit (v126). */
+function stockSpread(state: GameState): Map<string, number> {
+  const byKind = new Map<StockKind, Map<string, number>>();
+  for (const kind of STOCK_KINDS) {
+    const kit = state.equipment.filter(
+      (entry) => capacityOf(entry, kind) > 0 && !isSold(entry) && itemStandsInTheHall(entry),
+    );
+    const shares = new Map<string, number>();
+    let left = state.stock[kind];
+    for (const [index, rack] of kit.entries()) {
+      const here = index === kit.length - 1 ? left : Math.min(left, capacityOf(rack, kind));
+      if (!shares.has(rack.id)) shares.set(rack.id, here);
+      left -= here;
+    }
+    byKind.set(kind, shares);
+  }
+  const spread = new Map<string, number>();
+  for (const entry of state.equipment) {
+    if (spread.has(entry.id)) continue;
+    const kind = stockKindOf(entry);
+    spread.set(entry.id, kind === null ? 0 : (byKind.get(kind)?.get(entry.id) ?? 0));
+  }
+  return spread;
 }
 
 /** Where each kind waits in the paid store for the night (CLAUDE.md T32 2.2). */

@@ -93,7 +93,8 @@ describe('a figure past a machine (v121)', () => {
     const group = layer(kit('a') + engineer('1:1') + kit('b') + kit('c'));
     const names = moved(group, () => patchInto(group, kit('c') + kit('a') + engineer('1:1') + kit('b')));
     expect(Array.from(group.children).map((node) => node.getAttribute('data-kit') ?? node.getAttribute('data-engineer'))).toEqual(['c', 'a', '1:1', 'b']);
-    // One machine moved (c to the front), the engineer put back where he belongs, nothing else.
-    expect(names.sort()).toEqual(['1:1', 'c']);
+    // One machine moved (c to the front), and nothing else: the engineer already stood where he
+    // belongs, and from v126 a figure in his place is not taken out and put back.
+    expect(names.sort()).toEqual(['c']);
   });
 });
