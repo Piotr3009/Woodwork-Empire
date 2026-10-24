@@ -43,7 +43,7 @@ import {
   zoneOf,
 } from './machines';
 import { reservedItems } from './orders';
-import { pinned } from './pinned';
+import { keptWhilePinned, pinned, whilePinned } from './pinned';
 import { standsOutsideTheHall } from './walk';
 import type { Equipment, GameState, LineKind, OnOrderItem, Orientation } from './types';
 
@@ -295,8 +295,12 @@ export function canPlaceSpec(
   // metre behind it, while the line stands or is on order. It is asked here and only here, so a
   // line's own ground never refuses the line's move (CLAUDE.md T31 2.6; v93).
   if (!isLineModule(specId)) {
-    const taken = claimedGround(state).find((ground) => overlaps(box, ground.box));
-    if (taken !== undefined) return { ok: false, reason: GROUND_REFUSALS[taken.kind] };
+    const index = floorIndex(state);
+    const taken =
+      index === null
+        ? claimedGround(state).find((ground) => overlaps(box, ground.box)) ?? null
+        : firstGroundOn(index, box, NO_LINES, false);
+    if (taken !== null) return { ok: false, reason: GROUND_REFUSALS[taken.kind] };
   }
   return OK;
 }
@@ -508,7 +512,16 @@ export function lineFits(
   for (const box of [...own, ...strips]) {
     if (!canPlaceBox(state, box, ignore).ok) return false;
   }
-  const others = claimedGround(state, new Set([...(line === null ? [] : [line]), ...alsoLeftOut]));
+  const except = new Set([...(line === null ? [] : [line]), ...alsoLeftOut]);
+  // The same question of the floor's buckets while the state is pinned (v124).
+  const index = floorIndex(state);
+  if (index !== null) {
+    return (
+      own.every((box) => firstGroundOn(index, box, except, false) === null) &&
+      strips.every((strip) => firstGroundOn(index, strip, except, true) === null)
+    );
+  }
+  const others = claimedGround(state, except);
   for (const other of others) {
     if (own.some((box) => overlaps(box, other.box))) return false;
     if (!isLaneGround(other.kind) && strips.some((strip) => overlaps(strip, other.box))) return false;
@@ -526,6 +539,17 @@ export function nearestLanePlace(
   at: { x: number; y: number },
   leftOut: ReadonlySet<number> = new Set(),
   maxRows: number = state.unit.depthCells,
+): { x: number; y: number } | null {
+  // Pinned for the length of the search, as `lineSite` (v124).
+  return whilePinned(state, () => nearestLanePlaceOf(state, line, at, leftOut, maxRows));
+}
+
+function nearestLanePlaceOf(
+  state: GameState,
+  line: number,
+  at: { x: number; y: number },
+  leftOut: ReadonlySet<number>,
+  maxRows: number,
 ): { x: number; y: number } | null {
   const ignore = new Set<string>();
   for (const number of [line, ...leftOut]) {
@@ -626,6 +650,13 @@ export function canPlaceBox(
   if (overlaps(box, gateLane())) {
     return { ok: false, reason: 'Blocking the way to the gate' };
   }
+  // While the state is pinned the floor's buckets answer, the same thing found first; the long way
+  // below otherwise (v124).
+  const index = floorIndex(state);
+  if (index !== null) {
+    const thing = firstThingOn(index, box, ignore);
+    return thing === null ? OK : { ok: false, reason: thing.reason };
+  }
   for (const item of hallItems(state)) {
     if (ignore.has(item.id)) continue;
     const other = findSpec(item.specId);
@@ -647,6 +678,135 @@ export function canPlaceBox(
     }
   }
   return OK;
+}
+
+// ---------------------------------------------------------------------------
+// The floor in buckets (v124). On Piotr's save of day 8,464, a hall of 360 m by 97 m with 506
+// things and 57 lines, the catalogue's card of a window line asked whether one would go anywhere:
+// 30,000 places, every one of them asking every thing on the floor and every line's ground, the
+// whole of it once a game minute while the card was open: 44 to 48 seconds a page, and the
+// computer stood. The things and the ground go into buckets of the floor once while the state is
+// pinned, and a box asks only the buckets it covers. What it finds is what the long way finds: the
+// first thing in the order the long way asks them (`hallItems`, then `reservedItems`), the first
+// ground box in `claimedGround`'s order.
+// ---------------------------------------------------------------------------
+
+/** The side of a bucket of the floor, in metres [TUNE: chat]. */
+const FLOOR_BUCKET_CELLS = 8;
+
+/** No line left out of the ground asked of. */
+const NO_LINES: ReadonlySet<number> = new Set();
+
+/** One thing on the floor as `canPlaceBox` refuses a box on it: what it is, its floor and its
+ *  words. */
+interface FloorThing {
+  id: string;
+  box: Box;
+  reason: string;
+}
+
+/** The things on the floor and the lines' ground, each in the buckets its box covers, by its place
+ *  in its list, so a bucket's list runs in that order. */
+interface FloorIndex {
+  things: FloorThing[];
+  thingBuckets: Map<number, number[]>;
+  grounds: GroundBox[];
+  groundBuckets: Map<number, number[]>;
+}
+
+/** A bucket's key; a box of the yard behind the wall has a negative row, so both are moved on. */
+function bucketKey(column: number, row: number): number {
+  return (row + 1024) * 65536 + (column + 1024);
+}
+
+/** Every bucket a box covers or touches: the edge's bucket too, and from whichever end is the
+ *  smaller, so a box of no width (or a width below nought) that the long way would find is never
+ *  left out; what is found is asked of the box itself. */
+function bucketsOf(box: Box): number[] {
+  const keys: number[] = [];
+  const firstColumn = Math.floor(Math.min(box.x, box.x + box.width) / FLOOR_BUCKET_CELLS);
+  const lastColumn = Math.floor(Math.max(box.x, box.x + box.width) / FLOOR_BUCKET_CELLS);
+  const firstRow = Math.floor(Math.min(box.y, box.y + box.depth) / FLOOR_BUCKET_CELLS);
+  const lastRow = Math.floor(Math.max(box.y, box.y + box.depth) / FLOOR_BUCKET_CELLS);
+  for (let row = firstRow; row <= lastRow; row += 1) {
+    for (let column = firstColumn; column <= lastColumn; column += 1) keys.push(bucketKey(column, row));
+  }
+  return keys;
+}
+
+/** The boxes of a list in their buckets, each bucket's list in the boxes' order. */
+function bucketed(boxes: readonly Box[]): Map<number, number[]> {
+  const buckets = new Map<number, number[]>();
+  boxes.forEach((box, at) => {
+    for (const key of bucketsOf(box)) {
+      const list = buckets.get(key);
+      if (list === undefined) buckets.set(key, [at]);
+      else list.push(at);
+    }
+  });
+  return buckets;
+}
+
+/** The floor's index while the state is pinned, and null while it is not: the long way is then
+ *  asked, which is cheaper than building the index for one look. */
+function floorIndex(state: GameState): FloorIndex | null {
+  return keptWhilePinned(state, 'floorIndex', () => {
+    const things: FloorThing[] = [];
+    for (const item of hallItems(state)) {
+      const spec = findSpec(item.specId);
+      if (!spec) continue;
+      things.push({ id: item.id, box: boxOfItem(item, item.anchorX, item.anchorY), reason: `On the ${spec.name.toLowerCase()}` });
+    }
+    for (const item of reservedItems(state)) {
+      const spec = findSpec(item.specId);
+      if (!spec) continue;
+      things.push({
+        id: item.id,
+        box: boxOfItem(item, item.anchorX, item.anchorY),
+        reason: `On the ${spec.name.toLowerCase()} that is on order`,
+      });
+    }
+    const grounds = claimedGround(state);
+    return {
+      things,
+      thingBuckets: bucketed(things.map((thing) => thing.box)),
+      grounds,
+      groundBuckets: bucketed(grounds.map((ground) => ground.box)),
+    };
+  });
+}
+
+/** The first thing on the floor this box lies on, in the long way's order, what `ignore` names
+ *  apart; null with none. */
+function firstThingOn(index: FloorIndex, box: Box, ignore: ReadonlySet<string>): FloorThing | null {
+  let first = -1;
+  for (const key of bucketsOf(box)) {
+    for (const at of index.thingBuckets.get(key) ?? []) {
+      if (first !== -1 && at >= first) break;
+      const thing = index.things[at];
+      if (thing === undefined || ignore.has(thing.id) || !overlaps(box, thing.box)) continue;
+      first = at;
+      break;
+    }
+  }
+  return first === -1 ? null : (index.things[first] ?? null);
+}
+
+/** The first box of a line's ground this box lies on, in `claimedGround`'s order, of a line not in
+ *  `except`, and no lane's when `lanesShared` (two lines may share their lanes); null with none. */
+function firstGroundOn(index: FloorIndex, box: Box, except: ReadonlySet<number>, lanesShared: boolean): GroundBox | null {
+  let first = -1;
+  for (const key of bucketsOf(box)) {
+    for (const at of index.groundBuckets.get(key) ?? []) {
+      if (first !== -1 && at >= first) break;
+      const ground = index.grounds[at];
+      if (ground === undefined || except.has(ground.line) || (lanesShared && isLaneGround(ground.kind))) continue;
+      if (!overlaps(box, ground.box)) continue;
+      first = at;
+      break;
+    }
+  }
+  return first === -1 ? null : (index.grounds[first] ?? null);
 }
 
 /** Module 1 of a kind of line, whose size every module of the kind has (v114). */
@@ -685,6 +845,12 @@ export function lineDepthCells(kind: LineKind): number {
  *  place beside a line along a longer hall. Null when the hall has none (CLAUDE.md T30 2.4, T31 2.6;
  *  v93; v114) [TUNE: chat]. */
 export function lineSite(state: GameState, kind: LineKind): { x: number; y: number } | null {
+  // Pinned for as long as the search takes, so the floor's index is built once for its thousands of
+  // places, or shared with the page that asks (v124).
+  return whilePinned(state, () => lineSiteOf(state, kind));
+}
+
+function lineSiteOf(state: GameState, kind: LineKind): { x: number; y: number } | null {
   const none = new Set<string>();
   if (lineFits(state, WINDOW_LINE_ORIGIN, kind, none)) return { ...WINDOW_LINE_ORIGIN };
   const step = lineDepthCells(kind);
@@ -711,6 +877,14 @@ export function lineSite(state: GameState, kind: LineKind): { x: number; y: numb
  *  is true at a clear place, which is then `lineSite`'s own. Null when the block does not go into
  *  the hall at all (v119) [PIOTR, 19.10: the player is shown, not told to guess]. */
 export function bestLineSite(
+  state: GameState,
+  kind: LineKind,
+): { at: { x: number; y: number }; fits: boolean; items: string[]; lines: number[] } | null {
+  // Pinned for the length of the scan, as `lineSite` (v124).
+  return whilePinned(state, () => bestLineSiteOf(state, kind));
+}
+
+function bestLineSiteOf(
   state: GameState,
   kind: LineKind,
 ): { at: { x: number; y: number }; fits: boolean; items: string[]; lines: number[] } | null {
@@ -1055,6 +1229,11 @@ export function firstFreeCell(
   specId: string,
   variantId?: string,
 ): { x: number; y: number } | null {
+  // Pinned for the length of the search, so the floor's index is built once for its cells (v124).
+  return whilePinned(state, () => firstFreeCellOf(state, specId, variantId));
+}
+
+function firstFreeCellOf(state: GameState, specId: string, variantId?: string): { x: number; y: number } | null {
   const zone = zoneOf(specId, variantId);
   if (zone.width <= 0 || zone.depth <= 0) return null;
   for (let y = 0; y + zone.depth <= state.unit.depthCells; y += 1) {

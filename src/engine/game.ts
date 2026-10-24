@@ -294,6 +294,7 @@ import {
   underExtracted,
 } from './media';
 import { cubicMetres, metresBy, plural } from './text';
+import { pinned, whilePinned } from './pinned';
 import {
   STATION_OFFICE,
   STATION_DOOR,
@@ -3061,11 +3062,16 @@ function afterTheTrips(state: GameState): GameState {
   // Nothing on its way: the hall he is standing in is the hall the delivery will land in, and the
   // catalogue asks this question of every tile it draws, every minute.
   if (state.onOrder.length === 0) return state;
-  const after = clone(state);
-  // Everything already on the road, landed: the cash for all of it is spent, so the extraction he
-  // ordered on Monday is what Tuesday's floor edgebander is allowed against (T7 3.10, T8 3.2).
-  for (const item of after.onOrder.slice()) landOrder(after, item);
-  return after;
+  // One copy for the page, which asks it of every card it draws: a copy of Piotr's save of day
+  // 8,464 is a twentieth of a second, and was made once a card (v124). Nothing asked of it changes
+  // it.
+  return pinned(state, 'afterTheTrips', () => {
+    const after = clone(state);
+    // Everything already on the road, landed: the cash for all of it is spent, so the extraction he
+    // ordered on Monday is what Tuesday's floor edgebander is allowed against (T7 3.10, T8 3.2).
+    for (const item of after.onOrder.slice()) landOrder(after, item);
+    return after;
+  });
 }
 
 /** Can this machine be ordered at all: the owner has to be in, and it has to be one he could buy
@@ -3076,7 +3082,10 @@ export function orderEquipmentCheck(
   variantId?: string,
 ): BuyCheck {
   if (!state.owner.present) return { ok: false, reason: 'You are not in today' };
-  return canBuy(afterTheTrips(state), specId, variantId);
+  // Asked of the hall after the trips with that hall pinned, so its searches of the floor keep what
+  // they work out: unpinned, a window line's card on Piotr's save of day 8,464 was 44 seconds (v124).
+  const after = afterTheTrips(state);
+  return whilePinned(after, () => canBuy(after, specId, variantId));
 }
 
 /** The licence is installed the moment it is paid for, so it is asked of the hall he is standing
