@@ -78,7 +78,7 @@ describe('the ladder', () => {
 });
 
 describe('the subscription of a firm', () => {
-  it('scales with the area over 200 and one plus the insured value over 100,000', () => {
+  it('scales with the area over 200 plus the insured value over 100,000', () => {
     const state = newGame({ difficulty: 'veryEasy' });
     state.equipment = [];
     state.stock.sheets = 0;
@@ -89,22 +89,24 @@ describe('the subscription of a firm', () => {
     expect(securitySubscriptionMonthly(state, 5)).toBe(300);
     state.unit.areaM2 = SECURITY_SCALE_AREA_M2 * 2;
     expect(securitySubscriptionMonthly(state, 4)).toBe(250);
-    // Kit worth the reference value doubles it again.
+    // Kit worth the reference value adds the base once more. Flipped in v130: the area and the value
+    // are added [PIOTR, 26.10: "25 million a month for security is far too much"], where they doubled
+    // it until v129.
     placeEquipment(state, 'tableSaw', { variantId: 'industrial', x: 2, y: 1, id: 'kit-a' });
     const saw = state.equipment.find((item) => item.id === 'kit-a');
     if (!saw) throw new Error('no saw');
     saw.purchasePrice = SECURITY_SCALE_VALUE;
     expect(insuredValue(state)).toBe(SECURITY_SCALE_VALUE);
-    expect(securitySubscriptionMonthly(state, 4)).toBe(500);
-    expect(securitySubscriptionMonthly(state, 5)).toBe(1200);
+    expect(securitySubscriptionMonthly(state, 4)).toBe(375);
+    expect(securitySubscriptionMonthly(state, 5)).toBe(900);
     const parts = securitySubscriptionParts(state, 5);
     expect(parts).toEqual({
       base: 300,
       areaM2: 400,
       areaFactor: 2,
       insured: SECURITY_SCALE_VALUE,
-      valueFactor: 2,
-      monthly: 1200,
+      valuePart: 1,
+      monthly: 900,
     });
     // The one off levels never scale.
     expect(securitySubscriptionMonthly(state, 3)).toBe(150);

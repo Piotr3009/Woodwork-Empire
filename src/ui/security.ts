@@ -34,9 +34,15 @@ export function costLine(state: GameState, spec: SecurityLevelSpec): string {
   return parts.length === 0 ? 'nothing' : parts.join(' plus ');
 }
 
+/** A count of the formula to two places with its thousands marked, as the area is: `1,208.29`
+ *  (v130). */
+function counted(value: number): string {
+  return Number(value.toFixed(2)).toLocaleString('en-GB', { maximumFractionDigits: 2 });
+}
+
 /** The formula of a scaled level in words, with this hall's own figures in it (CLAUDE.md T13
- *  3.17): the base a month, times the area over the reference area, times one plus the insured
- *  value over the reference value. */
+ *  3.17): the base a month for every reference area of the hall and every reference value insured,
+ *  the two counted together (v130). */
 export function formulaLine(state: GameState, spec: SecurityLevelSpec): string {
   if (!spec.scaled) return '';
   const parts = securitySubscriptionParts(state, spec.level);
@@ -44,10 +50,10 @@ export function formulaLine(state: GameState, spec: SecurityLevelSpec): string {
   // 2.10).
   const line = lineValue(state) > 0 ? ', the production line is not in it' : '';
   return (
-    `The firm charges ${money(parts.base)} a month for a hall of ${SECURITY_SCALE_AREA_M2} m² ` +
-    `with nothing in it, times the hall's area over that (${parts.areaM2.toLocaleString('en-GB')} m², so ` +
-    `× ${trimmed(parts.areaFactor, 2)}), times one plus the insured value over ` +
-    `${money(SECURITY_SCALE_VALUE)} (${money(parts.insured)} insured${line}, so × ${trimmed(parts.valueFactor, 2)}): ` +
+    `The firm charges ${money(parts.base)} a month for every ${SECURITY_SCALE_AREA_M2} m² of the hall ` +
+    `(${parts.areaM2.toLocaleString('en-GB')} m², so ${trimmed(parts.areaFactor, 2)}) and every ` +
+    `${money(SECURITY_SCALE_VALUE)} insured (${money(parts.insured)} insured${line}, so ` +
+    `${counted(parts.valuePart)}), the two together ${counted(parts.areaFactor + parts.valuePart)}: ` +
     `${money(parts.monthly)} a month.`
   );
 }

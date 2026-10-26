@@ -169,11 +169,12 @@ describe('everything goes up with the floor (CLAUDE.md T31 2.7)', () => {
     // still too high"]: a longer hall is insured as the 800 m2 unit is.
     expect(premiumYearlyFor(open, 'liability')).toBeCloseTo(premiumYearlyFor(before, 'liability'), 6);
     expect(premiumYearlyFor(open, 'property')).toBeCloseTo(premiumYearlyFor(before, 'property'), 1);
-    // The dogs are 150 a month flat, 300 in the 800 m² unit, and 375 at 1,000 m²; a firm's month is
-    // the area's, five times 200.
+    // The dogs are 150 a month flat, 300 in the 800 m² unit, and 375 at 1,000 m²; a firm's month
+    // counts the area, five times 200. Flipped in v130: the area and the insured value are added, so
+    // the 200 m² more add the firm's base once, where they made the month a quarter dearer.
     expect(securitySubscriptionMonthly(open, 3)).toBe(375);
     expect(securitySubscriptionParts(open, 5).areaFactor).toBe(5);
-    expect(securitySubscriptionMonthly(open, 5)).toBeCloseTo(securitySubscriptionMonthly(before, 5) * 1.25, 6);
+    expect(securitySubscriptionMonthly(open, 5)).toBeCloseTo(securitySubscriptionMonthly(before, 5) + 300, 6);
   });
 
   it('eight lockers more in the enlarged canteen for every 200 m² past 800, said in figures', () => {

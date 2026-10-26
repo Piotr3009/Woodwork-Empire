@@ -40,14 +40,15 @@ export function securityLevel(state: GameState): SecurityLevelSpec {
 }
 
 /** The pieces of a scaled subscription, so the tab can print the formula in words with this
- *  hall's own figures in it: the base a month, the hall's area over the reference area, one plus
- *  the insured value over the reference value, and what they come to (CLAUDE.md T13 3.17). */
+ *  hall's own figures in it: the base a month, the hall's area over the reference area, the insured
+ *  value over the reference value, and what they come to (CLAUDE.md T13 3.17; v130). */
 export interface SubscriptionParts {
   base: number;
   areaM2: number;
   areaFactor: number;
   insured: number;
-  valueFactor: number;
+  /** What the insured value adds to the area's count: the value over the reference value (v130). */
+  valuePart: number;
   monthly: number;
 }
 
@@ -60,23 +61,26 @@ export function securitySubscriptionParts(
   // The insured value less the line's modules: the firm's price is not raised by kit nobody can
   // carry off (CLAUDE.md T29 2.10).
   const insured = insuredValue(state) - lineValue(state);
-  // A firm charges by the area. A flat level is what it is until the 800 m2 unit, which pays
-  // twice it: the firms' month has doubled with the floor, and so has the dogs' (v82).
+  // A firm charges by the area and by what is in it, the two added [PIOTR, 26.10: "25 million a month
+  // for security is far too much"; "yes" to the area plus the value]: until v129 they were multiplied,
+  // so the month grew as the square of the company and was 28 million on his factory of 45,760 m2
+  // and 98 million insured; added, it is 151,037, and a 200 m2 unit pays what it paid (v130). A flat
+  // level is what it is until the 800 m2 unit, which pays twice it, and so has the dogs' (v82).
   const areaFactor = spec.scaled ? areaM2 / SECURITY_SCALE_AREA_M2 : unitCostFactor(state.unit);
-  const valueFactor = spec.scaled ? 1 + insured / SECURITY_SCALE_VALUE : 1;
+  const valuePart = spec.scaled ? insured / SECURITY_SCALE_VALUE : 0;
   return {
     base: spec.monthly,
     areaM2,
     areaFactor: Math.round(areaFactor * 10000) / 10000,
     insured,
-    valueFactor: Math.round(valueFactor * 10000) / 10000,
-    monthly: Math.round(spec.monthly * areaFactor * valueFactor * 100) / 100,
+    valuePart: Math.round(valuePart * 10000) / 10000,
+    monthly: Math.round(spec.monthly * (areaFactor + valuePart) * 100) / 100,
   };
 }
 
 /** What a level costs a month: the flat figure, twice it on the 800 m2 unit (v82), or for the two
- *  firms the base scaled by the hall's area and the insured equipment value (CLAUDE.md T13
- *  3.17). */
+ *  firms the base times the hall's area and the insured equipment value counted together
+ *  (CLAUDE.md T13 3.17; v130). */
 export function securitySubscriptionMonthly(state: GameState, level = state.security.level): number {
   return securitySubscriptionParts(state, level).monthly;
 }

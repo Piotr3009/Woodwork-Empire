@@ -196,7 +196,9 @@ describe('everything goes up with the floor (v95)', () => {
     // The insurer's factor stops at two from v101 [PIOTR, 17.10].
     expect(premiumYearlyFor(open, 'liability')).toBeCloseTo(premiumYearlyFor(before, 'liability'), 6);
     expect(securitySubscriptionMonthly(open, 3)).toBe(405);
-    expect(securitySubscriptionMonthly(open, 5)).toBeCloseTo(securitySubscriptionMonthly(before, 5) * 1.35, 6);
+    // Flipped in v130: the area and the insured value are added, so the 280 m² more add 1.4 times the
+    // firm's base of 300, where they made the month 35 per cent dearer.
+    expect(securitySubscriptionMonthly(open, 5)).toBeCloseTo(securitySubscriptionMonthly(before, 5) + 1.4 * 300, 6);
   });
 });
 

@@ -243,7 +243,7 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v129';
+export const APP_VERSION = 'v130';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -995,13 +995,13 @@ export const HOUSE_LINE_FACTOR = 5;
 /** [TUNE: chat] A house takes a window's minutes times this: a working day of eight hours a house at
  *  the start, eighty minutes off it an upgrade, never under 160 minutes (v114). */
 export const HOUSE_LINE_MINUTES_FACTOR = 8;
-/** [PIOTR, 19.10: "the house factory will be a big outlay and the hall dearer and dearer; make the
- *  income from the houses twice as big, the clear profit twice as big, let the saving pay off";
- *  TUNE: chat: the round figure] What the housebuilder pays for a house, in place of the window's
- *  price times the factors (60,000): the house's timber and glass stay its 80 boards and 40 units,
- *  24,000, so a house keeps 76,000 where it kept 36,000, and the factory's month after its
- *  engineers, its power and its cover is a little over twice what it was at every pace (v115). */
-export const HOUSE_PRICE = 100000;
+/** [PIOTR, 26.10: "raise the income of the yachts times two, because I cannot catch up the cash for
+ *  the hall's growth, and the same with the houses times two"; "yes, code it" to the clear profit
+ *  twice over] What the housebuilder pays for a house: its timber and glass stay its 80 boards and
+ *  40 units, 24,000, so a house keeps 148,000 where it kept 76,000, and a factory at three houses a
+ *  day nets about 434,000 a working day where it netted 218,000 (v130). It was 100,000 from v115
+ *  [PIOTR, 19.10: "make the income from the houses twice as big"], 60,000 before. */
+export const HOUSE_PRICE = 172000;
 /** The house factory's six stations in their order along it, each carrying the window module's share
  *  in the same place five times over: 10, 12.5, 6.25, 6.25, 7.5 and 7.5 million, fifty in all
  *  (v114). */
@@ -1043,12 +1043,13 @@ export const YACHT_LINE_FACTOR = 10;
 /** [TUNE: chat] A yacht takes a window's minutes times this: two working days a yacht at the start,
  *  160 minutes off it an upgrade, never under 320 minutes (v123). */
 export const YACHT_LINE_MINUTES_FACTOR = 16;
-/** [PIOTR, 26.10: "the yacht has the same net profit as the houses, makes no sense"; "b": 600,000
- *  in place of 400,000] What the yacht dealer pays for a yacht: its timber and glass stay its 320
- *  boards and 160 units, 96,000, so a yacht keeps 504,000, and the line returns about 1.7 times what
- *  the house factory does on each pound it cost (v129). It was 400,000 from v123, the house's rule of
- *  v115 (five thirds of the window's price times the factors), which made the two return the same. */
-export const YACHT_PRICE = 600000;
+/** [PIOTR, 26.10: "raise the income of the yachts times two"; "yes, code it" to the clear profit
+ *  twice over] What the yacht dealer pays for a yacht: its timber and glass stay its 320 boards and
+ *  160 units, 96,000, so a yacht keeps 992,000 where it kept 504,000, and a line at a yacht and a half
+ *  a day nets about 1,470,000 a working day where it netted 738,000 (v130). It was 600,000 in v129
+ *  [PIOTR, 26.10: "b"], 400,000 from v123, the house's rule of v115, which made the two return the
+ *  same on each pound. */
+export const YACHT_PRICE = 1088000;
 /** The yacht line's twelve stations in their order along it, two for each window module, each pair
  *  carrying that module's share in the same place ten times over between them: 10, 10, 12.5, 12.5,
  *  6.25 four times and 7.5 four times million, a hundred in all (v123). */
@@ -7591,8 +7592,9 @@ export const SECURITY_LEVELS: readonly SecurityLevelSpec[] = [
   { level: 4, name: 'Security firm, basic', price: 0, monthly: 125, scaled: true, risk: 0.002 },
   { level: 5, name: 'Security firm, good', price: 0, monthly: 300, scaled: true, risk: 0 },
 ];
-/** The subscription of a scaled level: base times area over this, times one plus the insured
- *  value over this [TUNE] (CLAUDE.md T13 3.17). */
+/** The subscription of a scaled level: the base times the area over this plus the insured value
+ *  over this [TUNE] (CLAUDE.md T13 3.17); the two multiplied until v129, added from v130 [PIOTR,
+ *  26.10]. */
 export const SECURITY_SCALE_AREA_M2 = 200;
 export const SECURITY_SCALE_VALUE = 100000;
 /** A burglary takes one or two machines at random, the dearest first, and the free stock [TUNE]. */

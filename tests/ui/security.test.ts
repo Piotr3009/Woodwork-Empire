@@ -55,12 +55,13 @@ describe('the security tab', () => {
     const page = parse(renderSecurity(state));
     for (const level of [4, 5]) {
       const text = page.querySelector(`[data-level="${level}"]`)?.textContent ?? '';
-      expect(text).toContain('times the hall');
+      // Flipped in v130: the hall's area and the insured value counted together.
+      expect(text).toContain('m² of the hall');
       expect(text).toContain(`${state.unit.areaM2} m²`);
       expect(text).toContain(money(state.insurance.insuredValue));
     }
     for (const level of [0, 1, 2, 3]) {
-      expect(page.querySelector(`[data-level="${level}"]`)?.textContent).not.toContain('times the hall');
+      expect(page.querySelector(`[data-level="${level}"]`)?.textContent).not.toContain('m² of the hall');
     }
   });
 
