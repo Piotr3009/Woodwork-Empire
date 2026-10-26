@@ -38,6 +38,7 @@ import {
 import type { DayMeter, WeekHolder } from '../engine/staff';
 import { bubbleFor } from '../engine/bubbles';
 import { usageOfMan } from '../engine/usage';
+import { PURCHASE_COVERS, purchaseCoverOf, purchaseCoverWords } from '../engine/purchasing';
 import type { ManUsage } from '../engine/usage';
 import { characterSheet, cellBox, rowFor, sheetRoleFor } from '../render/characters';
 import { button, escapeHtml, minutes, money, plural, reasonLabel } from './modal';
@@ -365,6 +366,21 @@ function recordLine(person: Person): string {
   );
 }
 
+/** On the purchase manager's card, how far ahead he buys at noon: three chips, as the day's summary
+ *  offers its three cadences [PIOTR, 26.10: "best set on him by the player"] (v128). Nothing on
+ *  anybody else's card. */
+function purchaseLine(state: GameState, person: Person): string {
+  const worker = state.workers.find((entry) => entry.id === person.id);
+  if (worker === undefined || worker.role !== 'purchaseManager') return '';
+  const cover = purchaseCoverOf(state);
+  const chips = PURCHASE_COVERS.map(
+    (each) =>
+      `<button class="chip${each === cover ? ' is-on' : ''}" data-do="setPurchaseCover" data-id="${each}">` +
+      `${escapeHtml(purchaseCoverWords(each))}</button>`,
+  ).join('');
+  return `<p class="hint" data-purchase-cover>Orders at noon for: ${chips}</p>`;
+}
+
 /** The card's own two buttons: Assign, which opens the list of Turn 19 on the job he would go on,
  *  and Let go. The owner has Office and no Let go: nobody lets him go. */
 function cardActions(state: GameState, person: Person): string {
@@ -426,6 +442,7 @@ export function renderPerson(state: GameState, who: string, view: PersonView): s
     weekLines(state, person) +
     onLine(state, person) +
     recordLine(person) +
+    purchaseLine(state, person) +
     cardActions(state, person) +
     '</div></div>'
   );

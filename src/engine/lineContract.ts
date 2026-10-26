@@ -53,7 +53,7 @@ import { addWorkingDays, formatCalendarDay, isBreak, isWorkingDay, weekOfDay } f
 import { canAfford, charge, formatMoney, pay } from './economy';
 import { queueEvent } from './events';
 import { lineValueOf } from './insurance';
-import { MATERIAL_ORDER_ROLES } from './jobs';
+import { MATERIAL_ORDER_ROLES, PURCHASE_ROLES } from './jobs';
 import { lineEngineerSlot, lineKindOf, lineLevel, lineRecord, lineState, lineStandsWhole, standingLines } from './machines';
 import { buyStock, freeFor, pendingStockSheets, reserveWindowsShortfalls, restockCheck, restockSheets } from './materials';
 import { crewHasGoneHome, lineEngineers } from './staff';
@@ -257,9 +257,19 @@ function takeForUnit(state: GameState, line: number, contract: LineContract, kin
 }
 
 /** The windows of two working days at a line's pace today: 8 at 120 minutes a window, 16 at 60
- *  (CLAUDE.md T31 2.3). */
+ *  (CLAUDE.md T31 2.3). Never fewer than one: a yacht that takes longer than a working day made
+ *  nought of them a day, and the office never bought a board for a yacht line short of its third
+ *  upgrade [PIOTR, 26.10: "fix it"] (v128). */
 export function lineReorderWindows(state: GameState, line: number): number {
-  return LINE_REORDER_DAYS * Math.floor(MINUTES_PER_WORKING_DAY / lineWindowMinutes(state, line));
+  return Math.max(1, LINE_REORDER_DAYS * Math.floor(MINUTES_PER_WORKING_DAY / lineWindowMinutes(state, line)));
+}
+
+/** The boards or the glass a line on its contract takes in so many working days at its pace today:
+ *  the units it makes in them, a part of one counted whole, at its kind's figure a unit. What the
+ *  purchase manager buys for at noon (v128). */
+export function lineMaterialForDays(state: GameState, line: number, kind: 'boards' | 'glass', days: number): number {
+  const units = Math.ceil((days * MINUTES_PER_WORKING_DAY) / lineWindowMinutes(state, line) - 1e-9);
+  return Math.max(0, units) * perUnit(state, line, kind);
 }
 
 /** The office admin on duty restocks the boards and the glass for a line by himself, while its
@@ -272,6 +282,9 @@ export function lineReorderWindows(state: GameState, line: number): number {
  *  as a restock]. He restocks for the line and for nothing else. */
 export function officeOrdersLineMaterial(state: GameState, line: number): void {
   if (runningLineContract(state, line) === null) return;
+  // While the purchase manager is at work he buys for every line at noon, and the admin leaves it to
+  // him (v128).
+  if (firstOnDutyOf(state, PURCHASE_ROLES) !== null) return;
   const admin = firstOnDutyOf(state, MATERIAL_ORDER_ROLES);
   if (admin === null) return;
   const windows = lineReorderWindows(state, line);

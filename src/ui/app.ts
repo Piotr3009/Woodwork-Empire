@@ -1982,6 +1982,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'setCadence':
       dispatch({ type: 'SET_SUMMARY_CADENCE', cadence: id as SummaryCadence });
       return;
+    case 'setPurchaseCover':
+      // How far ahead the purchase manager buys, off the chips on his card (v128).
+      if (id === 'twoDays' || id === 'week' || id === 'full') dispatch({ type: 'SET_PURCHASE_COVER', cover: id });
+      return;
     case 'skipDay':
       ui.menuOpen = false;
       dispatch({ type: 'SKIP_DAY' });

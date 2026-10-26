@@ -237,12 +237,14 @@ describe('the sprite check page', () => {
       'spray',
     ]);
     // The owner and the six roles of Turn 26, and none of the three trades that went (CLAUDE.md
-    // T26 2.6); from v84 the line engineer after them, as the capsule (CLAUDE.md T29 2.8).
+    // T26 2.6); from v84 the line engineer after them, as the capsule (CLAUDE.md T29 2.8). Flipped
+    // in v128: the purchase manager after the admin, a capsule as the office's own (PIOTR, 26.10).
     expect(CHARACTER_ROLES).toEqual([
       'owner',
       'joiner',
       'helper',
       'officeAdmin',
+      'purchaseManager',
       'salesman',
       'draftsman',
       'productionManager',

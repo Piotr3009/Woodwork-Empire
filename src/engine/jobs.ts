@@ -657,10 +657,15 @@ export function refreshJob(state: GameState, job: Job): void {
   if (job.stage === 'materialPending') autoOrderMaterial(state, job);
 }
 
-/** Who places a job's material order when nobody asks him to: the office admin, whose the
- *  material list and its order are, and nobody else (PIOTR, 02.10; CLAUDE.md T21 2.5.2, T26
- *  2.9). */
-export const MATERIAL_ORDER_ROLES: ReadonlyArray<WorkerRole> = ['officeAdmin'];
+/** Who places a job's material order when nobody asks him to: the purchase manager while he is at
+ *  work, whose every order is from v128 [PIOTR, 26.10: "all of them, daily"], and the office admin,
+ *  whose the material list and its order are, while he is not (PIOTR, 02.10; CLAUDE.md T21 2.5.2,
+ *  T26 2.9). The order of the list is that order. */
+export const MATERIAL_ORDER_ROLES: ReadonlyArray<WorkerRole> = ['purchaseManager', 'officeAdmin'];
+
+/** Who buys the company's stock at noon: the purchase manager, and while he is at work the office
+ *  admin buys none of it (v128). */
+export const PURCHASE_ROLES: ReadonlyArray<WorkerRole> = ['purchaseManager'];
 
 /** The material is ordered the moment the drawings are done, by whoever in the office is there to
  *  order it, and not when the owner next has time to open the job's card (PIOTR, 19.09: "they wait

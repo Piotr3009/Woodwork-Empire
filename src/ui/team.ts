@@ -90,6 +90,8 @@ const TRADE_OF_ROLE: Record<WorkerRole, TeamTab> = {
   joiner: 'workshop',
   helper: 'workshop',
   officeAdmin: 'office',
+  // In the office, beside the admin whose orders he takes over (v128).
+  purchaseManager: 'office',
   salesman: 'office',
   // At the drawing: the Technical tab was the take off man's, who went with Turn 26, and the
   // draftsman's three grades are its tiles from tonight (CLAUDE.md T26 2.6, 2.8).

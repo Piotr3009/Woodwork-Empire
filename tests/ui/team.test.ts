@@ -93,12 +93,13 @@ describe('the board itself', () => {
       'helper.',
       'lineEngineer.',
     ]);
+    // Flipped in v128: the purchase manager's tile after the admin's (PIOTR, 26.10).
     const office = parse(renderTeam(known(), 'office'));
     expect(
       Array.from(office.querySelectorAll('[data-candidate]')).map((tile) =>
         tile.getAttribute('data-candidate'),
       ),
-    ).toEqual(['officeAdmin.', 'salesman.']);
+    ).toEqual(['officeAdmin.', 'purchaseManager.', 'salesman.']);
   });
 
   it('offers the production manager on Management, and the draftsman on Technical', () => {

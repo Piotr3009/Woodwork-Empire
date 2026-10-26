@@ -16,6 +16,7 @@ import { PRODUCTION_MANAGER_CARRIES, USAGE_LOW_PERCENT, USAGE_NEAR_FULL_PERCENT,
 import { weekOfDay } from './clock';
 import { crewLimit } from './layout';
 import { OWNER, lineLevel, lineModules, standingLines } from './machines';
+import { boughtFor, purchaseCoverOf, purchaseCoverWords } from './purchasing';
 import { ROLE_WORDS, ROLE_WORDS_MANY, carriedByAManager, crewCount, weekBeforeOf, weekNowOf, weekWorkedMinutes } from './staff';
 import { plural } from './text';
 import type { GameState, Worker, WorkerRole } from './types';
@@ -30,6 +31,8 @@ export const USAGE_TRADES: readonly UsageTrade[] = [
   'joiner',
   'helper',
   'officeAdmin',
+  // Beside the admin, whose orders he takes over (v128).
+  'purchaseManager',
   'salesman',
   'draftsman',
   'productionManager',
@@ -82,6 +85,8 @@ function bandOf(trade: UsageTrade, percent: number | null): UsageBand {
   // A line engineer keeps the line, and a full week of it asks for nobody: the game may refuse a
   // third (CLAUDE.md T29 2.8).
   if (trade === 'lineEngineer') return 'fine';
+  // Nor does a purchase manager stand about: his day is the noon order (v128).
+  if (trade === 'purchaseManager') return 'fine';
   // A manager with men to spare is not a man standing about: only the near full end is his.
   if (percent < USAGE_LOW_PERCENT && trade !== 'productionManager') return 'low';
   if (percent >= USAGE_NEAR_FULL_PERCENT && isSupport(trade)) return 'full';
@@ -106,6 +111,11 @@ export function usageOfMan(state: GameState, who: string): ManUsage | null {
   const worker = who === OWNER ? null : state.workers.find((entry) => entry.id === who);
   if (who !== OWNER && worker === undefined) return null;
   const trade: UsageTrade = worker?.role ?? OWNER;
+  // A purchase manager is measured by what he buys for, as a manager by the men he carries: his
+  // day is the noon order and not hours at a desk (v128).
+  if (worker !== null && worker !== undefined && worker.role === 'purchaseManager') {
+    return { who, percent: null, basis: 'none', band: 'fine', words: buyingWords(state), worked: 0, paid: 0 };
+  }
   if (worker !== null && worker !== undefined && worker.role === 'productionManager') {
     const { carried, limit } = carriedBy(state, worker);
     const percent = share(carried, limit);
@@ -151,11 +161,31 @@ export function usageOfMan(state: GameState, who: string): ManUsage | null {
   return { who, percent: null, basis: 'none', band: 'none', words: 'nothing on the books yet', worked: 0, paid: 0 };
 }
 
+/** What the purchase manager buys for and how far ahead: `buys at noon for 66 lines and 2 standing
+ *  contracts, two days ahead` [TUNE: the words] (v128). */
+function buyingWords(state: GameState): string {
+  const { lines, contracts } = boughtFor(state);
+  const cover = purchaseCoverOf(state);
+  const ahead = cover === 'full' ? 'to full stores' : `${purchaseCoverWords(cover)} ahead`;
+  if (lines === 0 && contracts === 0) return `buys at noon, ${ahead}, and nothing takes stock yet`;
+  const what = [
+    lines > 0 ? plural(lines, 'line', 'lines') : '',
+    contracts > 0 ? plural(contracts, 'standing contract', 'standing contracts') : '',
+  ].filter((part) => part !== '');
+  return `buys at noon for ${what.join(' and ')}, ${ahead}`;
+}
+
+function capitalised(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
 /** What the tile of a trade nobody is hired in says: whose work it is meanwhile. */
 const NOBODY_WORDS: Record<WorkerRole, string> = {
   joiner: 'Nobody. Every job is your own to make.',
   helper: 'Nobody. You unload, sweep and empty the bags yourself.',
   officeAdmin: 'Nobody. The emails, the orders and the material lists are yours.',
+  // [TUNE: chat] (v128).
+  purchaseManager: 'Nobody. The office admin orders the jobs\u0027 material and the lines\u0027 stock, and the rest is yours.',
   salesman: 'Nobody. The client calls are yours.',
   draftsman: 'Nobody. You draw, measure and meet the clients yourself.',
   productionManager: 'Nobody. You put every man on his job yourself.',
@@ -189,6 +219,7 @@ function wordsOf(state: GameState, trade: UsageTrade, men: readonly ManUsage[], 
       .map((line) => `${lineName(line)} runs as ${lineLevel(state, line)} of its ${lineModules(state, line)} modules.`)
       .join(' ');
   }
+  if (trade === 'purchaseManager') return `${capitalised(buyingWords(state))}.`;
   if (trade === 'productionManager') {
     const first = men[0];
     const carries = first === undefined ? '' : `Carries ${first.worked} of the ${first.paid} men his grade can.`;

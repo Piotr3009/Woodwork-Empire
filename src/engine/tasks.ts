@@ -93,9 +93,14 @@ interface TaskDefinition {
 const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   emails: { category: 'admin', eligibleRoles: ['officeAdmin'], autoRoles: ['officeAdmin'] },
   bookkeeping: { category: 'admin', eligibleRoles: ['officeAdmin'], autoRoles: ['officeAdmin'] },
-  // The consumables and materials chore is the office admin's and the owner's, nobody else's
-  // (PIOTR, 02.10; CLAUDE.md T26 2.9).
-  dailyOrdering: { category: 'admin', eligibleRoles: ['officeAdmin'], autoRoles: ['officeAdmin'] },
+  // The consumables and materials chore is the office admin's and the owner's (PIOTR, 02.10;
+  // CLAUDE.md T26 2.9), and the purchase manager's first from v128, whose every order is [PIOTR,
+  // 26.10: "all of them, daily"].
+  dailyOrdering: {
+    category: 'admin',
+    eligibleRoles: ['purchaseManager', 'officeAdmin'],
+    autoRoles: ['purchaseManager', 'officeAdmin'],
+  },
   // The salesman first, and the office admin behind him at half the speed when there is no
   // salesman on the books (CLAUDE.md T7 3.12).
   clientCall: {

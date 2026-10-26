@@ -295,6 +295,7 @@ import {
 } from './media';
 import { cubicMetres, metresBy, plural } from './text';
 import { pinned, whilePinned } from './pinned';
+import { purchaseAtNoon } from './purchasing';
 import {
   STATION_OFFICE,
   STATION_DOOR,
@@ -2313,6 +2314,8 @@ function advanceMinute(state: GameState): boolean {
   runLineMinute(state);
   state.clock.minute += 1;
   refreshBoardAtMidday(state);
+  // Noon: the purchase manager buys the day's stock, as the workshop goes to its dinner (v128).
+  purchaseAtNoon(state);
   if (shouldFinishDay(state)) finishDay(state);
   settle(state);
   return true;
@@ -2752,6 +2755,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'SET_NOON_BREAK':
       next.settings.noonBreak = action.choice;
+      break;
+    case 'SET_PURCHASE_COVER':
+      // How far ahead the purchase manager buys, set on his card (v128).
+      next.settings.purchaseCover = action.cover;
       break;
     case 'ADD_TO_JOB':
       // One more man on the job, however many are on it already (CLAUDE.md T19 2.5).

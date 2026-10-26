@@ -115,16 +115,17 @@ describe('every role of the game, on the hall or behind the office door (v75)', 
     }
     // From v84 the line engineer was never drawn on the hall either (CLAUDE.md T29 2.8); from v94 he
     // has his sheets and walks by his line (`src/render/engineers.ts`), still never a hall figure.
-    expect(CHARACTER_ROLES.filter((role) => !sheeted.includes(role))).toEqual(['officeAdmin', 'salesman', 'draftsman']);
+    // Flipped in v128: the purchase manager is one of the office's own, never drawn on the hall.
+    expect(CHARACTER_ROLES.filter((role) => !sheeted.includes(role))).toEqual(['officeAdmin', 'purchaseManager', 'salesman', 'draftsman']);
     // One of each of the office's roles with nothing to do, which is when they were seen on the
     // hall: the manager is still there, in his shirt, and the other three are behind the door.
-    for (const role of ['officeAdmin', 'salesman', 'draftsman', 'productionManager', 'lineEngineer']) {
+    for (const role of ['officeAdmin', 'purchaseManager', 'salesman', 'draftsman', 'productionManager', 'lineEngineer']) {
       state.workers.push({ ...helper, id: `staff-${role}`, name: role, role: role as WorkerRole, station: 'idle' });
     }
     const svg = renderHall(state);
     const manager = groupOf(svg, '[data-worker="staff-productionManager"]');
     expect(manager.querySelector('[data-character]')?.getAttribute('data-character')).toBe('productionManager');
-    for (const role of ['officeAdmin', 'salesman', 'draftsman', 'lineEngineer']) {
+    for (const role of ['officeAdmin', 'purchaseManager', 'salesman', 'draftsman', 'lineEngineer']) {
       expect(svg, role).not.toContain(`data-worker="staff-${role}"`);
     }
   });

@@ -153,12 +153,7 @@ export function jobStockKind(job: { timber?: boolean }): StockKind {
  *  in hand wants, the way a job holds what it still has to cut; the contracts are read here rather
  *  than through contracts.ts, which asks this file for the free stock. */
 export function reservedFor(state: GameState, kind: StockKind): number {
-  let reserved = 0;
-  for (const job of state.jobs) {
-    if (job.stage === 'completed') continue;
-    if (kind === 'glass') reserved += job.glassReserved;
-    else if (jobStockKind(job) === kind) reserved += job.sheetsReserved;
-  }
+  let reserved = heldByJobs(state, kind);
   if (kind === 'sheets') {
     for (const contract of state.contracts) {
       if (contract.status !== 'active') continue;
@@ -171,6 +166,19 @@ export function reservedFor(state: GameState, kind: StockKind): number {
     reserved += kind === 'boards' ? line.contract.boardsReserved : line.contract.glassReserved;
   }
   return reserved;
+}
+
+/** What of a kind the jobs hold and have not yet used: a sheet job's sheets, a timber job's boards
+ *  and its glass. The jobs' part of `reservedFor`, which the purchase manager leaves out of what he
+ *  has in hand for the lines and the contracts (v128). */
+export function heldByJobs(state: GameState, kind: StockKind): number {
+  let held = 0;
+  for (const job of state.jobs) {
+    if (job.stage === 'completed') continue;
+    if (kind === 'glass') held += job.glassReserved;
+    else if (jobStockKind(job) === kind) held += job.sheetsReserved;
+  }
+  return held;
 }
 
 /** What of a kind nobody has a claim on: what a new job, a contract or the line can have

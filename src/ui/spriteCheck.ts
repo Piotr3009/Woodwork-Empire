@@ -399,6 +399,8 @@ export const CHARACTER_ROLES: readonly string[] = [
   'joiner',
   'helper',
   'officeAdmin',
+  // No figure exists for him: he stands as the capsule, as the office's three do (v128).
+  'purchaseManager',
   'salesman',
   'draftsman',
   'productionManager',

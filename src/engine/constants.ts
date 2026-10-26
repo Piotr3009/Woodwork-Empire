@@ -243,7 +243,7 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v127';
+export const APP_VERSION = 'v128';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -7016,6 +7016,20 @@ export const FORKLIFT_LOADED_BY_KIND: Readonly<Partial<Record<LineKind, { sheet:
   // None for the house factory: a house drives out on its own transporter (v114).
 };
 
+/** [PIOTR, 26.10: "ok"] What the purchase manager is paid a month (v128). */
+export const PURCHASE_MANAGER_MONTHLY_WAGE = 5500;
+
+/** [PIOTR, 26.10: "he would order every day at noon"] The minute of the working day the purchase
+ *  manager buys the company's stock at: twelve o'clock, as the workshop goes to its dinner (v128). */
+export const PURCHASE_ORDER_MINUTE = BREAK_START_MINUTE;
+
+/** [PIOTR, 26.10: "2 days, a week"] The working days ahead the purchase manager buys for, set on his
+ *  card; the third setting fills every store and counts no days (v128). */
+export const PURCHASE_COVER_DAYS: Readonly<Record<'twoDays' | 'week', number>> = {
+  twoDays: 2,
+  week: WORKING_DAYS_PER_WEEK,
+};
+
 export const HIRING_SPECS: HiringSpec[] = [
   ...tieredSpecs(
     'joiner',
@@ -7049,6 +7063,20 @@ export const HIRING_SPECS: HiringSpec[] = [
     duties:
       'Emails, bookkeeping, the consumables and materials chore, the material list and its order ' +
       'at your own speed, and the client calls at half speed while there is no salesman.',
+  },
+  // The purchase manager, one grade, at a desk behind the admin's, whose orders he takes over while
+  // he is at work [PIOTR, 26.10: "a purchase manager who orders every day at noon"; "all of them,
+  // daily"] (v128) [TUNE: chat: the admin's reputation, the words].
+  {
+    role: 'purchaseManager',
+    tier: null,
+    label: 'Purchase manager',
+    monthlyWage: PURCHASE_MANAGER_MONTHLY_WAGE,
+    minReputation: 5,
+    duties:
+      'Buys every material at noon: the sheets, the timber boards and the glass for every line on ' +
+      'its contract and every standing contract, for as long ahead as his card is set to, and the ' +
+      'material of every job the moment its drawings are done. The daily ordering chore is his too.',
   },
   // The draftsman in three grades on his own gate, the drawings, the site survey and the client
   // meeting at his grade's speed (PIOTR, 02.10; CLAUDE.md T26 2.8).

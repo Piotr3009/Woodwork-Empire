@@ -101,6 +101,7 @@ export const ROLE_WORDS: Record<WorkerRole, string> = {
   joiner: 'joiner',
   helper: 'labourer',
   officeAdmin: 'office admin',
+  purchaseManager: 'purchase manager',
   salesman: 'salesman',
   draftsman: 'draftsman',
   productionManager: 'production manager',
@@ -113,6 +114,7 @@ export const ROLE_WORDS_MANY: Record<WorkerRole, string> = {
   joiner: 'joiners',
   helper: 'labourers',
   officeAdmin: 'office admins',
+  purchaseManager: 'purchase managers',
   salesman: 'salesmen',
   draftsman: 'draftsmen',
   productionManager: 'production managers',
@@ -126,13 +128,13 @@ export function produces(role: WorkerRole): boolean {
 
 /** The roles that have a working day of their own, the way the owner does (CLAUDE.md T2 3.8).
  *  A labourer still clears his workshop jobs at no cost, as in Turn 1. */
-const OFFICE_ROLES: WorkerRole[] = ['officeAdmin', 'salesman', 'draftsman', 'productionManager'];
+const OFFICE_ROLES: WorkerRole[] = ['officeAdmin', 'purchaseManager', 'salesman', 'draftsman', 'productionManager'];
 
 /** The desks that sit in the office block behind the one who runs it: nobody at them before the
  *  office admin (PIOTR, CLAUDE.md T10 3.6). The production manager is not on this list: the
  *  playthrough of CLAUDE.md T13 10.4 hires him without an admin, and running the hall is not the
  *  admin's specialist work. */
-const BEHIND_THE_ADMIN: WorkerRole[] = ['salesman', 'draftsman'];
+const BEHIND_THE_ADMIN: WorkerRole[] = ['salesman', 'draftsman', 'purchaseManager'];
 
 /** The roles that stand on the hall floor: the joiners, the labourer and the production manager,
  *  who runs it (CLAUDE.md T13 3.10). The office is in the office block, behind its door. */
@@ -254,7 +256,7 @@ export function countMonthDaysOff(state: GameState): void {
  *  standing about, and how much of each is used is on Our team. The production manager is not on
  *  the list: the hall is his job, and he is seen on it in his white shirt. The line engineer is: no
  *  figure exists for him, as none exists for the office (CLAUDE.md T29 2.8). */
-const NEVER_ON_THE_HALL: WorkerRole[] = ['officeAdmin', 'salesman', 'draftsman', 'lineEngineer'];
+const NEVER_ON_THE_HALL: WorkerRole[] = ['officeAdmin', 'purchaseManager', 'salesman', 'draftsman', 'lineEngineer'];
 
 /** True for a role the hall draws a figure for: everybody but the office's own three and the line
  *  engineer. */

@@ -179,6 +179,11 @@ export type WorkerRole =
   /** Everything of the office that is not the drawing board's or the phone's: the emails, the
    *  books, the material list and the orders (CLAUDE.md T26 2.9). */
   | 'officeAdmin'
+  /** Every material the company buys, at noon every working day, for every line on its contract and
+   *  every standing contract, for as long as the player sets on his card, and every job's material
+   *  when its drawings are done [PIOTR, 26.10: "a purchase manager who orders every day at noon"]
+   *  (v128). */
+  | 'purchaseManager'
   /** The drawings, the site survey and the client meeting, in three grades (CLAUDE.md T26 2.8). */
   | 'draftsman'
   | 'salesman'
@@ -1360,6 +1365,10 @@ export interface PipeRun {
  *  (PIOTR, 03.10; v70). */
 export type NoonBreak = 'ask' | 'take' | 'skip';
 
+/** How far ahead the purchase manager buys at noon: two working days, a working week, or every
+ *  store full [PIOTR, 26.10: "2 days, a week, to full: best set on him by the player"] (v128). */
+export type PurchaseCover = 'twoDays' | 'week' | 'full';
+
 export interface SettingsState {
   tips: boolean;
   /** The noon break: `ask` raises the Break card every day, `take` and `skip` answer it for him and
@@ -1367,6 +1376,9 @@ export interface SettingsState {
   noonBreak: NoonBreak;
   /** The master volume and the mute, saved with the game (CLAUDE.md T19 2.10). */
   sound: SoundSettings;
+  /** What the purchase manager buys for at noon, set on his card; two working days in a save from
+   *  before there was one (v128). */
+  purchaseCover?: PurchaseCover;
 }
 
 /** What the player has set the sound to. Volume is 0 to 1; muted silences everything whatever the
@@ -1723,6 +1735,8 @@ export type GameAction =
   | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number; orientation?: Orientation }
   | { type: 'END_SETUP'; speed: Speed }
   | { type: 'SET_SUMMARY_CADENCE'; cadence: SummaryCadence }
+  /** How far ahead the purchase manager buys at noon, set on his card (v128). */
+  | { type: 'SET_PURCHASE_COVER'; cover: PurchaseCover }
   | { type: 'SET_SHOW_WHY'; on: boolean }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }

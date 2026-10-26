@@ -113,8 +113,9 @@ describe('the material a job is short of', () => {
 
   it('is the admin s and nobody else s, and she does the take off before it', () => {
     // The material list and its order are the admin's from Turn 26: the two desk trades that took
-    // them before her went (PIOTR, 02.10; CLAUDE.md T21 2.5.2, T26 2.9).
-    expect(MATERIAL_ORDER_ROLES).toEqual(['officeAdmin']);
+    // them before her went (PIOTR, 02.10; CLAUDE.md T21 2.5.2, T26 2.9). Flipped in v128: the
+    // purchase manager orders it first while he is at work, and she while he is not (PIOTR, 26.10).
+    expect(MATERIAL_ORDER_ROLES).toEqual(['purchaseManager', 'officeAdmin']);
     const withAdmin = drawnAndShort();
     const admin = officeManOn(withAdmin, 'officeAdmin', 'Ann');
     // She takes the take off off the owner, at his own speed, and then orders what it found.
