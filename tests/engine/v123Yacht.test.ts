@@ -13,7 +13,8 @@
 // of 14 m by 10 m by 12 m, a ten metre lane along it, every money figure the window line's ten times
 // over and a yacht the window's minutes sixteen times over (the house factory's figures twice over,
 // its twelve stations the house factory's six twice over), a yacht at £400,000 by the house's rule of
-// v115, ten engineers, the robots doing the work [TUNE: chat: all of it, for Piotr's word].
+// v115, ten engineers, the robots doing the work [TUNE: chat: all of it, for Piotr's word]. Flipped in
+// v129: a yacht at £600,000 [PIOTR, 26.10: "b"].
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -64,16 +65,15 @@ function page(html: string): HTMLElement {
 }
 
 describe('the yacht line in the table (v123)', () => {
-  it('is the window line ten times over in money and sixteen in minutes, a yacht at £400,000', () => {
+  it('is the window line ten times over in money and sixteen in minutes, a yacht at £600,000', () => {
     const yacht = LINE_KINDS.yacht;
     expect(LINE_KIND_ORDER).toEqual(['window', 'door', 'house', 'yacht']);
     expect(yacht.name).toBe('Yacht production line');
     expect([yacht.factor, yacht.minutesFactor]).toEqual([10, 16]);
     expect(linePriceOf('yacht')).toBe(100000000);
     expect(Object.values(yacht.shares)).toEqual([10, 10, 12.5, 12.5, 6.25, 6.25, 6.25, 6.25, 7.5, 7.5, 7.5, 7.5].map((m) => m * 1000000));
-    // The house's rule of v115: five thirds of the window's price times the factors, its material
-    // still the factors' own.
-    expect(lineUnitPriceOf('yacht')).toBe(400000);
+    // Its material still the factors' own; its price Piotr's of v129, in place of the house's rule.
+    expect(lineUnitPriceOf('yacht')).toBe(600000);
     expect(lineMaterialPerUnitOf('yacht')).toBe(96000);
     expect(yacht.boards * SHEET_VALUE + yacht.glass * glassUnitPrice()).toBe(96000);
     expect([yacht.boards, yacht.glass, yacht.palletUnits, yacht.engineers, yacht.laneCells]).toEqual([320, 160, 1, 10, 10]);
@@ -156,7 +156,7 @@ describe('its contract (v123)', () => {
     const offered = toWorkingMorning(yachtLine());
     expect(lineState(offered, 1).contract).not.toBeNull();
     expect(lineOfferBody(offered, 1)).toBe(
-      'A yacht dealer will take every yacht line 1 makes, at £400,000 a yacht. The timber and the glass cost ' +
+      'A yacht dealer will take every yacht line 1 makes, at £600,000 a yacht. The timber and the glass cost ' +
         '£96,000 a yacht, taken from your timber stores and glass racks: restock them on the Materials page, ' +
         'or the office does. The line makes one every 16 hours, about 2 a week, and the client collects each ' +
         "yacht from the line's lane the next working day. It runs until you end it.",
@@ -164,7 +164,7 @@ describe('its contract (v123)', () => {
     expect([lineWindowMinutes(offered, 1), lineWindowsAWeek(offered, 1)]).toEqual([960, 2]);
   });
 
-  it('makes a yacht off 320 boards and 160 glass units at £400,000, which waits on its lane, drawn from its file', () => {
+  it('makes a yacht off 320 boards and 160 glass units at £600,000, which waits on its lane, drawn from its file', () => {
     let state = toWorkingMorning(yachtLine());
     state.stock.boards = 1000;
     state.stock.glass = 500;
@@ -180,7 +180,7 @@ describe('its contract (v123)', () => {
     state = runClock(state, 15);
     expect(runningLineContract(state, 1)?.windowsMade).toBe(1);
     expect([boards - state.stock.boards, glass - state.stock.glass]).toEqual([320, 160]);
-    expect(state.ledger.find((entry) => entry.label === 'Yachts off line 1: yachts')?.amount).toBe(400000);
+    expect(state.ledger.find((entry) => entry.label === 'Yachts off line 1: yachts')?.amount).toBe(600000);
     expect(lineState(state, 1).palletsAtGate).toBe(1);
     const hall = page(renderHall(state));
     const yacht = hall.querySelector('[data-house-waiting="0"]');

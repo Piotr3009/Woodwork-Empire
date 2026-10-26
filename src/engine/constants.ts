@@ -243,7 +243,7 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v128';
+export const APP_VERSION = 'v129';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1043,11 +1043,12 @@ export const YACHT_LINE_FACTOR = 10;
 /** [TUNE: chat] A yacht takes a window's minutes times this: two working days a yacht at the start,
  *  160 minutes off it an upgrade, never under 320 minutes (v123). */
 export const YACHT_LINE_MINUTES_FACTOR = 16;
-/** [TUNE: chat: the house's rule of v115, 100,000 for its 60,000 (PIOTR, 19.10: "let the saving pay
- *  off"), five thirds of the window's price times the factors] What the yacht dealer pays for a
- *  yacht, in place of 240,000: its timber and glass stay its 320 boards and 160 units, 96,000, so a
- *  yacht keeps 304,000 (v123). */
-export const YACHT_PRICE = 400000;
+/** [PIOTR, 26.10: "the yacht has the same net profit as the houses, makes no sense"; "b": 600,000
+ *  in place of 400,000] What the yacht dealer pays for a yacht: its timber and glass stay its 320
+ *  boards and 160 units, 96,000, so a yacht keeps 504,000, and the line returns about 1.7 times what
+ *  the house factory does on each pound it cost (v129). It was 400,000 from v123, the house's rule of
+ *  v115 (five thirds of the window's price times the factors), which made the two return the same. */
+export const YACHT_PRICE = 600000;
 /** The yacht line's twelve stations in their order along it, two for each window module, each pair
  *  carrying that module's share in the same place ten times over between them: 10, 10, 12.5, 12.5,
  *  6.25 four times and 7.5 four times million, a hundred in all (v123). */
