@@ -1,6 +1,7 @@
 // The engine entry points. `tick` and `applyAction` clone the incoming state and return the clone:
 // callers never see their input mutated. Every other engine module mutates the state it is given.
 
+import { CHEAT_CASH_AMOUNT } from './constants';
 import {
   ACCIDENT_CHANCE_PER_DAY,
   ADMIN_COVER_RATE,
@@ -2784,6 +2785,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'DISMISS_TIP':
       if (!next.tips.seen.includes(action.key)) next.tips.seen.push(action.key);
+      break;
+    case 'CHEAT_CASH':
+      // Piotr's cheat [PIOTR, 28.10: "a code that adds a billion when I type it"]: one line on the
+      // books, under Other, so the money is seen where it came from (v131).
+      receive(next, 'other', 'Cheat: kasa', CHEAT_CASH_AMOUNT);
       break;
     default:
       break;

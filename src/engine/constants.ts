@@ -243,7 +243,11 @@ export const STATE_VERSION = 53;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v130';
+export const APP_VERSION = 'v131';
+/** [PIOTR, 28.10] What the cheat `kasa` puts into the account: a billion pounds (v131). */
+export const CHEAT_CASH_AMOUNT = 1000000000;
+/** [PIOTR, 28.10] The word typed in the game, outside any field, that adds it (v131). */
+export const CHEAT_CASH_WORD = 'kasa';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of

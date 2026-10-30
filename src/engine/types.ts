@@ -1812,4 +1812,7 @@ export type GameAction =
   | { type: 'QUEUE_TASK_NEXT'; taskId: string }
   /** The master volume and the mute, off the Settings modal (CLAUDE.md T19 2.10). */
   | { type: 'SET_SOUND'; volume?: number; muted?: boolean }
-  | { type: 'DISMISS_TIP'; key: string };
+  | { type: 'DISMISS_TIP'; key: string }
+  /** Piotr's cheat: a billion pounds into the account, typed as `kasa` in the game [PIOTR, 28.10]
+   *  (v131). */
+  | { type: 'CHEAT_CASH' };

@@ -65,6 +65,7 @@ import {
   zoomAt,
   zoomTo,
 } from '../render/hall';
+import { CHEAT_CASH_WORD } from '../engine/constants';
 import {
   APP_VERSION,
   HOUSE_CARD_SECONDS,
@@ -2716,6 +2717,16 @@ function runKeyDown(event: KeyboardEvent): void {
   // running knobs. They do exactly what a click on the knob does, and nothing at all while a
   // field has the caret or before there is a game to run (CLAUDE.md T18 2.8).
   if (state !== null && !typingInAField()) {
+    // Piotr's cheat: `kasa` typed anywhere in the game, outside a field, adds a billion [PIOTR,
+    // 28.10] (v131).
+    if (event.key.length === 1) {
+      typedLetters = (typedLetters + event.key.toLowerCase()).slice(-CHEAT_CASH_WORD.length);
+      if (typedLetters === CHEAT_CASH_WORD) {
+        typedLetters = '';
+        dispatch({ type: 'CHEAT_CASH' });
+        return;
+      }
+    }
     if (event.key === 'p' || event.key === 'P') {
       togglePause();
       return;
@@ -2779,6 +2790,8 @@ function cellUnder(event: MouseEvent): { x: number; y: number } | null {
 /** True while the space bar is down: the player is asking to push the hall about, whatever the
  *  pointer is over (CLAUDE.md T6 3.3). */
 let spaceHeld = false;
+/** The last letters typed in the game, for the cheat word (v131). */
+let typedLetters = '';
 
 /** The wheel over the hall zooms about the pointer, from the fit to four times it. */
 function onWheel(event: WheelEvent): void {
